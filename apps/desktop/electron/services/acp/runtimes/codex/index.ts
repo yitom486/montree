@@ -4,7 +4,7 @@ import type { CodexAuthPreflight } from '@inkdown/contracts'
 import {
   buildCustomProviderConfigToml,
   buildCustomProviderSpawnEnv,
-} from '@inkdown/acp'
+} from "@yitom/acp-client"
 import { probeCodexAuth } from './codex-auth-preflight'
 import {
   getAcpProviderCodexHome,

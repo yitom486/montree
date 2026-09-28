@@ -6,7 +6,7 @@ import type {
   AcpSetConfigOptionResult,
 } from '@inkdown/contracts'
 import { methods } from '@agentclientprotocol/sdk'
-import { parseAcpConfigOptions } from '@inkdown/acp'
+import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
 import {
   startTocMcpServer,

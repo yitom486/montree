@@ -1,6 +1,6 @@
 import { RequestError } from '@agentclientprotocol/sdk'
 import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@inkdown/contracts'
-import { mergeTopLevelModelsIntoConfigOptions } from '@inkdown/acp'
+import { mergeTopLevelModelsIntoConfigOptions } from "@yitom/acp-client"
 
 export type AcpRpcRequest = (method: string, params?: unknown) => Promise<unknown>
 

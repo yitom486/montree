@@ -14,7 +14,7 @@ export {
   cursorAdapter,
   deepseekAdapter,
   agyAdapter,
-} from '@inkdown/acp'
+} from "@yitom/acp-client"
 
 export * from './codex'
 export * from './claude'

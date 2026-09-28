@@ -6,12 +6,10 @@
       "@inkdown/reader-core": ["./packages/reader-core/src/index.ts"],
       "@inkdown/pdf": ["./packages/pdf/src/index.ts"],
       "@inkdown/ocr-core": ["./packages/ocr-core/src/index.ts"],
-      "@inkdown/acp": ["./packages/acp/src/index.ts"],
-      "@yitom/acp-client": ["./packages/acp/src/index.ts"],
       "@inkdown/annotations": ["./packages/annotations/src/index.ts"],
       "@inkdown/web-doc": ["./packages/web-doc/src/index.ts"]
     },
     "types": ["electron-vite/node"]
   },
-  "include": ["apps/desktop/electron/**/*", "apps/desktop/electron.vite.config.ts", "packages/contracts/src/**/*", "packages/reader-core/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/acp/src/**/*", "packages/annotations/src/**/*", "packages/web-doc/src/**/*"]
+  "include": ["apps/desktop/electron/**/*", "apps/desktop/electron.vite.config.ts", "packages/contracts/src/**/*", "packages/reader-core/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/annotations/src/**/*", "packages/web-doc/src/**/*"]
 }

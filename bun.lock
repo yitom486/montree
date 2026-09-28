@@ -22,6 +22,7 @@
         "@lezer/common": "^1.5.2",
         "@tanstack/react-query": "^5.102.8",
         "@vscode/markdown-it-katex": "^1.1.2",
+        "@yitom/acp-client": "D:/project/js/acp-client/yitom-acp-client-0.1.0.tgz",
         "codemirror": "^6.0.2",
         "dompurify": "^3.4.14",
         "electron-updater": "^6.8.9",
@@ -65,13 +66,6 @@
         "typescript": "^7.0.2",
         "vite": "^8.2.2",
         "vitest": "^4.1.11",
-      },
-    },
-    "packages/acp": {
-      "name": "@inkdown/acp",
-      "version": "0.0.0",
-      "dependencies": {
-        "@inkdown/contracts": "workspace:*",
       },
     },
     "packages/annotations": {
@@ -325,8 +319,6 @@
     "@iconify/types": ["@iconify/types@2.0.0", "", {}, "sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg=="],
 
     "@iconify/utils": ["@iconify/utils@3.1.4", "", { "dependencies": { "@antfu/install-pkg": "^1.1.0", "@iconify/types": "^2.0.0", "import-meta-resolve": "^4.2.0" } }, "sha512-b1S7B1k9ohZ+iNTi2ATxbRYG9fTrJmUT0rc46bvVnNxqNRGW7dyo/vRREwyniI5IRN2RSJHDcm+s3BjWrSAjHw=="],
-
-    "@inkdown/acp": ["@inkdown/acp@workspace:packages/acp"],
 
     "@inkdown/annotations": ["@inkdown/annotations@workspace:packages/annotations"],
 
@@ -791,6 +783,8 @@
     "@vscode/markdown-it-katex": ["@vscode/markdown-it-katex@1.1.2", "", { "dependencies": { "katex": "^0.16.4" } }, "sha512-+4IIv5PgrmhKvW/3LpkpkGg257OViEhXkOOgCyj5KMsjsOfnRXkni8XAuuF9Ui5p3B8WnUovlDXAQNb8RJ/RaQ=="],
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.15", "", {}, "sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA=="],
+
+    "@yitom/acp-client": ["@yitom/acp-client@D:/project/js/acp-client/yitom-acp-client-0.1.0.tgz", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" } }, "sha512-StxK2w6HNBzWZelmZ5Hm002oXGEoPq6yXFzpi2LOJyQRx2/AmMtyl8H+zQj47+bOUNDBTWcLf7sKpkqRNbnfqQ=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 

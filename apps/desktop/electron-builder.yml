@@ -29,7 +29,8 @@ files:
   # pdf-inspector Node 绑定（主进程分类/抽取/OCR）与其平台二进制包
   - node_modules/@firecrawl/pdf-inspector/**/*
   - node_modules/@firecrawl/pdf-inspector-*/**/*
-  # ACP 官方 SDK（主进程 external 运行时依赖）与其 peer zod
+  # ACP 客户端与官方 SDK（主进程 external 运行时依赖）与其 peer zod
+  - node_modules/@yitom/acp-client/**/*
   - node_modules/@agentclientprotocol/sdk/**/*
   - node_modules/zod/**/*
   - '!node_modules/{@codemirror,codemirror,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'

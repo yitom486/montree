@@ -165,7 +165,7 @@ import {
 } from '../services/ocr/ocr-component-manager'
 import { getWindowSessionByWebContents } from '../window/window-session'
 import { setWorkspaceWatch, stopWorkspaceWatch } from '../services/workspace-watcher'
-import { listAcpRuntimes } from '@inkdown/acp'
+import { listAcpRuntimes } from "@yitom/acp-client"
 import {
   emptyAcpAuthPreflight,
   isCodexPreflightRuntime,

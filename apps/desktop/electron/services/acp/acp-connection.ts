@@ -15,18 +15,18 @@ import {
   methods,
   type InitializeResponse,
 } from '@agentclientprotocol/sdk'
-import { getAcpRuntime } from '@inkdown/acp'
+import { getAcpRuntime } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
-import { parseAcpConfigOptions } from '@inkdown/acp'
+import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { registerAcpClientHandlers } from './client-handlers'
 import { buildAcpProxySpawnEnv, readAcpProxySettings } from './acp-proxy-service'
-import { runConnectAuthGate } from '@inkdown/acp'
+import { runConnectAuthGate } from "@yitom/acp-client"
 import {
   parseLoadSessionSupported,
   parseMcpHttpSupported,
   parsePromptCapabilities,
   parseResumeSessionSupported,
-} from '@inkdown/acp'
+} from "@yitom/acp-client"
 import {
   startInkdownMcpServer,
   stopInkdownMcpServer,

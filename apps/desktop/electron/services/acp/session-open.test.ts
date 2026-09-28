@@ -316,7 +316,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     })
 
     expect(result.sessionId).toBe('dsh-1')
-    const { parseAcpConfigOptions } = await import('@inkdown/acp')
+    const { parseAcpConfigOptions } = await import("@yitom/acp-client")
     const parsed = parseAcpConfigOptions(result.configOptions)
     expect(parsed.find((o) => o.configId === 'model')?.options?.map((o) => o.value)).toEqual([
       'd1',
@@ -346,7 +346,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     })
 
     expect(result.restoreMethod).toBe('load')
-    const { parseAcpConfigOptions } = await import('@inkdown/acp')
+    const { parseAcpConfigOptions } = await import("@yitom/acp-client")
     const parsed = parseAcpConfigOptions(result.configOptions)
     expect(parsed.find((o) => o.configId === 'model')?.currentValue).toBe('a')
   })
