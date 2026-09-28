@@ -55,7 +55,7 @@
     "@lezer/common": "^1.5.2",
     "@tanstack/react-query": "^5.102.8",
     "@vscode/markdown-it-katex": "^1.1.2",
-    "@yitom/acp-client": "D:/project/js/acp-client/yitom-acp-client-0.1.0.tgz",
+    "@yitom/acp-client": "0.1.0",
     "codemirror": "^6.0.2",
     "dompurify": "^3.4.14",
     "electron-updater": "^6.8.9",

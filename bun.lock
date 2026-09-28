@@ -22,7 +22,7 @@
         "@lezer/common": "^1.5.2",
         "@tanstack/react-query": "^5.102.8",
         "@vscode/markdown-it-katex": "^1.1.2",
-        "@yitom/acp-client": "D:/project/js/acp-client/yitom-acp-client-0.1.0.tgz",
+        "@yitom/acp-client": "0.1.0",
         "codemirror": "^6.0.2",
         "dompurify": "^3.4.14",
         "electron-updater": "^6.8.9",
@@ -784,7 +784,7 @@
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.15", "", {}, "sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA=="],
 
-    "@yitom/acp-client": ["@yitom/acp-client@D:/project/js/acp-client/yitom-acp-client-0.1.0.tgz", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" } }, "sha512-StxK2w6HNBzWZelmZ5Hm002oXGEoPq6yXFzpi2LOJyQRx2/AmMtyl8H+zQj47+bOUNDBTWcLf7sKpkqRNbnfqQ=="],
+    "@yitom/acp-client": ["@yitom/acp-client@0.1.0", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" } }, "sha512-O4xWVKZ0Y8MYyWIKvd+RwxtEPhVq8i0o4LvUSab/Y9bvRglML4lUPeivK4XWNOH4N5ZPXQv66OfdJIEJR26Gvw=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 
