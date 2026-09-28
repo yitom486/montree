@@ -47,7 +47,7 @@ apps/desktop/e2e/        # Playwright E2E（见该目录 README）
 apps/desktop/resources/  # 图标等构建资源（`icon.png`/`icon.ico`）
 apps/desktop/electron.vite.config.ts | electron-builder.yml | playwright.config.ts  # 三配置已搬入 apps/desktop/，根命令经 --config 引用
 shared/          # 已清空：仅剩无文件空目录，阶段 10 删除；新代码禁止引用
-packages/        # `@inkdown/*` 私有 workspace 包：contracts / acp / reader-core / pdf / ocr-core / annotations / web-doc（不独立发版）
+packages/        # `@inkdown/*` 私有 workspace 包：contracts / reader-core / pdf / ocr-core / annotations / web-doc（不独立发版；ACP 已独立为外部包 `@yitom/acp-client`）
 scripts/ | third-party/  # 留守根（含手搓 JSON-RPC 教学归档，三无隔离，禁被正式 import）
 out/             # 留守根：构建输出（main / preload / renderer）；release/ 亦落根
 .plan/           # 本地计划（已 gitignore，不提交）
@@ -56,7 +56,7 @@ out/             # 留守根：构建输出（main / preload / renderer）；rel
 
 渲染进程总览：[`apps/desktop/src/README.md`](./apps/desktop/src/README.md)。主进程：[`apps/desktop/electron/README.md`](./apps/desktop/electron/README.md)。
 
-ACP（阶段 A/B/C）：协议纯逻辑在 `packages/acp/`（`@inkdown/acp`：传输/认证/会话/MCP）；主进程 `apps/desktop/electron/services/acp/` 仅留守 client/manager/terminal/fs/preflight/router/session-open + `apps/desktop/src/api/acp-api.ts` + `AgentPanel`；协议 v1，默认 `codex-acp`。  
+ACP（阶段 A/B/C）：协议与客户端底层纯逻辑已独立至 `@yitom/acp-client`（传输/认证/会话/多运行时适配/MCP）；主进程 `apps/desktop/electron/services/acp/` 留守接入桥接 + `apps/desktop/src/api/acp-api.ts` + `AgentPanel`；协议 v1，默认 `codex-acp`。  
 UI：**壳自研、皮复用**（shadcn + 可选开源消息渲染）；认证：**复用 `~/.codex` / ACP authMethods**（对齐 VS Code / Zed）。细则见本地 `.plan/`（若有）。
 
 路径别名：`@/` → `apps/desktop/src/`，`@inkdown/*` → `packages/*/src/index.ts`，`@foliate` → `third-party/foliate-js`；`@shared/` → `shared/` 已废弃（渲染/测试已剔除，新代码禁用）。
