@@ -1,13 +1,31 @@
 {
-  "name": "@inkdown/acp",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@yitom/acp-client",
+  "version": "0.1.0",
+  "description": "Headless ACP (Agent Client Protocol) SDK for connecting to Codex, Claude, Cursor, DeepSeek and more",
   "type": "module",
-  "dependencies": {
-    "@inkdown/contracts": "workspace:*"
-  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
     "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target node --external @agentclientprotocol/sdk && bun build ./src/index.ts --outfile ./dist/index.cjs --format cjs --target node --external @agentclientprotocol/sdk && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@inkdown/contracts": "workspace:*"
   }
 }

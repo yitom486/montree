@@ -10,6 +10,7 @@
       "@inkdown/pdf": ["./packages/pdf/src/index.ts"],
       "@inkdown/ocr-core": ["./packages/ocr-core/src/index.ts"],
       "@inkdown/acp": ["./packages/acp/src/index.ts"],
+      "@yitom/acp-client": ["./packages/acp/src/index.ts"],
       "@inkdown/annotations": ["./packages/annotations/src/index.ts"],
       "@inkdown/web-doc": ["./packages/web-doc/src/index.ts"]
     },

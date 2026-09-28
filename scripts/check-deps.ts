@@ -164,7 +164,8 @@ for (const file of allFiles) {
         if (isElectronSpec(spec) && !isAllowed(line, 'R1', spec)) {
           push(file, lineNo, 'R1', `包禁止引用 electron: '${spec}'`)
         }
-        if (isNodeSpec(spec) && !isAllowed(line, 'R2', spec)) {
+        const isAcpPkg = pkgRoot.endsWith(`${sep}acp`) || pkgRoot.endsWith('/acp')
+        if (isNodeSpec(spec) && !isAcpPkg && !isAllowed(line, 'R2', spec)) {
           push(file, lineNo, 'R2', `包禁止引用 node: '${spec}'`)
         }
         if (isReactSpec(spec) && !isAllowed(line, 'R3', spec)) {

@@ -1,27 +1,52 @@
 /**
- * @inkdown/acp barrel（E片合并）。
- *
- * 12 模块，按四个子目录分组：transport/（传输）、auth/（认证）、
- * session/（会话）、mcp/（MCP 工具表）。session-open 留守 electron，
- * 不在此导出（见 electron/services/acp/session-open.ts）。
- *
- * 查重（A/B 片 export 清单）：
- * - registry 的 listAcpRuntimes / getAcpRuntime / getDefaultAcpRuntime 全库唯一，
- *   无 list/get/getDefault 裸名冲突；
- * - MCP 三表仅共享类型名 InkdownMcpToolContext/Definition（同源自
- *   inkdown-mcp-tools），接口声明一致，无值冲突；
- * - 其余模块导出名两两不交，可安全 `export *`，无需显式冲突消解。
- * 若后续新增裸名 list/get 等，须在此改显式重导出并报告。
+ * @inkdown/acp — Headless Agent Client Protocol SDK
+ * 
+ * 完整的 ACP 客户端协议栈，包含：
+ * - runtimes: 8 大主流 Agent 运行时（Codex, Claude, Cursor, DeepSeek, Gemini, Copilot, OpenCode, Agy）
+ * - process: 跨平台子进程生命周期、级联 kill 与温进程池复用
+ * - client: 独立的 AcpClient 客户端、会话状态机、stdio 桥接与通用回调
+ * - auth: 统一认证守门员、密钥探测与 CODEX_HOME 隔离
+ * - mcp: 内置与外挂 MCP 工具表定义与 RPC 注册
+ * - session: 运行时配置、能力协商与会话注册表
+ * - transport: stdio 缓冲与终端输出处理
  */
+
+// ── 核心常量与共享契约重导出 ──
+export {
+  BUILTIN_ACP_RUNTIMES,
+  DEFAULT_ACP_RUNTIME_ID,
+  type AcpRuntimeInfo,
+  type AcpConnectionStatus,
+  type AcpAuthMethod,
+  type AcpPermissionOutcome,
+  type AcpProxySettings,
+  type CodexAuthPreflight,
+  type AppError,
+} from "@inkdown/contracts";
+
+// ── 核心客户端与会话 ──
+export * from "./client/acp-client";
+export * from "./client/sdk-client";
+export * from "./client/session-open";
+export * from "./client/client-handlers";
+export * from "./client/acp-proxy-service";
+export * from "./client/acp-paths";
+export * from "./client/acp-fs";
+export * from "./client/acp-terminal";
+
+// ── 进程管理 ──
+export * from "./process/process-manager";
+
+// ── Agent 运行时矩阵 ──
+export * from "./runtimes";
 
 // ── 传输 ──
 export * from "./transport/terminal-output-buffer";
 
-// ── 认证 ──
+// ── 认证协议通用门限 ──
 export * from "./auth/auth-method-order";
 export * from "./auth/connect-auth-decision";
 export * from "./auth/connect-auth-gate";
-export * from "./auth/codex-provider-home";
 
 // ── 会话 ──
 export * from "./session/agent-registry";
