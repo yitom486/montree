@@ -161,7 +161,7 @@ export function mergeTopLevelModelsIntoConfigOptions(
     ...(synthesized.currentValue !== undefined
       ? { currentValue: synthesized.currentValue }
       : {}),
-    options: synthesized.options?.map((o) => ({ value: o.value, name: o.name })),
+    options: synthesized.options?.map((o: AcpConfigOptionValue) => ({ value: o.value, name: o.name })),
   })
   return base
 }
