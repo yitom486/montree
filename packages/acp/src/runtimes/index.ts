@@ -1,5 +1,5 @@
-import type { AcpAuthMethod, AcpProxySettings, CodexAuthPreflight } from '@inkdown/contracts'
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import type { AcpAuthMethod, AcpProxySettings, CodexAuthPreflight } from "../contracts"
+import { DEFAULT_ACP_RUNTIME_ID } from "../contracts"
 import { codexAdapter } from './codex'
 import { emptyAcpAuthPreflight } from './codex/codex-auth-preflight'
 import { claudeAdapter } from './claude'

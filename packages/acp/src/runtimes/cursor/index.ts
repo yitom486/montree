@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
-import type { AcpAuthMethod, CodexAuthPreflight } from '@inkdown/contracts'
+import type { AcpAuthMethod, CodexAuthPreflight } from "../../contracts"
 import type { GenericRuntimeAdapter } from '../index'
 
 /**

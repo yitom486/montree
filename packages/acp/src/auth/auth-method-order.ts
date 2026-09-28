@@ -1,5 +1,5 @@
-import type { AcpAuthMethod } from '@inkdown/contracts'
-import type { CodexAuthPreflight } from '@inkdown/contracts'
+import type { AcpAuthMethod } from "../contracts"
+import type { CodexAuthPreflight } from "../contracts"
 
 function methodKey(method: AcpAuthMethod): string {
   return `${method.id} ${method.type ?? ''} ${method.name ?? ''}`.toLowerCase()

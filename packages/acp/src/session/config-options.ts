@@ -1,4 +1,4 @@
-import type { AcpConfigOption, AcpConfigOptionValue } from '@inkdown/contracts'
+import type { AcpConfigOption, AcpConfigOptionValue } from "../contracts"
 
 /** 选项值 coercion：string 原样（空串视为缺失），number/boolean 转 string；其余返回 null。 */
 function coerceOptionValue(raw: unknown): string | null {

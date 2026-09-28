@@ -1,5 +1,5 @@
 import { RequestError } from '@agentclientprotocol/sdk'
-import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@inkdown/contracts'
+import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from "../contracts"
 import { mergeTopLevelModelsIntoConfigOptions } from '../session/config-options'
 
 export type AcpRpcRequest = (method: string, params?: unknown) => Promise<unknown>

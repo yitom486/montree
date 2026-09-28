@@ -54,6 +54,7 @@ export interface InkdownSnapshotArgs {
   entry?: unknown
   /** toc-draft-write delete：按序号或标题 */
   index?: number
+  [key: string]: unknown
 }
 
 /** 常规快照应在毫秒级返回 */

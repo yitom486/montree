@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AcpProxySettings, AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import type { AcpProxySettings, AppError } from "../contracts"
+import { err, ok, type Result } from "../contracts"
 import { getDefaultAgentDataDir } from './acp-paths'
 
 /**

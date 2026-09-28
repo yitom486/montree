@@ -1,4 +1,4 @@
-import type { AcpProviderConfig } from '@inkdown/contracts'
+import type { AcpProviderConfig } from "../../contracts"
 
 /**
  * 自定义供应商专用 CODEX_HOME 内生成的 provider id。

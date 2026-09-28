@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
-import type { AcpRuntimeInfo } from '@inkdown/contracts'
+import type { AcpRuntimeInfo } from "../contracts"
 
 export interface SpawnedAcpProcess {
   runtimeId: string

@@ -16,9 +16,9 @@ import type {
   AppError,
   CodexAuthPreflight,
   InkdownVirtualResource,
-} from '@inkdown/contracts'
-import { DEFAULT_ACP_RUNTIME_ID, err, ok, type Result } from '@inkdown/contracts'
-import { findBuiltinAcpRuntime } from '@inkdown/contracts'
+} from "../contracts"
+import { DEFAULT_ACP_RUNTIME_ID, err, ok, type Result } from "../contracts"
+import { findBuiltinAcpRuntime } from "../contracts"
 import { getAcpRuntimeAdapter, type AcpRuntimeAdapter } from '../runtimes'
 import {
   getLiveAcpProcess,

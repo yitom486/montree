@@ -2,8 +2,8 @@ import {
   BUILTIN_ACP_RUNTIMES,
   DEFAULT_ACP_RUNTIME_ID,
   findBuiltinAcpRuntime,
-} from '@inkdown/contracts'
-import type { AcpRuntimeInfo } from '@inkdown/contracts'
+} from "../contracts"
+import type { AcpRuntimeInfo } from "../contracts"
 
 export function listAcpRuntimes(): AcpRuntimeInfo[] {
   return [...BUILTIN_ACP_RUNTIMES]

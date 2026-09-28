@@ -12,17 +12,7 @@
  */
 
 // ── 核心常量与共享契约重导出 ──
-export {
-  BUILTIN_ACP_RUNTIMES,
-  DEFAULT_ACP_RUNTIME_ID,
-  type AcpRuntimeInfo,
-  type AcpConnectionStatus,
-  type AcpAuthMethod,
-  type AcpPermissionOutcome,
-  type AcpProxySettings,
-  type CodexAuthPreflight,
-  type AppError,
-} from "@inkdown/contracts";
+export * from "./contracts";
 
 // ── 核心客户端与会话 ──
 export * from "./client/acp-client";

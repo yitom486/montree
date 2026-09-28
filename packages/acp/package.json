@@ -24,8 +24,5 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.0.0"
-  },
-  "devDependencies": {
-    "@inkdown/contracts": "workspace:*"
   }
 }

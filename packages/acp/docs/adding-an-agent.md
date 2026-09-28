@@ -52,7 +52,7 @@ export interface GenericRuntimeAdapter {
 
 ```typescript
 // packages/acp/src/runtimes/ollama/index.ts
-import type { CodexAuthPreflight } from '@inkdown/contracts'
+import type { CodexAuthPreflight } from '@yitom/acp-client'
 import type { GenericRuntimeAdapter } from '../index'
 
 export function probeOllamaAuth(): CodexAuthPreflight {

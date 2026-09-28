@@ -6,8 +6,8 @@ import type {
   AcpProviderSavePayload,
   AcpProviderStatus,
   AppError,
-} from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+} from "../../contracts"
+import { err, ok, type Result } from "../../contracts"
 import { getDefaultAgentDataDir } from '../../client/acp-paths'
 
 export interface StoredAcpProvider extends AcpProviderConfig {

@@ -1,6 +1,6 @@
 /** 从 initialize 的 agentCapabilities 解析会话恢复与 prompt 能力 */
 
-import type { AcpPromptCapabilities } from '@inkdown/contracts'
+import type { AcpPromptCapabilities } from "../contracts"
 
 export function parseLoadSessionSupported(caps: Record<string, unknown>): boolean {
   return caps.loadSession === true

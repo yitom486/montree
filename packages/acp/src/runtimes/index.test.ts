@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BUILTIN_ACP_RUNTIMES, DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { BUILTIN_ACP_RUNTIMES, DEFAULT_ACP_RUNTIME_ID } from "../contracts"
 import { getAcpRuntimeAdapter } from './index'
 import { resolveCursorCommand } from './cursor'
 

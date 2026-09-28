@@ -4,7 +4,7 @@ import {
   parseInkdownVirtualPath,
   type AcpPermissionOutcome,
   type InkdownVirtualResource,
-} from '@inkdown/contracts'
+} from "../contracts"
 import { methods, RequestError, type ClientApp } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from './acp-terminal'

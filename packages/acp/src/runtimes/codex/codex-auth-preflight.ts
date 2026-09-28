@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { CodexAuthPreflight } from '@inkdown/contracts'
+import type { CodexAuthPreflight } from "../../contracts"
 
 export type { CodexAuthPreflight }
 
