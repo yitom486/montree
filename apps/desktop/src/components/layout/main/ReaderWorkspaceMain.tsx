@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react'
 import { Loader2 } from 'lucide-react'
-import { FileBreadcrumb } from '@/components/layout/panels/FileBreadcrumb'
 import type { ReaderDocumentKind } from '@inkdown/contracts'
 import type { AppTheme } from '@/stores/editor-ui-store'
 
@@ -28,7 +27,6 @@ export function ReaderWorkspaceMain({
 }: ReaderWorkspaceMainProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <FileBreadcrumb filePath={filePath} isDirty={false} />
       <main className="min-h-0 flex-1 bg-editor">
         <Suspense
           fallback={

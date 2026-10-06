@@ -144,4 +144,36 @@ export const appApi = {
   onWorkspaceChanged(callback: (payload: { rootPath: string }) => void): (() => void) | undefined {
     return getElectronAPI()?.onWorkspaceChanged(callback)
   },
+
+  /** 判断是否运行在 Electron 桌面环境中 */
+  isElectron(): boolean {
+    return Boolean(getElectronAPI())
+  },
+
+  /** 最小化当前窗口 */
+  minimizeWindow(): void {
+    getElectronAPI()?.minimizeWindow?.()
+  },
+
+  /** 切换最大化 / 还原当前窗口 */
+  toggleMaximizeWindow(): void {
+    getElectronAPI()?.toggleMaximizeWindow?.()
+  },
+
+  /** 关闭当前窗口（走保存确认） */
+  closeWindow(): void {
+    getElectronAPI()?.closeWindow?.()
+  },
+
+  /** 获取当前窗口是否最大化 */
+  async isWindowMaximized(): Promise<boolean> {
+    const api = getElectronAPI()
+    if (!api?.isWindowMaximized) return false
+    return api.isWindowMaximized()
+  },
+
+  /** 监听窗口最大化状态变更；返回取消订阅 */
+  onWindowMaximizeChanged(callback: (isMaximized: boolean) => void): (() => void) | undefined {
+    return getElectronAPI()?.onWindowMaximizeChanged?.(callback)
+  },
 }

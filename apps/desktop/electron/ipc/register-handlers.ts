@@ -517,6 +517,36 @@ export function registerIpcHandlers(): void {
     app.quit()
   })
 
+  ipcMain.on(IPC.APP_WINDOW_MINIMIZE, (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+    if (targetWindow && !targetWindow.isDestroyed()) {
+      targetWindow.minimize()
+    }
+  })
+
+  ipcMain.on(IPC.APP_WINDOW_TOGGLE_MAXIMIZE, (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+    if (targetWindow && !targetWindow.isDestroyed()) {
+      if (targetWindow.isMaximized()) {
+        targetWindow.unmaximize()
+      } else {
+        targetWindow.maximize()
+      }
+    }
+  })
+
+  ipcMain.on(IPC.APP_WINDOW_CLOSE, (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+    if (targetWindow && !targetWindow.isDestroyed()) {
+      targetWindow.close()
+    }
+  })
+
+  ipcMain.handle(IPC.APP_WINDOW_IS_MAXIMIZED, (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+    return Boolean(targetWindow && !targetWindow.isDestroyed() && targetWindow.isMaximized())
+  })
+
   ipcMain.on(IPC.APP_NEW_WINDOW, () => {
     createWindow({ fresh: true })
   })

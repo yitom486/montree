@@ -78,6 +78,7 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
     backgroundColor: '#1e1e1e',
     title: APP_TITLE,
     icon: windowIcon,
@@ -100,6 +101,18 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
   session.closeController = createWindowCloseHandlers(session)
   registerWindowSession(session)
   const disposeDevIconWatcher = watchDevAppIcon(window, iconPath)
+
+  window.on('maximize', () => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(IPC.APP_WINDOW_MAXIMIZE_CHANGED, true)
+    }
+  })
+
+  window.on('unmaximize', () => {
+    if (!window.isDestroyed()) {
+      window.webContents.send(IPC.APP_WINDOW_MAXIMIZE_CHANGED, false)
+    }
+  })
 
   window.on('ready-to-show', () => {
     // 保留 Application Menu 的 editMenu 角色（Ctrl+C/V）；仅隐藏菜单栏

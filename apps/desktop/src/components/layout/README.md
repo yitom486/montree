@@ -6,7 +6,8 @@
 
 | 文件 | 功能 |
 |------|------|
-| `WorkspaceShell` | ActivityBar + 可折叠侧栏 + 主区 + Agent 面板（顶栏 TitleBar 已删除，入口收进资源管理器 ⋯ 菜单） |
+| `AppTitleBar` | VS Code 风格统一自绘顶栏（无边框窗口融合、主题对齐、Command Center 居中胶囊标题、窗口控制三键与快捷工具） |
+| `WorkspaceShell` | ActivityBar + 可折叠侧栏 + 主区 + Agent 面板 + AppTitleBar 顶栏 |
 | `ActivityBar` | 左侧活动条 |
 | `Sidebar` | 侧栏（装配 panels/ 的内容面板） |
 | `SplitPane` | 通用分栏容器 |

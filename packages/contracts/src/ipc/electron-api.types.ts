@@ -145,6 +145,16 @@ export interface ElectronAPI {
   /** 回复主进程的关窗请求：继续关闭或取消 */
   confirmClose: (decision: 'proceed' | 'cancel') => void
   /* ===== 应用与窗口：关闭流程 / 快捷动作 ===== */
+  /** 最小化窗口 */
+  minimizeWindow: () => void
+  /** 切换最大化 / 还原窗口 */
+  toggleMaximizeWindow: () => void
+  /** 关闭窗口（走保存确认） */
+  closeWindow: () => void
+  /** 获取当前窗口是否最大化 */
+  isWindowMaximized: () => Promise<boolean>
+  /** 监听窗口最大化状态变更；返回取消订阅 */
+  onWindowMaximizeChanged: (callback: (isMaximized: boolean) => void) => () => void
   /** 监听主进程「请关闭窗口」；返回取消订阅 */
   onRequestClose: (callback: () => void) => () => void
   /** 监听主进程全局快捷键动作（quick-open / find / replace 等）；返回取消订阅 */

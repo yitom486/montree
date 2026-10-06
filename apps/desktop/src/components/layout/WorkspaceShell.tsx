@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
+import { AppTitleBar } from '@/components/layout/AppTitleBar'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { AgentPanel, useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
 import { FloatingAIHud } from '@/components/agent/FloatingAIHud'
@@ -29,6 +30,7 @@ export interface WorkspaceShellProps {
   workspaceRoot?: string
   fileTree: FileTreeNode[]
   activeFilePath?: string
+  isDirty?: boolean
   webPageUrl?: string | null
   recentWebUrls?: string[]
   recentFiles: string[]
@@ -99,7 +101,10 @@ export function WorkspaceShell({
   onQuit,
   children,
   suppressDockedAgent = false,
+  isDirty = false,
 }: WorkspaceShellProps) {
+  const theme = useEditorUiStore((state) => state.theme)
+  const cycleTheme = useEditorUiStore((state) => state.cycleTheme)
   const sidebarVisible = useEditorUiStore((state) => state.sidebarVisible)
   const setSidebarVisible = useEditorUiStore((state) => state.setSidebarVisible)
   const toggleSidebar = useEditorUiStore((state) => state.toggleSidebar)
@@ -168,7 +173,22 @@ export function WorkspaceShell({
   }, [handleToggleAgentPanel, zenMode, setZenMode, toggleZenMode])
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
+      {!zenMode && (
+        <AppTitleBar
+          activeFilePath={activeFilePath}
+          isDirty={isDirty}
+          sidebarVisible={sidebarVisible}
+          onToggleSidebar={handleToggleSidebar}
+          onQuickOpen={onQuickOpen}
+          onToggleAgentPanel={handleToggleAgentPanel}
+          agentPanelOpen={agentPanelOpen}
+          theme={theme}
+          onCycleTheme={cycleTheme}
+          onOpenSettings={onOpenSettings}
+        />
+      )}
+
       <div className="flex min-h-0 flex-1">
         {!zenMode && (
           <ActivityBar

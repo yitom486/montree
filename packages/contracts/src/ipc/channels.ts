@@ -37,6 +37,16 @@ export const IPC = {
   APP_GET_WINDOW_INIT: 'app:get-window-init',
   /** invoke：用系统默认浏览器打开外链 */
   APP_OPEN_EXTERNAL: 'app:open-external',
+  /** send：最小化当前窗口 */
+  APP_WINDOW_MINIMIZE: 'app:window-minimize',
+  /** send：切换最大化 / 还原当前窗口 */
+  APP_WINDOW_TOGGLE_MAXIMIZE: 'app:window-toggle-maximize',
+  /** send：关闭当前窗口（走保存确认） */
+  APP_WINDOW_CLOSE: 'app:window-close',
+  /** invoke：查询当前窗口是否最大化 */
+  APP_WINDOW_IS_MAXIMIZED: 'app:window-is-maximized',
+  /** main→renderer：窗口最大化状态变更推送 */
+  APP_WINDOW_MAXIMIZE_CHANGED: 'app:window-maximize-changed',
 
   /* ================================================================
    * 应用更新（app:update-*）

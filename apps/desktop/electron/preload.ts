@@ -29,6 +29,23 @@ const electronAPI: ElectronAPI = {
   confirmClose: (decision: 'proceed' | 'cancel') => {
     ipcRenderer.send(IPC.APP_CLOSE_DECISION, decision)
   },
+  minimizeWindow: () => {
+    ipcRenderer.send(IPC.APP_WINDOW_MINIMIZE)
+  },
+  toggleMaximizeWindow: () => {
+    ipcRenderer.send(IPC.APP_WINDOW_TOGGLE_MAXIMIZE)
+  },
+  closeWindow: () => {
+    ipcRenderer.send(IPC.APP_WINDOW_CLOSE)
+  },
+  isWindowMaximized: () => ipcRenderer.invoke(IPC.APP_WINDOW_IS_MAXIMIZED),
+  onWindowMaximizeChanged: (callback: (isMaximized: boolean) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, isMaximized: boolean): void => callback(isMaximized)
+    ipcRenderer.on(IPC.APP_WINDOW_MAXIMIZE_CHANGED, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC.APP_WINDOW_MAXIMIZE_CHANGED, handler)
+    }
+  },
   onRequestClose: (callback: () => void) => {
     const handler = (): void => callback()
     ipcRenderer.on(IPC.APP_REQUEST_CLOSE, handler)
