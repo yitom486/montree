@@ -150,6 +150,11 @@ export const appApi = {
     return Boolean(getElectronAPI())
   },
 
+  /** 当前运行平台（win32 / darwin / linux） */
+  getPlatform(): string {
+    return getElectronAPI()?.platform ?? (typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows') ? 'win32' : 'linux')
+  },
+
   /** 最小化当前窗口 */
   minimizeWindow(): void {
     getElectronAPI()?.minimizeWindow?.()

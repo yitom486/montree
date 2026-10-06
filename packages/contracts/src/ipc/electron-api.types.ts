@@ -68,6 +68,7 @@ import type {
   AcpProviderStatus,
   AcpStatusChangedEvent,
   AcpProxySettings,
+  AgyCliStatus,
 } from '../types/acp'
 import type {
   WebDocDiscoverTocPayload,
@@ -357,6 +358,10 @@ export interface ElectronAPI {
   ) => () => void
   /** Agent 请求当前文档快照；返回取消订阅 */
   onAcpSnapshotRequest: (callback: (event: AcpSnapshotRequestEvent) => void) => () => void
+  /** 探测本机 Antigravity CLI (agy) 状态与路径 */
+  probeAgyCli: () => Promise<Result<AgyCliStatus, AppError>>
+  /** 一键安装 Antigravity CLI (agy) 并配置环境变量 */
+  installAgyCli: () => Promise<Result<AgyCliStatus, AppError>>
   /* ===== 在线文档 ===== */
   /** 抓取在线文档一页 HTML */
   fetchWebDocPage: (payload: WebDocFetchPayload) => Promise<Result<WebDocFetchResult, AppError>>

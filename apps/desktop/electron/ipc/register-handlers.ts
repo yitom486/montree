@@ -185,6 +185,7 @@ import {
   setAcpPermissionBridge,
   setAcpSnapshotBridge,
 } from '../services/acp/acp-client'
+import { installAgyCli, probeAgyCli } from '../services/acp/runtimes/agy'
 import { pickAllowOptionId } from '../services/acp/client-handlers'
 import {
   clearAcpProvider,
@@ -395,6 +396,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.ACP_PROXY_SAVE, (_event, payload: AcpProxySettings) =>
     saveAcpProxySettings(payload),
   )
+  // --- ACP：Antigravity CLI (agy) 探针与一键安装 ---
+  ipcMain.handle(IPC.ACP_PROBE_AGY_CLI, async () => ok(await probeAgyCli()))
+  ipcMain.handle(IPC.ACP_INSTALL_AGY_CLI, async () => installAgyCli())
 
   // --- 应用：版本与自动更新 ---
   ipcMain.handle(IPC.APP_GET_VERSION, () => getAppVersion())

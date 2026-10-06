@@ -214,6 +214,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.removeListener(IPC.ACP_SNAPSHOT_REQUEST, handler)
     }
   },
+  probeAgyCli: () => ipcRenderer.invoke(IPC.ACP_PROBE_AGY_CLI),
+  installAgyCli: () => ipcRenderer.invoke(IPC.ACP_INSTALL_AGY_CLI),
   fetchWebDocPage: (payload: WebDocFetchPayload) =>
     ipcRenderer.invoke(IPC.WEB_DOC_FETCH_PAGE, payload),
   discoverWebDocToc: (payload: WebDocDiscoverTocPayload) =>

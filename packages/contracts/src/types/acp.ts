@@ -20,6 +20,15 @@ export type AcpConnectionStatus =
   | 'connected'
   | 'error'
 
+/** 本机 Antigravity CLI (agy) 探测状态 */
+export interface AgyCliStatus {
+  installed: boolean
+  /** 探测到时的版本号 */
+  version?: string
+  /** 实体可执行文件路径 */
+  path?: string
+}
+
 /** 可启动的 Agent 运行时（来自 agent-registry，不是一次 RPC 结果） */
 export interface AcpRuntimeInfo {
   /** 如 codex-acp，connect 时用这个选运行时 */

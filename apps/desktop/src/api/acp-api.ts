@@ -25,6 +25,7 @@ import type {
   AcpProviderStatus,
   AcpProxySettings,
   AcpStatusChangedEvent,
+  AgyCliStatus,
 } from '@montree/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
@@ -245,5 +246,29 @@ export const acpApi = {
     const api = requireAcpBridge()
     if (!api.ok || typeof api.value.acpRespondSnapshot !== 'function') return
     api.value.acpRespondSnapshot(payload)
+  },
+
+  async probeAgyCli(): Promise<Result<AgyCliStatus, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.probeAgyCli !== 'function') {
+      return err({
+        code: 'API_UNAVAILABLE',
+        message: 'Antigravity CLI 探测接口未就绪（请完全重启应用）',
+      })
+    }
+    return api.value.probeAgyCli()
+  },
+
+  async installAgyCli(): Promise<Result<AgyCliStatus, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.installAgyCli !== 'function') {
+      return err({
+        code: 'API_UNAVAILABLE',
+        message: 'Antigravity CLI 安装接口未就绪（请完全重启应用）',
+      })
+    }
+    return api.value.installAgyCli()
   },
 }

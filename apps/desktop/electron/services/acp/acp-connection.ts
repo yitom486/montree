@@ -36,6 +36,7 @@ import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
 import { ensureBunForCommand } from '../bun-runtime'
 import { buildCursorMissingCliMessage, getCursorCatalogIds } from './runtimes/cursor'
+import { buildAgyMissingCliMessage } from './runtimes/agy'
 import { acpState, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
 import {
   emitSessionUpdate,
@@ -252,7 +253,9 @@ export async function connectAcp(payload: {
       const message =
         runtime.id === 'cursor-cli' || runtime.id === 'cursor'
           ? buildCursorMissingCliMessage()
-          : `Agent CLI 未安装（${runtime.id}）：请先安装对应 CLI 后重试`
+          : runtime.id === 'agy'
+            ? buildAgyMissingCliMessage()
+            : `Agent CLI 未安装（${runtime.id}）：请先安装对应 CLI 后重试`
       setStatus('error', message)
       return err({ code: 'ACP_SPAWN_ERROR', message })
     }

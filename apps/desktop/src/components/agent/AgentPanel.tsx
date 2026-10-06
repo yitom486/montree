@@ -12,6 +12,7 @@ import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentAuthDialog } from '@/components/agent/AgentAuthDialog'
 import { AgentProviderDialog } from '@/components/agent/AgentProviderDialog'
 import { AgentBunInstallBanner } from '@/components/agent/AgentBunInstallBanner'
+import { AgentAgyInstallBanner } from '@/components/agent/AgentAgyInstallBanner'
 import { AgentHistoryMenu } from '@/components/agent/AgentHistoryMenu'
 import { AgentHeaderOverflowMenu } from '@/components/agent/AgentHeaderOverflowMenu'
 import { CompactConfigMenu } from '@/components/agent/CompactConfigMenu'
@@ -847,6 +848,11 @@ export const AgentPanel = memo(function AgentPanel({
 
         {view.statusErrorCode === 'BUN_NOT_INSTALLED' ? (
           <AgentBunInstallBanner onInstalled={() => void connect()} />
+        ) : view.selectedRuntimeId === 'agy' &&
+          (view.statusError?.includes('Antigravity CLI') ||
+            view.statusError?.includes('未安装') ||
+            view.statusError?.includes('agy')) ? (
+          <AgentAgyInstallBanner onInstalled={() => void connect()} />
         ) : view.statusError ? (
           <p className="px-3 pb-2 text-[10px] text-destructive">{view.statusError}</p>
         ) : null}

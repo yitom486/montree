@@ -199,6 +199,10 @@ export const IPC = {
   ACP_PERMISSION_REQUEST: 'acp:permission-request',
   /** main→renderer：Agent 要当前编辑器/阅读器快照 */
   ACP_SNAPSHOT_REQUEST: 'acp:snapshot-request',
+  /** invoke：探测本机 Antigravity CLI (agy) 状态与路径 */
+  ACP_PROBE_AGY_CLI: 'acp:probe-agy-cli',
+  /** invoke：一键安装 Antigravity CLI (agy) 并配置环境变量 */
+  ACP_INSTALL_AGY_CLI: 'acp:install-agy-cli',
 
   /* ================================================================
    * 在线文档（web-doc:*）
