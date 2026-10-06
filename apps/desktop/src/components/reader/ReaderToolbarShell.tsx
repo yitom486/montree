@@ -2,24 +2,20 @@ import type { ReactNode } from 'react'
 import {
   Bookmark,
   BookmarkPlus,
-  Coffee,
   Columns2,
   FileText,
   List,
   Maximize2,
   Minimize2,
-  Moon,
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
-  Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useReaderNavTitles } from '@/stores/reader-navigation-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
 import { cn } from '@/lib/utils'
 
@@ -198,16 +194,16 @@ export function ReaderToolbarShell({
               type="button"
               onClick={handleToggleHud}
               className={cn(
-                'flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer select-none',
+                'flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all duration-150 cursor-pointer select-none',
                 panelOpen
-                  ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 shadow-xs'
-                  : 'border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                  ? 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
               )}
               aria-label="AI 伴读模态切换"
             >
-            <Sparkles className="size-3.5 text-primary" />
-            <span className="hidden md:inline font-medium">AI 伴读</span>
-            {/* 伴读运行状态微型指示点 */}
+              <Sparkles className="size-3.5 text-primary" />
+              <span className="hidden md:inline font-medium">AI 伴读</span>
+              {/* 伴读运行状态微型指示点 */}
               <span
                 className={cn(
                   'size-1.5 rounded-full',
@@ -233,52 +229,6 @@ export function ReaderToolbarShell({
               {zenMode ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </Button>
           </ToolbarTip>
-
-          {/* 三态微晶主题切换胶囊 (纸质白 / 羊皮纸暖调 / 石墨暗晶) */}
-          <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/60">
-            <ToolbarTip label="纸质明亮模式">
-              <button
-                type="button"
-                onClick={() => useEditorUiStore.getState().setTheme('light')}
-                className={cn(
-                  'p-1 rounded-md transition-all cursor-pointer',
-                  useEditorUiStore((s) => s.theme) === 'light'
-                    ? 'bg-card text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Sun className="w-3.5 h-3.5" />
-              </button>
-            </ToolbarTip>
-            <ToolbarTip label="羊皮纸暖调模式">
-              <button
-                type="button"
-                onClick={() => useEditorUiStore.getState().setTheme('sepia')}
-                className={cn(
-                  'p-1 rounded-md transition-all cursor-pointer',
-                  useEditorUiStore((s) => s.theme) === 'sepia'
-                    ? 'bg-card text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Coffee className="w-3.5 h-3.5" />
-              </button>
-            </ToolbarTip>
-            <ToolbarTip label="极夜深色模式">
-              <button
-                type="button"
-                onClick={() => useEditorUiStore.getState().setTheme('dark')}
-                className={cn(
-                  'p-1 rounded-md transition-all cursor-pointer',
-                  useEditorUiStore((s) => s.theme) === 'dark'
-                    ? 'bg-card text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Moon className="w-3.5 h-3.5" />
-              </button>
-            </ToolbarTip>
-          </div>
         </div>
       </div>
     </div>
