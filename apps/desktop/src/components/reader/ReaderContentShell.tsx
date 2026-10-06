@@ -11,21 +11,21 @@ import { buildAnkiCardsExport } from '@/lib/reader/marks/export-anki-cards'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
-import type { Flashcard } from '@inkdown/annotations'
-import type { FlashcardReviewRating } from '@inkdown/annotations'
+import type { Flashcard } from '@montree/annotations'
+import type { FlashcardReviewRating } from '@montree/annotations'
 import { flashcardsApi } from '@/api/flashcards-api'
 import { sortCardsByDueOrder } from '@/lib/reader/marks/review-order'
-import type { ReaderUnit } from '@inkdown/reader-core'
+import type { ReaderUnit } from '@montree/reader-core'
 import {
   findCurrentChapterRef,
   normalizeLoadKey,
   type ReadingNotesChapterRef,
   type ReadingNotesContentKind,
   type ReadingNotesScope,
-} from '@inkdown/reader-core'
-import { passageExcerpt } from '@inkdown/reader-core'
-import type { ReadingMark } from '@inkdown/contracts'
-import { isOk, toChapterKey } from '@inkdown/contracts'
+} from '@montree/reader-core'
+import { passageExcerpt } from '@montree/reader-core'
+import type { ReadingMark } from '@montree/contracts'
+import { isOk, toChapterKey } from '@montree/contracts'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { narrowChapterScopeMarks } from '@/lib/reader/marks/chapter-scope'
 import type { DiagramVisualStep } from '@/components/agent/tools/DiagramViewerCard'

@@ -1,28 +1,28 @@
 import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { handleInkdownMcpRpc, type McpRpcMessage } from "@yitom/acp-client"
+import { handleInkdownMcpRpc as handleMontreeMcpRpc, type McpRpcMessage } from "@yitom/acp-client"
 import type {
-  InkdownMcpToolContext,
-  InkdownMcpToolDefinition,
+  InkdownMcpToolContext as MontreeMcpToolContext,
+  InkdownMcpToolDefinition as MontreeMcpToolDefinition,
 } from "@yitom/acp-client"
-import { callInkdownMcpTool, INKDOWN_MCP_TOOLS } from "@yitom/acp-client"
+import { callInkdownMcpTool as callMontreeMcpTool, INKDOWN_MCP_TOOLS as MONTREE_MCP_TOOLS } from "@yitom/acp-client"
 import {
-  callInkdownTocTool,
-  INKDOWN_TOC_MCP_TOOLS,
+  callInkdownTocTool as callMontreeTocTool,
+  INKDOWN_TOC_MCP_TOOLS as MONTREE_TOC_MCP_TOOLS,
 } from "@yitom/acp-client"
 
 const MCP_ENDPOINT_PATH = '/mcp'
 const MAX_BODY_BYTES = 256 * 1024
 
-export interface InkdownMcpServerHandle {
+export interface MontreeMcpServerHandle {
   url: string
   authToken: string
   close: () => Promise<void>
 }
 
-let handle: InkdownMcpServerHandle | null = null
+let handle: MontreeMcpServerHandle | null = null
 /** 目录副会话专用端点（只挂目录工具，主会话看不到） */
-let tocHandle: InkdownMcpServerHandle | null = null
+let tocHandle: MontreeMcpServerHandle | null = null
 
 function readBody(
   request: NodeJS.ReadableStream & { destroy: () => void },
@@ -60,11 +60,11 @@ function listen(server: Server): Promise<number> {
  * 进程内 MCP server（Streamable HTTP 的最小子集）。
  * 单例：一个 App 一个端点，工具调用最终落到渲染进程内存快照。
  */
-export async function startInkdownMcpServer(
-  context: InkdownMcpToolContext,
-): Promise<InkdownMcpServerHandle> {
+export async function startMontreeMcpServer(
+  context: MontreeMcpToolContext,
+): Promise<MontreeMcpServerHandle> {
   if (handle) return handle
-  handle = await serveMcpServer(context, INKDOWN_MCP_TOOLS, callInkdownMcpTool, 'inkdown')
+  handle = await serveMcpServer(context, MONTREE_MCP_TOOLS, callMontreeMcpTool, 'montree')
   return handle
 }
 
@@ -73,19 +73,19 @@ export async function startInkdownMcpServer(
  * 主会话的表一个字不动，目录 agent 也看不到主表。
  */
 export async function startTocMcpServer(
-  context: InkdownMcpToolContext,
-): Promise<InkdownMcpServerHandle> {
+  context: MontreeMcpToolContext,
+): Promise<MontreeMcpServerHandle> {
   if (tocHandle) return tocHandle
-  tocHandle = await serveMcpServer(context, INKDOWN_TOC_MCP_TOOLS, callInkdownTocTool, 'inkdown-toc')
+  tocHandle = await serveMcpServer(context, MONTREE_TOC_MCP_TOOLS, callMontreeTocTool, 'montree-toc')
   return tocHandle
 }
 
 async function serveMcpServer(
-  context: InkdownMcpToolContext,
-  tools: readonly InkdownMcpToolDefinition[],
-  call: typeof callInkdownMcpTool,
+  context: MontreeMcpToolContext,
+  tools: readonly MontreeMcpToolDefinition[],
+  call: typeof callMontreeMcpTool,
   label: string,
-): Promise<InkdownMcpServerHandle> {
+): Promise<MontreeMcpServerHandle> {
   const authToken = randomBytes(24).toString('hex')
 
   const server = createServer((request, response) => {
@@ -114,7 +114,7 @@ async function serveMcpServer(
       }
 
       try {
-        const rpcResponse = await handleInkdownMcpRpc(message, context, tools, call)
+        const rpcResponse = await handleMontreeMcpRpc(message, context, tools, call)
         if (!rpcResponse) {
           response.writeHead(202).end()
           return
@@ -156,7 +156,7 @@ async function serveMcpServer(
   }
 }
 
-export async function stopInkdownMcpServer(): Promise<void> {
+export async function stopMontreeMcpServer(): Promise<void> {
   await handle?.close()
   handle = null
   await tocHandle?.close()

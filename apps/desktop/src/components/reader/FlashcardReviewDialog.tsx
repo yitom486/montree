@@ -8,12 +8,12 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { Flashcard } from '@inkdown/annotations'
+import type { Flashcard } from '@montree/annotations'
 import {
   calculateReviewStats,
   parseClozeContent,
   type FlashcardReviewRating,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import {
   BookOpen,
   RotateCcw,
@@ -177,7 +177,7 @@ export function FlashcardReviewDialog({
             </span>
           </div>
           <DialogDescription className="sr-only">
-            Inkdown 沉浸式闪卡抽认复习模式
+            Montree 沉浸式闪卡抽认复习模式
           </DialogDescription>
           {/* 进度条 */}
           <div className="w-full h-1.5 bg-secondary/80 rounded-full overflow-hidden">

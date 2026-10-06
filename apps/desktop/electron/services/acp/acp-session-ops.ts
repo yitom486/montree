@@ -1,17 +1,17 @@
-import type { AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   AcpContentBlock,
   AcpPromptResult,
   AcpSetConfigOptionResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import { methods } from '@agentclientprotocol/sdk'
 import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
 import {
   startTocMcpServer,
-  type InkdownMcpServerHandle,
-} from './mcp/inkdown-mcp-server'
+  type MontreeMcpServerHandle,
+} from './mcp/montree-mcp-server'
 import { sdkRequest } from './sdk-client'
 import { disposeAllAcpProcesses } from './process-manager'
 import { acpState, disarmSuppressSettle, setStatus } from './acp-state'
@@ -22,7 +22,7 @@ import {
 } from './acp-bridges'
 import { disconnectAcp } from './acp-connection'
 
-function mcpServerEntry(handle: InkdownMcpServerHandle, name: string): unknown[] {
+function mcpServerEntry(handle: MontreeMcpServerHandle, name: string): unknown[] {
   return [
     {
       type: 'http',
@@ -33,7 +33,7 @@ function mcpServerEntry(handle: InkdownMcpServerHandle, name: string): unknown[]
   ]
 }
 
-async function ensureTocMcpServer(): Promise<InkdownMcpServerHandle> {
+async function ensureTocMcpServer(): Promise<MontreeMcpServerHandle> {
   if (!acpState.tocMcp) {
     acpState.tocMcp = await startTocMcpServer({ readSnapshot: handleSnapshotRequest })
   }
@@ -68,13 +68,13 @@ export async function loadAcpSession(payload: {
       {
         sessionId: payload.sessionId,
         cwd,
-        mcpServers: acpState.inkdownMcp
+        mcpServers: acpState.montreeMcp
           ? [
               {
                 type: 'http',
-                name: 'inkdown',
-                url: acpState.inkdownMcp.url,
-                headers: [{ name: 'Authorization', value: `Bearer ${acpState.inkdownMcp.authToken}` }],
+                name: 'montree',
+                url: acpState.montreeMcp.url,
+                headers: [{ name: 'Authorization', value: `Bearer ${acpState.montreeMcp.authToken}` }],
               },
             ]
           : [],
@@ -118,9 +118,9 @@ export async function createAcpSession(
   try {
     const mcpServers =
       toolScope === 'toc'
-        ? mcpServerEntry(await ensureTocMcpServer(), 'inkdown-toc')
-        : acpState.inkdownMcp
-          ? mcpServerEntry(acpState.inkdownMcp, 'inkdown')
+        ? mcpServerEntry(await ensureTocMcpServer(), 'montree-toc')
+        : acpState.montreeMcp
+          ? mcpServerEntry(acpState.montreeMcp, 'montree')
           : []
     const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
       a.value,

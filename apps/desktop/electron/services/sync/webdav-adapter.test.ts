@@ -78,10 +78,10 @@ describe('WebDavStorageAdapter', () => {
       password: 'pwd',
     })
 
-    const res = await adapter.ensureDir('/InkdownSync/sub')
+    const res = await adapter.ensureDir('/MontreeSync/sub')
     expect(res.ok).toBe(true)
 
-    // 应包含对 InkdownSync/ 的 PROPFIND 和 MKCOL，以及 sub/ 的 PROPFIND 和 MKCOL
+    // 应包含对 MontreeSync/ 的 PROPFIND 和 MKCOL，以及 sub/ 的 PROPFIND 和 MKCOL
     const mkcolCalls = calls.filter((c) => c.method === 'MKCOL')
     expect(mkcolCalls).toHaveLength(2)
   })
@@ -101,13 +101,13 @@ describe('WebDavStorageAdapter', () => {
       password: 'pwd',
     })
 
-    const okRes = await adapter.downloadFile('/InkdownSync/found.json')
+    const okRes = await adapter.downloadFile('/MontreeSync/found.json')
     expect(okRes.ok).toBe(true)
     if (okRes.ok) {
       expect(okRes.value).toBe('{"hello":"world"}')
     }
 
-    const notFoundRes = await adapter.downloadFile('/InkdownSync/missing.json')
+    const notFoundRes = await adapter.downloadFile('/MontreeSync/missing.json')
     expect(notFoundRes.ok).toBe(false)
     if (!notFoundRes.ok) {
       expect(notFoundRes.error.code).toBe('FILE_NOT_FOUND')
@@ -130,7 +130,7 @@ describe('WebDavStorageAdapter', () => {
       password: 'pwd',
     })
 
-    const res = await adapter.uploadFile('/InkdownSync/data.json', '{"test":123}')
+    const res = await adapter.uploadFile('/MontreeSync/data.json', '{"test":123}')
     expect(res.ok).toBe(true)
     expect(capturedMethod).toBe('PUT')
     expect(capturedBody).toBe('{"test":123}')
@@ -139,7 +139,7 @@ describe('WebDavStorageAdapter', () => {
   it('statFile 正确解析 207 Multi-Status 中的 getlastmodified 时间戳', async () => {    const xml = `<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
   <d:response>
-    <d:href>/dav/InkdownSync/data.json</d:href>
+    <d:href>/dav/MontreeSync/data.json</d:href>
     <d:propstat>
       <d:prop>
         <d:getlastmodified>Wed, 03 Sep 2026 12:00:00 GMT</d:getlastmodified>
@@ -159,7 +159,7 @@ describe('WebDavStorageAdapter', () => {
       password: 'pwd',
     })
 
-    const res = await adapter.statFile('/InkdownSync/data.json')
+    const res = await adapter.statFile('/MontreeSync/data.json')
     expect(res.ok).toBe(true)
     if (res.ok) {
       expect(res.value.exists).toBe(true)
@@ -222,7 +222,7 @@ describe('WebDavStorageAdapter', () => {
       retryBaseDelayMs: 1,
     })
 
-    const res = await adapter.downloadFile('/InkdownSync/data.json')
+    const res = await adapter.downloadFile('/MontreeSync/data.json')
     expect(res.ok).toBe(false)
     expect(calls).toBe(3)
   })

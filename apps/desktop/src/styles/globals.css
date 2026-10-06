@@ -33,7 +33,7 @@
   --color-editor: var(--editor);
   --color-preview: var(--preview);
 
-  /* inkdown-ui 视觉体系核心命名 */
+  /* montree-ui 视觉体系核心命名 */
   --color-bg-base: var(--color-bg-base);
   --color-bg-surface: var(--color-bg-surface);
   --color-bg-elevated: var(--color-bg-elevated);

@@ -1,4 +1,4 @@
-import type { WebDocTocEntry } from '@inkdown/contracts'
+import type { WebDocTocEntry } from '@montree/contracts'
 
 function decodeHtmlEntities(text: string): string {
   return text

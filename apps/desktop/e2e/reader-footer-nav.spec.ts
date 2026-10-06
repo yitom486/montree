@@ -28,7 +28,7 @@ async function openSectionsBook(window: Page): Promise<void> {
 
 test.describe('底栏翻页（正文列内聚）', () => {
   test('底栏位于正文列下方且与正文同宽，不横跨卡片轨', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-footer-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-footer-'))
     await writeFoliateSectionsWorkspace(workspace)
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,
@@ -69,7 +69,7 @@ test.describe('底栏翻页（正文列内聚）', () => {
   })
 
   test('点下一单元/上一单元，正文与底栏同步翻章', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-footer-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-footer-'))
     await writeFoliateSectionsWorkspace(workspace)
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,

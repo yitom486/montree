@@ -111,7 +111,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         const copyButton = target.closest<HTMLButtonElement>('.code-block-copy')
         if (copyButton) return
 
-        const wikilinkAnchor = target.closest<HTMLAnchorElement>('a.inkdown-wikilink')
+        const wikilinkAnchor = target.closest<HTMLAnchorElement>('a.montree-wikilink')
         if (wikilinkAnchor) {
           event.preventDefault()
           const wikilinkTarget = wikilinkAnchor.getAttribute('data-wikilink-target')
@@ -121,7 +121,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           return
         }
 
-        const deepLinkAnchor = target.closest<HTMLAnchorElement>('a[href^="inkdown://"]')
+        const deepLinkAnchor = target.closest<HTMLAnchorElement>('a[href^="montree://"]')
         if (deepLinkAnchor) {
           event.preventDefault()
           const href = deepLinkAnchor.getAttribute('href')

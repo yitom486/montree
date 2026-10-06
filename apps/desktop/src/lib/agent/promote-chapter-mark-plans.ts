@@ -1,4 +1,4 @@
-import type { ChapterMarkPlanEntry } from '@inkdown/annotations'
+import type { ChapterMarkPlanEntry } from '@montree/annotations'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
 export function isChapterPlanPromotedToAgent(

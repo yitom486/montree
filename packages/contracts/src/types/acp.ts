@@ -2,15 +2,15 @@
  * ACP 跨进程 DTO（精简，不嵌入完整协议 schema）。
  *
  * 设计要点：
- * - 只放 Inkdown IPC / UI 真正用到的字段；Agent 多出来的键进 Record 透传，避免每次协议小改就改类型。
+ * - 只放 Montree IPC / UI 真正用到的字段；Agent 多出来的键进 Record 透传，避免每次协议小改就改类型。
  * - 用判别联合（phase / outcome / ok / type）让 UI 用 switch 收窄，不要用布尔「又成功又要登录」。
  * - cwd 一律可选：有工作区就用用户目录，没有就主进程沙箱 cwd（纯阅读场景）。
  */
 
 import type {
-  InkdownSnapshotArgs,
-  InkdownSnapshotResource,
-} from '../agent/inkdown-snapshot'
+  MontreeSnapshotArgs,
+  MontreeSnapshotResource,
+} from '../agent/montree-snapshot'
 
 /** 主进程单例连接状态；UI 按钮/指示灯跟这个走 */
 export type AcpConnectionStatus =
@@ -62,7 +62,7 @@ export interface AcpConnectPayload {
  * 定居窗口过期或静默超时时主进程广播一次，渲染端冻结残留 streaming 消息，不碰 prompting。
  * 与主进程 `acp-state` / 渲染 `chat-slice` 约定的同一字面量，改动须两边同步。
  */
-export const INKDOWN_SETTLE_COMPLETE_KIND = 'inkdown_settle_complete'
+export const MONTREE_SETTLE_COMPLETE_KIND = 'montree_settle_complete'
 
 /** Agent initialize 声明的登录方式；id 交给后续 authenticate */
 export interface AcpAuthMethod {
@@ -216,7 +216,7 @@ export interface AcpSessionNewPayload {
   /** 缺省时用当前已连接 Agent 的工作区 */
   cwd?: string
   /**
-   * 挂载的 MCP 工具域：full=全部 Inkdown 工具（默认），toc=仅目录工具。
+   * 挂载的 MCP 工具域：full=全部 Montree 工具（默认），toc=仅目录工具。
    * 目录副会话传 toc，主会话与其他副会话看不到目录写工具。
    */
   toolScope?: 'full' | 'toc'
@@ -318,12 +318,12 @@ export interface AcpPermissionResponsePayload {
   outcome: AcpPermissionOutcome
 }
 
-/** 主进程向渲染进程索取 Inkdown 内存快照 */
+/** 主进程向渲染进程索取 Montree 内存快照 */
 export interface AcpSnapshotRequestEvent {
   requestId: number
   /** 要哪一类快照（当前文档、目录等） */
-  resource: InkdownSnapshotResource
-  args?: InkdownSnapshotArgs
+  resource: MontreeSnapshotResource
+  args?: MontreeSnapshotArgs
 }
 
 /** 用 ok 判别成功/失败，避免 content 与 message 同时可选对不齐 */

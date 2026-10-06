@@ -5,17 +5,17 @@ import {
   DEFAULT_READER_TYPOGRAPHY,
   type ReaderFontSize,
   type ReaderLineHeight,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import {
   DEFAULT_PDF_OCR_SCALE,
   PDF_OCR_SCALE_OPTION_LABELS,
   type PdfOcrScale,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 
 export {
   PDF_OCR_SCALE_OPTION_LABELS,
   type PdfOcrScale,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 
 export {
   READER_FONT_SIZE_OPTIONS,
@@ -23,7 +23,7 @@ export {
   READER_LINE_HEIGHT_OPTION_LABELS,
   type ReaderFontSize,
   type ReaderLineHeight,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 export type AutoSaveIntervalMs = 15000 | 30000 | 60000
 export type PreviewDebounceMs = 150 | 300 | 500

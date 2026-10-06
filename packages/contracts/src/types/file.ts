@@ -57,7 +57,7 @@ export interface OpenFolderResult {
 export interface SavePastedImagePayload {
   /** Markdown 旁 assets/；与 workspaceRoot 二选一 */
   markdownFilePath?: string
-  /** Agent 粘贴：落到 workspace/.inkdown/agent-pasted/ */
+  /** Agent 粘贴：落到 workspace/.montree/agent-pasted/ */
   workspaceRoot?: string
   base64: string
   mimeType: string

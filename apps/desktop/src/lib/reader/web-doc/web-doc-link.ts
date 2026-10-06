@@ -1,14 +1,14 @@
-export const INKDOWN_NAV_HREF_ATTR = 'data-inkdown-href'
+export const MONTREE_NAV_HREF_ATTR = 'data-montree-href'
 /** 临时保留卡片内部链接的原始 href，归一化后会提升到语义卡片根节点。 */
-export const INKDOWN_SOURCE_HREF_ATTR = 'data-inkdown-source-href'
-export const WEB_DOC_READER_MARKER_ATTR = 'data-inkdown-web-doc-reader'
+export const MONTREE_SOURCE_HREF_ATTR = 'data-montree-source-href'
+export const WEB_DOC_READER_MARKER_ATTR = 'data-montree-web-doc-reader'
 export const WEB_DOC_READER_MARKER_VALUE = '1'
 
 function isNavigableHref(href: string): boolean {
   if (!href || href === '#') return false
   if (href.startsWith('mailto:') || href.startsWith('tel:')) return false
   try {
-    const protocol = new URL(href, 'https://inkdown.invalid').protocol
+    const protocol = new URL(href, 'https://montree.invalid').protocol
     return protocol === 'http:' || protocol === 'https:'
   } catch {
     return false
@@ -31,30 +31,30 @@ function toAbsoluteNavUrl(href: string, baseUrl: string): string | null {
 export function neutralizeWebDocNavigationLinks(bodyHtml: string, baseUrl: string): string {
   if (!baseUrl.trim()) return bodyHtml
 
-  const doc = new DOMParser().parseFromString(`<div id="inkdown-nav-root">${bodyHtml}</div>`, 'text/html')
-  const root = doc.getElementById('inkdown-nav-root')
+  const doc = new DOMParser().parseFromString(`<div id="montree-nav-root">${bodyHtml}</div>`, 'text/html')
+  const root = doc.getElementById('montree-nav-root')
   if (!root) return bodyHtml
 
   // Mintlify 等站点把卡片做成 div[role="link"]，真正的 href 放在一个
   // aria-hidden/display:contents 的子 anchor 上。把原始 href 提升到卡片根节点，
   // 这样卡片的任意子元素都能走同一套应用内导航。
-  root.querySelectorAll<HTMLElement>(`[${INKDOWN_SOURCE_HREF_ATTR}]`).forEach((target) => {
-    const raw = target.getAttribute(INKDOWN_SOURCE_HREF_ATTR)?.trim() ?? ''
-    target.removeAttribute(INKDOWN_SOURCE_HREF_ATTR)
+  root.querySelectorAll<HTMLElement>(`[${MONTREE_SOURCE_HREF_ATTR}]`).forEach((target) => {
+    const raw = target.getAttribute(MONTREE_SOURCE_HREF_ATTR)?.trim() ?? ''
+    target.removeAttribute(MONTREE_SOURCE_HREF_ATTR)
     target.removeAttribute('href')
 
     if (!raw || raw === '#' || raw.startsWith('mailto:') || raw.startsWith('tel:')) {
-      target.removeAttribute(INKDOWN_NAV_HREF_ATTR)
+      target.removeAttribute(MONTREE_NAV_HREF_ATTR)
       return
     }
 
     const absolute = toAbsoluteNavUrl(raw, baseUrl)
     if (!absolute || !isNavigableHref(raw)) {
-      target.removeAttribute(INKDOWN_NAV_HREF_ATTR)
+      target.removeAttribute(MONTREE_NAV_HREF_ATTR)
       return
     }
 
-    target.setAttribute(INKDOWN_NAV_HREF_ATTR, absolute)
+    target.setAttribute(MONTREE_NAV_HREF_ATTR, absolute)
     if (target.tagName !== 'A' && target.tagName !== 'AREA') {
       target.setAttribute('role', 'link')
       target.setAttribute('tabindex', '0')
@@ -67,13 +67,13 @@ export function neutralizeWebDocNavigationLinks(bodyHtml: string, baseUrl: strin
     if (anchor.classList.contains('web-doc-card-inner-link')) {
       anchor.removeAttribute('href')
       anchor.removeAttribute('target')
-      anchor.removeAttribute(INKDOWN_NAV_HREF_ATTR)
+      anchor.removeAttribute(MONTREE_NAV_HREF_ATTR)
       anchor.setAttribute('aria-hidden', 'true')
       anchor.setAttribute('tabindex', '-1')
       return
     }
 
-    const existing = anchor.getAttribute(INKDOWN_NAV_HREF_ATTR)?.trim()
+    const existing = anchor.getAttribute(MONTREE_NAV_HREF_ATTR)?.trim()
     if (existing) {
       // Keep the target in a data attribute only. A native href would still be
       // able to navigate the srcdoc frame if the delegated listener is late or
@@ -113,7 +113,7 @@ export function neutralizeWebDocNavigationLinks(bodyHtml: string, baseUrl: strin
       return
     }
 
-    anchor.setAttribute(INKDOWN_NAV_HREF_ATTR, absolute)
+    anchor.setAttribute(MONTREE_NAV_HREF_ATTR, absolute)
     anchor.removeAttribute('href')
     anchor.removeAttribute('target')
     anchor.setAttribute('role', 'link')
@@ -130,7 +130,7 @@ export function neutralizeWebDocNavigationLinks(bodyHtml: string, baseUrl: strin
       return
     }
 
-    area.setAttribute(INKDOWN_NAV_HREF_ATTR, absolute)
+    area.setAttribute(MONTREE_NAV_HREF_ATTR, absolute)
     area.removeAttribute('href')
   })
 
@@ -187,7 +187,7 @@ export function resolveWebDocClickHref(
 
   const area = element.closest('area')
   if (area) {
-    const href = readInkdownNavHref(area)
+    const href = readMontreeNavHref(area)
     if (!href) return null
     try {
       return new URL(href, currentPageUrl).toString()
@@ -196,9 +196,9 @@ export function resolveWebDocClickHref(
     }
   }
 
-  const navigableTarget = element.closest(`[${INKDOWN_NAV_HREF_ATTR}]`)
+  const navigableTarget = element.closest(`[${MONTREE_NAV_HREF_ATTR}]`)
   if (navigableTarget) {
-    const href = readInkdownNavHref(navigableTarget)
+    const href = readMontreeNavHref(navigableTarget)
     if (!href) return null
     try {
       return new URL(href, currentPageUrl).toString()
@@ -212,7 +212,7 @@ export function resolveWebDocClickHref(
   // 之前会被拦截逻辑漏掉而直接跳转。getAttribute 在各类 Element 上都可用。
   if (!anchor) return null
 
-  const href = readInkdownNavHref(anchor)
+  const href = readMontreeNavHref(anchor)
   if (!href) return null
 
   try {
@@ -258,7 +258,7 @@ export function detectWebDocIframeEscape(
   }
 }
 
-/** 判断 iframe 当前文档是否为 Inkdown 生成的 srcdoc 阅读文档。 */
+/** 判断 iframe 当前文档是否为 Montree 生成的 srcdoc 阅读文档。 */
 export function isWebDocReaderDocument(document: Document | null): boolean {
   return document?.documentElement?.getAttribute(WEB_DOC_READER_MARKER_ATTR) === WEB_DOC_READER_MARKER_VALUE
 }
@@ -267,8 +267,8 @@ export function isCrossOriginIframeEscape(mark: string | null): mark is '__cross
   return mark === '__cross_origin__'
 }
 
-function readInkdownNavHref(element: Element): string | null {
-  const fromData = element.getAttribute(INKDOWN_NAV_HREF_ATTR)?.trim()
+function readMontreeNavHref(element: Element): string | null {
+  const fromData = element.getAttribute(MONTREE_NAV_HREF_ATTR)?.trim()
   if (fromData) return fromData
 
   const href = element.getAttribute('href')?.trim()

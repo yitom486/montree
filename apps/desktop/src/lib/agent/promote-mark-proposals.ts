@@ -1,5 +1,5 @@
-import { toProposedMark } from '@inkdown/annotations'
-import type { MarkProposalStatus, ProposedMark } from '@inkdown/annotations'
+import { toProposedMark } from '@montree/annotations'
+import type { MarkProposalStatus, ProposedMark } from '@montree/annotations'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 

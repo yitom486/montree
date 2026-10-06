@@ -26,10 +26,10 @@ export function splitMarkdownParts(html: string): MarkdownPart[] {
   }
 
   const doc = new DOMParser().parseFromString(
-    `<div id="inkdown-md-split">${html}</div>`,
+    `<div id="montree-md-split">${html}</div>`,
     'text/html',
   )
-  const root = doc.getElementById('inkdown-md-split') ?? doc.body
+  const root = doc.getElementById('montree-md-split') ?? doc.body
   const parts: MarkdownPart[] = []
   let htmlBuf = ''
   let mermaidSeq = 0

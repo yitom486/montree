@@ -1,7 +1,7 @@
-import type { PdfTextRect, ReadingAnchor, ReadingMark } from '@inkdown/contracts'
-import { applyHighlightSurface } from '@inkdown/reader-core'
-import { getMarkLayerMetrics, normalizeRectsInScrollDocument } from '@inkdown/reader-core'
-import { normalizeWebDocNavUrl } from '@inkdown/reader-core'
+import type { PdfTextRect, ReadingAnchor, ReadingMark } from '@montree/contracts'
+import { applyHighlightSurface } from '@montree/reader-core'
+import { getMarkLayerMetrics, normalizeRectsInScrollDocument } from '@montree/reader-core'
+import { normalizeWebDocNavUrl } from '@montree/reader-core'
 
 const MARK_SELECTOR = '.mobi-mark-highlight, .mobi-mark-note, .mobi-mark-note-hit'
 
@@ -283,7 +283,7 @@ export function findMobiMarksAtPoint(
 }
 
 /** 批注对话框打开期间：用 rect 叠层顶替失焦后消失的原生选区 */
-export const MOBI_PENDING_SELECTION_ID = '__inkdown-pending-selection__'
+export const MOBI_PENDING_SELECTION_ID = '__montree-pending-selection__'
 
 export function removeMobiPendingSelectionHighlight(container: HTMLElement | null): void {
   if (!container) return

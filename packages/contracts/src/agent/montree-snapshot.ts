@@ -1,4 +1,4 @@
-import type { InkdownVirtualResource } from './inkdown-virtual-fs'
+import type { MontreeVirtualResource } from './montree-virtual-fs'
 
 /**
  * 主进程能向渲染进程索取的内存快照。
@@ -6,8 +6,8 @@ import type { InkdownVirtualResource } from './inkdown-virtual-fs'
  * 虚拟文件资源都能当快照读；`search` 只走 MCP —— 它需要参数，
  * 没法表达成一个固定的 fs 路径。
  */
-export type InkdownSnapshotResource =
-  | InkdownVirtualResource
+export type MontreeSnapshotResource =
+  | MontreeVirtualResource
   | 'search'
   | 'selection'
   | 'chapter'
@@ -22,7 +22,7 @@ export type InkdownSnapshotResource =
   | 'toc-draft-write'
   | 'content-audit'
 
-export interface InkdownSnapshotArgs {
+export interface MontreeSnapshotArgs {
   query?: string
   /** content-audit：展示条数 1–10，缺省 10（非法值由审计服务报 INVALID_ARGUMENT） */
   limit?: number
@@ -31,7 +31,7 @@ export interface InkdownSnapshotArgs {
   note?: string
   excerpt?: string
   kind?: 'highlight' | 'note' | 'auto'
-  /** inkdown_list_marks：all | highlights | bookmarks */
+  /** montree_list_marks：all | highlights | bookmarks */
   filter?: 'all' | 'highlights' | 'bookmarks'
   chapters?: Array<{
     flatIndex: number
@@ -63,7 +63,7 @@ export const ACP_SNAPSHOT_TIMEOUT_MS = 5_000
 /** 可能触发扫描 PDF 按需 OCR 的快照 */
 export const ACP_SNAPSHOT_OCR_TIMEOUT_MS = 120_000
 
-export function resolveSnapshotTimeoutMs(resource: InkdownSnapshotResource): number {
+export function resolveSnapshotTimeoutMs(resource: MontreeSnapshotResource): number {
   switch (resource) {
     case 'viewport.txt':
     case 'chapter.txt':

@@ -8,13 +8,13 @@
     <article>
       <h1>XSS Probe</h1>
       <p>Benign paragraph that must survive sanitization.</p>
-      <p><a href="https://e2e.inkdown.test/docs/start">Benign link back to start</a>.</p>
-      <script>window.__inkdownXssFired = 'script-tag'</script>
-      <p><a href="javascript:window.__inkdownXssFired='js-href'">suspicious link</a></p>
-      <p><a href="JaVaScRiPt:window.__inkdownXssFired='js-href-case'">mixed case link</a></p>
-      <p><img src="x" onerror="window.__inkdownXssFired='onerror'" alt="probe" /></p>
-      <div onclick="window.__inkdownXssFired='onclick'">clickable div</div>
-      <svg onload="window.__inkdownXssFired='svg-onload'"><circle r="4" /></svg>
+      <p><a href="https://e2e.montree.test/docs/start">Benign link back to start</a>.</p>
+      <script>window.__montreeXssFired = 'script-tag'</script>
+      <p><a href="javascript:window.__montreeXssFired='js-href'">suspicious link</a></p>
+      <p><a href="JaVaScRiPt:window.__montreeXssFired='js-href-case'">mixed case link</a></p>
+      <p><img src="x" onerror="window.__montreeXssFired='onerror'" alt="probe" /></p>
+      <div onclick="window.__montreeXssFired='onclick'">clickable div</div>
+      <svg onload="window.__montreeXssFired='svg-onload'"><circle r="4" /></svg>
     </article>
   </body>
 </html>

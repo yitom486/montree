@@ -1,7 +1,7 @@
 import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
-import { getDocumentKind, isWorkspaceFileExtension } from '@inkdown/contracts'
-import type { FileTreeNode } from '@inkdown/contracts'
+import { getDocumentKind, isWorkspaceFileExtension } from '@montree/contracts'
+import type { FileTreeNode } from '@montree/contracts'
 
 /** 工作区目录树最大递归深度 */
 export const WORKSPACE_MAX_DEPTH = 6

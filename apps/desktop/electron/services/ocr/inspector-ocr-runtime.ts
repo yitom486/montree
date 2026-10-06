@@ -12,8 +12,8 @@ import {
 } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 import {
   INSPECTOR_MODELS,
   INSPECTOR_OCR_REVISION,
@@ -21,7 +21,7 @@ import {
   INSPECTOR_PDFIUM,
   resolveInspectorPlatform,
   type InspectorNativeLib,
-} from '@inkdown/ocr-core'
+} from '@montree/ocr-core'
 
 /**
  * pdf-inspector OCR 外部运行时分发（PDFium + ONNX Runtime + PP-OCRv6 Small）。
@@ -200,7 +200,7 @@ async function installNativeLib(
   onProgress?: (message: string, progress: number) => void,
   signal?: AbortSignal,
 ): Promise<string> {
-  const tempDir = join(app.getPath('temp'), 'inkdown-inspector-ocr')
+  const tempDir = join(app.getPath('temp'), 'montree-inspector-ocr')
   await mkdir(tempDir, { recursive: true })
   const archiveExt = lib.url.endsWith('.zip') ? '.zip' : '.tgz'
   const archivePath = join(tempDir, `lib${archiveExt}`)
@@ -317,7 +317,7 @@ export async function ensureInspectorOcrRuntime(
       // ORT 目录整体保留（同目录 providers*.dll 按需加载）
       const ortStaging = join(root, 'ort')
       await mkdir(ortStaging, { recursive: true })
-      const tempDir = join(app.getPath('temp'), 'inkdown-inspector-ocr')
+      const tempDir = join(app.getPath('temp'), 'montree-inspector-ocr')
       const ortEntry = INSPECTOR_ORT[platform]
       const ortArchive = join(tempDir, `ort${ortEntry.url.endsWith('.zip') ? '.zip' : '.tgz'}`)
       onProgress?.('正在下载推理库…', 30)

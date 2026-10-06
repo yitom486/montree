@@ -1,4 +1,4 @@
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 
 export function rankVisualMarks(marks: ReadingMark[]): ReadingMark[] {
   return [...marks].sort((a, b) => {

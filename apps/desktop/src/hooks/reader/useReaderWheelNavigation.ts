@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { resolveWheelPageTurn } from '@inkdown/reader-core'
+import { resolveWheelPageTurn } from '@montree/reader-core'
 
 interface UseReaderWheelNavigationOptions {
   onPrev: () => void

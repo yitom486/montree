@@ -1,4 +1,4 @@
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import type { Flashcard } from './flashcard'
 import {
   highlightSortKey,
@@ -7,7 +7,7 @@ import {
   passageNote,
   type ReadingNotesChapterRef,
   type ReadingNotesScope,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 export interface BuildAnkiCardsExportInput {
   marks: ReadingMark[]
@@ -141,7 +141,7 @@ function buildAnkiDeepLinkUrl(target: {
     params.set('anchor', target.anchor)
   }
 
-  return `inkdown://open?${params.toString()}`
+  return `montree://open?${params.toString()}`
 }
 
 /**
@@ -177,7 +177,7 @@ export function buildAnkiCardsExport(
 
     const chapterRef = input.resolveChapter(mark, input.toc)
     const chapterTag = chapterRef.label ? sanitizeAnkiTag(chapterRef.label) : ''
-    const tags = ['Inkdown']
+    const tags = ['Montree']
     if (bookTag) tags.push(bookTag)
     if (chapterTag && chapterTag !== bookTag) tags.push(chapterTag)
 

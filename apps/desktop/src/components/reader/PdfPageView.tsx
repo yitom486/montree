@@ -12,15 +12,15 @@ import {
   type PdfTextLayerBuilderInstance,
 } from '@/lib/reader/pdf/pdf-text-layer-builder'
 import { mountOcrTextLayer } from '@/lib/reader/pdf-ocr/pdf-ocr-text-layer'
-import { pageHasNativeText } from '@inkdown/ocr-core'
-import type { PdfOcrPageCache } from '@inkdown/contracts'
+import { pageHasNativeText } from '@montree/ocr-core'
+import type { PdfOcrPageCache } from '@montree/contracts'
 import {
   PdfTextLayerMappingSink,
   registerPdfPageTextGeometry,
   type PdfSelectionSnapshot,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { reportAppError } from '@/lib/workspace/report-error'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 
 import type { AppTheme } from '@/stores/editor-ui-store'
 

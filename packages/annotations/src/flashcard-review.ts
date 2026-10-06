@@ -1,5 +1,5 @@
 // 评分字面归 contracts 所有（线上传输单源）；本包 re-export，调用方零改。
-import type { FlashcardReviewRating } from '@inkdown/contracts'
+import type { FlashcardReviewRating } from '@montree/contracts'
 
 export type { FlashcardReviewRating }
 

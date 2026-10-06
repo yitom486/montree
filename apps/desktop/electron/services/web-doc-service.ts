@@ -1,23 +1,23 @@
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import { toAppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import { toAppError } from '@montree/contracts'
 import type {
   WebDocDiscoverTocPayload,
   WebDocDiscoverTocResult,
   WebDocFetchPayload,
   WebDocFetchResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   extractGenericWebDocToc,
   extractSameOriginDocLinks,
-} from '@inkdown/web-doc'
+} from '@montree/web-doc'
 import {
   extractLlmsTxtToc,
   looksLikeDocsIndexCandidate,
   resolveLlmsTxtUrl,
-} from '@inkdown/web-doc'
+} from '@montree/web-doc'
 import { tryFetchE2eWebDocFixture } from './web-doc/e2e-fixture'
-import { extractPeopleDailyToc } from '@inkdown/web-doc'
+import { extractPeopleDailyToc } from '@montree/web-doc'
 import { resolveWebDocSiteId } from './web-doc/site-registry'
 import { assertWebDocUrlAllowed, normalizeWebDocUrl } from './web-doc/url-policy'
 
@@ -28,10 +28,10 @@ const WEB_DOC_MAX_REDIRECTS = 5
 
 /**
  * 使用接近 Chromium 的 UA。部分 CDN（如 Vercel）会对自定义 bot UA 直接 429。
- * 末尾保留 Inkdown 标识，便于站点识别桌面阅读器。
+ * 末尾保留 Montree 标识，便于站点识别桌面阅读器。
  */
 const WEB_DOC_USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Inkdown/0.2.7'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Montree/0.2.7'
 
 function webDocHtmlHeaders(): Record<string, string> {
   return {

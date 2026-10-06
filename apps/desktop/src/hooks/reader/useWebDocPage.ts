@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { webDocApi } from '@/api/web-doc-api'
 import { queryKeys } from '@/api/query-keys'
 import { buildWebDocPageContent } from '@/lib/reader/web-doc/web-doc-html'
-import { resolveWebDocSiteId, stripWebDocFragment } from '@inkdown/web-doc'
-import { isOk } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import type { WebDocPageContent } from '@inkdown/contracts'
+import { resolveWebDocSiteId, stripWebDocFragment } from '@montree/web-doc'
+import { isOk } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import type { WebDocPageContent } from '@montree/contracts'
 
 export interface WebDocPageData {
   pageUrl: string

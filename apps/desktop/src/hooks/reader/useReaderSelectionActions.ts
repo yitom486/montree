@@ -4,8 +4,8 @@ import {
   addSelectionMarkerToComposer,
   openAgentComposerToAskSelection,
 } from '@/lib/agent/context/focus-agent-composer'
-import { copyTextToClipboard } from '@inkdown/reader-core'
-import type { HighlightColorId } from '@inkdown/reader-core'
+import { copyTextToClipboard } from '@montree/reader-core'
+import type { HighlightColorId } from '@montree/reader-core'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { generateAiCardContent } from '@/lib/agent/card-studio'
 import { sendCardStudioPrompt } from '@/lib/agent/card-studio-session'

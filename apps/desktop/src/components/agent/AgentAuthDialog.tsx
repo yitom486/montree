@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { findBuiltinAcpRuntime, type AcpAuthMethod } from '@inkdown/contracts'
+import { findBuiltinAcpRuntime, type AcpAuthMethod } from '@montree/contracts'
 
 const FALLBACK_AUTH_HINT =
   '复用本机登录凭证（如 ~/.codex / 环境变量），或选择 Agent 提供的认证方式。'

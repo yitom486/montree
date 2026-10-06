@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
-  INKDOWN_NAV_HREF_ATTR,
-  INKDOWN_SOURCE_HREF_ATTR,
+  MONTREE_NAV_HREF_ATTR,
+  MONTREE_SOURCE_HREF_ATTR,
   WEB_DOC_READER_MARKER_ATTR,
   WEB_DOC_READER_MARKER_VALUE,
   detectWebDocIframeEscape,
@@ -40,11 +40,11 @@ describe('web-doc-link', () => {
     root.innerHTML = html
     const link = root.querySelector('a')
     expect(link?.getAttribute('href')).toBeNull()
-    expect(link?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBe(
+    expect(link?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBe(
       'https://paper.people.com.cn/rmrb/pc/layout/202609/01/node_02.html',
     )
     expect(root.querySelectorAll('a')[1]?.getAttribute('href')).toBeNull()
-    expect(root.querySelectorAll('a')[1]?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBe(
+    expect(root.querySelectorAll('a')[1]?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBe(
       'https://paper.people.com.cn/rmrb/pc/layout/202609/01/node_03.html#top',
     )
   })
@@ -57,7 +57,7 @@ describe('web-doc-link', () => {
     )
     const links = root.querySelectorAll('a')
     expect(links[0]?.getAttribute('href')).toBeNull()
-    expect(links[0]?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBeNull()
+    expect(links[0]?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBeNull()
     expect(links[1]?.getAttribute('href')).toBeNull()
     expect(links[2]?.getAttribute('href')).toBeNull()
     // 惰性链接不再是导航目标，点击走默认行为也不会离开 srcdoc
@@ -67,13 +67,13 @@ describe('web-doc-link', () => {
   it('neutralize 将非 anchor 卡片根节点的来源 href 提升为导航目标', () => {
     const root = document.createElement('div')
     root.innerHTML = neutralizeWebDocNavigationLinks(
-      `<div role="link" tabindex="0" ${INKDOWN_SOURCE_HREF_ATTR}="/protocol/v1/elicitation"><span>Learn more</span></div>`,
+      `<div role="link" tabindex="0" ${MONTREE_SOURCE_HREF_ATTR}="/protocol/v1/elicitation"><span>Learn more</span></div>`,
       'https://agentclientprotocol.com/protocol/v1/initialization',
     )
 
     const card = root.firstElementChild
-    expect(card?.getAttribute(INKDOWN_SOURCE_HREF_ATTR)).toBeNull()
-    expect(card?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBe(
+    expect(card?.getAttribute(MONTREE_SOURCE_HREF_ATTR)).toBeNull()
+    expect(card?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBe(
       'https://agentclientprotocol.com/protocol/v1/elicitation',
     )
     expect(card?.getAttribute('role')).toBe('link')
@@ -86,13 +86,13 @@ describe('web-doc-link', () => {
   it('卡片内部 display-contents anchor 不会抢走外层导航目标', () => {
     const root = document.createElement('div')
     root.innerHTML = neutralizeWebDocNavigationLinks(
-      `<div ${INKDOWN_SOURCE_HREF_ATTR}="/next"><a class="web-doc-card-inner-link" href="/next"><span>Next</span></a></div>`,
+      `<div ${MONTREE_SOURCE_HREF_ATTR}="/next"><a class="web-doc-card-inner-link" href="/next"><span>Next</span></a></div>`,
       'https://example.com/docs/start',
     )
 
     const inner = root.querySelector('a')
     expect(inner?.getAttribute('href')).toBeNull()
-    expect(inner?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBeNull()
+    expect(inner?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBeNull()
     expect(resolveWebDocClickHref(inner?.firstElementChild ?? null, 'https://example.com/docs/start')).toBe(
       'https://example.com/next',
     )
@@ -108,14 +108,14 @@ describe('web-doc-link', () => {
     const links = root.querySelectorAll('a')
     expect(links[0]?.getAttribute('href')).toBe('mailto:reader@example.com')
     expect(links[1]?.getAttribute('href')).toBe('tel:+8613800000000')
-    expect(links[0]?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBeNull()
-    expect(links[1]?.getAttribute(INKDOWN_NAV_HREF_ATTR)).toBeNull()
+    expect(links[0]?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBeNull()
+    expect(links[1]?.getAttribute(MONTREE_NAV_HREF_ATTR)).toBeNull()
   })
 
   it('解析 SVG 命名空间的 a 链接（SVGAElement 同样可点击导航）', () => {
     const svgAnchor = document.createElementNS('http://www.w3.org/2000/svg', 'a')
     svgAnchor.setAttribute('href', '#')
-    svgAnchor.setAttribute(INKDOWN_NAV_HREF_ATTR, 'https://bojieli.github.io/ai-infra-book/manuscripts/00-x.html')
+    svgAnchor.setAttribute(MONTREE_NAV_HREF_ATTR, 'https://bojieli.github.io/ai-infra-book/manuscripts/00-x.html')
     expect(svgAnchor instanceof HTMLAnchorElement).toBe(false)
     expect(resolveWebDocClickHref(svgAnchor, 'https://bojieli.github.io/ai-infra-book/')).toBe(
       'https://bojieli.github.io/ai-infra-book/manuscripts/00-x.html',
@@ -135,23 +135,23 @@ describe('web-doc-link', () => {
     expect(detectWebDocIframeEscape(iframe, 'https://bojieli.github.io')).toBe('http://localhost:5173/')
   })
 
-  it('解析 data-inkdown-href 链接', () => {
+  it('解析 data-montree-href 链接', () => {
     const anchor = document.createElement('a')
-    anchor.setAttribute(INKDOWN_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
+    anchor.setAttribute(MONTREE_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
     const href = resolveWebDocClickHref(anchor, current)
     expect(href).toBe('https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
   })
 
   it('isWebDocNavigationTarget 识别 data 链接', () => {
     const anchor = document.createElement('a')
-    anchor.setAttribute(INKDOWN_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
+    anchor.setAttribute(MONTREE_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
     expect(isWebDocNavigationTarget(anchor, current)).toBe(true)
   })
 
   it('解析不同 DOM realm 的链接目标（真实 iframe 点击）', () => {
     const otherDocument = document.implementation.createHTMLDocument('iframe')
     const anchor = otherDocument.createElement('a')
-    anchor.setAttribute(INKDOWN_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
+    anchor.setAttribute(MONTREE_NAV_HREF_ATTR, 'https://paper.people.com.cn/rmrb/pc/content/202609/01/content_30178365.html')
     otherDocument.body.append(anchor)
 
     expect(resolveWebDocClickHref(anchor, current)).toBe(

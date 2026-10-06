@@ -65,7 +65,7 @@ export function createSdkStreamHandle(child: ChildProcessWithoutNullStreams): Sd
 }
 
 /**
- * 长驻连接：client({ name: 'inkdown' }).connect()，持有 ClientConnection。
+ * 长驻连接：client({ name: 'montree' }).connect()，持有 ClientConnection。
  * 不用 connectWith 作用域式；调用方用返回的 connection.agent 发请求，
  * 断开时 connection.close() 取消在途请求。
  */
@@ -78,7 +78,7 @@ export function connectSdkClient(
   if (runtimeId && process.env.NODE_ENV !== 'production') {
     console.info(`[acp:sdk] connect runtime=${runtimeId} pid=${child.pid ?? '?'}`)
   }
-  const app = createSdkClientApp({ name: 'inkdown' })
+  const app = createSdkClientApp({ name: 'montree' })
   configure(app)
   const streamHandle = createSdkStreamHandle(child)
   const connection = app.connect(streamHandle.stream)

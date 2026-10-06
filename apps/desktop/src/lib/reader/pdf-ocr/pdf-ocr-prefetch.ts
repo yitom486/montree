@@ -1,4 +1,4 @@
-import type { ReaderUnit } from '@inkdown/reader-core'
+import type { ReaderUnit } from '@montree/reader-core'
 
 export interface PdfOcrPrefetchRange {
   start: number

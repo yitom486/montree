@@ -5,7 +5,7 @@ describe('url-policy SSRF 防护', () => {
   it('放行正常公网文档站', () => {
     expect(() => assertWebDocUrlAllowed('https://react.dev/learn')).not.toThrow()
     expect(() => assertWebDocUrlAllowed('https://v2.cn.vuejs.org/guide/')).not.toThrow()
-    expect(() => assertWebDocUrlAllowed('https://e2e.inkdown.test/fixture')).not.toThrow()
+    expect(() => assertWebDocUrlAllowed('https://e2e.montree.test/fixture')).not.toThrow()
   })
 
   it('拦截回环与本地主机名', () => {

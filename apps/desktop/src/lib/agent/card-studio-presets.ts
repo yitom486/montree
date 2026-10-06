@@ -1,4 +1,4 @@
-import type { ReadingMarkCategory } from '@inkdown/contracts'
+import type { ReadingMarkCategory } from '@montree/contracts'
 
 /**
  * AI 制卡预设（P1，见 `.plan/ai-cards/01-card-studio-plan.md`）。

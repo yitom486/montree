@@ -2,8 +2,8 @@ import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AcpProxySettings, AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import type { AcpProxySettings, AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 
 /**
  * ACP 子进程代理设置：读写 userData/agent/proxy.json。

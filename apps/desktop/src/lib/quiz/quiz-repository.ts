@@ -1,6 +1,6 @@
-import type { QuizSessionRecord } from '@inkdown/contracts'
-import type { Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
+import type { Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 
 export interface IQuizRepository {
   appendSession(session: QuizSessionRecord): Promise<Result<void, AppError>>

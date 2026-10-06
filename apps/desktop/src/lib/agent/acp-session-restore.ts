@@ -1,4 +1,4 @@
-import type { AcpConnectReadyResult } from '@inkdown/contracts'
+import type { AcpConnectReadyResult } from '@montree/contracts'
 
 /** 连接成功后的系统文案（恢复成功 / 失败回退新建） */
 export function formatAcpConnectedMessage(

@@ -4,9 +4,9 @@ import {
   HIGHLIGHT_COLORS,
   type HighlightColorId,
   normalizeHighlightColor,
-} from '@inkdown/reader-core'
-import { getReadingMarkStatusLabel } from '@inkdown/reader-core'
-import type { ReadingMark } from '@inkdown/contracts'
+} from '@montree/reader-core'
+import { getReadingMarkStatusLabel } from '@montree/reader-core'
+import type { ReadingMark } from '@montree/contracts'
 import { cn } from '@/lib/utils'
 
 interface ReadingMarkPopoverProps {

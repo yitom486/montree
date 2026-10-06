@@ -2,11 +2,11 @@ import type {
   MarkProposalBatchToolResult,
   MarkProposalToolResult,
   ProposedMark,
-} from '@inkdown/annotations'
-import { toProposedMark } from '@inkdown/annotations'
+} from '@montree/annotations'
+import { toProposedMark } from '@montree/annotations'
 
 const PROPOSE_TOOL_PATTERN =
-  /inkdown_(?:propose_note|create_note|propose_mark|create_mark)|propose.?note|create.?note|提议批注|批注草稿/i
+  /montree_(?:propose_note|create_note|propose_mark|create_mark)|propose.?note|create.?note|提议批注|批注草稿/i
 
 export function isProposeMarkToolTitle(title: string | undefined): boolean {
   if (!title?.trim()) return false
@@ -117,10 +117,10 @@ export function enrichToolMessageWithMarkProposal<
     toolStatus?: string
     streaming?: boolean
     markProposal?: ProposedMark
-    markProposalStatus?: import('@inkdown/annotations').MarkProposalStatus
+    markProposalStatus?: import('@montree/annotations').MarkProposalStatus
     markProposals?: Array<{
       proposal: ProposedMark
-      status: import('@inkdown/annotations').MarkProposalStatus
+      status: import('@montree/annotations').MarkProposalStatus
     }>
   },
 >(message: T, isActiveStatus: (status: string | undefined) => boolean): T {

@@ -1,4 +1,4 @@
-import type { BookDbBlockHit } from '@inkdown/contracts'
+import type { BookDbBlockHit } from '@montree/contracts'
 
 /**
  * 罗盘块 → Agent 可读文本：标题恢复 ## 层级，表格/列表/段落原样拼回。

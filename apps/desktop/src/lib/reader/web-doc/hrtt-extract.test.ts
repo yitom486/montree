@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import { resolveWebDocSiteId } from '@inkdown/web-doc'
+import { resolveWebDocSiteId } from '@montree/web-doc'
 import { extractWebDocArticle } from '@/lib/reader/web-doc/web-doc-html'
 
 describe('hrtt-news 华人头条资讯正文', () => {

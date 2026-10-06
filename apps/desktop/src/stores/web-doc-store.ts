@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { normalizeWebDocInputUrl } from '@inkdown/web-doc'
+import { normalizeWebDocInputUrl } from '@montree/web-doc'
 
 const MAX_RECENT = 12
 
@@ -36,7 +36,7 @@ export const useWebDocStore = create<WebDocStore>()(
       },
     }),
     {
-      name: 'inkdown-web-doc',
+      name: 'montree-web-doc',
       partialize: (state) => ({
         recentUrls: state.recentUrls,
       }),

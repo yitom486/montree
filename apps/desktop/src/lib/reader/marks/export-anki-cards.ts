@@ -1,14 +1,14 @@
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import {
   bookTitleFromPath,
   type ReadingNotesChapterRef,
   type ReadingNotesScope,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { fileApi } from '@/api/file-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { reportAppError } from '@/lib/workspace/report-error'
 import { toast } from 'sonner'
-import { buildAnkiCardsExport } from '@inkdown/annotations'
+import { buildAnkiCardsExport } from '@montree/annotations'
 
 // 门面：纯构建已整迁入 packages/annotations/src/anki-cards.ts，调用方零改
 //（ReaderContentShell 的 buildAnkiCardsExport 与单测的各纯函数仍可从此文件导入）。
@@ -19,11 +19,11 @@ export {
   escapeAnkiHtml,
   formatFlashcardForAnkiHtml,
   sanitizeAnkiTag,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 export type {
   BuildAnkiCardsExportInput,
   BuildAnkiCardsExportResult,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 
 /**
  * 调起文件保存对话框导出 Anki 记忆卡片。

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { fileApi } from '@/api/file-api'
 import { queryKeys } from '@/api/query-keys'
-import { isOk } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 
 export function useReaderBinary(filePath?: string) {
   return useQuery({

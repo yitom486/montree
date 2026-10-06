@@ -3,9 +3,9 @@ import type {
   DueFlashcard,
   FlashcardReviewRating,
   ReadingMark,
-} from '@inkdown/contracts'
-import type { FlashcardKind } from '@inkdown/annotations'
-import { isHighlightPassage, passageExcerpt, passageNote } from '@inkdown/reader-core'
+} from '@montree/contracts'
+import type { FlashcardKind } from '@montree/annotations'
+import { isHighlightPassage, passageExcerpt, passageNote } from '@montree/reader-core'
 
 /**
  * 记忆卡片 SQL 后端（[2]-02b）：本书库 `book.db` v6 的 flashcards + review_log。

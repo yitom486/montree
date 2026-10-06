@@ -14,11 +14,11 @@ import { CardPresetMenuContent } from '@/components/reader/CardPresetMenu'
 import { DeepAnswerMenuContent } from '@/components/reader/DeepAnswerMenu'
 import { isMarkdownEditorFocused } from '@/lib/editor/editor-focus'
 import { cn } from '@/lib/utils'
-import { shouldHandleReaderCopyShortcut } from '@inkdown/reader-core'
+import { shouldHandleReaderCopyShortcut } from '@montree/reader-core'
 import {
   HIGHLIGHT_COLORS,
   type HighlightColorId,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 export interface SelectionToolbarProps {
   x: number

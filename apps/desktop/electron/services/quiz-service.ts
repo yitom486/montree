@@ -2,9 +2,9 @@ import { appendFile, mkdir, readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import { err, ok, parseQuizJsonl, serializeQuizSession, type Result } from '@inkdown/contracts'
-import type { QuizSessionRecord } from '@inkdown/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, parseQuizJsonl, serializeQuizSession, type Result } from '@montree/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
 import {
   exportQuizJsonl,
   importQuizJsonl,
@@ -14,18 +14,18 @@ import {
 } from './quiz-db'
 
 // 兼容再导出：纯函数已下沉 contracts，旧测试仍从本模块引入，保持可用
-export { parseQuizJsonl, serializeQuizSession } from '@inkdown/contracts'
+export { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
 
 export function getQuizFilePath(): string {
   return join(app.getPath('userData'), 'quiz-records.jsonl')
 }
 
 /**
- * 后端开关（[2]-02a 灰度/回滚）：默认走全局 inkdown.db；
- * `INKDOWN_QUIZ_BACKEND=file` 切回旧 JSONL 实现（保留旧代码路径）。
+ * 后端开关（[2]-02a 灰度/回滚）：默认走全局 montree.db；
+ * `MONTREE_QUIZ_BACKEND=file` 切回旧 JSONL 实现（保留旧代码路径）。
  */
 export function useFileQuizBackend(): boolean {
-  return process.env.INKDOWN_QUIZ_BACKEND === 'file'
+  return process.env.MONTREE_QUIZ_BACKEND === 'file'
 }
 
 async function readQuizStoreFile(): Promise<string> {

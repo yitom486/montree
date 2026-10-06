@@ -1,4 +1,4 @@
-import type { ReadingMarkCategory } from '@inkdown/contracts'
+import type { ReadingMarkCategory } from '@montree/contracts'
 import type { HeuristicCardResult } from '@/lib/reader/marks/card-shape'
 import { highlightColorForCategory } from '@/lib/reader/marks/card-shape'
 import {

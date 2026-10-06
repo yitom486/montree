@@ -3,7 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MarginaliaBar } from './MarginaliaBar'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -216,7 +216,7 @@ describe('MarginaliaBar', () => {
 
     // 初挂载 effect 已用初始值跑过（当时度量为 0）；推一次跟随事件触发赋值
     await act(async () => {
-      window.dispatchEvent(new CustomEvent('inkdown:rail-follow', { detail: 0.5 }))
+      window.dispatchEvent(new CustomEvent('montree:rail-follow', { detail: 0.5 }))
     })
     expect(rail.scrollTop).toBe(300)
   })

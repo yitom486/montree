@@ -6,7 +6,7 @@ export {
 } from '@/lib/agent/context/propose-mark'
 
 import { proposeMarksUnifiedForAgent } from '@/lib/agent/context/propose-mark'
-import type { MarkProposalPayload } from '@inkdown/annotations'
+import type { MarkProposalPayload } from '@montree/annotations'
 
 function normalizePayload(payload: MarkProposalPayload): MarkProposalPayload {
   return payload
@@ -17,7 +17,7 @@ export async function createNoteForAgent(note: string) {
   return proposeMarksUnifiedForAgent({ note }, { source: 'agent' })
 }
 
-/** MCP inkdown_propose_mark 快照入口（单条 / 批量 / 高亮） */
+/** MCP montree_propose_mark 快照入口（单条 / 批量 / 高亮） */
 export async function proposeMarkAtForAgentResult(payload: MarkProposalPayload) {
   return proposeMarksUnifiedForAgent(normalizePayload(payload), { source: 'agent' })
 }

@@ -29,7 +29,7 @@ export async function acpReadTextFile(params: {
 }): Promise<{ content: string }> {
   if (isBinaryDocumentPath(params.path)) {
     throw new Error(
-      `Inkdown 拒绝按文本读取电子书/PDF：${params.path}。` +
+      `Montree 拒绝按文本读取电子书/PDF：${params.path}。` +
         '该格式已由客户端解析，请改为向用户索取所需的章节、目录或视口文本。',
     )
   }

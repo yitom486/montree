@@ -1,11 +1,11 @@
-import { isReaderDocumentKind } from '@inkdown/contracts'
-import type { DocumentKind } from '@inkdown/contracts'
+import { isReaderDocumentKind } from '@montree/contracts'
+import type { DocumentKind } from '@montree/contracts'
 import { readingMarksApi } from '@/api/reading-marks-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import {
   collectHighlightPassages,
   serializeMarkPassage,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { collectActiveDocument } from './collect-turn-context'
 import { getReaderMarksProvider } from './reader-marks-registry'
 
@@ -13,9 +13,9 @@ export {
   collectHighlightPassages,
   isHighlightPassage,
   serializeMarkPassage as serializeMarkForAgent,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
-function supportsInkdownMarks(kind: DocumentKind): boolean {
+function supportsMontreeMarks(kind: DocumentKind): boolean {
   return kind === 'web' || isReaderDocumentKind(kind)
 }
 
@@ -24,8 +24,8 @@ async function loadMarksForOpenDocument() {
   if (!document?.path) {
     throw new Error('当前没有打开的文档')
   }
-  if (!supportsInkdownMarks(document.kind)) {
-    throw new Error('当前不是 EPUB/PDF/MOBI/在线文档，不必用 Inkdown 书签工具')
+  if (!supportsMontreeMarks(document.kind)) {
+    throw new Error('当前不是 EPUB/PDF/MOBI/在线文档，不必用 Montree 书签工具')
   }
 
   const result = await readingMarksApi.list(document.path)

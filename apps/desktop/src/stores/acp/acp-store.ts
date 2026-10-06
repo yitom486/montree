@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { createThrottledStorage } from '@/lib/agent/throttled-storage'
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import {
   MAX_THREADS,
   type AcpChatMessage,
@@ -26,7 +26,7 @@ export const useAcpUiStore = create<AcpUiStore>()(
       ...createHudSlice(...a),
     }),
     {
-      name: 'inkdown-acp-ui',
+      name: 'montree-acp-ui',
       storage: createJSONStorage(() => createThrottledStorage(localStorage, 1500)),
       partialize: (state) => ({
         // 重启 / 更新后恢复 Agent 面板展开状态与伴读 HUD 模式

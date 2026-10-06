@@ -46,13 +46,13 @@ import { useAcpChatShell, useAcpUiStore } from '@/stores/acp-ui-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { acpApi } from '@/api/acp-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import {
   BUILTIN_ACP_RUNTIMES,
   DEFAULT_ACP_RUNTIME_ID,
   findBuiltinAcpRuntime,
-} from '@inkdown/contracts'
-import type { AcpConfigOption, AcpProviderStatus, AcpProxySettings } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { AcpConfigOption, AcpProviderStatus, AcpProxySettings } from '@montree/contracts'
 
 interface AgentPanelProps {
   workspaceRoot?: string
@@ -545,7 +545,7 @@ export const AgentPanel = memo(function AgentPanel({
                 key: 'cross-ref',
                 label: '跨章引证',
                 hint: '调用交叉引用分析当前阅读位置',
-                text: '请对当前阅读位置做跨章节引证分析：调用 inkdown_cross_reference 工具，找出与当前内容相关的章节与实体，给出可跳转的结论。',
+                text: '请对当前阅读位置做跨章节引证分析：调用 montree_cross_reference 工具，找出与当前内容相关的章节与实体，给出可跳转的结论。',
               },
               {
                 key: 'probe',

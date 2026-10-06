@@ -35,7 +35,7 @@ async function openViaQuickOpen(window: Page, fileName: string, query: string): 
 test.describe('扫描版 PDF 单页 OCR', () => {
   test('识别本页落缓存且文字层可读', async () => {
     test.setTimeout(300_000)
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-pdf-ocr-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-pdf-ocr-'))
     await copyFile(
       join(__dirname, 'fixtures', 'ocr', 'scanned-hello.pdf'),
       join(workspace, 'scanned-hello.pdf'),

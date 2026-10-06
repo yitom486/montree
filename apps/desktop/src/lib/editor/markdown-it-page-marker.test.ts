@@ -30,7 +30,7 @@ describe('parsePageMarker', () => {
 describe('markdownItPageMarker', () => {
   it('独立成行标记转 chip，上下文保留', () => {
     const html = render('第一章\n\n<!-- Page 19 -->\n\n正文')
-    expect(html).toContain('class="inkdown-page-marker"')
+    expect(html).toContain('class="montree-page-marker"')
     expect(html).toContain('data-page="19"')
     expect(html).toContain('第 19 页')
     expect(html).toContain('第一章')
@@ -40,13 +40,13 @@ describe('markdownItPageMarker', () => {
 
   it('普通注释与混排标记保持转义原文', () => {
     const html = render('<!-- note -->\n\n正文 <!-- Page 3 --> 混排')
-    expect(html).not.toContain('inkdown-page-marker')
+    expect(html).not.toContain('montree-page-marker')
     expect(html).toContain('&lt;!-- note --&gt;')
   })
 
   it('围栏内标记不动', () => {
     const html = render('```text\n<!-- Page 5 -->\n```')
-    expect(html).not.toContain('inkdown-page-marker')
+    expect(html).not.toContain('montree-page-marker')
     expect(html).toContain('Page 5')
   })
 

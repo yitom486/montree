@@ -1,9 +1,9 @@
-appId: com.inkdown.app
-productName: Inkdown
+appId: com.montree.app
+productName: Montree
 publish:
   provider: github
   owner: yitom486
-  repo: inkdown
+  repo: montree
 directories:
   buildResources: apps/desktop/resources
   output: release
@@ -56,7 +56,7 @@ nsis:
   allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Inkdown
+  shortcutName: Montree
   installerLanguages:
     - zh_CN
     - en_US
@@ -86,7 +86,7 @@ linux:
   maintainer: yitom486 <yitom486@gmail.com>
   desktop:
     entry:
-      Name: Inkdown
+      Name: Montree
       Comment: Markdown 编辑与电子书 / 在线文档阅读
       Categories: Office;TextEditor;
       Terminal: false

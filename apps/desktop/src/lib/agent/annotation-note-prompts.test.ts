@@ -20,7 +20,7 @@ describe('annotation-note-prompts', () => {
     expect(built.displayText).toBe('解释这段')
     expect(built.promptText).toContain('天下大势分久必合')
     expect(built.promptText).toContain('普通聊天')
-    expect(built.promptText).toContain('不要调用 inkdown_propose_mark')
+    expect(built.promptText).toContain('不要调用 montree_propose_mark')
     expect(built.promptText).toContain('禁止输出 English:')
   })
 
@@ -30,7 +30,7 @@ describe('annotation-note-prompts', () => {
       hint: '写批注：侧重作者语气',
     })
     expect(built.displayText).toContain('写批注')
-    expect(built.promptText).toContain('inkdown_propose_mark')
+    expect(built.promptText).toContain('montree_propose_mark')
     expect(built.promptText).toContain('只输出批注正文')
     expect(built.promptText).toContain('Natural English:')
   })

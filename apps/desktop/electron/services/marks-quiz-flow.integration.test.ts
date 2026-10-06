@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
 }))
 
 import { closeAllBookDbs, getBookDbDir, openBookDb } from './book-db/open-book-db'
-import { closeAllInkdownDbs, openInkdownDb } from './app-db/open-app-db'
+import { closeAllMontreeDbs, openMontreeDb } from './app-db/open-app-db'
 import {
   createReadingMark,
   deleteReadingMark,
@@ -44,25 +44,25 @@ import {
   readQuizSessionsByFile,
 } from './quiz-service'
 import { clearQuizFingerprintCache, exportQuizJsonl, importQuizJsonl } from './quiz-db'
-import { isOk, toChapterKey } from '@inkdown/contracts'
-import type { QuizSessionRecord } from '@inkdown/contracts'
+import { isOk, toChapterKey } from '@montree/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
 
 afterEach(() => {
   // 兜底：helper 已做清理；此处只防用例中途抛错漏关句柄（不删目录，由 helper 断言负责）
   closeAllBookDbs()
-  closeAllInkdownDbs()
+  closeAllMontreeDbs()
 })
 
 /** 独占隔离目录跑一段流程；返回后目录必须已消失（清理及时性断言在调用方做） */
 async function withIsolatedUserData(fn: (dir: string) => Promise<void>): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'inkdown-integration-'))
+  const dir = await mkdtemp(join(tmpdir(), 'montree-integration-'))
   tempUserData = dir
   try {
     await fn(dir)
   } finally {
     // 先关句柄再删目录（顺序反了 Windows 上 rm 会失败，测试即红）
     closeAllBookDbs()
-    closeAllInkdownDbs()
+    closeAllMontreeDbs()
     clearFlashcardsBackfillCache()
     clearQuizFingerprintCache()
     tempUserData = ''
@@ -191,7 +191,7 @@ describe('落库读写集成（marks/quiz/flashcards 全链路）', () => {
       expect(mine.value[0]?.submissions['q1']?.score).toBe(90)
 
       // 指纹回填对账
-      const rows = openInkdownDb(tempUserData)
+      const rows = openMontreeDb(tempUserData)
         .prepare('SELECT id, book_fingerprint AS fp FROM quiz_sessions ORDER BY id')
         .all() as Array<{ id: string; fp: string | null }>
       expect(rows).toEqual([

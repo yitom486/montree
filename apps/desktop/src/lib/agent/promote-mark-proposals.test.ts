@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { promoteMarkProposalsToLastAgent, isProposalPromotedToAgent } from '@/lib/agent/promote-mark-proposals'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
-import { toProposedMark } from '@inkdown/annotations'
+import { toProposedMark } from '@montree/annotations'
 
 describe('promote-mark-proposals', () => {
   it('把工具 propose 挂到最近 Agent 回复下方', () => {

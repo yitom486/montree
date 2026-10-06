@@ -1,9 +1,9 @@
-import type { DocumentKind } from '@inkdown/contracts'
+import type { DocumentKind } from '@montree/contracts'
 
 /** 附加到用户消息前的 turn-context 体积上限（字符数） */
 export const TURN_CONTEXT_MAX_CHARS = 1200
 
-export interface InkdownActiveDocument {
+export interface MontreeActiveDocument {
   /** 绝对路径 */
   path: string
   kind: DocumentKind
@@ -11,7 +11,7 @@ export interface InkdownActiveDocument {
   name: string
 }
 
-export interface InkdownReadingState {
+export interface MontreeReadingState {
   /** 阅读进度百分比，0–100 的整数 */
   percent?: number
   /** 当前所在章节 / 页 */
@@ -24,34 +24,34 @@ export interface InkdownReadingState {
   page?: number
 }
 
-export interface InkdownTurnContext {
+export interface MontreeTurnContext {
   /** 相比上次附加的 turn-context，用户是否换了文件 */
   documentChanged: boolean
-  activeDocument: InkdownActiveDocument | null
-  reading?: InkdownReadingState
-  /** 发送时用户是否选中了文本（不含选区正文，正文走 inkdown_get_selection） */
+  activeDocument: MontreeActiveDocument | null
+  reading?: MontreeReadingState
+  /** 发送时用户是否选中了文本（不含选区正文，正文走 montree_get_selection） */
   hasSelection?: boolean
-  /** 目录顶层标题（最多约 10 条），便于记住全书结构；完整目录仍走 inkdown_get_toc */
+  /** 目录顶层标题（最多约 10 条），便于记住全书结构；完整目录仍走 montree_get_toc */
   tocTopLevel?: string[]
 }
 
 /** turn-context 块的稳定首尾标记：回放清洗（strip-replay-scaffolding）据此剥离 */
-export const INKDOWN_TURN_CONTEXT_OPEN_TAG = '<inkdown-turn-context>'
-export const INKDOWN_TURN_CONTEXT_CLOSE_TAG = '</inkdown-turn-context>'
+export const MONTREE_TURN_CONTEXT_OPEN_TAG = '<montree-turn-context>'
+export const MONTREE_TURN_CONTEXT_CLOSE_TAG = '</montree-turn-context>'
 
-const OPEN_TAG = INKDOWN_TURN_CONTEXT_OPEN_TAG
-const CLOSE_TAG = INKDOWN_TURN_CONTEXT_CLOSE_TAG
+const OPEN_TAG = MONTREE_TURN_CONTEXT_OPEN_TAG
+const CLOSE_TAG = MONTREE_TURN_CONTEXT_CLOSE_TAG
 
 /** 同一文件同一格式视为同一文档；无打开文件时为 null */
-export function documentKey(doc: InkdownActiveDocument | null): string | null {
+export function documentKey(doc: MontreeActiveDocument | null): string | null {
   if (!doc) return null
   return `${doc.kind}:${doc.path}`
 }
 
-function compactReading(reading: InkdownReadingState): InkdownReadingState | undefined {
+function compactReading(reading: MontreeReadingState): MontreeReadingState | undefined {
   const entries = Object.entries(reading).filter(([, v]) => v !== undefined && v !== '')
   if (entries.length === 0) return undefined
-  return Object.fromEntries(entries) as InkdownReadingState
+  return Object.fromEntries(entries) as MontreeReadingState
 }
 
 /**
@@ -59,12 +59,12 @@ function compactReading(reading: InkdownReadingState): InkdownReadingState | und
  * 超出 {@link TURN_CONTEXT_MAX_CHARS} 时逐级丢弃可选字段，保证不会撑爆上下文。
  */
 export function formatTurnContextBlock(
-  context: InkdownTurnContext,
+  context: MontreeTurnContext,
   maxChars = TURN_CONTEXT_MAX_CHARS,
 ): string {
   const reading = context.reading ? compactReading(context.reading) : undefined
 
-  const candidates: InkdownTurnContext[] = [
+  const candidates: MontreeTurnContext[] = [
     { ...context, reading },
     // 退化 1：丢掉顶层目录（可选、体积最大）
     { ...context, reading, tocTopLevel: undefined },
@@ -86,7 +86,7 @@ export function formatTurnContextBlock(
     if (text.length <= maxChars) return text
   }
 
-  const fallback: InkdownTurnContext = {
+  const fallback: MontreeTurnContext = {
     documentChanged: context.documentChanged,
     activeDocument: context.activeDocument
       ? {

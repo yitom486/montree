@@ -3,18 +3,18 @@ import type {
   ClientConnection,
 } from '@agentclientprotocol/sdk'
 import {
-  INKDOWN_SETTLE_COMPLETE_KIND,
+  MONTREE_SETTLE_COMPLETE_KIND,
   type AcpConnectionStatus,
   type AcpPermissionOutcome,
   type AcpPromptCapabilities,
   type AcpSessionUpdateEvent,
   type AcpStatusChangedEvent,
-  type InkdownSnapshotArgs,
-  type InkdownSnapshotResource,
-} from '@inkdown/contracts'
+  type MontreeSnapshotArgs,
+  type MontreeSnapshotResource,
+} from '@montree/contracts'
 import type { SdkStreamHandle } from './sdk-client'
 import type { SpawnedAcpProcess } from './process-manager'
-import type { InkdownMcpServerHandle } from './mcp/inkdown-mcp-server'
+import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
 import { AcpTerminalManager } from './acp-terminal'
 
 /** 协议版本（与 Agent initialize 握手协商一致，单点定义供 connection 读写） */
@@ -36,8 +36,8 @@ export type AcpPermissionBridge = (payload: {
 }) => Promise<AcpPermissionOutcome>
 export type AcpSnapshotBridge = (payload: {
   requestId: number
-  resource: InkdownSnapshotResource
-  args?: InkdownSnapshotArgs
+  resource: MontreeSnapshotResource
+  args?: MontreeSnapshotArgs
 }) => Promise<string>
 
 /**
@@ -92,9 +92,9 @@ export const acpState: {
   snapshotRequestSeq: number
   /** 权限请求自增序号（供 UI 回显，无待决 Map，直返 bridge 结果） */
   permissionSeq: number
-  inkdownMcp: InkdownMcpServerHandle | null
+  montreeMcp: MontreeMcpServerHandle | null
   /** 目录副会话专用端点句柄（懒启动，随 disconnect 关闭） */
-  tocMcp: InkdownMcpServerHandle | null
+  tocMcp: MontreeMcpServerHandle | null
   /** 已绑过退出监听的温进程（复用时刷新代际，避免监听器堆积） */
   exitWatch: { handle: SpawnedAcpProcess; listener: () => void } | null
   sessionUpdateListeners: Set<AcpSessionUpdateListener>
@@ -127,7 +127,7 @@ export const acpState: {
   snapshotBridge: null,
   snapshotRequestSeq: 0,
   permissionSeq: 0,
-  inkdownMcp: null,
+  montreeMcp: null,
   tocMcp: null,
   exitWatch: null,
   sessionUpdateListeners: new Set<AcpSessionUpdateListener>(),
@@ -242,7 +242,7 @@ export function broadcastSettleComplete(): void {
     acpState.activePromptSessionId ?? acpState.sessionId ?? ''
   const event: AcpSessionUpdateEvent = {
     sessionId: sid,
-    update: { sessionUpdate: INKDOWN_SETTLE_COMPLETE_KIND },
+    update: { sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND },
   }
   for (const listener of acpState.sessionUpdateListeners) {
     try {

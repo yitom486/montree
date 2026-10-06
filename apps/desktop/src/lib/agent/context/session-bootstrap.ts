@@ -1,5 +1,5 @@
 /**
- * Track which ACP sessions have received the one-time Inkdown bootstrap.
+ * Track which ACP sessions have received the one-time Montree bootstrap.
  * The set is renderer-process scoped, so a resumed session after an app reload
  * receives the bootstrap again even if the ACP session id is unchanged.
  */

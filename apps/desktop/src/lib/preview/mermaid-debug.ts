@@ -1,13 +1,13 @@
 /**
  * Mermaid 诊断日志。
  * - 默认开启（方便排查出图竞态）
- * - 关闭：localStorage.setItem('inkdown:mermaid-debug', '0') 后刷新
- * - 强制开：localStorage.setItem('inkdown:mermaid-debug', '1')
+ * - 关闭：localStorage.setItem('montree:mermaid-debug', '0') 后刷新
+ * - 强制开：localStorage.setItem('montree:mermaid-debug', '1')
  */
 export function isMermaidDebugEnabled(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    const flag = window.localStorage.getItem('inkdown:mermaid-debug')
+    const flag = window.localStorage.getItem('montree:mermaid-debug')
     if (flag === '0') return false
     if (flag === '1') return true
   } catch {

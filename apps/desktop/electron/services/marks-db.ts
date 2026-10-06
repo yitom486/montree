@@ -9,12 +9,12 @@ import type {
   ReadingMark,
   ReadingMarkCategory,
   ReadingMarkKind,
-} from '@inkdown/contracts'
-import { canonicalAnchorKey } from '@inkdown/contracts'
+} from '@montree/contracts'
+import { canonicalAnchorKey } from '@montree/contracts'
 import {
   normalizeMarkFilePath as normalizeMarkFilePathCore,
   type SyncMarksPayload,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import type { ReadingMarksFile } from './reading-marks-service'
 import { getBookDbDir, openBookDb } from './book-db/open-book-db'
 import {

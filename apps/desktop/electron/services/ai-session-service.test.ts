@@ -13,10 +13,10 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { INKDOWN_DB_SCHEMA_VERSION, getInkdownDbVersion, migrateInkdownDb } from './app-db/schema'
-import { closeAllInkdownDbs, openInkdownDb } from './app-db/open-app-db'
+import { MONTREE_DB_SCHEMA_VERSION, getMontreeDbVersion, migrateMontreeDb } from './app-db/schema'
+import { closeAllMontreeDbs, openMontreeDb } from './app-db/open-app-db'
 import { getAiSession, putAiSession, touchAiSession } from './ai-session-service'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 
 describe('ai-session-service（一书一会话指针）', () => {
   beforeEach(async () => {
@@ -24,7 +24,7 @@ describe('ai-session-service（一书一会话指针）', () => {
   })
 
   afterEach(() => {
-    closeAllInkdownDbs()
+    closeAllMontreeDbs()
     if (tempUserData) rmSync(tempUserData, { recursive: true, force: true })
     tempUserData = ''
   })
@@ -32,8 +32,8 @@ describe('ai-session-service（一书一会话指针）', () => {
   it('v2 迁移建 ai_sessions（复合主键，quiz 表原位保留）', () => {
     const db = new DatabaseSync(':memory:')
     try {
-      expect(migrateInkdownDb(db)).toEqual({ migrated: true, version: INKDOWN_DB_SCHEMA_VERSION })
-      expect(migrateInkdownDb(db).migrated).toBe(false)
+      expect(migrateMontreeDb(db)).toEqual({ migrated: true, version: MONTREE_DB_SCHEMA_VERSION })
+      expect(migrateMontreeDb(db).migrated).toBe(false)
       const tables = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all() as Array<{ name: string }>
@@ -105,25 +105,25 @@ describe('ai-session-service（一书一会话指针）', () => {
   })
 
   it('v1 老库升级 v2：测验行保留', async () => {
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     db.prepare(
       `INSERT INTO quiz_sessions (
         id, book_fingerprint, file_path, book_title, chapter_key, chapter_title,
         total_score, grade, question_count, correct_count, created_at
       ) VALUES ('s1', NULL, 'D:/b.epub', '书', NULL, NULL, 80, 'B', 1, 1, 1)`,
     ).run()
-    closeAllInkdownDbs()
+    closeAllMontreeDbs()
     // 降回 v1 形态（删表 + 回拨版本号，模拟 02a 时代库），再打开即升 v2
-    const raw = new DatabaseSync(join(tempUserData, 'inkdown.db'))
+    const raw = new DatabaseSync(join(tempUserData, 'montree.db'))
     try {
       raw.exec('DROP TABLE ai_sessions')
       raw.exec('PRAGMA user_version = 1')
-      expect(getInkdownDbVersion(raw)).toBe(1)
+      expect(getMontreeDbVersion(raw)).toBe(1)
     } finally {
       raw.close()
     }
-    const upgraded = openInkdownDb(tempUserData)
-    expect(getInkdownDbVersion(upgraded)).toBe(2)
+    const upgraded = openMontreeDb(tempUserData)
+    expect(getMontreeDbVersion(upgraded)).toBe(2)
     const count = (
       upgraded.prepare('SELECT COUNT(*) AS c FROM quiz_sessions').get() as {
         c: number

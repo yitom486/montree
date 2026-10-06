@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@inkdown/contracts'
-import { markMatchesKindFilters } from '@inkdown/reader-core'
+import type { ReadingMark } from '@montree/contracts'
+import { markMatchesKindFilters } from '@montree/reader-core'
 
 function mark(
   overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' | 'anchor'>,

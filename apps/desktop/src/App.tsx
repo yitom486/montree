@@ -25,7 +25,7 @@ import { useGlobalErrorHandlers } from '@/hooks/workspace/useGlobalErrorHandlers
 import { useAppMeta, useFileOperations } from '@/hooks/workspace/useFileOperations'
 import { useSyncProgressBridge } from '@/hooks/reader/useSyncProgressBridge'
 import { useAcpPermissionIngest } from '@/hooks/agent/useAcpPermissionIngest'
-import { useInkdownSnapshotHost } from '@/hooks/agent/useInkdownSnapshotHost'
+import { useMontreeSnapshotHost } from '@/hooks/agent/useMontreeSnapshotHost'
 import { useAcpStreamHost } from '@/hooks/agent/useAcpStreamHost'
 import { pickLatestRecoverableDraft } from '@/lib/editor/draft-utils'
 import { resolveStartupRestoreTarget } from '@/lib/workspace/workspace-session'
@@ -125,7 +125,7 @@ function App() {
   useGlobalErrorHandlers(filePath)
   useSyncProgressBridge()
   useAcpPermissionIngest()
-  useInkdownSnapshotHost()
+  useMontreeSnapshotHost()
   // ACP 流式推送宿主：生命周期跟应用走（useAcpStreamHost），
   // 绝不跟 Agent 面板的挂载走——双面板挂载曾导致同一 chunk 进两遍时间线（复读）
   useAcpStreamHost()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEEPSEEK_DSH_NPM_PACKAGE } from '@inkdown/contracts'
+import { DEEPSEEK_DSH_NPM_PACKAGE } from '@montree/contracts'
 import {
   buildDeepseekMissingKeyMessage,
   deepseekAdapter,

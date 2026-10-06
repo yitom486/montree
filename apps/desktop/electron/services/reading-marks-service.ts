@@ -3,8 +3,8 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { app } from 'electron'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   AppendFlashcardReviewPayload,
   CreateReadingMarkPayload,
@@ -14,14 +14,14 @@ import type {
   MarksSearchPayload,
   ReadingMark,
   UpdateReadingMarkPayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   applyReadingMarkDelete,
   applyReadingMarkUpdate,
   buildReadingMark,
   normalizeMarkFilePath as normalizeMarkFilePathCore,
   validateReadingAnchor,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import {
   appendFlashcardReview as appendFlashcardReviewInDb,
   dropFlashcardForMark,
@@ -53,10 +53,10 @@ export function getMarksFilePath(): string {
 
 /**
  * 后端开关（[2]-01 灰度/回滚）：默认走各书 book.db；
- * `INKDOWN_MARKS_BACKEND=file` 切回旧文件实现（保留旧代码路径）。
+ * `MONTREE_MARKS_BACKEND=file` 切回旧文件实现（保留旧代码路径）。
  */
 export function useFileMarksBackend(): boolean {
-  return process.env.INKDOWN_MARKS_BACKEND === 'file'
+  return process.env.MONTREE_MARKS_BACKEND === 'file'
 }
 
 export async function readMarksStore(): Promise<ReadingMarksFile> {

@@ -3,7 +3,7 @@ import { WebDocUrlField } from '@/components/layout/web-doc/WebDocUrlField'
 import { Clock, FileText, FolderOpen, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { APP_TAGLINE, APP_TITLE } from '@inkdown/contracts'
+import { APP_TAGLINE, APP_TITLE } from '@montree/contracts'
 
 function getFileName(filePath: string): string {
   return filePath.split(/[/\\]/).pop() ?? filePath

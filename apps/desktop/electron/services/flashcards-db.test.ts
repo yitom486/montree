@@ -32,11 +32,11 @@ import {
   listDueFlashcards,
 } from './marks-db'
 import { countDueFlashcards, deriveFlashcard, getFlashcardRow, listReviewRows } from './flashcards-db'
-import { isOk, toChapterKey } from '@inkdown/contracts'
+import { isOk, toChapterKey } from '@montree/contracts'
 
 describe('flashcards-db（[2]-02b 记忆卡片复习态）', () => {
   beforeEach(async () => {
-    delete process.env.INKDOWN_MARKS_BACKEND
+    delete process.env.MONTREE_MARKS_BACKEND
     tempUserData = await mkdtemp(join(tmpdir(), 'flashcards-db-'))
   })
 
@@ -44,7 +44,7 @@ describe('flashcards-db（[2]-02b 记忆卡片复习态）', () => {
     closeAllBookDbs()
     // 先关句柄再删目录（Windows 占文件删不掉）；用后即焚，不留 tmp 堆积
     if (tempUserData) rmSync(tempUserData, { recursive: true, force: true })
-    delete process.env.INKDOWN_MARKS_BACKEND
+    delete process.env.MONTREE_MARKS_BACKEND
     tempUserData = ''
   })
 
@@ -297,7 +297,7 @@ describe('flashcards-db（[2]-02b 记忆卡片复习态）', () => {
   })
 
   it('file 后端：卡片联动不碰库（回滚即无 DB 写入）', async () => {
-    process.env.INKDOWN_MARKS_BACKEND = 'file'
+    process.env.MONTREE_MARKS_BACKEND = 'file'
     const created = await createReadingMark({
       filePath: 'D:\\books\\demo.epub',
       fileFingerprint: 'fp-file',
@@ -361,7 +361,7 @@ describe('flashcards-db（[2]-02b 记忆卡片复习态）', () => {
   })
 
   it('UI批 service file 后端：列表空、落盘 false（调用方回落内存）', async () => {
-    process.env.INKDOWN_MARKS_BACKEND = 'file'
+    process.env.MONTREE_MARKS_BACKEND = 'file'
     const due = await listDueFlashcardsService({ filePath: 'D:\\books\\demo.epub' })
     expect(isOk(due) && due.value).toEqual([])
     const persisted = await appendFlashcardReviewService({

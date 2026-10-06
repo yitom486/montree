@@ -9,7 +9,7 @@
  *   `emitRailFollow` 上报，卡片轨统一订阅跟随——而不是各格式自搞一套。
  */
 
-export const RAIL_FOLLOW_EVENT = 'inkdown:rail-follow'
+export const RAIL_FOLLOW_EVENT = 'montree:rail-follow'
 
 export function emitRailFollow(fraction: number): void {
   if (!Number.isFinite(fraction)) return
@@ -29,7 +29,7 @@ export function subscribeRailFollow(handler: (fraction: number) => void): () => 
  * 反向联动：点正文标记 → 卡片轨滚动到对应卡并闪现。
  * 与跟随通道一样走 window 事件，不经过 React state。
  */
-export const RAIL_FOCUS_EVENT = 'inkdown:rail-focus'
+export const RAIL_FOCUS_EVENT = 'montree:rail-focus'
 
 export function emitRailFocus(markId: string): void {
   if (!markId) return

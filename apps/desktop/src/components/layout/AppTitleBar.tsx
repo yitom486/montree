@@ -34,7 +34,7 @@ interface AppTitleBarProps {
 function getDisplayFileInfo(filePath?: string) {
   if (!filePath) {
     return {
-      name: 'Inkdown',
+      name: 'Montree',
       sub: '快速打开 (Ctrl+P)',
       isBook: false,
     }
@@ -117,7 +117,7 @@ export function AppTitleBar({
         )}
 
         <div className="flex items-center gap-1.5 pl-1 pr-2">
-          <span className="text-xs font-semibold tracking-wide text-foreground/80">Inkdown</span>
+          <span className="text-xs font-semibold tracking-wide text-foreground/80">Montree</span>
         </div>
       </div>
 

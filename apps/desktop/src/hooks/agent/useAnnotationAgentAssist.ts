@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { acpApi } from '@/api/acp-api'
-import { buildInkdownPromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
+import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {
   markSessionBootstrapSent,
   shouldSendSessionBootstrap,
@@ -166,7 +166,7 @@ export function useAnnotationAgentAssist(options: {
       store.beginAgentReply()
 
       const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildInkdownPromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
+      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
       const result = await acpApi.prompt({
         sessionId: sid,
         prompt: [...prefix, { type: 'text', text: promptText }],
@@ -353,7 +353,7 @@ export function useAnnotationAgentAssist(options: {
       store.beginAgentReply()
 
       const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildInkdownPromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
+      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
       const result = await acpApi.prompt({
         sessionId: sid,
         prompt: [...prefix, { type: 'text', text: built.promptText }],

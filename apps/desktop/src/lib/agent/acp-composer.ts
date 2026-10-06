@@ -1,11 +1,11 @@
 import {
   IMAGE_EXTENSION_BY_MIME,
   IMAGE_MIME_BY_EXTENSION,
-} from '@inkdown/contracts'
-import type { AcpContentBlock, AcpPromptCapabilities } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
 
 /** 侧栏 → Agent 输入区拖拽的自定义 MIME（JSON 绝对路径数组） */
-export const INKDOWN_WORKSPACE_PATHS_MIME = 'application/x-inkdown-workspace-paths'
+export const MONTREE_WORKSPACE_PATHS_MIME = 'application/x-montree-workspace-paths'
 
 /** 单张图片上限（发送前） */
 export const ACP_MAX_IMAGE_BYTES = 8 * 1024 * 1024
@@ -99,14 +99,14 @@ export function writeWorkspacePathsToDataTransfer(
 ): void {
   const unique = [...new Set(paths.filter((p) => p.trim()))]
   if (unique.length === 0) return
-  dataTransfer.setData(INKDOWN_WORKSPACE_PATHS_MIME, JSON.stringify(unique))
+  dataTransfer.setData(MONTREE_WORKSPACE_PATHS_MIME, JSON.stringify(unique))
   dataTransfer.setData('text/plain', unique.join('\n'))
   dataTransfer.effectAllowed = 'copy'
 }
 
 /** 从拖放数据解析工作区绝对路径（自定义 MIME 优先） */
 export function readWorkspacePathsFromDataTransfer(dataTransfer: DataTransfer): string[] {
-  const raw = dataTransfer.getData(INKDOWN_WORKSPACE_PATHS_MIME)
+  const raw = dataTransfer.getData(MONTREE_WORKSPACE_PATHS_MIME)
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw)
@@ -121,7 +121,7 @@ export function readWorkspacePathsFromDataTransfer(dataTransfer: DataTransfer): 
 }
 
 export function dataTransferHasWorkspacePaths(dataTransfer: DataTransfer): boolean {
-  return Array.from(dataTransfer.types).includes(INKDOWN_WORKSPACE_PATHS_MIME)
+  return Array.from(dataTransfer.types).includes(MONTREE_WORKSPACE_PATHS_MIME)
 }
 
 export function attachmentToMessageMeta(att: ComposerAttachment): AcpMessageAttachment {

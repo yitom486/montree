@@ -1,5 +1,5 @@
-import type { FileTreeNode } from '@inkdown/contracts'
-import { getFileExtension, getDocumentKind, type DocumentKind } from '@inkdown/contracts'
+import type { FileTreeNode } from '@montree/contracts'
+import { getFileExtension, getDocumentKind, type DocumentKind } from '@montree/contracts'
 
 export interface QuickOpenFileItem {
   path: string

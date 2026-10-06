@@ -3,12 +3,12 @@ import { formatWindowTitle } from './window-title'
 
 describe('formatWindowTitle', () => {
   it('无打开文件时仅显示应用名', () => {
-    expect(formatWindowTitle(undefined, false, 'Inkdown')).toBe('Inkdown')
+    expect(formatWindowTitle(undefined, false, 'Montree')).toBe('Montree')
   })
 
   it('脏标记追加圆点', () => {
-    expect(formatWindowTitle('D:\\books\\novel.epub', true, 'Inkdown')).toBe(
-      'novel.epub • — Inkdown',
+    expect(formatWindowTitle('D:\\books\\novel.epub', true, 'Montree')).toBe(
+      'novel.epub • — Montree',
     )
   })
 

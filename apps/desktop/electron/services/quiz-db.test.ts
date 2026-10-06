@@ -13,8 +13,8 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { INKDOWN_DB_SCHEMA_VERSION, migrateInkdownDb } from './app-db/schema'
-import { closeAllInkdownDbs, openInkdownDb } from './app-db/open-app-db'
+import { MONTREE_DB_SCHEMA_VERSION, migrateMontreeDb } from './app-db/schema'
+import { closeAllMontreeDbs, openMontreeDb } from './app-db/open-app-db'
 import { closeAllBookDbs, openBookDb } from './book-db/open-book-db'
 import {
   appendQuizSession,
@@ -29,8 +29,8 @@ import {
   importQuizJsonl,
   listQuizSessionsByFile,
 } from './quiz-db'
-import { isOk, parseQuizJsonl, serializeQuizSession } from '@inkdown/contracts'
-import type { QuizSessionRecord } from '@inkdown/contracts'
+import { isOk, parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
 import { mergeQuizSessions } from './sync/mergers/quiz-merger'
 
 function sampleSession(overrides: Partial<QuizSessionRecord> = {}): QuizSessionRecord {
@@ -90,25 +90,25 @@ function sampleSession(overrides: Partial<QuizSessionRecord> = {}): QuizSessionR
 
 describe('quiz-db（[2]-02a 测验全局库后端）', () => {
   beforeEach(async () => {
-    delete process.env.INKDOWN_QUIZ_BACKEND
+    delete process.env.MONTREE_QUIZ_BACKEND
     tempUserData = await mkdtemp(join(tmpdir(), 'quiz-db-'))
   })
 
   afterEach(() => {
-    closeAllInkdownDbs()
+    closeAllMontreeDbs()
     closeAllBookDbs()
     // 先关句柄再删目录（Windows 占文件删不掉）；用后即焚，不留 tmp 堆积
     if (tempUserData) rmSync(tempUserData, { recursive: true, force: true })
-    delete process.env.INKDOWN_QUIZ_BACKEND
+    delete process.env.MONTREE_QUIZ_BACKEND
     tempUserData = ''
   })
 
   it('v1 迁移建 sessions/questions 表与索引（幂等）', () => {
     const db = new DatabaseSync(':memory:')
     try {
-      const first = migrateInkdownDb(db)
-      expect(first).toEqual({ migrated: true, version: INKDOWN_DB_SCHEMA_VERSION })
-      expect(migrateInkdownDb(db)).toEqual({ migrated: false, version: INKDOWN_DB_SCHEMA_VERSION })
+      const first = migrateMontreeDb(db)
+      expect(first).toEqual({ migrated: true, version: MONTREE_DB_SCHEMA_VERSION })
+      expect(migrateMontreeDb(db)).toEqual({ migrated: false, version: MONTREE_DB_SCHEMA_VERSION })
       const tables = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all() as Array<{ name: string }>
@@ -148,7 +148,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     expect(back.createdAt).toBe('2026-09-01T12:00:00.000Z')
 
     // 派生列：2 题、1 题及格（85 分过线，40 分不过）
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     const row = db.prepare('SELECT question_count, correct_count FROM quiz_sessions WHERE id = ?').get(
       'session-1',
     ) as { question_count: number; correct_count: number }
@@ -191,7 +191,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     expect(isOk(await appendQuizSession(sampleSession()))).toBe(true)
     expect(listQuizSessionsByFile(tempUserData, 'D:/books/hongloumeng.epub')).toHaveLength(1)
 
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     const filePlan = db
       .prepare(
         'EXPLAIN QUERY PLAN SELECT * FROM quiz_sessions WHERE file_path = ? ORDER BY created_at DESC',
@@ -216,7 +216,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     if (!isOk(all)) return
     expect(all.value.map((session) => session.id)).toEqual(['session-2', 'session-1'])
 
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     const sessionCount = (db.prepare('SELECT COUNT(*) AS c FROM quiz_sessions').get() as { c: number }).c
     const questionCount = (db.prepare('SELECT COUNT(*) AS c FROM quiz_questions').get() as { c: number }).c
     expect(sessionCount).toBe(2)
@@ -260,7 +260,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
         'session-remote',
       ])
     } finally {
-      closeAllInkdownDbs()
+      closeAllMontreeDbs()
       rmSync(fresh, { recursive: true, force: true })
     }
   })
@@ -283,7 +283,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
       ),
     ).toBe(true)
 
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     const rows = db
       .prepare('SELECT id, book_fingerprint AS fp FROM quiz_sessions ORDER BY id')
       .all() as Array<{ id: string; fp: string | null }>
@@ -293,8 +293,8 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     ])
   })
 
-  it('回滚开关：INKDOWN_QUIZ_BACKEND=file 走旧 JSONL 路径', async () => {
-    process.env.INKDOWN_QUIZ_BACKEND = 'file'
+  it('回滚开关：MONTREE_QUIZ_BACKEND=file 走旧 JSONL 路径', async () => {
+    process.env.MONTREE_QUIZ_BACKEND = 'file'
     expect(isOk(await appendQuizSession(sampleSession()))).toBe(true)
     const raw = await readFile(getQuizFilePath(), 'utf-8')
     expect(parseQuizJsonl(raw)).toHaveLength(1)
@@ -303,7 +303,7 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     if (!isOk(all)) return
     expect(all.value).toHaveLength(1)
     // 文件后端只碰 JSONL：库中无写入
-    const db = openInkdownDb(tempUserData)
+    const db = openMontreeDb(tempUserData)
     const count = (db.prepare('SELECT COUNT(*) AS c FROM quiz_sessions').get() as { c: number }).c
     expect(count).toBe(0)
   })

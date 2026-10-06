@@ -7,7 +7,7 @@ import {
   MARK_CATEGORY_SWATCH_FALLBACK,
   normalizeHighlightColor,
   resolveMarkCategorySwatch,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 describe('reading-mark-colors', () => {
   it('默认与未知值都回落到黄色', () => {

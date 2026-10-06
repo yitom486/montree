@@ -56,10 +56,10 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 |------|------|
 | `AgentPermissionCard` | 工具权限请求卡（聊天内联审批按钮） |
 
-> 订阅接线已在 `hooks/agent/useAcpPermissionIngest` / `useInkdownSnapshotHost`（原 `AgentPermissionHost` / `AgentSnapshotHost` 假组件已删，App 根直接调 Hook）。
+> 订阅接线已在 `hooks/agent/useAcpPermissionIngest` / `useMontreeSnapshotHost`（原 `AgentPermissionHost` / `AgentSnapshotHost` 假组件已删，App 根直接调 Hook）。
 
 ---
 
 会话状态机：`src/hooks/agent/useAcpSession`；UI 状态：`acp-ui-store`。
 
-协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`；标记提议模型见 `@inkdown/annotations`（`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议）。
+协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`；标记提议模型见 `@montree/annotations`（`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议）。

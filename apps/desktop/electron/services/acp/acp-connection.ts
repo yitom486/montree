@@ -2,15 +2,15 @@ import { app } from 'electron'
 import {
   APP_TITLE,
   findBuiltinAcpRuntime,
-} from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   AcpConnectResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type {
   AcpRuntimeInfo,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   methods,
   type InitializeResponse,
@@ -28,9 +28,9 @@ import {
   parseResumeSessionSupported,
 } from "@yitom/acp-client"
 import {
-  startInkdownMcpServer,
-  stopInkdownMcpServer,
-} from './mcp/inkdown-mcp-server'
+  startMontreeMcpServer,
+  stopMontreeMcpServer,
+} from './mcp/montree-mcp-server'
 import { restoreOrCreateAcpSession } from './session-open'
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
@@ -118,13 +118,13 @@ async function openSessionAfterAuth(
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
-      mcpServers: acpState.inkdownMcp
+      mcpServers: acpState.montreeMcp
         ? [
             {
               type: 'http',
-              name: 'inkdown',
-              url: acpState.inkdownMcp.url,
-              headers: [{ name: 'Authorization', value: `Bearer ${acpState.inkdownMcp.authToken}` }],
+              name: 'montree',
+              url: acpState.montreeMcp.url,
+              headers: [{ name: 'Authorization', value: `Bearer ${acpState.montreeMcp.authToken}` }],
             },
           ]
         : [],
@@ -372,7 +372,7 @@ export async function connectAcp(payload: {
       return err({ code: 'ACP_SPAWN_ERROR', message: '子进程 stdio 不可用' })
     }
 
-    // SDK 长驻连接：client({ name: 'inkdown' }).connect()，持有 ClientConnection。
+    // SDK 长驻连接：client({ name: 'montree' }).connect()，持有 ClientConnection。
     // 回调经 onRequest/onNotification 注册；stdio 经 toWeb→ndJsonStream 桥接。
     // SDK 调用沿用直迁形态，仅增参 runtimeId 供日志/隔离（sdk-client 签名向后兼容）。
     const created = connectSdkClient(
@@ -414,7 +414,7 @@ export async function connectAcp(payload: {
           _meta: { parameterizedModelPicker: true },
         },
         clientInfo: {
-          name: 'inkdown',
+          name: 'montree',
           title: APP_TITLE,
           version: app.getVersion(),
         },
@@ -445,10 +445,10 @@ export async function connectAcp(payload: {
 
     // codex 不会主动走 fs/read_text_file，只有 MCP 工具能让它拉到我们的内存数据
     if (parseMcpHttpSupported(caps)) {
-      acpState.inkdownMcp = await startInkdownMcpServer({ readSnapshot: handleSnapshotRequest })
+      acpState.montreeMcp = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest })
     } else {
-      acpState.inkdownMcp = null
-      console.warn('[acp-mcp] Agent 未声明 mcpCapabilities.http，Inkdown 工具不可用')
+      acpState.montreeMcp = null
+      console.warn('[acp-mcp] Agent 未声明 mcpCapabilities.http，Montree 工具不可用')
     }
 
     // preflight/auth gate 一律走 adapter.probeAuth（防御性回落中性结果）；
@@ -588,8 +588,8 @@ export async function disconnectAcp(
     }
   }
 
-  await stopInkdownMcpServer()
-  acpState.inkdownMcp = null
+  await stopMontreeMcpServer()
+  acpState.montreeMcp = null
   acpState.tocMcp = null
 
   acpState.sessionId = null

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { appApi } from '@/api/app-api'
-import type { AppUpdateStatus } from '@inkdown/contracts'
+import type { AppUpdateStatus } from '@montree/contracts'
 
 export function useAppUpdate() {
   const [status, setStatus] = useState<AppUpdateStatus>({ phase: 'idle' })

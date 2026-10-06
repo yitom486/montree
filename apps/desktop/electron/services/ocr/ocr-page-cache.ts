@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import type { PdfOcrPageCache } from '@inkdown/contracts'
+import type { PdfOcrPageCache } from '@montree/contracts'
 
 function docCacheDir(fileFingerprint: string): string {
   const hash = createHash('sha256').update(fileFingerprint).digest('hex').slice(0, 16)

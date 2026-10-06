@@ -1,7 +1,7 @@
 import type { PageViewport } from 'pdfjs-dist'
-import type { PdfOcrPageCache } from '@inkdown/contracts'
-import { filterOcrHitLayerWords, ocrPageCacheToTextContent } from '@inkdown/ocr-core'
-import { registerPdfPageTextGeometry } from '@inkdown/reader-core'
+import type { PdfOcrPageCache } from '@montree/contracts'
+import { filterOcrHitLayerWords, ocrPageCacheToTextContent } from '@montree/ocr-core'
+import { registerPdfPageTextGeometry } from '@montree/reader-core'
 
 export function mountOcrTextLayer(
   host: HTMLElement,

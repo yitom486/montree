@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWheelPageTurn } from '@inkdown/reader-core'
+import { resolveWheelPageTurn } from '@montree/reader-core'
 
 describe('resolveWheelPageTurn', () => {
   const fitsViewport = { scrollTop: 0, scrollHeight: 800, clientHeight: 800 }

@@ -1,4 +1,4 @@
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import {
   type AcpChatMessage,
   flattenToolContent,

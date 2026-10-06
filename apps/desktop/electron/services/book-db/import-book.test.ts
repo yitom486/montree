@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { buildBookIndex } from '@inkdown/reader-core'
+import { buildBookIndex } from '@montree/reader-core'
 import { migrateBookDb } from './schema'
 import {
   alignBlockToSpan,

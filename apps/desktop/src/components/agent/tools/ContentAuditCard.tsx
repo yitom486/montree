@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ContentAuditHit } from '@inkdown/contracts'
+import type { ContentAuditHit } from '@montree/contracts'
 
 export interface ContentAuditPayload {
   query: string
@@ -94,7 +94,7 @@ export function ContentAuditCard({
       onHighlightAnchor(hit.text)
     } else {
       window.dispatchEvent(
-        new CustomEvent('inkdown:anchor-highlight', { detail: hit.text }),
+        new CustomEvent('montree:anchor-highlight', { detail: hit.text }),
       )
     }
   }

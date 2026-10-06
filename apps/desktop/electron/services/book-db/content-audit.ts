@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 import {
   CONTENT_AUDIT_HIT_TEXT_BUDGET,
   CONTENT_AUDIT_RESPONSE_TEXT_BUDGET,
@@ -11,7 +11,7 @@ import {
   windowContentAuditText,
   type ContentAuditHit,
   type ContentAuditResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import { getBookDbPath } from './open-book-db'
 import { countSearchBookBlocks, getBookRecord, searchBookBlocks } from './queries'
 

@@ -27,7 +27,7 @@ async function openSectionsBook(window: Page): Promise<void> {
 
 test.describe('foliate 大部头分片', () => {
   test('点目录章落到节内锚点且滚动跟随小节', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-foliate-sections-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-foliate-sections-'))
     await writeFoliateSectionsWorkspace(workspace)
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,

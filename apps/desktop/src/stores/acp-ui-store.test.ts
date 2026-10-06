@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { INKDOWN_SETTLE_COMPLETE_KIND } from '@inkdown/contracts'
-import { buildInkdownPromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
+import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import { formatTurnContextBlock } from '@/lib/agent/context/turn-context'
 import {
   selectActiveThreadHasSubstantiveMessages,
@@ -180,7 +180,7 @@ describe('acp-ui-store history + plan', () => {
     useAcpUiStore.getState().applySessionUpdate({
       sessionUpdate: 'tool_call',
       toolCallId: 'late-propose',
-      title: 'mcp.inkdown.inkdown_propose_mark',
+      title: 'mcp.montree.montree_propose_mark',
       kind: 'other',
       status: 'in_progress',
     })
@@ -225,7 +225,7 @@ describe('acp-ui-store history + plan', () => {
     useAcpUiStore.getState().applySessionUpdate({
       sessionUpdate: 'tool_call',
       toolCallId: 'mcp-propose',
-      title: 'mcp.inkdown.inkdown_propose_mark',
+      title: 'mcp.montree.montree_propose_mark',
       kind: 'other',
       status: 'completed',
     })
@@ -275,7 +275,7 @@ describe('acp-ui-store history + plan', () => {
     useAcpUiStore.getState().applySessionUpdate({
       sessionUpdate: 'tool_call',
       toolCallId: 'mcp-late-tool-event',
-      title: 'mcp.inkdown.inkdown_propose_mark',
+      title: 'mcp.montree.montree_propose_mark',
       kind: 'other',
       status: 'completed',
     })
@@ -446,7 +446,7 @@ describe('load 定居收尾（freezeSettledStreaming + 空线程例外）', () =
     })
     const before = activeMessages().length
     useAcpUiStore.getState().applySessionUpdate({
-      sessionUpdate: INKDOWN_SETTLE_COMPLETE_KIND,
+      sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND,
     })
     const messages = activeMessages()
     expect(messages).toHaveLength(before)
@@ -477,7 +477,7 @@ describe('load 定居收尾（freezeSettledStreaming + 空线程例外）', () =
 
     // 静默超时/过期收尾：一次冻结，多轮历史不丢失
     useAcpUiStore.getState().applySessionUpdate({
-      sessionUpdate: INKDOWN_SETTLE_COMPLETE_KIND,
+      sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND,
     })
     messages = activeMessages()
     expect(messages.map((m) => m.text)).toEqual(['旧问题', '旧回答一旧回答二'])
@@ -526,7 +526,7 @@ describe('cursor load 回放清洗（user-chunk 第二道网）', () => {
 
   /** 真实发送前缀（bootstrap 已套稳定标记）+ turn-context + 原文 */
   function replayFixture(userText: string): string {
-    const prefix = buildInkdownPromptPrefix('replay-wash-fixture', {
+    const prefix = buildMontreePromptPrefix('replay-wash-fixture', {
       includeBootstrap: true,
     })
       .filter((b) => b.type === 'text')
@@ -548,7 +548,7 @@ describe('cursor load 回放清洗（user-chunk 第二道网）', () => {
     expect(users[0]?.streaming).toBe(true)
 
     useAcpUiStore.getState().applySessionUpdate({
-      sessionUpdate: INKDOWN_SETTLE_COMPLETE_KIND,
+      sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND,
     })
     const after = activeReplayMessages().filter((m) => m.role === 'user')
     expect(after.map((m) => m.text)).toEqual(['你好'])
@@ -591,7 +591,7 @@ describe('cursor load 回放清洗（user-chunk 第二道网）', () => {
     userChunk(`半句\n${turn.slice(0, Math.floor(turn.length / 2))}`)
     expect(activeReplayMessages()).toHaveLength(0)
     useAcpUiStore.getState().applySessionUpdate({
-      sessionUpdate: INKDOWN_SETTLE_COMPLETE_KIND,
+      sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND,
     })
     const users = activeReplayMessages().filter((m) => m.role === 'user')
     expect(users.map((m) => m.text)).toEqual(['半句'])

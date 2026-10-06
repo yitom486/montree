@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import { scanWorkspace } from './workspace'
-import type { FileTreeNode } from '@inkdown/contracts'
+import type { FileTreeNode } from '@montree/contracts'
 
 describe('scanWorkspace', () => {
   it('发现 Markdown、PDF、EPUB 与 MOBI 文件', async () => {

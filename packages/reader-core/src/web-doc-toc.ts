@@ -1,4 +1,4 @@
-import type { WebDocTocEntry } from '@inkdown/contracts'
+import type { WebDocTocEntry } from '@montree/contracts'
 import type { ReaderUnit } from './reader-navigation'
 import { resolveAdjacentFlatNav, type AdjacentFlatNavState } from './reader-chapter-nav'
 

@@ -1,5 +1,5 @@
-import type { AppError } from '@inkdown/contracts'
-import { err, type Result } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import { err, type Result } from '@montree/contracts'
 import type {
   RosettaActiveImport,
   RosettaBodyWatermarkApplyPayload,
@@ -16,7 +16,7 @@ import type {
   RosettaQueryResult,
   RosettaTocRebuildPayload,
   RosettaTocRebuildResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 
 function getElectronAPI() {
   return typeof window !== 'undefined' ? window.electronAPI : undefined

@@ -1,6 +1,6 @@
 # src/lib
 
-渲染进程**纯逻辑**（无 React Hook）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@inkdown/reader-core`（`packages/reader-core/src/`）。  
+渲染进程**纯逻辑**（无 React Hook）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@montree/reader-core`（`packages/reader-core/src/`）。  
 **不要**在根目录再堆新文件。例外：`utils.ts` 是 shadcn 的 `cn()`，必须留在 `@/lib/utils`。
 
 组件胶水在 `src/hooks/`，IPC 在 `src/api/`，UI 状态在 `src/stores/`。
@@ -10,9 +10,9 @@
 | `editor/` | Markdown 解析/编辑/导出、CodeMirror、草稿、换行规范化 |
 | `preview/` | 预览 DOM：代码块复制、消毒、Mermaid hydrate |
 | `reader/` | EPUB / PDF / MOBI / **在线文档 HTML** 渲染端专属逻辑，按域分子目录（`adapter/` `pdf/` `pdf-ocr/` `rosetta/` `marks/` `web-doc/`，详见该目录 README） |
-| `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@inkdown/contracts`） |
+| `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@montree/contracts`） |
 | `workspace/` | 文件树、对话框路径、全局错误上报 |
-| `agent/` | ACP 会话辅助；`context/` 为 Inkdown 注入 Agent 的 Skill / 快照 / 选区（协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`） |
+| `agent/` | ACP 会话辅助；`context/` 为 Montree 注入 Agent 的 Skill / 快照 / 选区（协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`） |
 
 ---
 
@@ -34,7 +34,7 @@
 | `code-highlight` / `code-block-lines` | 代码高亮与行号 |
 | `codemirror-theme` / `codemirror-syntax-linter` / `codemirror-paste-image` | CodeMirror 主题、语法 gutter、粘贴图 |
 | `export-document` / `export-document-styles` | 导出 HTML/PDF 的文档与样式 |
-| `deep-link` | 跨格式深度回跳协议解析与构建（`inkdown://open`） |
+| `deep-link` | 跨格式深度回跳协议解析与构建（`montree://open`） |
 | `markdown-it-wikilinks` | 双向链接 `[[target\|label]]` markdown-it 扩展 |
 | `markdown-it-page-marker` | OCR 页标记 chip 插件（独立成行 `<!-- Page N -->`→分页 chip，`data-page` 预留跳原图页） |
 | `wikilink-completion` | CodeMirror 6 `[[` 实时自动补全源 |
@@ -52,7 +52,7 @@
 
 ## reader/
 
-通用导航/选区/标记/排版等 27 模块已迁 `@inkdown/reader-core`（`packages/reader-core/src/`，见该包 `packages/reader-core/src/index.ts` 分组注释）。
+通用导航/选区/标记/排版等 27 模块已迁 `@montree/reader-core`（`packages/reader-core/src/`，见该包 `packages/reader-core/src/index.ts` 分组注释）。
 本目录已按域分子目录（2026-09 重构），逐文件说明见 [reader/README.md](./reader/README.md)：
 
 | 子目录 | 管什么 |
@@ -76,7 +76,7 @@
 | `dialog-default-path` | 打开/保存对话框默认目录 |
 | `workspace-session` | 启动时恢复上次文件 / 在线文档 |
 | `report-error` / `error-reporter` | AppError 与运行时错误上报 |
-| `path-utils.test` / `document-types.test` | 测的是 `@inkdown/contracts`（原 `@shared`）路径与文档类型，放在工作区侧 |
+| `path-utils.test` / `document-types.test` | 测的是 `@montree/contracts`（原 `@shared`）路径与文档类型，放在工作区侧 |
 
 ## quiz/
 
@@ -87,7 +87,7 @@
 | `quiz-evaluator` | AI 出题 Prompt 构造、解析、批量多题判卷打分与离线启发式考官 |
 | `quiz-acp-session` | 持续性考官独立副会话管理（2小时生命周期轮转、物理流式拦截与分流隔离） |
 
-`parseQuizJsonl` / `serializeQuizSession` 已下沉 `@inkdown/contracts`（`packages/contracts/src/types/quiz.ts`）。
+`parseQuizJsonl` / `serializeQuizSession` 已下沉 `@montree/contracts`（`packages/contracts/src/types/quiz.ts`）。
 
 ## agent/
 
@@ -116,7 +116,7 @@
 | `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote |
 | `mark-proposal-failure` | 提议/采用失败分类与「打开该章 / 去划词」引导 |
 
-`agent/context/`（原 `agent-context/`）：静态 Skill、turn-context、阅读器内容/选区/标记 registry、MCP 快照序列化；标记提议统一走 `propose-mark`（`inkdown_propose_mark`）；目录 Agent 草稿走 `toc-draft`（`toc_*` 工具经快照回路写入，人点保存才进缓存）；已入库内容审计走 `inspect-indexed-content`（`inkdown_inspect_content` 经快照回路只读取证）；编辑器内存审计走 `inspect-editor-buffer`（当前 .md 未保存修改可见，`editor-buffer` 来源；有工作区根时再合并其他已保存 markdown，`workspace-file` 来源，相对路径）；EPUB/MOBI 章节审计走 `inspect-ebook-sections`（`ebook-section` 来源，章节标题定位，不持久入库）；已入库 PDF 章节迭代走 `rosetta-chapter-units`（chapters 失败/空/零产出直接抛错，禁止回退逐页 OCR）。
+`agent/context/`（原 `agent-context/`）：静态 Skill、turn-context、阅读器内容/选区/标记 registry、MCP 快照序列化；标记提议统一走 `propose-mark`（`montree_propose_mark`）；目录 Agent 草稿走 `toc-draft`（`toc_*` 工具经快照回路写入，人点保存才进缓存）；已入库内容审计走 `inspect-indexed-content`（`montree_inspect_content` 经快照回路只读取证）；编辑器内存审计走 `inspect-editor-buffer`（当前 .md 未保存修改可见，`editor-buffer` 来源；有工作区根时再合并其他已保存 markdown，`workspace-file` 来源，相对路径）；EPUB/MOBI 章节审计走 `inspect-ebook-sections`（`ebook-section` 来源，章节标题定位，不持久入库）；已入库 PDF 章节迭代走 `rosetta-chapter-units`（chapters 失败/空/零产出直接抛错，禁止回退逐页 OCR）。
 
 ---
 

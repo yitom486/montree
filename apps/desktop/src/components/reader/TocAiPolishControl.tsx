@@ -3,10 +3,10 @@ import { BotMessageSquare, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { acpApi } from '@/api/acp-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import type { AcpConfigOption } from '@inkdown/contracts'
-import type { OcrTocEntry } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
+import type { OcrTocEntry } from '@montree/contracts'
 import { buildTocAiPrompt, mergeTocAiDraft, parseTocAiEntries } from '@/lib/reader/rosetta/toc-ai'
 import {
   decideTocAiPromptOutcome,

@@ -1,15 +1,15 @@
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import type {
   AcpConfigOption,
   AcpConnectionStatus,
   AcpPromptCapabilities,
   AppErrorCode,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type { AcpPermissionOptionView } from '@/lib/agent/acp-permission'
 import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import type { AcpPreferredConfigMap } from '@/lib/agent/acp-config-preferences'
-import type { MarkProposalStatus } from '@inkdown/annotations'
+import type { MarkProposalStatus } from '@montree/annotations'
 
 export type AcpHudDisplayMode = 'docked' | 'floating' | 'capsule'
 

@@ -27,7 +27,7 @@ export interface ReaderSearchResult {
    */
   source: ReaderSearchSource
   /**
-   * S2：本工具恒为 false。全书精确 total 只有 inkdown_inspect_content；
+   * S2：本工具恒为 false。全书精确 total 只有 montree_inspect_content；
    * 禁止根据 source 或 truncated=false 把它设为 true。
    */
   preciseTotal: false

@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { existsSync, statSync } from 'node:fs'
-import { IPC } from '@inkdown/contracts'
+import { IPC } from '@montree/contracts'
 import { createWindow } from './window/create-window'
 import { extractExternalFilePaths, pendingExternalFiles } from './window/external-file'
 import { installAppMenu } from './window/app-menu'
@@ -12,13 +12,15 @@ import { closeAllBookDbs } from './services/book-db/open-book-db'
 import { disposeAllWorkspaceWatches } from './services/workspace-watcher'
 import { syncManager } from './services/sync/sync-manager'
 
-// 注册应用自定义深度协议 inkdown://
+// 注册应用自定义深度协议 montree:// 与历史 montree://
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('inkdown', process.execPath, [path.resolve(process.argv[1] ?? '')])
+    app.setAsDefaultProtocolClient('montree', process.execPath, [path.resolve(process.argv[1] ?? '')])
+    app.setAsDefaultProtocolClient('montree', process.execPath, [path.resolve(process.argv[1] ?? '')])
   }
 } else {
-  app.setAsDefaultProtocolClient('inkdown')
+  app.setAsDefaultProtocolClient('montree')
+  app.setAsDefaultProtocolClient('montree')
 }
 
 // 开发环境下隔离应用数据目录，避免与已安装的正式版互相冲突锁定或污染数据；若命令行显式传入了 --user-data-dir 则优先遵循
@@ -30,7 +32,7 @@ if (!app.isPackaged) {
       app.setPath('userData', customDir)
     }
   } else {
-    app.setPath('userData', path.join(app.getPath('appData'), 'inkdown-dev'))
+    app.setPath('userData', path.join(app.getPath('appData'), 'montree-dev'))
   }
 }
 
@@ -43,7 +45,7 @@ if (!gotSingleInstanceLock) {
     if (win) {
       if (win.isMinimized()) win.restore()
       win.focus()
-      const deepLink = commandLine.find((arg) => arg.startsWith('inkdown://'))
+      const deepLink = commandLine.find((arg) => arg.startsWith('montree://') || arg.startsWith('montree://'))
       if (deepLink) {
         win.webContents.send(IPC.APP_GLOBAL_ACTION, `deep-link:${deepLink}`)
       }

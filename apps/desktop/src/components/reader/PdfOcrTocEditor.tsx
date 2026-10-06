@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, ListTree, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { OcrTocEntry } from '@inkdown/contracts'
+import type { OcrTocEntry } from '@montree/contracts'
 
 interface PdfOcrTocEditorProps {
   entries: OcrTocEntry[]

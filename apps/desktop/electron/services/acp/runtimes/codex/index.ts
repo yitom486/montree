@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { CodexAuthPreflight } from '@inkdown/contracts'
+import type { CodexAuthPreflight } from '@montree/contracts'
 import {
   buildCustomProviderConfigToml,
   buildCustomProviderSpawnEnv,

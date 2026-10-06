@@ -10,7 +10,7 @@ import {
   parseEvaluationResponse,
   parseQuestionResponse,
 } from './quiz-evaluator'
-import type { QuizQuestion } from '@inkdown/contracts'
+import type { QuizQuestion } from '@montree/contracts'
 
 describe('quiz-evaluator', () => {
   it('builds question prompt containing passage and chapter', () => {

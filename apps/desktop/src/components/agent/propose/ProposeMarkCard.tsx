@@ -8,7 +8,7 @@ import {
 } from '@/lib/agent/context/propose-mark'
 import { toastMarkProposalFailure } from '@/lib/agent/mark-proposal-failure'
 import { cn } from '@/lib/utils'
-import type { MarkProposalStatus, ProposedMark } from '@inkdown/annotations'
+import type { MarkProposalStatus, ProposedMark } from '@montree/annotations'
 
 interface ProposeMarkCardProps {
   proposal: ProposedMark

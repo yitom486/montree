@@ -69,43 +69,43 @@
       },
     },
     "packages/annotations": {
-      "name": "@inkdown/annotations",
+      "name": "@montree/annotations",
       "version": "0.0.0",
       "dependencies": {
-        "@inkdown/contracts": "workspace:*",
-        "@inkdown/reader-core": "workspace:*",
+        "@montree/contracts": "workspace:*",
+        "@montree/reader-core": "workspace:*",
       },
     },
     "packages/contracts": {
-      "name": "@inkdown/contracts",
+      "name": "@montree/contracts",
       "version": "0.0.0",
     },
     "packages/ocr-core": {
-      "name": "@inkdown/ocr-core",
+      "name": "@montree/ocr-core",
       "version": "0.0.0",
       "dependencies": {
-        "@inkdown/contracts": "workspace:*",
+        "@montree/contracts": "workspace:*",
       },
     },
     "packages/pdf": {
-      "name": "@inkdown/pdf",
+      "name": "@montree/pdf",
       "version": "0.0.0",
       "dependencies": {
-        "@inkdown/contracts": "workspace:*",
+        "@montree/contracts": "workspace:*",
       },
     },
     "packages/reader-core": {
-      "name": "@inkdown/reader-core",
+      "name": "@montree/reader-core",
       "version": "0.0.0",
       "dependencies": {
-        "@inkdown/contracts": "workspace:*",
+        "@montree/contracts": "workspace:*",
       },
     },
     "packages/web-doc": {
-      "name": "@inkdown/web-doc",
+      "name": "@montree/web-doc",
       "version": "0.0.0",
       "dependencies": {
-        "@inkdown/contracts": "workspace:*",
+        "@montree/contracts": "workspace:*",
       },
     },
   },
@@ -320,18 +320,6 @@
 
     "@iconify/utils": ["@iconify/utils@3.1.4", "", { "dependencies": { "@antfu/install-pkg": "^1.1.0", "@iconify/types": "^2.0.0", "import-meta-resolve": "^4.2.0" } }, "sha512-b1S7B1k9ohZ+iNTi2ATxbRYG9fTrJmUT0rc46bvVnNxqNRGW7dyo/vRREwyniI5IRN2RSJHDcm+s3BjWrSAjHw=="],
 
-    "@inkdown/annotations": ["@inkdown/annotations@workspace:packages/annotations"],
-
-    "@inkdown/contracts": ["@inkdown/contracts@workspace:packages/contracts"],
-
-    "@inkdown/ocr-core": ["@inkdown/ocr-core@workspace:packages/ocr-core"],
-
-    "@inkdown/pdf": ["@inkdown/pdf@workspace:packages/pdf"],
-
-    "@inkdown/reader-core": ["@inkdown/reader-core@workspace:packages/reader-core"],
-
-    "@inkdown/web-doc": ["@inkdown/web-doc@workspace:packages/web-doc"],
-
     "@isaacs/fs-minipass": ["@isaacs/fs-minipass@4.0.1", "", { "dependencies": { "minipass": "^7.0.4" } }, "sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w=="],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
@@ -385,6 +373,18 @@
     "@marijn/find-cluster-break": ["@marijn/find-cluster-break@1.0.4", "", {}, "sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ=="],
 
     "@mermaid-js/parser": ["@mermaid-js/parser@1.2.1", "", { "dependencies": { "@chevrotain/types": "~11.1.2" } }, "sha512-n12NohV3mrUyUL2o93IgG/ifeW9FTyeJn3zDxkhwa8MJ9Fxg3HQMlA3RiGmD/3UnJvheztkjjQAjA2T4LmUcpw=="],
+
+    "@montree/annotations": ["@montree/annotations@workspace:packages/annotations"],
+
+    "@montree/contracts": ["@montree/contracts@workspace:packages/contracts"],
+
+    "@montree/ocr-core": ["@montree/ocr-core@workspace:packages/ocr-core"],
+
+    "@montree/pdf": ["@montree/pdf@workspace:packages/pdf"],
+
+    "@montree/reader-core": ["@montree/reader-core@workspace:packages/reader-core"],
+
+    "@montree/web-doc": ["@montree/web-doc@workspace:packages/web-doc"],
 
     "@napi-rs/canvas": ["@napi-rs/canvas@1.0.8", "", { "optionalDependencies": { "@napi-rs/canvas-android-arm64": "1.0.8", "@napi-rs/canvas-darwin-arm64": "1.0.8", "@napi-rs/canvas-darwin-x64": "1.0.8", "@napi-rs/canvas-linux-arm-gnueabihf": "1.0.8", "@napi-rs/canvas-linux-arm64-gnu": "1.0.8", "@napi-rs/canvas-linux-arm64-musl": "1.0.8", "@napi-rs/canvas-linux-riscv64-gnu": "1.0.8", "@napi-rs/canvas-linux-x64-gnu": "1.0.8", "@napi-rs/canvas-linux-x64-musl": "1.0.8", "@napi-rs/canvas-win32-arm64-msvc": "1.0.8", "@napi-rs/canvas-win32-x64-msvc": "1.0.8" } }, "sha512-/SaLcvlqGWdm0HSCWMgHu7cjJiQXfP8/mOY+6dUyV9flQz7sPBBZ+ed2zYtoukojPmxOaL7bm+d/G4GeWWoN7g=="],
 

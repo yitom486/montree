@@ -1,12 +1,12 @@
 import {
-  INKDOWN_BOOTSTRAP_CLOSE_TAG,
-  INKDOWN_BOOTSTRAP_OPEN_TAG,
-  INKDOWN_CLIENT_CLOSE_TAG,
-  INKDOWN_CLIENT_OPEN_TAG,
-} from './inkdown-static-skill'
+  MONTREE_BOOTSTRAP_CLOSE_TAG,
+  MONTREE_BOOTSTRAP_OPEN_TAG,
+  MONTREE_CLIENT_CLOSE_TAG,
+  MONTREE_CLIENT_OPEN_TAG,
+} from './montree-static-skill'
 import {
-  INKDOWN_TURN_CONTEXT_CLOSE_TAG,
-  INKDOWN_TURN_CONTEXT_OPEN_TAG,
+  MONTREE_TURN_CONTEXT_CLOSE_TAG,
+  MONTREE_TURN_CONTEXT_OPEN_TAG,
 } from './turn-context'
 
 /**
@@ -33,9 +33,9 @@ export interface ReplayStripResult {
 }
 
 const MARKER_PAIRS: ReadonlyArray<readonly [string, string]> = [
-  [INKDOWN_BOOTSTRAP_OPEN_TAG, INKDOWN_BOOTSTRAP_CLOSE_TAG],
-  [INKDOWN_CLIENT_OPEN_TAG, INKDOWN_CLIENT_CLOSE_TAG],
-  [INKDOWN_TURN_CONTEXT_OPEN_TAG, INKDOWN_TURN_CONTEXT_CLOSE_TAG],
+  [MONTREE_BOOTSTRAP_OPEN_TAG, MONTREE_BOOTSTRAP_CLOSE_TAG],
+  [MONTREE_CLIENT_OPEN_TAG, MONTREE_CLIENT_CLOSE_TAG],
+  [MONTREE_TURN_CONTEXT_OPEN_TAG, MONTREE_TURN_CONTEXT_CLOSE_TAG],
 ]
 
 /** 文本是否含我方脚手架标记（store 门限用：正常用户输入零影响） */
@@ -58,7 +58,7 @@ export function stripReplayScaffolding(text: string): ReplayStripResult {
   let out = text
 
   // 1. 整段剥离完整标记对（含标记本身）；循环到稳定以处理嵌套与相邻多段。
-  //    bootstrap 包着 client（`<inkdown-bootstrap><inkdown-client>…`），
+  //    bootstrap 包着 client（`<montree-bootstrap><montree-client>…`），
   //    先剥内层 client、再剥外层 bootstrap，循环自然收敛。
   let changed = true
   while (changed) {

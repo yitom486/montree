@@ -7,7 +7,7 @@ import {
   isHeadingLabelMatch,
   scrollToViewportEntry,
   type ViewportNavEntry,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { mockRelativeOffsetTop, mockScrollDocument } from '@/lib/reader/reader-viewport-test-helpers'
 
 describe('isHeadingLabelMatch wrapper guard', () => {

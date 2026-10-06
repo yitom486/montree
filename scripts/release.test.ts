@@ -55,8 +55,8 @@ describe('release changelog', () => {
 
 ---
 
-[未发布]: https://github.com/yitom486/inkdown/compare/v0.2.5...HEAD
-[0.2.5]: https://github.com/yitom486/inkdown/compare/v0.2.3...v0.2.5
+[未发布]: https://github.com/yitom486/montree/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/yitom486/montree/compare/v0.2.3...v0.2.5
 `
 
   it('提取未发布正文并去掉节末 ---', () => {
@@ -75,10 +75,10 @@ describe('release changelog', () => {
     expect(next).toContain('- 示例要点')
     expect(next).toContain('## [0.2.5] - 2026-09-01')
     expect(next).toContain(
-      '[未发布]: https://github.com/yitom486/inkdown/compare/v0.2.6...HEAD',
+      '[未发布]: https://github.com/yitom486/montree/compare/v0.2.6...HEAD',
     )
     expect(next).toContain(
-      '[0.2.6]: https://github.com/yitom486/inkdown/compare/v0.2.5...v0.2.6',
+      '[0.2.6]: https://github.com/yitom486/montree/compare/v0.2.5...v0.2.6',
     )
   })
 })

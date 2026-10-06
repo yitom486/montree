@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { err, ok } from '@inkdown/contracts'
+import { err, ok } from '@montree/contracts'
 
 vi.mock('@/api/acp-api', () => ({
   acpApi: {

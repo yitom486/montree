@@ -1,8 +1,8 @@
 import type {
-  InkdownSnapshotArgs,
-  InkdownSnapshotResource,
-} from '@inkdown/contracts'
-import type { MarkProposalItem, MarkProposalKind, MarkProposalPayload } from '@inkdown/annotations'
+  MontreeSnapshotArgs,
+  MontreeSnapshotResource,
+} from '@montree/contracts'
+import type { MarkProposalItem, MarkProposalKind, MarkProposalPayload } from '@montree/annotations'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { collectActiveDocument, collectReadingState } from './collect-turn-context'
 import {
@@ -27,9 +27,9 @@ import {
 import { readSelectionWithContext } from './read-selection-context'
 import { searchReaderContent } from './search-reader-content'
 import { inspectIndexedContentForAgent } from './inspect-indexed-content'
-import type { InkdownActiveDocument, InkdownReadingState } from './turn-context'
+import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
 
-function parseMarkProposalArgs(args?: InkdownSnapshotArgs): MarkProposalPayload {
+function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload {
   const marksRaw = (args as { marks?: unknown } | undefined)?.marks
   const marks = Array.isArray(marksRaw)
     ? marksRaw
@@ -72,25 +72,25 @@ function parseMarkProposalArgs(args?: InkdownSnapshotArgs): MarkProposalPayload 
 /** 目录条目上限：整本书目录再大也不该一次灌满 Agent 上下文 */
 export const TOC_ENTRY_LIMIT = 600
 
-export interface InkdownTocEntry {
+export interface MontreeTocEntry {
   index: number
   level: number
   label: string
 }
 
-export interface InkdownTocSnapshot {
-  document: InkdownActiveDocument | null
+export interface MontreeTocSnapshot {
+  document: MontreeActiveDocument | null
   format: string | null
   unitCount: number
   /** 当前所在条目下标，未知为 -1 */
   currentIndex: number
   truncated: boolean
-  entries: InkdownTocEntry[]
+  entries: MontreeTocEntry[]
 }
 
-export interface InkdownFocusedSnapshot {
-  activeDocument: InkdownActiveDocument | null
-  reading?: InkdownReadingState
+export interface MontreeFocusedSnapshot {
+  activeDocument: MontreeActiveDocument | null
+  reading?: MontreeReadingState
 }
 
 interface TocSourceUnit {
@@ -101,7 +101,7 @@ interface TocSourceUnit {
 export function buildTocEntries(
   units: readonly TocSourceUnit[],
   limit = TOC_ENTRY_LIMIT,
-): { entries: InkdownTocEntry[]; truncated: boolean } {
+): { entries: MontreeTocEntry[]; truncated: boolean } {
   const entries = units.slice(0, limit).map((unit, index) => ({
     index,
     level: unit.level ?? 0,
@@ -110,7 +110,7 @@ export function buildTocEntries(
   return { entries, truncated: units.length > limit }
 }
 
-function buildTocSnapshot(): InkdownTocSnapshot {
+function buildTocSnapshot(): MontreeTocSnapshot {
   const document = collectActiveDocument()
   const reader = useReaderNavigationStore.getState()
   const sameFile = Boolean(document) && reader.filePath === document?.path
@@ -137,7 +137,7 @@ function buildTocSnapshot(): InkdownTocSnapshot {
   }
 }
 
-function buildFocusedSnapshot(): InkdownFocusedSnapshot {
+function buildFocusedSnapshot(): MontreeFocusedSnapshot {
   const activeDocument = collectActiveDocument()
   return { activeDocument, reading: collectReadingState(activeDocument) }
 }
@@ -146,9 +146,9 @@ function buildFocusedSnapshot(): InkdownFocusedSnapshot {
  * 把快照资源序列化成 Agent 能直接读的文本。
  * 全部取自渲染进程内存，不重新解析文件、不落盘。
  */
-export async function resolveInkdownSnapshot(
-  resource: InkdownSnapshotResource,
-  args?: InkdownSnapshotArgs,
+export async function resolveMontreeSnapshot(
+  resource: MontreeSnapshotResource,
+  args?: MontreeSnapshotArgs,
 ): Promise<string> {
   switch (resource) {
     case 'toc.json':

@@ -4,7 +4,7 @@ import {
   isEditableCopyTarget,
   shouldHandleReaderCopyShortcut,
   type ReaderCopyShortcutKey,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 const ctrlC: ReaderCopyShortcutKey = {
   key: 'c',

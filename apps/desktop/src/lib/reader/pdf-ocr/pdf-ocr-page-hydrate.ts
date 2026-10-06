@@ -1,4 +1,4 @@
-import type { PdfOcrPageCache } from '@inkdown/contracts'
+import type { PdfOcrPageCache } from '@montree/contracts'
 
 export interface OcrPageCacheHydrateDeps {
   listPages: () => Promise<number[]>

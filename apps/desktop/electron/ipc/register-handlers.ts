@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { IPC } from '@inkdown/contracts'
+import { IPC } from '@montree/contracts'
 import type {
   ExportDocumentPayload,
   ExportMarkdownPayload,
@@ -13,8 +13,8 @@ import type {
   WorkspaceFsMovePayload,
   WorkspaceFsRenamePayload,
   WorkspaceSearchMarkdownPayload,
-} from '@inkdown/contracts'
-import type { RendererErrorPayload } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { RendererErrorPayload } from '@montree/contracts'
 import type {
   AppendFlashcardReviewPayload,
   CreateReadingMarkPayload,
@@ -22,7 +22,7 @@ import type {
   MarksListByChapterPayload,
   MarksSearchPayload,
   UpdateReadingMarkPayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type {
   AcpAuthPreflightPayload,
   AcpAuthenticatePayload,
@@ -36,9 +36,9 @@ import type {
   AcpSnapshotResponsePayload,
   AcpProviderSavePayload,
   AcpProxySettings,
-} from '@inkdown/contracts'
-import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@inkdown/contracts'
-import { resolveSnapshotTimeoutMs } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@montree/contracts'
+import { resolveSnapshotTimeoutMs } from '@montree/contracts'
 import type {
   DetectPdfTocPagesPayload,
   GetPdfOcrTocPayload,
@@ -47,17 +47,17 @@ import type {
   RecognizePdfPagePayload,
   RecognizePdfTocPayload,
   SavePdfOcrTocPayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type {
   ClassifyPdfDocumentPayload,
   ExtractPdfBookMarkdownPayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   classifyPdfDocument,
   extractPdfBookMarkdown,
 } from '../services/pdf-inspector-service'
-import { ok, err } from '@inkdown/contracts'
-import type { SyncConfig } from '@inkdown/contracts'
+import { ok, err } from '@montree/contracts'
+import type { SyncConfig } from '@montree/contracts'
 import { syncManager } from '../services/sync/sync-manager'
 import { readSyncConfig, writeSyncConfig } from '../services/sync/sync-config-service'
 import { writeLocalProgress } from '../services/sync/reading-progress-sync'
@@ -115,7 +115,7 @@ import type {
   RosettaInspectContentPayload,
   RosettaQuery,
   RosettaTocRebuildPayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import { applyWindowTitle } from '../window/window-title'
 import { setVerboseRendererLogs } from '../services/runtime-state'
 import {
@@ -142,8 +142,8 @@ import type {
   AiSessionGetPayload,
   AiSessionPutPayload,
   AiSessionTouchPayload,
-} from '@inkdown/contracts'
-import type { QuizSessionRecord } from '@inkdown/contracts'
+} from '@montree/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,
@@ -303,7 +303,7 @@ export function registerIpcHandlers(): void {
   setAcpSnapshotBridge(async ({ requestId, resource, args }) => {
     const target = resolveAgentOwnerWebContents()
     if (!target) {
-      throw new Error('没有可用窗口提供 Inkdown 快照')
+      throw new Error('没有可用窗口提供 Montree 快照')
     }
     target.send(IPC.ACP_SNAPSHOT_REQUEST, { requestId, resource, args })
 
@@ -312,7 +312,7 @@ export function registerIpcHandlers(): void {
       const timeoutMs = resolveSnapshotTimeoutMs(resource)
       const timer = setTimeout(() => {
         cleanup()
-        reject(new Error(`Inkdown 快照请求超时：${resource}`))
+        reject(new Error(`Montree 快照请求超时：${resource}`))
       }, timeoutMs)
 
       const handler = (

@@ -11,7 +11,7 @@ test.describe('应用启动', () => {
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
-      await expect(window.getByRole('heading', { name: 'Inkdown' })).toBeVisible()
+      await expect(window.getByRole('heading', { name: 'Montree' })).toBeVisible()
 
       // 设置入口已迁入资源管理器 ⋯ 菜单（顶栏 TitleBar 已删除）
       await window.getByRole('button', { name: '更多操作', exact: true }).click()

@@ -1,4 +1,4 @@
-import type { BookBlockType } from '@inkdown/contracts'
+import type { BookBlockType } from '@montree/contracts'
 import { normalizeWatermarkText } from './ocr-watermark'
 
 /**

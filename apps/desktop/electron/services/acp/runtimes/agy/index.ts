@@ -1,4 +1,4 @@
-import type { AcpAuthMethod, CodexAuthPreflight } from '@inkdown/contracts'
+import type { AcpAuthMethod, CodexAuthPreflight } from '@montree/contracts'
 import type { GenericRuntimeAdapter } from '../index'
 
 /**

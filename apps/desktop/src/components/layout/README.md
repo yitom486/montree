@@ -38,4 +38,4 @@
 | `WebDocUrlField` | URL 输入（欢迎页与侧栏共用） |
 | `WebDocSidebarPanel` | 侧栏内嵌在线文档面板（无工作区时展示当前页/最近 URL） |
 
-在线文档的正文/目录/站点谓词逻辑见 `@inkdown/web-doc`（`packages/web-doc/`）与 `lib/reader/web-doc/`。
+在线文档的正文/目录/站点谓词逻辑见 `@montree/web-doc`（`packages/web-doc/`）与 `lib/reader/web-doc/`。

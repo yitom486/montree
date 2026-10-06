@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSameSpineBase, splitChapterFragment } from '@inkdown/reader-core'
+import { isSameSpineBase, splitChapterFragment } from '@montree/reader-core'
 
 const normalize = (value: string): string => value.split('#')[0]?.toLowerCase() ?? ''
 

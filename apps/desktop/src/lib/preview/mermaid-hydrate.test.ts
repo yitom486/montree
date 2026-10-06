@@ -21,7 +21,7 @@ describe('hydrateMermaidInElement', () => {
       svg: `<svg xmlns="http://www.w3.org/2000/svg" data-test="1"><title>${source.slice(0, 12)}</title></svg>`,
     }))
     document.body.innerHTML = ''
-    window.localStorage.setItem('inkdown:mermaid-debug', '0')
+    window.localStorage.setItem('montree:mermaid-debug', '0')
   })
 
   it('uses mermaid.render and keeps source on data attribute', async () => {
@@ -53,7 +53,7 @@ describe('hydrateMermaidInElement', () => {
     await hydrateMermaidInElement(root, 'light')
     const svg = root.querySelector('.mermaid svg')
     expect(svg).not.toBeNull()
-    expect(svg?.id.startsWith('inkdown-mmd-')).toBe(true)
+    expect(svg?.id.startsWith('montree-mmd-')).toBe(true)
   })
 
   it('hydrates when root itself is the mermaid host (MermaidBlock)', async () => {

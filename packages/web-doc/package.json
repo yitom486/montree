@@ -1,10 +1,10 @@
 {
-  "name": "@inkdown/web-doc",
+  "name": "@montree/web-doc",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@inkdown/contracts": "workspace:*"
+    "@montree/contracts": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",

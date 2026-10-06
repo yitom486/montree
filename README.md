@@ -1,29 +1,29 @@
 <div align="center">
 
-<img src="./apps/desktop/resources/icon.png" alt="Inkdown Logo" width="100" height="100" />
+<img src="./apps/desktop/resources/icon.png" alt="Montree Logo" width="100" height="100" />
 
-# Inkdown
+# Montree
 
 **把每一页读成自己的知识：阅读、标注、写作与 Agent 思考，全部在一个本地优先的桌面工作区完成。**  
 *Read deeply. Mark precisely. Think with context. Keep your knowledge local.*
 
-[![Release](https://img.shields.io/github/v/release/yitom486/inkdown?color=3b82f6&label=Release)](https://github.com/yitom486/inkdown/releases)
+[![Release](https://img.shields.io/github/v/release/yitom486/montree?color=3b82f6&label=Release)](https://github.com/yitom486/montree/releases)
 [![Version](https://img.shields.io/badge/Version-v0.4.0-blue)](./CHANGELOG.md)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/yitom486/inkdown/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/yitom486/montree/releases)
 [![Package Manager](https://img.shields.io/badge/Bun-1.x-black?logo=bun)](https://bun.sh)
-[![Tests](https://img.shields.io/badge/Tests-1275%20passed-success)](./.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/Tests-1665%20passed-success)](./.github/workflows/ci.yml)
 
-[为什么是 Inkdown](#-为什么是-inkdown) • [你可以用它做什么](#-你可以用它做什么) • [快速开始](#-快速开始) • [本地开发](#-本地开发) • [更新日志](./CHANGELOG.md)
+[为什么是 Montree](#-为什么是-montree) • [你可以用它做什么](#-你可以用它做什么) • [快速开始](#-快速开始) • [本地开发](#-本地开发) • [更新日志](./CHANGELOG.md)
 
 </div>
 
 ---
 
-## 💡 为什么是 Inkdown？
+## 💡 为什么是 Montree？
 
 阅读、摘录、理解和整理知识，通常被拆在阅读器、浏览器、笔记软件和 AI 聊天窗口里。结果是：原文与笔记失去位置关系，AI 不知道你正在看哪一页，批注也很难回到真正的上下文。
 
-**Inkdown 把“来源 → 理解 → 沉淀”连成一条链：**
+**Montree 把“来源 → 理解 → 沉淀”连成一条链：**
 
 - **打开来源**：一个工作区同时容纳 Markdown、PDF、EPUB、MOBI、AZW3 与在线技术文档。
 - **保留位置**：目录、章节、页码、视口、选区和批注互相对得上，不只是把文字复制出来。
@@ -41,7 +41,7 @@
 
 ---
 
-## ✨ 你可以用 Inkdown 做什么？
+## ✨ 你可以用 Montree 做什么？
 
 ### 📚 1. 把书和资料放在一起读
 
@@ -75,7 +75,7 @@ PDF 的标记会跟随页面和文字位置，缩放后仍能准确贴合，不�
 
 ### 🌐 4. 不离开阅读窗口浏览在线文档
 
-输入一个网页地址，Inkdown 会提取适合阅读的正文：
+输入一个网页地址，Montree 会提取适合阅读的正文：
 
 - 自动整理页面标题和目录
 - 代码块一键复制
@@ -104,7 +104,7 @@ AI 伴读可以知道你正在看的文档、章节、页码和选区，而不�
 
 所有修改建议都会先显示给你确认，不会未经同意改动原文。
 
-> **使用 AI 伴读前的准备**：需要先安装 [Bun](https://bun.sh)，并准备好 Codex 登录或 API Key。Bun 用来启动 AI 运行环境；Codex 登录信息会复用本机配置。没有完成这些准备时，Inkdown 的 Markdown 编辑、电子书阅读、在线文档、标注和导出仍然可以正常使用。
+> **使用 AI 伴读前的准备**：需要先安装 [Bun](https://bun.sh)，并准备好 Codex 登录或 API Key。Bun 用来启动 AI 运行环境；Codex 登录信息会复用本机配置。没有完成这些准备时，Montree 的 Markdown 编辑、电子书阅读、在线文档、标注和导出仍然可以正常使用。
 
 ---
 
@@ -112,10 +112,10 @@ AI 伴读可以知道你正在看的文档、章节、页码和选区，而不�
 
 ### 下载与安装
 
-- 各平台正式安装包均发布于 **[GitHub Releases](https://github.com/yitom486/inkdown/releases)**（Windows `.exe` / macOS `.dmg`（Apple Silicon） / Linux `.AppImage`）。
+- 各平台正式安装包均发布于 **[GitHub Releases](https://github.com/yitom486/montree/releases)**（Windows `.exe` / macOS `.dmg`（Apple Silicon） / Linux `.AppImage`）。
 - **应用内静默更新**：现版本 **v0.4.0** 已内置自动检查更新，启动时自动检测新版本；也可随时在「关于」或「设置 → 应用」中手动检查并一键更新。
 
-> **从 v0.2.x 升级**：安装包 appId 已变更，旧版「轻量阅读器」无法原地自动升级，请下载新安装包覆盖或并行安装；此后同 Inkdown 安装包之间可走应用内更新。
+> **从 v0.2.x 升级**：安装包 appId 已变更，旧版「轻量阅读器」无法原地自动升级，请下载新安装包覆盖或并行安装；此后同 Montree 安装包之间可走应用内更新。
 
 ### 基本使用
 
@@ -141,13 +141,13 @@ AI 伴读可以知道你正在看的文档、章节、页码和选区，而不�
 
 #### 必须准备的两件事
 
-1. **安装 Bun**：安装后请完全退出并重新打开 Inkdown，让系统 PATH 生效。Inkdown 会使用 Bun 按需启动 AI 运行环境。
+1. **安装 Bun**：安装后请完全退出并重新打开 Montree，让系统 PATH 生效。Montree 会使用 Bun 按需启动 AI 运行环境。
 2. **配置 Codex 认证**，任选一种方式：
    - 使用 Codex / ChatGPT 登录：准备好本机 `~/.codex` 登录信息
    - 使用 API Key：配置 `OPENAI_API_KEY` 或 `CODEX_API_KEY`
    - 使用其他模型服务：在 Agent 设置中填写服务地址、API Key 和模型名称
 
-无需单独安装全局 Codex CLI。Bun 或 Codex 未准备好时，只有 Agent 伴读不可用，Inkdown 的编辑、阅读、在线文档、标注和导出功能不受影响。
+无需单独安装全局 Codex CLI。Bun 或 Codex 未准备好时，只有 Agent 伴读不可用，Montree 的编辑、阅读、在线文档、标注和导出功能不受影响。
 
 ### 常用快捷键
 
@@ -177,7 +177,7 @@ AI 伴读可以知道你正在看的文档、章节、页码和选区，而不�
 
 ```bash
 # 1. 克隆（含子模块；已克隆则用第二行补齐）
-git clone --recurse-submodules https://github.com/yitom486/inkdown.git
+git clone --recurse-submodules https://github.com/yitom486/montree.git
 git submodule update --init --recursive
 
 # 2. 安装依赖（单一根 bun.lock，不建嵌套锁）
@@ -206,9 +206,9 @@ bun run dev
 ## 🗺️ Monorepo 地图
 
 ```
-inkdown/
+montree/
 ├── apps/desktop/          # 桌面应用（Electron 主进程 + React 渲染进程 + E2E/资源/三配置）
-├── packages/@inkdown/*    # 私有 workspace 包（纯逻辑与契约，不独立发版）
+├── packages/@montree/*    # 私有 workspace 包（纯逻辑与契约，不独立发版）
 ├── scripts/               # 发版 / 文档 lint / 依赖边界 / 打包门禁脚本
 ├── third-party/           # 第三方与教学归档（阅读后端子模块 + 手搓 JSON-RPC 教学快照，三无隔离，不进构建）
 ├── out/ + release/        # 构建与打包产物（根目录，gitignore）
@@ -223,29 +223,29 @@ inkdown/
 | `apps/desktop/electron-builder.yml` | `pack` / `pack:win` / `pack:mac` / `pack:linux` | 安装包目标、文件白名单（主进程运行时依赖）、`output: release`（落根） |
 | `apps/desktop/playwright.config.ts` | `test:e2e`（含 `test:e2e:web-doc`） | E2E 目录 `apps/desktop/e2e/`、已构建应用回归 |
 
-### packages/@inkdown/* 一句话
+### packages/@montree/* 一句话
 
 | 包 | 一句话 |
 |----|--------|
-| `@inkdown/contracts` | 跨进程契约：`Result` / `AppError`、IPC 通道与 `electron-api.types`、跨边界 DTO、稳定常量 |
-| `@inkdown/reader-core` | 阅读纯逻辑：导航 / TOC / 选区 / 标记几何 / 主题排版与阅读模型 |
-| `@inkdown/pdf` | PDF 原生结果归一与拼装（页码归一 / 分类映射 / 整档拼装，`normalize` / `models` / `ports`） |
-| `@inkdown/ocr-core` | OCR 纯逻辑：目录抽取与重组 / 水印清洗 / 页词与质量判断，另含 `pdf-bytes` 与缓存 `ports`、外部运行时版本 pin（`inspector-pins`） |
-| `@inkdown/annotations` | 标注纯逻辑：标记合并 / 纯核 / Anki 构建 / Flashcard 模型与复习，另含标记提议模型（`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议） |
-| `@inkdown/web-doc` | 在线文档纯逻辑：目录抽取（`extract-toc-links` / `extract-llms-toc`）与站点谓词（`hrtt` / `people-daily`） |
+| `@montree/contracts` | 跨进程契约：`Result` / `AppError`、IPC 通道与 `electron-api.types`、跨边界 DTO、稳定常量 |
+| `@montree/reader-core` | 阅读纯逻辑：导航 / TOC / 选区 / 标记几何 / 主题排版与阅读模型 |
+| `@montree/pdf` | PDF 原生结果归一与拼装（页码归一 / 分类映射 / 整档拼装，`normalize` / `models` / `ports`） |
+| `@montree/ocr-core` | OCR 纯逻辑：目录抽取与重组 / 水印清洗 / 页词与质量判断，另含 `pdf-bytes` 与缓存 `ports`、外部运行时版本 pin（`inspector-pins`） |
+| `@montree/annotations` | 标注纯逻辑：标记合并 / 纯核 / Anki 构建 / Flashcard 模型与复习，另含标记提议模型（`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议） |
+| `@montree/web-doc` | 在线文档纯逻辑：目录抽取（`extract-toc-links` / `extract-llms-toc`）与站点谓词（`hrtt` / `people-daily`） |
 
 > 注：ACP 协议客户端纯逻辑已完全独立为外部包 `@yitom/acp-client`（stdio JSON-RPC 传输 / 认证决策链 / 会话能力与 registry / 终端缓冲 / MCP RPC 与工具表），不再作为内部 workspace 包维护。
 
 ### shared/ 已删声明
 
-`shared/` **已清空**（仅剩无文件的空目录，阶段 10 删除）：全部契约与纯逻辑已分别迁入 `@inkdown/contracts` / `@inkdown/reader-core` / `@inkdown/pdf` / `@inkdown/ocr-core` / `@inkdown/annotations` / `@inkdown/web-doc`（ACP 已独立为外部包 `@yitom/acp-client`）。新代码一律走 `@inkdown/*`，**禁止引用 `@shared`**。各目录 README 中的“原 `shared/…`”仅为迁移溯源备注。
+`shared/` **已清空**（仅剩无文件的空目录，阶段 10 删除）：全部契约与纯逻辑已分别迁入 `@montree/contracts` / `@montree/reader-core` / `@montree/pdf` / `@montree/ocr-core` / `@montree/annotations` / `@montree/web-doc`（ACP 已独立为外部包 `@yitom/acp-client`）。新代码一律走 `@montree/*`，**禁止引用 `@shared`**。各目录 README 中的“原 `shared/…`”仅为迁移溯源备注。
 
 ### 路径别名
 
 | 别名 | 指向 | 说明 |
 |------|------|------|
 | `@/` | `apps/desktop/src/` | 渲染进程源码 |
-| `@inkdown/*` | `packages/*/src/index.ts` | workspace 包（构建与测试均已接线） |
+| `@montree/*` | `packages/*/src/index.ts` | workspace 包（构建与测试均已接线） |
 | `@foliate` | `third-party/foliate-js` | 阅读后端子模块 |
 | `@shared` | `shared/` | **已废弃**：渲染与测试工程已剔除，仅主进程构建保留兼容，新代码禁用 |
 

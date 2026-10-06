@@ -1,12 +1,12 @@
-import type { OcrTocEntry, OcrTocEntrySource } from '@inkdown/contracts'
+import type { OcrTocEntry, OcrTocEntrySource } from '@montree/contracts'
 import {
   cleanupOcrTocTitle,
   inferLevel,
   isWatermarkTocEntry,
   normalizeOcrChinese,
   sortTocEntriesForDisplay,
-} from '@inkdown/ocr-core'
-import { sectionOfHeading } from '@inkdown/ocr-core'
+} from '@montree/ocr-core'
+import { sectionOfHeading } from '@montree/ocr-core'
 
 /**
  * 目录 AI 整理：把目录页 OCR 原文发给大模型做结构化抽取，

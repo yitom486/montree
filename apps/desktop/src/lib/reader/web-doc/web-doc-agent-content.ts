@@ -1,10 +1,10 @@
 import { webDocApi } from '@/api/web-doc-api'
 import { htmlToText } from '@/lib/agent/context/extract-dom-text'
 import { buildWebDocPageContent } from '@/lib/reader/web-doc/web-doc-html'
-import type { ReaderUnit } from '@inkdown/reader-core'
-import { normalizeWebDocNavUrl } from '@inkdown/reader-core'
-import { resolveWebDocSiteId } from '@inkdown/web-doc'
-import { isOk } from '@inkdown/contracts'
+import type { ReaderUnit } from '@montree/reader-core'
+import { normalizeWebDocNavUrl } from '@montree/reader-core'
+import { resolveWebDocSiteId } from '@montree/web-doc'
+import { isOk } from '@montree/contracts'
 import type { ReaderUnitText } from '@/lib/agent/context/reader-content-registry'
 
 const WEB_DOC_TEXT_CACHE_LIMIT = 48

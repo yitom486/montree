@@ -1,5 +1,5 @@
-import type { ReaderUnit } from '@inkdown/reader-core'
-import { sectionOfHeading } from '@inkdown/ocr-core'
+import type { ReaderUnit } from '@montree/reader-core'
+import { sectionOfHeading } from '@montree/ocr-core'
 
 export interface ReaderUnitTreeNode {
   unit: ReaderUnit

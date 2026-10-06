@@ -1,5 +1,5 @@
-import type { QuizSessionRecord } from '@inkdown/contracts'
-import { parseQuizJsonl, serializeQuizSession } from '@inkdown/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
+import { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
 
 export interface QuizMergeResult {
   mergedSessions: QuizSessionRecord[]

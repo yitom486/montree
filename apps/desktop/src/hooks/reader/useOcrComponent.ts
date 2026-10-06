@@ -7,7 +7,7 @@ import {
   onOcrComponentStatus,
 } from '@/api/ocr-api'
 import { queryKeys } from '@/api/query-keys'
-import type { OcrComponentStatus } from '@inkdown/contracts'
+import type { OcrComponentStatus } from '@montree/contracts'
 
 const DEFAULT_STATUS: OcrComponentStatus = {
   phase: 'not-ready',

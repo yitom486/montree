@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sortCardsByDueOrder } from './review-order'
-import type { Flashcard } from '@inkdown/annotations'
+import type { Flashcard } from '@montree/annotations'
 
 function card(id: string): Flashcard {
   return { id, kind: 'basic', front: id, back: '', tags: [], sourceTitle: '书' }

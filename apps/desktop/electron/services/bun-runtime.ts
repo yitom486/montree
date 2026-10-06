@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import type { BunRuntimeStatus } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import type { BunRuntimeStatus } from '@montree/contracts'
 
 /** Agent 通过 bunx 启动时，是否像「未安装 Bun」导致的错误 */
 export function isLikelyBunMissingMessage(message: string): boolean {
@@ -20,7 +20,7 @@ export function isLikelyBunMissingMessage(message: string): boolean {
 }
 
 export function bunNotInstalledMessage(): string {
-  return '未检测到 Bun。Agent 需通过 bunx 启动 Codex，请先安装 Bun（安装后请完全退出并重新打开 Inkdown）。'
+  return '未检测到 Bun。Agent 需通过 bunx 启动 Codex，请先安装 Bun（安装后请完全退出并重新打开 Montree）。'
 }
 
 const execFileAsync = promisify(execFile)
@@ -99,7 +99,7 @@ export async function installBunRuntime(): Promise<Result<void, AppError>> {
     return err({
       code: 'BUN_NOT_INSTALLED',
       message:
-        '安装脚本已执行。若仍无法连接，请完全退出 Inkdown 后重试（或注销/重启以使 PATH 生效）。',
+        '安装脚本已执行。若仍无法连接，请完全退出 Montree 后重试（或注销/重启以使 PATH 生效）。',
     })
   }
 

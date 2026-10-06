@@ -1,5 +1,5 @@
-import { err, ok, type Result } from '@inkdown/contracts'
-import { toAppError, type AppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
 import type { ISyncStorageAdapter, StatResult } from './storage-adapter'
 
 export interface WebDavAdapterOptions {

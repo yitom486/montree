@@ -14,7 +14,7 @@ describe('isExternalFileCandidate', () => {
   it('开关/协议/空参数过滤', () => {
     expect(isExternalFileCandidate('--user-data-dir=x')).toBe(false)
     expect(isExternalFileCandidate('--squirrel-firstrun')).toBe(false)
-    expect(isExternalFileCandidate('inkdown://open?file=a')).toBe(false)
+    expect(isExternalFileCandidate('montree://open?file=a')).toBe(false)
     expect(isExternalFileCandidate('.')).toBe(false)
     expect(isExternalFileCandidate('  ')).toBe(false)
   })
@@ -25,7 +25,7 @@ describe('extractExternalFilePaths', () => {
 
   it('跳过首个参数（可执行文件），只收存在的文件', () => {
     expect(
-      extractExternalFilePaths(['Inkdown.exe', 'D:\\a.md', '--flag', 'D:\\b.txt'], isFile),
+      extractExternalFilePaths(['Montree.exe', 'D:\\a.md', '--flag', 'D:\\b.txt'], isFile),
     ).toEqual(['D:\\a.md'])
   })
 

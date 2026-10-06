@@ -1,4 +1,4 @@
-import type { Flashcard } from '@inkdown/annotations'
+import type { Flashcard } from '@montree/annotations'
 
 /**
  * 待复习排序（UI批）：派生卡按 due id 顺序重排。

@@ -1,5 +1,5 @@
 /**
- * @inkdown/annotations barrel（F片合并）。
+ * @montree/annotations barrel（F片合并）。
  *
  * 5 模块，按合并 / 复习 / 模型 / 核心 / 导出分组。
  *

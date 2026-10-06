@@ -1,4 +1,4 @@
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import { findTextRangeInRoot } from './excerpt-text-match'
 
 /**
@@ -186,7 +186,7 @@ export function scrollElementTextIntoView(el: HTMLElement, text: string): Range 
  * 各 viewer 订阅后在自家 marks 中找 mark 并走自家适配器执行。
  * 与 rail-follow / rail-focus 同族（window 事件，不经过 React state）。
  */
-export const REVEAL_MARK_EVENT = 'inkdown:reveal-mark'
+export const REVEAL_MARK_EVENT = 'montree:reveal-mark'
 
 export function emitRevealMark(markId: string): void {
   if (typeof window === 'undefined' || !markId) return

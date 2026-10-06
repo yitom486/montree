@@ -14,7 +14,7 @@ export interface Flashcard {
   front: string
   /** 问答卡背面（原文摘录）；填空卡可为空或附加说明（纯文本） */
   back: string
-  /** Anki 标签列表，如 ['Inkdown', '书名', '章名'] */
+  /** Anki 标签列表，如 ['Montree', '书名', '章名'] */
   tags: string[]
   chapterName?: string
   sourceTitle: string

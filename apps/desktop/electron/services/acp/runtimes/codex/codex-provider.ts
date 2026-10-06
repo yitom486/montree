@@ -7,8 +7,8 @@ import type {
   AcpProviderSavePayload,
   AcpProviderStatus,
   AppError,
-} from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+} from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 
 export interface StoredAcpProvider extends AcpProviderConfig {
   apiKey: string

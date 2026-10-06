@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copyPdfBytesForPdfJs } from '@inkdown/ocr-core'
+import { copyPdfBytesForPdfJs } from '@montree/ocr-core'
 import { readPdfPageSizes } from './pdf-page-geometry'
 
 const MINIMAL_PDF = Buffer.from(

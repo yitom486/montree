@@ -1,11 +1,11 @@
 {
-  "name": "@inkdown/annotations",
+  "name": "@montree/annotations",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@inkdown/contracts": "workspace:*",
-    "@inkdown/reader-core": "workspace:*"
+    "@montree/contracts": "workspace:*",
+    "@montree/reader-core": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",

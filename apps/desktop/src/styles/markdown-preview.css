@@ -335,7 +335,7 @@
 }
 
 /* 双向链接（Wikilinks）与跨格式深度回跳样式 */
-.markdown-preview a.inkdown-wikilink {
+.markdown-preview a.montree-wikilink {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -353,13 +353,13 @@
   transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.markdown-preview a.inkdown-wikilink-note {
+.markdown-preview a.montree-wikilink-note {
   color: #3b82f6;
   background-color: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
-.markdown-preview a.inkdown-wikilink-note:hover {
+.markdown-preview a.montree-wikilink-note:hover {
   background-color: rgba(59, 130, 246, 0.2);
   border-color: rgba(59, 130, 246, 0.5);
   transform: translateY(-1px);
@@ -367,13 +367,13 @@
   text-decoration: none;
 }
 
-.markdown-preview a.inkdown-wikilink-book {
+.markdown-preview a.montree-wikilink-book {
   color: #10b981;
   background-color: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
-.markdown-preview a.inkdown-wikilink-book:hover {
+.markdown-preview a.montree-wikilink-book:hover {
   background-color: rgba(16, 185, 129, 0.2);
   border-color: rgba(16, 185, 129, 0.5);
   transform: translateY(-1px);
@@ -381,7 +381,7 @@
   text-decoration: none;
 }
 
-.markdown-preview .inkdown-wikilink-icon {
+.markdown-preview .montree-wikilink-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -389,19 +389,19 @@
   line-height: 1;
 }
 
-.markdown-preview .inkdown-wikilink-text {
+.markdown-preview .montree-wikilink-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.markdown-preview .inkdown-wikilink-svg {
+.markdown-preview .montree-wikilink-svg {
   display: block;
   flex-shrink: 0;
 }
 
 /* OCR 页标记 chip（markdown-it-page-marker 插件输出；data-page 预留跳原图页） */
-.markdown-preview .inkdown-page-marker {
+.markdown-preview .montree-page-marker {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -411,8 +411,8 @@
   user-select: none;
 }
 
-.markdown-preview .inkdown-page-marker::before,
-.markdown-preview .inkdown-page-marker::after {
+.markdown-preview .montree-page-marker::before,
+.markdown-preview .montree-page-marker::after {
   content: '';
   flex: 1;
   border-top: 1px dashed var(--border);

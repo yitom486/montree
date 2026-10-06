@@ -25,16 +25,16 @@ import { registerReaderContent } from '@/lib/agent/context/reader-content-regist
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { registerSelectionProvider, commitReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-agent-composer'
-import { DEFAULT_HIGHLIGHT_COLOR } from '@inkdown/reader-core'
+import { DEFAULT_HIGHLIGHT_COLOR } from '@montree/reader-core'
 import { emitRailFollow, emitRailFocus } from '@/lib/reader/rail-follow'
-import { findMarkForSelection, isClickNotDrag } from '@inkdown/reader-core'
+import { findMarkForSelection, isClickNotDrag } from '@montree/reader-core'
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { useReaderNavigationStore, useReaderNavTitles, isNavIntentLocked } from '@/stores/reader-navigation-store'
 import { cn } from '@/lib/utils'
-import type { AppError } from '@inkdown/contracts'
-import type { ReadingMark } from '@inkdown/contracts'
-import { isOk } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import type { ReadingMark } from '@montree/contracts'
+import { isOk } from '@montree/contracts'
 import { toast } from 'sonner'
 import { appApi } from '@/api/app-api'
 import { openFoliateBook, type FoliateBookAdapter } from '@/lib/reader/adapter/foliate-book-adapter'
@@ -54,7 +54,7 @@ import {
   subscribeRevealMark,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
-import { toCanonicalChapter } from '@inkdown/reader-core'
+import { toCanonicalChapter } from '@montree/reader-core'
 import { parse as parseFoliateCfi, toRange as foliateCfiToRange } from '@foliate/epubcfi.js'
 import type { FoliateViewElement } from '@foliate/view.js'
 import type { OverlayerDrawFn } from '@foliate/overlayer.js'
@@ -62,41 +62,41 @@ import {
   flattenEpubToc,
   pickInitialChapter,
   type EpubChapter,
-} from '@inkdown/reader-core'
-import { normalizeLoadKey } from '@inkdown/reader-core'
+} from '@montree/reader-core'
+import { normalizeLoadKey } from '@montree/reader-core'
 import {
   isSameSpineBase,
   MARK_CATEGORY_SWATCH_FALLBACK,
   resolveMarkCategorySwatch,
   scrollFoliateSectionToFragment,
   splitChapterFragment,
-} from '@inkdown/reader-core'
-import { getEpubThemeRules, applyEpubReadingLayout } from '@inkdown/reader-core'
+} from '@montree/reader-core'
+import { getEpubThemeRules, applyEpubReadingLayout } from '@montree/reader-core'
 import {
   buildEpubSnapshotFromRange,
   readEpubSelection,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
 import {
   bindDocumentSelectionCollapse,
   bindOutsideReaderPointerDismiss,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { buildReadingFileFingerprint } from '@/lib/reader/adapter/reading-file-fingerprint'
 import {
   findCurrentChapterRef,
   resolveEpubChapter,
   resolveMobiChapter,
   tocFromEpubUnits,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { reportAppError } from '@/lib/workspace/report-error'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 
 declare global {
   interface Window {
     /** E2E 专用钩子（仅 E2E_FOLIATE_READER 门控开启时挂载） */
-    __inkdownE2eReader?: {
+    __montreeE2eReader?: {
       selectText: (excerpt: string) => Promise<boolean>
       clickMark: (markId: string) => Promise<boolean>
       listMarks: () => Array<{ id: string; kind: string; excerpt?: string }>
@@ -430,22 +430,22 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
         const HighlightCtor = viewWindow?.Highlight
         if (!registry || !HighlightCtor) continue
         if (markHighlightStyleSigRef.current.get(doc) !== sig) {
-          let style = doc.querySelector('style[data-inkdown-marks]') as HTMLStyleElement | null
+          let style = doc.querySelector('style[data-montree-marks]') as HTMLStyleElement | null
           if (!style) {
             style = doc.createElement('style')
-            style.setAttribute('data-inkdown-marks', '')
+            style.setAttribute('data-montree-marks', '')
             ;(doc.head ?? doc.documentElement)?.appendChild(style)
           }
           style.textContent = Object.entries(palette)
             .map(
               ([cat, color]) =>
-                `::highlight(inkdown-mark-${cat}){text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:${color};}`,
+                `::highlight(montree-mark-${cat}){text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:${color};}`,
             )
             .join('\n')
           markHighlightStyleSigRef.current.set(doc, sig)
         }
         for (const cat of Object.keys(palette)) {
-          registry.delete(`inkdown-mark-${cat}`)
+          registry.delete(`montree-mark-${cat}`)
           buckets.set(cat, [])
         }
         for (const mark of marksRef.current) {
@@ -470,7 +470,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
         for (const [cat, ranges] of buckets) {
           if (ranges.length === 0) continue
           try {
-            registry.set(`inkdown-mark-${cat}`, new HighlightCtor(...ranges))
+            registry.set(`montree-mark-${cat}`, new HighlightCtor(...ranges))
           } catch {
             // 单个失败不影响其余分类
           }
@@ -508,7 +508,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
     )
     for (const { doc, index } of contents) {
       try {
-        doc.querySelectorAll('[data-inkdown-flag]').forEach((el) => el.remove())
+        doc.querySelectorAll('[data-montree-flag]').forEach((el) => el.remove())
         // 旗标挂 documentElement 而非 body：主题 CSS 所有全宽 static 规则
         // 全是 `body ...` 作用域，挂根元素天然免疫，新旧版本通吃；
         // 行内 !important 再保一层，双保险。
@@ -596,23 +596,23 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
         const HighlightCtor = viewWindow?.Highlight
         if (!registry || !HighlightCtor) continue
         if (!excerpt?.trim()) {
-          registry.delete('inkdown-hover')
+          registry.delete('montree-hover')
           continue
         }
         if (!hoverStyleInjectedRef.current.has(doc)) {
           const style = doc.createElement('style')
-          style.setAttribute('data-inkdown-hover', '')
+          style.setAttribute('data-montree-hover', '')
           style.textContent =
-            '::highlight(inkdown-hover){background:rgba(139,92,246,.32);border-radius:2px;}'
+            '::highlight(montree-hover){background:rgba(139,92,246,.32);border-radius:2px;}'
           ;(doc.head ?? doc.documentElement)?.appendChild(style)
           hoverStyleInjectedRef.current.add(doc)
         }
         const body = doc.body
         if (!body) continue
         const range = findTextRangeInRoot(body, excerpt.trim())
-        registry.delete('inkdown-hover')
+        registry.delete('montree-hover')
         if (range) {
-          registry.set('inkdown-hover', new HighlightCtor(range))
+          registry.set('montree-hover', new HighlightCtor(range))
         }
       } catch {
         // 高亮失败时静默忽略，不干扰阅读
@@ -658,18 +658,18 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
         const registry = viewWindow?.CSS?.highlights
         const HighlightCtor = viewWindow?.Highlight
         if (!registry || !HighlightCtor) return
-        if (!target.doc.querySelector('style[data-inkdown-hover]')) {
+        if (!target.doc.querySelector('style[data-montree-hover]')) {
           const style = target.doc.createElement('style')
-          style.setAttribute('data-inkdown-hover', '')
+          style.setAttribute('data-montree-hover', '')
           style.textContent =
-            '::highlight(inkdown-hover){background:rgba(139,92,246,.32);border-radius:2px;}'
+            '::highlight(montree-hover){background:rgba(139,92,246,.32);border-radius:2px;}'
           ;(target.doc.head ?? target.doc.documentElement)?.appendChild(style)
         }
-        registry.set('inkdown-hover', new HighlightCtor(range))
+        registry.set('montree-hover', new HighlightCtor(range))
         window.setTimeout(() => {
           if (jumpFlashTokenRef.current !== token) return
           try {
-            registry.delete('inkdown-hover')
+            registry.delete('montree-hover')
           } catch {
             // 忽略
           }
@@ -1591,7 +1591,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
   //（findTextRangeInRoot → snapshot → toolbar；toRange → inspector）。
   useEffect(() => {
     if (typeof window === 'undefined' || !appApi.isE2EFoliateReader()) return
-    window.__inkdownE2eReader = {
+    window.__montreeE2eReader = {
       listMarks: () =>
         marksRef.current.map((mark) => ({ id: mark.id, kind: mark.kind, excerpt: mark.excerpt })),
       selectText: async (excerpt: string) => {
@@ -1663,7 +1663,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
       },
     }
     return () => {
-      delete window.__inkdownE2eReader
+      delete window.__montreeE2eReader
     }
   }, [filePath, getRenderedDocs, openInspectorAtRange])
 

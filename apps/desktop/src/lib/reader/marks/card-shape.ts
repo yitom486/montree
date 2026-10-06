@@ -1,5 +1,5 @@
-import type { ReadingMarkCategory } from '@inkdown/contracts'
-import type { HighlightColorId } from '@inkdown/reader-core'
+import type { ReadingMarkCategory } from '@montree/contracts'
+import type { HighlightColorId } from '@montree/reader-core'
 
 export interface HeuristicCardResult {
   category: ReadingMarkCategory

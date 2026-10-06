@@ -1,5 +1,5 @@
-import { isOk, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import { isOk, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 
 /**
  * 阅读器手动正文搜索逻辑（P0.1/S3，框架无关；React 组件只做渲染接线）。

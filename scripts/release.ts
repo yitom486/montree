@@ -22,7 +22,7 @@ export type BumpKind = 'patch' | 'minor' | 'major'
 const ROOT = join(import.meta.dirname, '..')
 const PACKAGE_JSON = join(ROOT, 'package.json')
 const CHANGELOG = join(ROOT, 'CHANGELOG.md')
-const REPO = 'yitom486/inkdown'
+const REPO = 'yitom486/montree'
 
 const AUTHOR_NAME = 'yitom486'
 const AUTHOR_EMAIL = 'yitom486@gmail.com'

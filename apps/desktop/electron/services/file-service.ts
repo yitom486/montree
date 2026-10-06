@@ -1,11 +1,11 @@
 import { dialog, BrowserWindow } from 'electron'
 import { dirname, extname, join } from 'path'
 import { mkdir, readFile, writeFile } from 'fs/promises'
-import { ALL_DOCUMENT_EXTENSIONS, DEFAULT_SAVE_FILENAME, MARKDOWN_EXTENSIONS } from '@inkdown/contracts'
-import { getDocumentKind } from '@inkdown/contracts'
-import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@inkdown/contracts'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import { ALL_DOCUMENT_EXTENSIONS, DEFAULT_SAVE_FILENAME, MARKDOWN_EXTENSIONS } from '@montree/contracts'
+import { getDocumentKind } from '@montree/contracts'
+import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@montree/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   ExportDocumentPayload,
   ExportDocumentResult,
@@ -20,7 +20,7 @@ import type {
   SaveFileResult,
   SavePastedImagePayload,
   SavePastedImageResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import { scanWorkspace } from './workspace'
 import { resolveExportSavePath } from './export-save-path'
 
@@ -244,7 +244,7 @@ export async function savePastedImage(
 
     const assetsDir = markdownPath
       ? join(dirname(markdownPath), PASTED_IMAGE_ASSETS_DIR)
-      : join(workspaceRoot!, '.inkdown', 'agent-pasted')
+      : join(workspaceRoot!, '.montree', 'agent-pasted')
     await mkdir(assetsDir, { recursive: true })
 
     const fileName = `pasted-${Date.now()}${extension}`
@@ -253,7 +253,7 @@ export async function savePastedImage(
 
     const relativePath = markdownPath
       ? `./${PASTED_IMAGE_ASSETS_DIR}/${fileName}`.replace(/\\/g, '/')
-      : `.inkdown/agent-pasted/${fileName}`.replace(/\\/g, '/')
+      : `.montree/agent-pasted/${fileName}`.replace(/\\/g, '/')
 
     return ok({ relativePath, absolutePath })
   } catch (error) {

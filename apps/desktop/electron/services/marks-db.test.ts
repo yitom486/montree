@@ -31,12 +31,12 @@ import {
   rowToReadingMark,
   searchMarks,
 } from './marks-db'
-import { isOk } from '@inkdown/contracts'
-import { toChapterKey } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import { toChapterKey } from '@montree/contracts'
 
 describe('marks-db（[2]-01 卡片 SQL 后端）', () => {
   beforeEach(async () => {
-    delete process.env.INKDOWN_MARKS_BACKEND
+    delete process.env.MONTREE_MARKS_BACKEND
     tempUserData = await mkdtemp(join(tmpdir(), 'marks-db-'))
   })
 

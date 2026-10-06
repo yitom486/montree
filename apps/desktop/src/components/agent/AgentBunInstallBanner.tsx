@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getBunRuntimeStatus, installBunRuntime } from '@/api/bun-api'
 import { appApi } from '@/api/app-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { toast } from 'sonner'
 
 interface AgentBunInstallBannerProps {
@@ -27,7 +27,7 @@ export function AgentBunInstallBanner({ onInstalled }: AgentBunInstallBannerProp
         onInstalled?.()
       } else {
         toast.message('安装脚本已执行', {
-          description: '请完全退出 Inkdown 后重新打开，再试连接 Agent。',
+          description: '请完全退出 Montree 后重新打开，再试连接 Agent。',
         })
       }
     } finally {
@@ -39,7 +39,7 @@ export function AgentBunInstallBanner({ onInstalled }: AgentBunInstallBannerProp
     <div className="mx-3 mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-950 dark:text-amber-100">
       <p className="font-medium">需要安装 Bun</p>
       <p className="mt-1 leading-relaxed text-amber-900/85 dark:text-amber-100/85">
-        Inkdown 安装包不含 Agent 运行时。连接 Codex 需本机安装 Bun（含 bunx），与 OCR 语言包类似，均为按需准备。
+        Montree 安装包不含 Agent 运行时。连接 Codex 需本机安装 Bun（含 bunx），与 OCR 语言包类似，均为按需准备。
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button type="button" size="xs" disabled={installing} onClick={() => void handleInstall()}>

@@ -1,8 +1,8 @@
 import DOMPurify from 'dompurify'
-import type { WebDocPageContent, WebDocSiteId } from '@inkdown/contracts'
+import type { WebDocPageContent, WebDocSiteId } from '@montree/contracts'
 import { normalizeWebDocCards, stripWebDocChrome } from '@/lib/reader/web-doc/web-doc-chrome'
-import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@inkdown/reader-core'
-import { DEFAULT_READER_TYPOGRAPHY, type ReaderTypography } from '@inkdown/reader-core'
+import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@montree/reader-core'
+import { DEFAULT_READER_TYPOGRAPHY, type ReaderTypography } from '@montree/reader-core'
 import { buildWebDocCodeBlockCss, buildWebDocTabsRuntimeScript, enhanceWebDocCodeBlocks } from '@/lib/reader/web-doc/web-doc-code-blocks'
 import {
   buildWebDocEmbedCss,
@@ -15,7 +15,7 @@ import {
   enhanceWebDocMath,
 } from '@/lib/reader/web-doc/web-doc-math'
 import {
-  INKDOWN_SOURCE_HREF_ATTR,
+  MONTREE_SOURCE_HREF_ATTR,
   neutralizeWebDocNavigationLinks,
   WEB_DOC_READER_MARKER_ATTR,
   WEB_DOC_READER_MARKER_VALUE,
@@ -516,8 +516,8 @@ export function sanitizeWebDocBodyHtml(html: string): string {
       'aria-hidden',
       'role',
       'tabindex',
-      'data-inkdown-href',
-      INKDOWN_SOURCE_HREF_ATTR,
+      'data-montree-href',
+      MONTREE_SOURCE_HREF_ATTR,
       'referrerpolicy',
       'allow',
       'allowfullscreen',
@@ -568,10 +568,10 @@ export function buildWebDocReaderDocument(
   // srcdoc 前再归一化一次，确保旧片段也不会把 display:contents 卡片撑坏。
   const normalizedBodyHtml = (() => {
     const doc = new DOMParser().parseFromString(
-      `<div id="inkdown-reader-body">${content.bodyHtml}</div>`,
+      `<div id="montree-reader-body">${content.bodyHtml}</div>`,
       'text/html',
     )
-    const root = doc.getElementById('inkdown-reader-body')
+    const root = doc.getElementById('montree-reader-body')
     if (!root) return content.bodyHtml
     normalizeWebDocCards(root)
     return root.innerHTML
@@ -596,7 +596,7 @@ export function buildWebDocReaderDocument(
   <style>
     body { margin: 0; padding: 1.25rem 1.5rem 2rem; }
     a { word-break: break-word; }
-    [data-inkdown-href] { cursor: pointer; }
+    [data-montree-href] { cursor: pointer; }
     pre { overflow-x: auto; }
     img { max-width: 100%; height: auto; }
     /* 无宽高的图标 SVG（如「编辑此页」）否则会按 viewBox 撑满版面 */

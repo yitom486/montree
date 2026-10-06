@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
-import type { AcpRuntimeInfo } from '@inkdown/contracts'
+import type { AcpRuntimeInfo } from '@montree/contracts'
 
 export interface SpawnedAcpProcess {
   runtimeId: string
@@ -99,7 +99,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
 
   // 默认允许本机浏览器 OAuth（对齐 VS Code/Zed）；无头/CI 才禁用
   const forceNoBrowser =
-    process.env.INKDOWN_ACP_NO_BROWSER === '1' ||
+    process.env.MONTREE_ACP_NO_BROWSER === '1' ||
     process.env.CI === 'true' ||
     process.env.CI === '1'
   if (forceNoBrowser) {

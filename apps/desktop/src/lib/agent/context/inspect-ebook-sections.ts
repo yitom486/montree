@@ -5,7 +5,7 @@ import {
   windowContentAuditText,
   type ContentAuditHit,
   type ContentAuditResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type { ReaderUnitText } from './reader-content-registry'
 
 /**

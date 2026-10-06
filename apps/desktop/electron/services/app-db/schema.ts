@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 
 /**
- * 全局库 schema（跨书数据）：`userData/inkdown.db`。
+ * 全局库 schema（跨书数据）：`userData/montree.db`。
  * v1 只放测验（[2]-02a）：`quiz_sessions` 每次作答 1 行 +
  * `quiz_questions` 每题 1 行（questions 数组拆行，"错题本/按题统计"变普通查询；
  * `submissions` 明细读多写少，以 JSON 存题行，不拆）。
@@ -11,7 +11,7 @@ import type { DatabaseSync } from 'node:sqlite'
  * 2. 补 `title` 列：草案漏了 `QuizQuestion.title`，否则丢题干标题。
  */
 
-export const INKDOWN_DB_SCHEMA_VERSION = 2
+export const MONTREE_DB_SCHEMA_VERSION = 2
 
 const MIGRATION_V1 = `
 CREATE TABLE IF NOT EXISTS quiz_sessions (
@@ -64,20 +64,20 @@ const MIGRATIONS: Record<number, string> = {
 );`,
 }
 
-export function getInkdownDbVersion(db: DatabaseSync): number {
+export function getMontreeDbVersion(db: DatabaseSync): number {
   const row = db.prepare('PRAGMA user_version').get() as { user_version?: unknown } | undefined
   const version = row?.user_version
   return typeof version === 'number' && Number.isInteger(version) ? version : 0
 }
 
 /** 按 user_version 顺序执行缺失迁移；幂等，可重复调用 */
-export function migrateInkdownDb(db: DatabaseSync): { migrated: boolean; version: number } {
+export function migrateMontreeDb(db: DatabaseSync): { migrated: boolean; version: number } {
   try {
     db.exec('PRAGMA journal_mode = WAL')
   } catch {
     // 极早版本驱动不支持时忽略，迁移本身不受影响
   }
-  const current = getInkdownDbVersion(db)
+  const current = getMontreeDbVersion(db)
   const pending = Object.keys(MIGRATIONS)
     .map(Number)
     .filter((version) => version > current)

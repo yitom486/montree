@@ -15,18 +15,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import {
   groupMarksByChapter,
   type ReadingNotesChapterRef,
   type ReadingNotesContentKind,
   type ReadingNotesScope,
-} from '@inkdown/reader-core'
-import { isHighlightPassage, passageExcerpt } from '@inkdown/reader-core'
-import { getReadingMarkDisplayKind, getReadingMarkLabel, getReadingMarkStatusLabel } from '@inkdown/reader-core'
-import { highlightSwatch } from '@inkdown/reader-core'
+} from '@montree/reader-core'
+import { isHighlightPassage, passageExcerpt } from '@montree/reader-core'
+import { getReadingMarkDisplayKind, getReadingMarkLabel, getReadingMarkStatusLabel } from '@montree/reader-core'
+import { highlightSwatch } from '@montree/reader-core'
 import { useReadingMarkKindFilters } from '@/stores/reading-mark-panel-store'
-import { markMatchesKindFilters } from '@inkdown/reader-core'
+import { markMatchesKindFilters } from '@montree/reader-core'
 import { cn } from '@/lib/utils'
 
 function MarkKindIcon({ kind }: { kind: ReadingMark['kind'] }) {

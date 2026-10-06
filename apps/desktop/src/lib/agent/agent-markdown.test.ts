@@ -9,7 +9,7 @@ import {
 describe('renderAgentMarkdown + splitAgentMarkdownParts', () => {
   beforeEach(() => {
     // 单测里关掉 mermaid 诊断噪音
-    window.localStorage.setItem('inkdown:mermaid-debug', '0')
+    window.localStorage.setItem('montree:mermaid-debug', '0')
   })
 
   it('highlights fenced code with hljs (shared preview pipeline)', () => {    const html = renderAgentMarkdown(['```ts', 'const answer = 42', '```'].join('\n'))

@@ -160,7 +160,7 @@ describe('web-doc-html', () => {
     const result = extractWebDocArticle(html, 'https://agentclientprotocol.com/protocol/v1/initialization')
     expect(result.bodyHtml).toContain('web-doc-card')
     expect(result.bodyHtml).toContain('web-doc-card-with-container')
-    expect(result.bodyHtml).toContain(`data-inkdown-source-href="/protocol/v1/elicitation"`)
+    expect(result.bodyHtml).toContain(`data-montree-source-href="/protocol/v1/elicitation"`)
     expect(result.bodyHtml).toContain('web-doc-card-content-wrap')
 
     const readerDocument = buildWebDocReaderDocument(
@@ -172,9 +172,9 @@ describe('web-doc-html', () => {
       'dark',
     )
     expect(readerDocument).toContain(
-      'data-inkdown-href="https://agentclientprotocol.com/protocol/v1/elicitation"',
+      'data-montree-href="https://agentclientprotocol.com/protocol/v1/elicitation"',
     )
-    expect(readerDocument).not.toContain('data-inkdown-source-href')
+    expect(readerDocument).not.toContain('data-montree-source-href')
     expect(readerDocument).toContain('data-component-part="card-content-container"')
     expect(readerDocument).toContain('<main class="web-doc-reader-content">')
     expect(readerDocument).toContain('</main>')
@@ -202,9 +202,9 @@ describe('web-doc-html', () => {
 
     expect(readerDocument).toContain('web-doc-card-with-container')
     expect(readerDocument).toContain(
-      'data-inkdown-href="https://agentclientprotocol.com/protocol/v1/elicitation"',
+      'data-montree-href="https://agentclientprotocol.com/protocol/v1/elicitation"',
     )
-    expect(readerDocument).not.toContain('data-inkdown-source-href')
+    expect(readerDocument).not.toContain('data-montree-source-href')
   })
 
   it('把原生 hr、Tailwind 边界类与 inline border 归一化为通用分割线类', () => {

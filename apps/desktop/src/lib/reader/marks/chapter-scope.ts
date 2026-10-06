@@ -1,5 +1,5 @@
-import type { ReadingMark } from '@inkdown/contracts'
-import type { ReadingNotesChapterRef } from '@inkdown/reader-core'
+import type { ReadingMark } from '@montree/contracts'
+import type { ReadingNotesChapterRef } from '@montree/reader-core'
 
 /**
  * 本章 scope 窄化（[3] 索引化章节查询的调用方侧）。

@@ -1,19 +1,19 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@inkdown/contracts'
-import { toAppError, type AppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
 import type {
   InspectorBookMarkdown,
   InspectorPdfClassification,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type {
   InspectorPagesMarkdown,
-} from '@inkdown/pdf'
+} from '@montree/pdf'
 import {
   assembleBookMarkdown,
   mapClassification,
   mapPagesMarkdown,
   toZeroIndexed,
-} from '@inkdown/pdf'
+} from '@montree/pdf'
 
 /**
  * pdf-inspector 主进程封装（分类 + 原生抽取；_loading 纯抽取，不碰 OCR 运行时）。

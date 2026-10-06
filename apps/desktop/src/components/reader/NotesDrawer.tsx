@@ -11,8 +11,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { ReadingMark, ReadingMarkCategory } from '@inkdown/contracts'
-import { isOk } from '@inkdown/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
+import { isOk } from '@montree/contracts'
 import { queryKeys } from '@/api/query-keys'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'

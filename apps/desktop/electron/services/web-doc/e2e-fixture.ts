@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import type { WebDocFetchResult } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import type { WebDocFetchResult } from '@montree/contracts'
 import { normalizeWebDocUrl } from './url-policy'
 
-export const E2E_WEB_DOC_FIXTURE_HOST = 'e2e.inkdown.test'
+export const E2E_WEB_DOC_FIXTURE_HOST = 'e2e.montree.test'
 
 type FixtureManifest = Record<string, string>
 

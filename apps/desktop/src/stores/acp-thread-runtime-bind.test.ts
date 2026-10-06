@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
 const CODEX = DEFAULT_ACP_RUNTIME_ID

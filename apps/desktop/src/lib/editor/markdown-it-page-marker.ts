@@ -47,7 +47,7 @@ export function markdownItPageMarker(md: MarkdownItInstance): void {
     const token = tokens[index]
     const page = (token?.meta as { page?: unknown } | undefined)?.page
     if (typeof page !== 'number') return ''
-    return `<div class="inkdown-page-marker" data-page="${page}"><span class="inkdown-page-marker-label">第 ${page} 页</span></div>`
+    return `<div class="montree-page-marker" data-page="${page}"><span class="montree-page-marker-label">第 ${page} 页</span></div>`
   }
 }
 

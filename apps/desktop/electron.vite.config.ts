@@ -14,12 +14,12 @@ const foliateAlias = {
 }
 
 const workspaceAlias = {
-  '@inkdown/contracts': resolve(appDir, '../../packages/contracts/src/index.ts'),
-  '@inkdown/reader-core': resolve(appDir, '../../packages/reader-core/src/index.ts'),
-  '@inkdown/pdf': resolve(appDir, '../../packages/pdf/src/index.ts'),
-  '@inkdown/ocr-core': resolve(appDir, '../../packages/ocr-core/src/index.ts'),
-  '@inkdown/annotations': resolve(appDir, '../../packages/annotations/src/index.ts'),
-  '@inkdown/web-doc': resolve(appDir, '../../packages/web-doc/src/index.ts'),
+  '@montree/contracts': resolve(appDir, '../../packages/contracts/src/index.ts'),
+  '@montree/reader-core': resolve(appDir, '../../packages/reader-core/src/index.ts'),
+  '@montree/pdf': resolve(appDir, '../../packages/pdf/src/index.ts'),
+  '@montree/ocr-core': resolve(appDir, '../../packages/ocr-core/src/index.ts'),
+  '@montree/annotations': resolve(appDir, '../../packages/annotations/src/index.ts'),
+  '@montree/web-doc': resolve(appDir, '../../packages/web-doc/src/index.ts'),
 }
 
 /** file:// 协议下 crossorigin 会导致 JS/CSS 静默加载失败（生产黑屏） */

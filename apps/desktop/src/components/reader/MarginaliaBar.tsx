@@ -6,7 +6,7 @@ import {
   FoldVertical,
   UnfoldVertical,
 } from 'lucide-react'
-import type { ReadingMark, ReadingMarkCategory } from '@inkdown/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
 import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { KnowledgeCardItem } from './KnowledgeCardItem'
 import { BracketConnector } from './BracketConnector'

@@ -1,6 +1,6 @@
-import { basename } from '@inkdown/contracts'
+import { basename } from '@montree/contracts'
 import type { BrowserWindow } from 'electron'
-import { APP_TITLE } from '@inkdown/contracts'
+import { APP_TITLE } from '@montree/contracts'
 
 export function formatWindowTitle(
   filePath?: string,

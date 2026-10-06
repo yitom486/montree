@@ -24,7 +24,7 @@ async function openViaQuickOpen(window: Page, fileName: string, query: string): 
 
 test.describe('PDF Agent 正文（主进程 inspector）', () => {
   test('生产包解析整档且 Agent 正文走 inspector 路径', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-pdf-structure-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-pdf-structure-'))
     const { pdfName } = await writeReaderSmokeWorkspace(workspace)
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,
@@ -48,7 +48,7 @@ test.describe('PDF Agent 正文（主进程 inspector）', () => {
       await expect(panel.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
 
       const result = await window.evaluate(async () => {
-        const hook = window.__inkdownE2ePdfStructure
+        const hook = window.__montreeE2ePdfStructure
         if (!hook) return null
         return {
           read: await hook.readCurrentPage(),
@@ -60,7 +60,7 @@ test.describe('PDF Agent 正文（主进程 inspector）', () => {
       expect(result!.status.status).toBe('ready')
       expect(result!.read.source).toBe('inspector')
       expect(result!.read.prefix).toContain('【PDF 第 1/1 页】')
-      expect(result!.read.prefix).toContain('Inkdown E2E minimal PDF paragraph.')
+      expect(result!.read.prefix).toContain('Montree E2E minimal PDF paragraph.')
     } finally {
       await app.close()
     }

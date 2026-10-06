@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sortMarksByDocumentPosition } from './mark-document-order'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 
 function mark(id: string, chapterId: string | null): ReadingMark {
   return {

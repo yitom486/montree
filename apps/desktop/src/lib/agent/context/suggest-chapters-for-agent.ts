@@ -2,7 +2,7 @@ import {
   CHAPTER_MARK_PLAN_MAX,
   type ChapterMarkPlanInput,
   type ChapterMarkPlanToolResult,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import { collectActiveDocument } from '@/lib/agent/context/collect-turn-context'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 
@@ -13,7 +13,7 @@ function resolveTocLabel(flatIndex: number): string | null {
   return reader.units[flatIndex]?.label?.trim() ?? null
 }
 
-/** MCP inkdown_suggest_chapters：校验 flatIndex 并返回结构化章级建议。 */
+/** MCP montree_suggest_chapters：校验 flatIndex 并返回结构化章级建议。 */
 export async function suggestChaptersForAgent(
   chapters: ChapterMarkPlanInput[],
 ): Promise<ChapterMarkPlanToolResult> {
@@ -32,7 +32,7 @@ export async function suggestChaptersForAgent(
     const tocLabel = resolveTocLabel(item.flatIndex)
     if (!tocLabel) {
       throw new Error(
-        `flatIndex ${item.flatIndex} 不在当前目录中，请先 inkdown_read(scope=toc) 核对`,
+        `flatIndex ${item.flatIndex} 不在当前目录中，请先 montree_read(scope=toc) 核对`,
       )
     }
     normalized.push({
@@ -47,6 +47,6 @@ export async function suggestChaptersForAgent(
     count: normalized.length,
     chapters: normalized,
     message:
-      '已展示章级划重点建议；请用户点选一章后，再 read(scope=chapter) 并 inkdown_propose_mark(marks)，单批≤10。',
+      '已展示章级划重点建议；请用户点选一章后，再 read(scope=chapter) 并 montree_propose_mark(marks)，单批≤10。',
   }
 }

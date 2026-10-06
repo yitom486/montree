@@ -59,13 +59,13 @@ export function markdownItWikilinks(md: MarkdownItInstance): void {
     const escapedTarget = md.utils.escapeHtml(target)
     const escapedLabel = md.utils.escapeHtml(label)
     const isEbook = /\.(pdf|epub|mobi|azw3)(#|$)/i.test(target)
-    const badgeClass = isEbook ? 'inkdown-wikilink-book' : 'inkdown-wikilink-note'
+    const badgeClass = isEbook ? 'montree-wikilink-book' : 'montree-wikilink-note'
     const svgIcon = isEbook
-      ? `<svg class="inkdown-wikilink-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
-      : `<svg class="inkdown-wikilink-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+      ? `<svg class="montree-wikilink-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
+      : `<svg class="montree-wikilink-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
 
-    return `<a class="inkdown-wikilink ${badgeClass}" data-wikilink-target="${escapedTarget}" href="#wikilink:${encodeURIComponent(
+    return `<a class="montree-wikilink ${badgeClass}" data-wikilink-target="${escapedTarget}" href="#wikilink:${encodeURIComponent(
       target,
-    )}" title="${escapedTarget}"><span class="inkdown-wikilink-icon">${svgIcon}</span><span class="inkdown-wikilink-text">${escapedLabel}</span></a>`
+    )}" title="${escapedTarget}"><span class="montree-wikilink-icon">${svgIcon}</span><span class="montree-wikilink-text">${escapedLabel}</span></a>`
   }
 }

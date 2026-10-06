@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import {
   findMarkByOverlayerKey,
   overlayerKeyForMark,

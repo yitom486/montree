@@ -1,7 +1,7 @@
-import type { RendererErrorPayload } from '@inkdown/contracts'
-import type { AppUpdateStatus } from '@inkdown/contracts'
-import { ok, err, isOk, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import type { RendererErrorPayload } from '@montree/contracts'
+import type { AppUpdateStatus } from '@montree/contracts'
+import { ok, err, isOk, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 
 function getElectronAPI() {
   return typeof window !== 'undefined' ? window.electronAPI : undefined

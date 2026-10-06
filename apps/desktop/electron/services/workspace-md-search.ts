@@ -9,7 +9,7 @@ import { assertInsideWorkspace } from './workspace-fs'
  * - root 由调用方（渲染端文件树状态）给出，模型碰不到；每个候选仍过
  *   assertInsideWorkspace，且用 realpath 防 symlink 逃出根；
  * - 只认 .md / .markdown（大小写不敏感）；跳过点开头目录/文件、
- *   node_modules、.git、.inkdown、dist、out、release；
+ *   node_modules、.git、.montree、dist、out、release；
  * - 字面匹配（toLowerCase + includes），无正则、无 shell、无 spawn；
  * - 最多读 200 文件、单文件 256KB（超则跳过）、内部命中最多 100 条；
  * - 单文件超时/异常只跳过该文件，永不整次失败；只读不写。
@@ -36,7 +36,7 @@ export const WORKSPACE_MD_MAX_HITS = 100
 export const WORKSPACE_MD_MAX_LINE_CHARS = 2000
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown'])
-const SKIP_DIRECTORIES = new Set(['node_modules', '.git', '.inkdown', 'dist', 'out', 'release'])
+const SKIP_DIRECTORIES = new Set(['node_modules', '.git', '.montree', 'dist', 'out', 'release'])
 
 function isMarkdownFile(name: string): boolean {
   const dot = name.lastIndexOf('.')

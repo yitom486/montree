@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { ReaderDocumentKind } from '@inkdown/contracts'
+import type { ReaderDocumentKind } from '@montree/contracts'
 import type { AppTheme } from '@/stores/editor-ui-store'
 
 // 阅读器按格式懒加载：foliate 统一承载 EPUB/MOBI，pdfjs 承载 PDF，首屏不付成本。

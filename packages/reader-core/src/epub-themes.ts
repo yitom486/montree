@@ -190,7 +190,7 @@ export function buildReaderLayoutCss(
     }
     body p,
     body span:not(.mobi-mark-highlight):not(.mobi-mark-note):not(.reader-mark-highlight):not(.reader-mark-note),
-    body div:not(.mobi-mark-highlight):not(.mobi-mark-note):not(#reader-mark-layer):not([data-inkdown-flag]),
+    body div:not(.mobi-mark-highlight):not(.mobi-mark-note):not(#reader-mark-layer):not([data-montree-flag]),
     body li,
     body td,
     body th,
@@ -248,7 +248,7 @@ export function buildReaderLayoutCss(
     body a:hover {
       color: ${palette.linkHover} !important;
     }
-    body > div:not(.mobi-mark-highlight):not(.mobi-mark-note):not(#reader-mark-layer):not([data-inkdown-flag]),
+    body > div:not(.mobi-mark-highlight):not(.mobi-mark-note):not(#reader-mark-layer):not([data-montree-flag]),
     body > section,
     body > article,
     body > main,

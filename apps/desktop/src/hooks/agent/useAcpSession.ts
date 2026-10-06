@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { findBuiltinAcpRuntime, isOk } from '@inkdown/contracts'
+import { findBuiltinAcpRuntime, isOk } from '@montree/contracts'
 import type {
   AcpAuthMethod,
   AcpConfigOption,
   AcpConnectReadyResult,
   AcpContentBlock,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import { acpApi } from '@/api/acp-api'
-import { buildInkdownPromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
+import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {
   markSessionBootstrapSent,
   shouldSendSessionBootstrap,
@@ -609,7 +609,7 @@ export function useAcpSession(workspaceRoot?: string) {
       setPrompting(true)
       beginAgentReply()
       const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildInkdownPromptPrefix(useAcpUiStore.getState().activeThreadId, {
+      const prefix = buildMontreePromptPrefix(useAcpUiStore.getState().activeThreadId, {
         includeBootstrap,
       })
       const result = await acpApi.prompt({

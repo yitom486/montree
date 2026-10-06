@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import {
   extractTextFromContent,
@@ -11,7 +11,7 @@ import { parseAcpPlanEntries, summarizePlanProgress } from '@/lib/agent/acp-plan
 import { enrichAcpToolMessage } from '@/lib/agent/enrich-tool-message'
 import { promoteMarkProposalsToLastAgent, resolveMarkProposalOnMessages } from '@/lib/agent/promote-mark-proposals'
 import { extractAnnotationDraft } from '@/lib/agent/annotation-note-prompts'
-import type { MarkProposalStatus } from '@inkdown/annotations'
+import type { MarkProposalStatus } from '@montree/annotations'
 
 function messageId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -518,7 +518,7 @@ export const useAnnotationAgentStore = create<AnnotationAgentStore>()(
         ),
     }),
     {
-      name: 'inkdown-annotation-agent',
+      name: 'montree-annotation-agent',
       partialize: (s) => ({
         byFileKey: s.byFileKey,
       }),

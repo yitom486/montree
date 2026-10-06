@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { FileTreeNode } from '@inkdown/contracts'
+import type { FileTreeNode } from '@montree/contracts'
 import { resolveWikilinkTarget } from './resolve-wikilink'
 
 describe('resolveWikilinkTarget', () => {

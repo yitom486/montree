@@ -9,7 +9,7 @@ import {
   textFromOcrPageCache,
 } from '@/lib/reader/pdf/pdf-page-text'
 import { assertPageOcrAllowed, mergeOcrPageCaches } from '@/lib/reader/pdf-ocr/pdf-page-auto-ocr'
-import type { PdfOcrPageCache } from '@inkdown/contracts'
+import type { PdfOcrPageCache } from '@montree/contracts'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 
 /**
@@ -153,7 +153,7 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
 
   /**
    * 统一正文读取：嵌入文字层 → OCR 缓存 → 扫描版按需 OCR。
-   * Agent（inkdown_read 等）与 UI 共用此路径，MCP 工具接口不变。
+   * Agent（montree_read 等）与 UI 共用此路径，MCP 工具接口不变。
    */
   const readPageText = useCallback(
     async (page: number, options?: { allowAutoOcr?: boolean }): Promise<string> => {

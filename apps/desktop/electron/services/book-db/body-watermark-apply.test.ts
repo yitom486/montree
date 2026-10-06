@@ -19,8 +19,8 @@ import {
   planBodyWatermarkPatches,
   sha256HexAscii,
   type BodyWatermarkPatch,
-} from '@inkdown/ocr-core'
-import type { BookBlockType } from '@inkdown/contracts'
+} from '@montree/ocr-core'
+import type { BookBlockType } from '@montree/contracts'
 import { getBookDbPath } from './open-book-db'
 import { migrateBookDb } from './schema'
 import { getBookRecord, searchBookBlocks } from './queries'

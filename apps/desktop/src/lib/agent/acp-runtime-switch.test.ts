@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   BUILTIN_ACP_RUNTIMES,
   DEFAULT_ACP_RUNTIME_ID,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   selectActiveThreadAgentSessionId,
   selectThreadsForRuntime,
@@ -175,7 +175,7 @@ describe('ACP 运行时切换：状态联动语义', () => {
   it('旧版持久化自动迁移：单值 agentSessionId 归入 codex 桶', async () => {
     const threadId = 'thread_legacy'
     localStorage.setItem(
-      'inkdown-acp-ui',
+      'montree-acp-ui',
       JSON.stringify({
         state: {
           selectedRuntimeId: CODEX,
@@ -299,7 +299,7 @@ describe('ACP 运行时切换：状态联动语义', () => {
   it('批注旧版持久化自动迁移：单值 agentSessionId 归入 codex 桶', async () => {
     const key = annotationFileKey('fp-legacy', '/book.epub')
     localStorage.setItem(
-      'inkdown-annotation-agent',
+      'montree-annotation-agent',
       JSON.stringify({
         state: {
           byFileKey: {

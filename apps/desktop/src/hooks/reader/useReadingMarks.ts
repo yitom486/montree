@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { queryKeys } from '@/api/query-keys'
-import { isOk } from '@inkdown/contracts'
-import type { CreateReadingMarkPayload, UpdateReadingMarkPayload } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import type { CreateReadingMarkPayload, UpdateReadingMarkPayload } from '@montree/contracts'
 import { reportAppError } from '@/lib/workspace/report-error'
 
 export function useReadingMarks(filePath: string) {

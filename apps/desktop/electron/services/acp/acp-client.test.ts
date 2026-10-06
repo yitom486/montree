@@ -7,8 +7,8 @@ import type {
 } from '@agentclientprotocol/sdk'
 import { registerAcpClientHandlers, pickAllowOptionId } from './client-handlers'
 import { AcpTerminalManager } from './acp-terminal'
-import type { AcpPermissionOutcome } from '@inkdown/contracts'
-import type { InkdownVirtualResource } from '@inkdown/contracts'
+import type { AcpPermissionOutcome } from '@montree/contracts'
+import type { MontreeVirtualResource } from '@montree/contracts'
 
 const liveConnections: Array<{ close: () => void }> = []
 
@@ -25,7 +25,7 @@ afterEach(() => {
 function testDeps(
   overrides: Partial<{
     workspaceRoot: string | null
-    readSnapshot: (resource: InkdownVirtualResource) => Promise<string>
+    readSnapshot: (resource: MontreeVirtualResource) => Promise<string>
     onPermission: (payload: {
       sessionId?: string
       params: Record<string, unknown>
@@ -53,7 +53,7 @@ function testDeps(
  * agentApp.connect(clientApp) 拿到 AgentConnection 调用客户端方法。
  */
 function setupPeer(deps: ReturnType<typeof testDeps>) {
-  const appClient = client({ name: 'inkdown-test' })
+  const appClient = client({ name: 'montree-test' })
   registerAcpClientHandlers(appClient, deps)
   const appAgent = agent({ name: 'fake' })
   const agentConn = appAgent.connect(appClient)
@@ -109,7 +109,7 @@ describe('SDK 握手（initialize 内存对接）', () => {
       authMethods: [],
       agentInfo: { name: 'mock-agent', version: '0.0.1' },
     }))
-    const appClient = client({ name: 'inkdown-test' })
+    const appClient = client({ name: 'montree-test' })
     const clientConn = appClient.connect(appAgent)
     liveConnections.push(clientConn)
 
@@ -246,7 +246,7 @@ describe('SDK fs 虚拟快照（±32602）', () => {
 
     const response = await agentConn.client.request(methods.client.fs.readTextFile, {
       sessionId: 's1',
-      path: '/ws/.inkdown/agent/toc.json',
+      path: '/ws/.montree/agent/toc.json',
     })
 
     expect(seen).toEqual(['toc.json'])
@@ -259,7 +259,7 @@ describe('SDK fs 虚拟快照（±32602）', () => {
     const error = await agentConn.client
       .request(methods.client.fs.readTextFile, {
         sessionId: 's1',
-        path: '/ws/.inkdown/agent/nope.json',
+        path: '/ws/.montree/agent/nope.json',
       })
       .then(
         () => null,
@@ -323,7 +323,7 @@ describe('SDK auth 守门（authenticate → session/new）', () => {
       if (!authed) throw RequestError.authRequired()
       return { sessionId: 's-auth' }
     })
-    const appClient = client({ name: 'inkdown-test' })
+    const appClient = client({ name: 'montree-test' })
     const clientConn = appClient.connect(appAgent)
     liveConnections.push(clientConn)
 
@@ -355,7 +355,7 @@ describe('SDK disconnect 代际（close 取消在途，新连接不受影响）'
       methods.agent.session.prompt,
       async () => new Promise<never>(() => undefined),
     )
-    const appClient = client({ name: 'inkdown-test' })
+    const appClient = client({ name: 'montree-test' })
     const clientConn = appClient.connect(appAgent)
     liveConnections.push(clientConn)
 

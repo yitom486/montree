@@ -7,7 +7,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import type { MarkdownHeading } from '@/lib/editor/markdown-headings'
-import type { FileTreeNode } from '@inkdown/contracts'
+import type { FileTreeNode } from '@montree/contracts'
 import type { useFileTreeActions } from '@/hooks/workspace/useFileTreeActions'
 
 interface SidebarProps {

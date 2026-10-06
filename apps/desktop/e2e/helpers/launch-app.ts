@@ -10,7 +10,7 @@ const MAIN_ENTRY = path.join(__dirname, '../../../../out/main/main.js')
 export async function launchBuiltApp(
   extraEnv: Record<string, string> = {},
 ): Promise<ElectronApplication> {
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inkdown-e2e-'))
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'montree-e2e-'))
   const electronTestArgs =
     process.platform === 'win32' ? ['--disable-gpu', '--in-process-gpu', '--no-sandbox'] : []
   const app = await electron.launch({

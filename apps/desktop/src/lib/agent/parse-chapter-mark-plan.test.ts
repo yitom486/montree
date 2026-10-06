@@ -6,8 +6,8 @@ import {
 
 describe('parse-chapter-mark-plan', () => {
   it('识别 suggest_chapters 工具名', () => {
-    expect(isChapterMarkPlanToolTitle('inkdown_suggest_chapters')).toBe(true)
-    expect(isChapterMarkPlanToolTitle('inkdown_propose_mark')).toBe(false)
+    expect(isChapterMarkPlanToolTitle('montree_suggest_chapters')).toBe(true)
+    expect(isChapterMarkPlanToolTitle('montree_propose_mark')).toBe(false)
   })
 
   it('解析章级建议 JSON', () => {

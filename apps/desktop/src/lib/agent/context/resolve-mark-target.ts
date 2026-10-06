@@ -1,4 +1,4 @@
-import type { MarkProposalPayload } from '@inkdown/annotations'
+import type { MarkProposalPayload } from '@montree/annotations'
 import { excerptAppearsIn, findExcerptInText } from '@/lib/reader/marks/excerpt-text-match'
 import {
   markProposalDevLog,

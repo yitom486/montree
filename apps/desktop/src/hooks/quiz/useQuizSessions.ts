@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/query-keys'
 import { defaultQuizRepository } from '@/lib/quiz/quiz-storage-jsonl'
-import type { QuizSessionRecord } from '@inkdown/contracts'
+import type { QuizSessionRecord } from '@montree/contracts'
 
 /**
  * 按书籍路径读取测验历史（JSONL 仓储）。

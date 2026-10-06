@@ -57,7 +57,7 @@ import {
 import { useAcpPendingPermission } from '@/stores/acp-ui-store'
 
 function parseDiagramPayload(text?: string, title?: string): DiagramPayload | null {
-  if (!text || (!text.includes('mermaidCode') && !title?.includes('inkdown_generate_diagram'))) {
+  if (!text || (!text.includes('mermaidCode') && !title?.includes('montree_generate_diagram'))) {
     return null
   }
   try {
@@ -74,7 +74,7 @@ function parseDiagramPayload(text?: string, title?: string): DiagramPayload | nu
 function parseCrossReferencePayload(text?: string, title?: string): CrossReferencePayload | null {
   if (
     !text ||
-    (!text.includes('chapterDistribution') && !title?.includes('inkdown_cross_reference'))
+    (!text.includes('chapterDistribution') && !title?.includes('montree_cross_reference'))
   ) {
     return null
   }
@@ -95,7 +95,7 @@ function parseCrossReferencePayload(text?: string, title?: string): CrossReferen
 }
 
 function parseContentAuditPayload(text?: string, title?: string): ContentAuditPayload | null {
-  if (!text || (!text.includes('"hits"') && !title?.includes('inkdown_inspect_content'))) {
+  if (!text || (!text.includes('"hits"') && !title?.includes('montree_inspect_content'))) {
     return null
   }
   try {
@@ -110,7 +110,7 @@ function parseContentAuditPayload(text?: string, title?: string): ContentAuditPa
 }
 
 function parseSuggestChaptersPayload(text?: string, title?: string): SuggestChaptersPayload | null {
-  if (!text || (!text.includes('"chapters"') && !title?.includes('inkdown_suggest_chapters'))) {
+  if (!text || (!text.includes('"chapters"') && !title?.includes('montree_suggest_chapters'))) {
     return null
   }
   try {
@@ -311,7 +311,7 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
                 onHighlightAnchor={(anchor: string) => {
                   toast.message(`正在定位原文：「${anchor.slice(0, 24)}...」`)
                   window.dispatchEvent(
-                    new CustomEvent('inkdown:anchor-highlight', { detail: anchor }),
+                    new CustomEvent('montree:anchor-highlight', { detail: anchor }),
                   )
                 }}
                 onPinToDoc={(p: DiagramPayload) => {
@@ -333,7 +333,7 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
                   }
                   if (excerpt) {
                     window.dispatchEvent(
-                      new CustomEvent('inkdown:anchor-highlight', { detail: excerpt }),
+                      new CustomEvent('montree:anchor-highlight', { detail: excerpt }),
                     )
                   }
                 }}
@@ -347,7 +347,7 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
                 onHighlightAnchor={(anchor: string) => {
                   toast.message(`正在定位原句：「${anchor.slice(0, 24)}...」`)
                   window.dispatchEvent(
-                    new CustomEvent('inkdown:anchor-highlight', { detail: anchor }),
+                    new CustomEvent('montree:anchor-highlight', { detail: anchor }),
                   )
                 }}
               />

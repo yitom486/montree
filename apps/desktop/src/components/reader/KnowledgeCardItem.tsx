@@ -11,7 +11,7 @@ import {
   MapPin,
   Network,
 } from 'lucide-react'
-import type { ReadingMark, ReadingMarkCategory } from '@inkdown/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
 import { filterRedundantKeyPoints, resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 
 export interface KnowledgeCardItemProps {

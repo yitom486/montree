@@ -1,19 +1,19 @@
 import { existsSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import type { BookBlockType } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import type { BookBlockType } from '@montree/contracts'
 import type {
   RosettaBodyWatermarkPreviewResult,
   RosettaBodyWatermarkPreviewSample,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   computeBodyWatermarkPlanSignature,
   planBodyWatermarkPatches,
   validateCustomEdgeToken,
   type BodyBlockInput,
   type BodyWatermarkPatch,
-} from '@inkdown/ocr-core'
+} from '@montree/ocr-core'
 import { getBookDbPath } from './open-book-db'
 import { getBookRecord } from './queries'
 

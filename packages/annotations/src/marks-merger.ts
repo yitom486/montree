@@ -1,4 +1,4 @@
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 
 export interface SyncMarksPayload {
   marks: ReadingMark[]

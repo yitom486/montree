@@ -22,7 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { QuizAnswerSubmission, QuizGrade, QuizQuestion, QuizSessionRecord } from '@inkdown/contracts'
+import type { QuizAnswerSubmission, QuizGrade, QuizQuestion, QuizSessionRecord } from '@montree/contracts'
 import {
   evaluateAnswersWithAi,
   generateQuestionsWithAi,

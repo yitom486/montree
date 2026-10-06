@@ -9,7 +9,7 @@ import {
 import { renderMarkdown } from '@/lib/editor/markdown'
 import { PREVIEW_SANITIZE_OPTIONS } from '@/lib/preview/preview-sanitize'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 
 async function resolveLocalImagesInHtml(
   html: string,

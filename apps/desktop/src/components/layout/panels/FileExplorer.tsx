@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@inkdown/contracts'
+import { SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
 import {
   BookMarked,
   BookOpen,
@@ -12,7 +12,7 @@ import {
   Globe,
   PanelLeftClose,
 } from 'lucide-react'
-import type { FileTreeNode } from '@inkdown/contracts'
+import type { FileTreeNode } from '@montree/contracts'
 import { Button } from '@/components/ui/button'
 import { writeWorkspacePathsToDataTransfer } from '@/lib/agent/acp-composer'
 import { getParentDir, isAncestorOrSelf, isAncestorPath, isMarkdownPath } from '@/lib/workspace/file-tree-ops'

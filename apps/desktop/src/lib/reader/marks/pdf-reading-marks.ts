@@ -1,19 +1,19 @@
 import type { PageViewport } from 'pdfjs-dist'
-import type { PdfTextQuad, PdfTextRect, ReadingMark } from '@inkdown/contracts'
+import type { PdfTextQuad, PdfTextRect, ReadingMark } from '@montree/contracts'
 import {
   LIVE_SELECTION_BACKGROUND,
   highlightFill,
   highlightSwatch,
   normalizeHighlightColor,
   resolveMarkCategorySwatch,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import {
   buildPdfSnapshotFromRange,
   coalescePdfLineRects,
   type PdfSelectionSnapshot,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 

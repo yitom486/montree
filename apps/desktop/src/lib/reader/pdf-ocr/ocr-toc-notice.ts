@@ -1,4 +1,4 @@
-import type { OcrTocCacheAssessment } from '@inkdown/ocr-core'
+import type { OcrTocCacheAssessment } from '@montree/ocr-core'
 
 /**
  * OCR 目录缓存状态的独立 UI 状态（不复用普通 outlineNotice）。

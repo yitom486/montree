@@ -30,7 +30,7 @@ import {
   insertMarkRow,
   updateMarkRow,
 } from './marks-db'
-import { canonicalAnchorKey, isOk, toChapterKey, type ReadingMark } from '@inkdown/contracts'
+import { canonicalAnchorKey, isOk, toChapterKey, type ReadingMark } from '@montree/contracts'
 
 /**
  * 锚点绑定真库集成测试（一卡一段、一段多卡的 DB 体现）。
@@ -43,7 +43,7 @@ describe('marks anchor_key 绑定', () => {
       expect(existsSync(dir), `上一轮临时库未清理: ${dir}`).toBe(false)
     }
     createdDirs.length = 0
-    delete process.env.INKDOWN_MARKS_BACKEND
+    delete process.env.MONTREE_MARKS_BACKEND
     tempUserData = await mkdtemp(join(tmpdir(), 'marks-anchor-'))
     createdDirs.push(tempUserData)
   })

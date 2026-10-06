@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isReaderOverlayUiTarget,
   isReaderSelectionToolbarTarget,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 function div(html: string): HTMLElement {
   const host = document.createElement('div')

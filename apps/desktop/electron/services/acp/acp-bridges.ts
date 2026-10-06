@@ -1,15 +1,15 @@
-import type { AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   AcpAuthMethod,
   AcpAuthPreflightResult,
   AcpPermissionOutcome,
   AcpSessionUpdateEvent,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type {
-  InkdownSnapshotArgs,
-  InkdownSnapshotResource,
-} from '@inkdown/contracts'
+  MontreeSnapshotArgs,
+  MontreeSnapshotResource,
+} from '@montree/contracts'
 import type { ClientContext } from '@agentclientprotocol/sdk'
 import { getAcpRuntimeAdapter } from './runtimes'
 import { mapSpawnErrorToAppError } from '../bun-runtime'
@@ -202,11 +202,11 @@ function forwardSessionUpdate(params: Record<string, unknown>): void {  const si
 }
 
 export async function handleSnapshotRequest(
-  resource: InkdownSnapshotResource,
-  args?: InkdownSnapshotArgs,
+  resource: MontreeSnapshotResource,
+  args?: MontreeSnapshotArgs,
 ): Promise<string> {
   if (!acpState.snapshotBridge) {
-    throw new Error('Inkdown 快照桥未就绪，请稍后重试')
+    throw new Error('Montree 快照桥未就绪，请稍后重试')
   }
   acpState.snapshotRequestSeq += 1
   return await acpState.snapshotBridge({ requestId: acpState.snapshotRequestSeq, resource, args })

@@ -1,5 +1,5 @@
-import type { QuizGrade, QuizQuestion, QuizAnswerSubmission } from '@inkdown/contracts'
-import { calculateQuizGrade } from '@inkdown/contracts'
+import type { QuizGrade, QuizQuestion, QuizAnswerSubmission } from '@montree/contracts'
+import { calculateQuizGrade } from '@montree/contracts'
 import { sendQuizPrompt } from './quiz-acp-session'
 
 /**

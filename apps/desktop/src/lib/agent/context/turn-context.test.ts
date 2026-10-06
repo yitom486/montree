@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { INKDOWN_STATIC_SKILL } from './inkdown-static-skill'
+import { MONTREE_STATIC_SKILL } from './montree-static-skill'
 import {
   documentKey,
   formatTurnContextBlock,
   TURN_CONTEXT_MAX_CHARS,
-  type InkdownTurnContext,
+  type MontreeTurnContext,
 } from './turn-context'
 
-const sample: InkdownTurnContext = {
+const sample: MontreeTurnContext = {
   documentChanged: true,
   activeDocument: { path: '/books/dune.epub', kind: 'epub', name: 'dune.epub' },
   reading: { percent: 42, current: '第七章', previous: '第六章', next: '第八章', unitCount: 30 },
@@ -16,8 +16,8 @@ const sample: InkdownTurnContext = {
 describe('formatTurnContextBlock', () => {
   it('输出可解析的 JSON 并带标签包裹', () => {
     const text = formatTurnContextBlock(sample)
-    expect(text.startsWith('<inkdown-turn-context>')).toBe(true)
-    expect(text.endsWith('</inkdown-turn-context>')).toBe(true)
+    expect(text.startsWith('<montree-turn-context>')).toBe(true)
+    expect(text.endsWith('</montree-turn-context>')).toBe(true)
 
     const json = text.slice(text.indexOf('\n') + 1, text.lastIndexOf('\n'))
     expect(JSON.parse(json)).toMatchObject({
@@ -102,53 +102,53 @@ describe('documentKey', () => {
   })
 })
 
-describe('INKDOWN_STATIC_SKILL', () => {
+describe('MONTREE_STATIC_SKILL', () => {
   it('保持全静态：不含路径、时间戳等动态占位', () => {
-    expect(INKDOWN_STATIC_SKILL).not.toMatch(/\{\{|\$\{|%s/)
-    expect(INKDOWN_STATIC_SKILL).toBe(INKDOWN_STATIC_SKILL.trim())
+    expect(MONTREE_STATIC_SKILL).not.toMatch(/\{\{|\$\{|%s/)
+    expect(MONTREE_STATIC_SKILL).toBe(MONTREE_STATIC_SKILL.trim())
   })
 
   it('明确禁止 Agent 自行解析电子书，并区分纯文本走原生读', () => {
-    expect(INKDOWN_STATIC_SKILL).toContain('.epub')
-    expect(INKDOWN_STATIC_SKILL).toContain('turn-context')
-    expect(INKDOWN_STATIC_SKILL).toContain('Soft cues')
-    expect(INKDOWN_STATIC_SKILL).toContain('normal workspace file read/write')
-    expect(INKDOWN_STATIC_SKILL).toContain('No user workspace folder')
-    expect(INKDOWN_STATIC_SKILL).toContain('Do **not** call tools only to "prove"')
-    expect(INKDOWN_STATIC_SKILL).toContain('inkdown_read')
-    expect(INKDOWN_STATIC_SKILL).toContain('inkdown_list_marks')
-    expect(INKDOWN_STATIC_SKILL).toContain('inkdown_suggest_chapters')
-    expect(INKDOWN_STATIC_SKILL).toContain('Chapter-level highlighting')
-    expect(INKDOWN_STATIC_SKILL).toContain('tocTopLevel')
-    expect(INKDOWN_STATIC_SKILL).toContain('「选区」')
-    expect(INKDOWN_STATIC_SKILL).toContain('Match the **language of the user')
-    expect(INKDOWN_STATIC_SKILL).not.toContain('默认使用简体中文')
+    expect(MONTREE_STATIC_SKILL).toContain('.epub')
+    expect(MONTREE_STATIC_SKILL).toContain('turn-context')
+    expect(MONTREE_STATIC_SKILL).toContain('Soft cues')
+    expect(MONTREE_STATIC_SKILL).toContain('normal workspace file read/write')
+    expect(MONTREE_STATIC_SKILL).toContain('No user workspace folder')
+    expect(MONTREE_STATIC_SKILL).toContain('Do **not** call tools only to "prove"')
+    expect(MONTREE_STATIC_SKILL).toContain('montree_read')
+    expect(MONTREE_STATIC_SKILL).toContain('montree_list_marks')
+    expect(MONTREE_STATIC_SKILL).toContain('montree_suggest_chapters')
+    expect(MONTREE_STATIC_SKILL).toContain('Chapter-level highlighting')
+    expect(MONTREE_STATIC_SKILL).toContain('tocTopLevel')
+    expect(MONTREE_STATIC_SKILL).toContain('「选区」')
+    expect(MONTREE_STATIC_SKILL).toContain('Match the **language of the user')
+    expect(MONTREE_STATIC_SKILL).not.toContain('默认使用简体中文')
   })
 
   it('T1：turn-context 节说明 reading.page 的用法与边界', () => {
-    expect(INKDOWN_STATIC_SKILL).toContain('reading.page')
-    expect(INKDOWN_STATIC_SKILL).toContain('inkdown_read(scope=viewport)')
+    expect(MONTREE_STATIC_SKILL).toContain('reading.page')
+    expect(MONTREE_STATIC_SKILL).toContain('montree_read(scope=viewport)')
   })
 
   it('T2：位置变化重贴，滞后句已删除', () => {
-    expect(INKDOWN_STATIC_SKILL).toContain('PDF page / reader location change')
-    expect(INKDOWN_STATIC_SKILL).not.toContain('not re-attached on every page turn')
-    expect(INKDOWN_STATIC_SKILL).toContain('reading.page')
-    expect(INKDOWN_STATIC_SKILL).toContain('inkdown_read(scope=viewport)')
+    expect(MONTREE_STATIC_SKILL).toContain('PDF page / reader location change')
+    expect(MONTREE_STATIC_SKILL).not.toContain('not re-attached on every page turn')
+    expect(MONTREE_STATIC_SKILL).toContain('reading.page')
+    expect(MONTREE_STATIC_SKILL).toContain('montree_read(scope=viewport)')
   })
 
   it('S1.3：已入库只读库口径与代码一致，不再教整书 OCR', () => {
-    expect(INKDOWN_STATIC_SKILL).toContain('Indexed PDFs')
-    expect(INKDOWN_STATIC_SKILL).toContain('compass index already built')
-    expect(INKDOWN_STATIC_SKILL).toContain('all read **only** the compass index')
-    expect(INKDOWN_STATIC_SKILL).toContain('do NOT retry the same tool hoping OCR will fill it in')
-    expect(INKDOWN_STATIC_SKILL).toContain('do NOT invent that page')
+    expect(MONTREE_STATIC_SKILL).toContain('Indexed PDFs')
+    expect(MONTREE_STATIC_SKILL).toContain('compass index already built')
+    expect(MONTREE_STATIC_SKILL).toContain('all read **only** the compass index')
+    expect(MONTREE_STATIC_SKILL).toContain('do NOT retry the same tool hoping OCR will fill it in')
+    expect(MONTREE_STATIC_SKILL).toContain('do NOT invent that page')
     // 旧句必须消失：已入库 viewport/current/chapter 不再 OCR
-    expect(INKDOWN_STATIC_SKILL).not.toContain('viewport/current/chapter may still OCR one page')
+    expect(MONTREE_STATIC_SKILL).not.toContain('viewport/current/chapter may still OCR one page')
   })
 
   it('S1.3：未入库口径保留（search 不整书 OCR，页眉可信）', () => {
-    expect(INKDOWN_STATIC_SKILL).toContain('instead of OCRing the whole book')
-    expect(INKDOWN_STATIC_SKILL).toContain('【PDF 第 N/M 页】')
+    expect(MONTREE_STATIC_SKILL).toContain('instead of OCRing the whole book')
+    expect(MONTREE_STATIC_SKILL).toContain('【PDF 第 N/M 页】')
   })
 })

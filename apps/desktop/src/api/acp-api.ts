@@ -1,6 +1,6 @@
-import type { AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { ElectronAPI } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { ElectronAPI } from '@montree/contracts'
 import type {
   AcpAuthPreflightPayload,
   AcpAuthPreflightResult,
@@ -25,7 +25,7 @@ import type {
   AcpProviderStatus,
   AcpProxySettings,
   AcpStatusChangedEvent,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   if (!window.electronAPI) {

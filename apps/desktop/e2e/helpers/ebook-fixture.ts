@@ -108,12 +108,12 @@ const EPUB_CHAPTER = `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>Smoke Chapter</title></head>
-<body><h1>Smoke Chapter</h1><p>Inkdown E2E minimal EPUB paragraph.</p></body>
+<body><h1>Smoke Chapter</h1><p>Montree E2E minimal EPUB paragraph.</p></body>
 </html>`
 
 const EPUB_OPF = `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bookid">
-<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Smoke Book</dc:title><dc:identifier id="bookid">inkdown-e2e-smoke</dc:identifier><dc:language>en</dc:language></metadata>
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Smoke Book</dc:title><dc:identifier id="bookid">montree-e2e-smoke</dc:identifier><dc:language>en</dc:language></metadata>
 <manifest><item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest>
 <spine><itemref idref="ch1"/></spine>
 </package>`
@@ -216,7 +216,7 @@ export async function writeMinimalMobi(filePath: string): Promise<void> {
 
   const title = enc.encode('Smoke Mobi')
   const text = enc.encode(
-    '<h1>Smoke Mobi Chapter</h1><p>Inkdown E2E minimal MOBI paragraph.</p>' +
+    '<h1>Smoke Mobi Chapter</h1><p>Montree E2E minimal MOBI paragraph.</p>' +
       '<mbp:pagebreak/><h1>Second Mobi Chapter</h1><p>Second mobi paragraph.</p>',
   )
 
@@ -263,7 +263,7 @@ export async function writeMinimalMobi(filePath: string): Promise<void> {
 }
 export async function writeMinimalPdf(filePath: string): Promise<void> {
   const enc = new TextEncoder()
-  const streamText = 'BT /F1 24 Tf 72 720 Td (Inkdown E2E minimal PDF paragraph.) Tj ET\n'
+  const streamText = 'BT /F1 24 Tf 72 720 Td (Montree E2E minimal PDF paragraph.) Tj ET\n'
   const streamLen = enc.encode(streamText).length
   const objects: string[] = [
     '<< /Type /Catalog /Pages 2 0 R >>',

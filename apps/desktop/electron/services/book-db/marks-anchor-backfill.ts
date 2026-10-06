@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { canonicalAnchorKey, type ReadingAnchor } from '@inkdown/contracts'
+import { canonicalAnchorKey, type ReadingAnchor } from '@montree/contracts'
 
 /**
  * 存量 marks 行 anchor_key 回填（v7 新增列）。

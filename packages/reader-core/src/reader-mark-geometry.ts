@@ -1,4 +1,4 @@
-import type { PdfTextRect } from '@inkdown/contracts'
+import type { PdfTextRect } from '@montree/contracts'
 
 import {
   applyHighlightSurface,

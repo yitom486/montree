@@ -7,7 +7,7 @@
  * 章节名/书名/deepLink 等展示字段。
  */
 
-/** 复习评分（与 `@inkdown/annotations` 的同名字面一致，线上传输以本定义为准） */
+/** 复习评分（与 `@montree/annotations` 的同名字面一致，线上传输以本定义为准） */
 export type FlashcardReviewRating = 'again' | 'hard' | 'good'
 
 /** 待复习卡（本书库 `flashcards` 行 + 复习统计） */

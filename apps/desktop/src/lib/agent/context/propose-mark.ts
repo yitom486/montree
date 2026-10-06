@@ -7,11 +7,11 @@ import type {
   MarkProposalToolResult,
   ProposedMark,
   ProposedMarkSource,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import {
   MARK_PROPOSAL_BATCH_MAX,
   toProposedMark,
-} from '@inkdown/annotations'
+} from '@montree/annotations'
 import { getReaderMarksProvider } from '@/lib/agent/context/reader-marks-registry'
 import { resolveMarkTarget } from '@/lib/agent/context/resolve-mark-target'
 import {
@@ -123,14 +123,14 @@ function toToolResult(result: ProposeMarkResult): MarkProposalToolResult {
   }
 }
 
-/** inkdown_propose_mark：按 excerpt（+ 可选 flatIndex）定位后再提议。 */
+/** montree_propose_mark：按 excerpt（+ 可选 flatIndex）定位后再提议。 */
 export async function proposeMarkAtForAgent(
   payload: MarkProposalPayload,
   options: Omit<ProposeMarkOptions, 'excerpt' | 'flatIndex' | 'kind'> = {},
 ): Promise<ProposeMarkResult> {
   const excerpt = payload.excerpt?.trim()
   if (!excerpt) {
-    throw new Error('inkdown_propose_mark 需要 excerpt 或 marks 参数')
+    throw new Error('montree_propose_mark 需要 excerpt 或 marks 参数')
   }
 
   const note = resolveNote(payload)

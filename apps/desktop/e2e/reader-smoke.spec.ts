@@ -18,7 +18,7 @@ async function openViaQuickOpen(window: Page, fileName: string, query: string): 
 
 test.describe('阅读器冒烟（自研最小 fixture）', () => {
   test('Markdown 预览渲染 Mermaid / 公式 / 代码高亮', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-reader-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-reader-'))
     const { mdName } = await writeReaderSmokeWorkspace(workspace)
     const app = await launchBuiltApp({ E2E_AUTO_OPEN_PATH: workspace })
 
@@ -45,7 +45,7 @@ test.describe('阅读器冒烟（自研最小 fixture）', () => {
   })
 
   test('PDF 单页渲染出画布与文字层', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-reader-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-reader-'))
     const { pdfName } = await writeReaderSmokeWorkspace(workspace)
     const app = await launchBuiltApp({ E2E_AUTO_OPEN_PATH: workspace })
 
@@ -64,7 +64,7 @@ test.describe('阅读器冒烟（自研最小 fixture）', () => {
       const panel = window.locator('#main')
       await expect(panel.getByText('1 / 1').first()).toBeVisible({ timeout: 20_000 })
       await expect(panel.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
-      await expect(panel.getByText('Inkdown E2E minimal PDF paragraph.').first()).toBeVisible({
+      await expect(panel.getByText('Montree E2E minimal PDF paragraph.').first()).toBeVisible({
         timeout: 10_000,
       })
     } finally {

@@ -1,4 +1,4 @@
-import type { WebDocSiteId } from '@inkdown/contracts'
+import type { WebDocSiteId } from '@montree/contracts'
 import { isHrttNewsHost } from './hrtt'
 import { isPeopleDailyPaperHost, resolvePeopleDailyEditionUrl } from './people-daily'
 

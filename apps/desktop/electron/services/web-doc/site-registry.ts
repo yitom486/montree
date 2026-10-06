@@ -1,6 +1,6 @@
-import type { WebDocSiteId } from '@inkdown/contracts'
-import { isHrttNewsHost } from '@inkdown/web-doc'
-import { isPeopleDailyPaperHost } from '@inkdown/web-doc'
+import type { WebDocSiteId } from '@montree/contracts'
+import { isHrttNewsHost } from '@montree/web-doc'
+import { isPeopleDailyPaperHost } from '@montree/web-doc'
 
 /**
  * 仅保留确需版面特化的站点 id。

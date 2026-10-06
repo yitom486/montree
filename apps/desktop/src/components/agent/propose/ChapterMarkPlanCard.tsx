@@ -5,7 +5,7 @@ import {
   AgentChatItemBody,
 } from '@/components/agent/chat/AgentChatItem'
 import { cn } from '@/lib/utils'
-import type { ChapterMarkPlanEntry } from '@inkdown/annotations'
+import type { ChapterMarkPlanEntry } from '@montree/annotations'
 
 export interface ChapterMarkPlanSelectPayload {
   entry: ChapterMarkPlanEntry
@@ -25,9 +25,9 @@ function buildChapterSelectPayload(entry: ChapterMarkPlanEntry): ChapterMarkPlan
   const promptText = [
     `用户已选择章节：「${entry.title}」（flatIndex=${entry.flatIndex}）。`,
     `推荐理由：${entry.reason}`,
-    '请执行：1) inkdown_read(scope=chapter, flatIndex=…) 读取该章正文；',
+    '请执行：1) montree_read(scope=chapter, flatIndex=…) 读取该章正文；',
     '2) 挑选不超过 10 条值得划重点的句子；',
-    '3) 调用 inkdown_propose_mark(marks=[{ excerpt, note? }]) 一次提交批量提议（不要逐条调用）。',
+    '3) 调用 montree_propose_mark(marks=[{ excerpt, note? }]) 一次提交批量提议（不要逐条调用）。',
     '不要一次全书；仅本章。',
   ].join('\n')
   return { entry, displayText, promptText }

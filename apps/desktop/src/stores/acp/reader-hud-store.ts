@@ -146,7 +146,7 @@ export const useReaderHudUiStore = create<ReaderHudUiState>()(
         })),
     }),
     {
-      name: 'inkdown-reader-hud-ui',
+      name: 'montree-reader-hud-ui',
       partialize: (state) => ({
         hudDisplayMode: state.hudDisplayMode,
         isCardRailOpen: state.isCardRailOpen,

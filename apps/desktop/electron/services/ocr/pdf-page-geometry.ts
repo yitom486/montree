@@ -6,8 +6,8 @@
  * 禁止用 612×792 等假尺寸归一化。
  */
 
-import { copyPdfBytesForPdfJs } from '@inkdown/ocr-core'
-import type { PdfPageSizePt } from '@inkdown/ocr-core'
+import { copyPdfBytesForPdfJs } from '@montree/ocr-core'
+import type { PdfPageSizePt } from '@montree/ocr-core'
 
 declare module 'pdfjs-dist/legacy/build/pdf.mjs' {
   export interface PdfJsGeometryViewport {

@@ -1,9 +1,9 @@
-import { getDocumentKind } from '@inkdown/contracts'
-import { resolveWebDocDocumentId, resolveWebDocSiteId } from '@inkdown/web-doc'
-import type { ReaderFormat } from '@inkdown/reader-core'
+import { getDocumentKind } from '@montree/contracts'
+import { resolveWebDocDocumentId, resolveWebDocSiteId } from '@montree/web-doc'
+import type { ReaderFormat } from '@montree/reader-core'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
-import type { InkdownActiveDocument, InkdownReadingState } from './turn-context'
+import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
 
 export const TOC_TOP_LEVEL_LIMIT = 10
 export const TOC_TOP_LEVEL_LABEL_MAX = 40
@@ -27,7 +27,7 @@ export function resolveReaderLocationKey(
   return null
 }
 
-/** 从 navigation store 读 format/pageNum/flatIndex，供 buildInkdownPromptPrefix 使用 */
+/** 从 navigation store 读 format/pageNum/flatIndex，供 buildMontreePromptPrefix 使用 */
 export function collectReaderLocationKey(): string | null {
   const reader = useReaderNavigationStore.getState()
   if (!reader.ready) return null
@@ -39,7 +39,7 @@ export function baseName(filePath: string): string {
   return index === -1 ? filePath : filePath.slice(index + 1)
 }
 
-function activeDocumentDisplayName(path: string, kind: InkdownActiveDocument['kind']): string {
+function activeDocumentDisplayName(path: string, kind: MontreeActiveDocument['kind']): string {
   if (kind === 'web') {
     try {
       const url = new URL(path)
@@ -52,7 +52,7 @@ function activeDocumentDisplayName(path: string, kind: InkdownActiveDocument['ki
   return baseName(path)
 }
 
-export function collectActiveDocument(): InkdownActiveDocument | null {
+export function collectActiveDocument(): MontreeActiveDocument | null {
   const rawPath = useActiveDocumentStore.getState().filePath?.trim()
   if (!rawPath) return null
   const kind = getDocumentKind(rawPath)
@@ -100,8 +100,8 @@ export function collectTocTopLevel(
 
 /** 阅读器进度：只有当阅读器确实停在同一个文件上时才给，避免报陈旧状态 */
 export function collectReadingState(
-  doc: InkdownActiveDocument | null,
-): InkdownReadingState | undefined {
+  doc: MontreeActiveDocument | null,
+): MontreeReadingState | undefined {
   if (!doc) return undefined
   const reader = useReaderNavigationStore.getState()
   if (!reader.ready || reader.filePath !== doc.path) return undefined
@@ -128,7 +128,7 @@ export function collectReadingState(
 
 /** 当前打开电子书的顶层目录；Markdown / 未就绪阅读器不附带 */
 export function collectTocTopLevelForDocument(
-  doc: InkdownActiveDocument | null,
+  doc: MontreeActiveDocument | null,
 ): string[] | undefined {
   if (!doc) return undefined
   const reader = useReaderNavigationStore.getState()

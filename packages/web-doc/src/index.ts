@@ -1,5 +1,5 @@
 /**
- * @inkdown/web-doc barrel（F片合并）。
+ * @montree/web-doc barrel（F片合并）。
  *
  * 6 模块：目录提取 2（extract-toc-links / extract-llms-toc）+ 适配 1
  * （people-daily-toc）+ 站点识别 2（hrtt / people-daily）+ 站点门面 1

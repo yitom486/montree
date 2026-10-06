@@ -28,7 +28,7 @@ describe('probeCodexAuth', () => {
   })
 
   it('detects auth.json under CODEX_HOME', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-codex-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-codex-'))
     writeFileSync(join(home, 'auth.json'), '{}', 'utf8')
     process.env.CODEX_HOME = home
     delete process.env.CODEX_API_KEY
@@ -42,7 +42,7 @@ describe('probeCodexAuth', () => {
   })
 
   it('no auth.json and no env key → not logged in', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-codex-empty-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-codex-empty-'))
     mkdirSync(home, { recursive: true })
     process.env.CODEX_HOME = home
     delete process.env.CODEX_API_KEY

@@ -17,7 +17,7 @@ import { syncApi } from '@/api/sync-api'
 import { appApi } from '@/api/app-api'
 import { queryKeys } from '@/api/query-keys'
 import { useSyncConfig, useSyncStatus } from '@/hooks/sync/useSyncConfigStatus'
-import type { SyncConfig, SyncProviderType } from '@inkdown/contracts'
+import type { SyncConfig, SyncProviderType } from '@montree/contracts'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -43,7 +43,7 @@ export function SyncSettingsSection(_props: SyncSettingsSectionProps) {
     serverUrl: 'https://dav.jianguoyun.com/dav/',
     username: '',
     password: '',
-    remoteDir: '/InkdownSync',
+    remoteDir: '/MontreeSync',
     syncOnStartup: true,
     ignoreTlsErrors: false,
   })
@@ -83,7 +83,7 @@ export function SyncSettingsSection(_props: SyncSettingsSectionProps) {
       updateConfig({
         provider,
         serverUrl: 'https://dav.jianguoyun.com/dav/',
-        remoteDir: config.remoteDir || '/InkdownSync',
+        remoteDir: config.remoteDir || '/MontreeSync',
       })
     } else if (provider === 'nextcloud') {
       const defaultNc = config.serverUrl.includes('jianguoyun')
@@ -92,7 +92,7 @@ export function SyncSettingsSection(_props: SyncSettingsSectionProps) {
       updateConfig({
         provider,
         serverUrl: defaultNc,
-        remoteDir: config.remoteDir || '/InkdownSync',
+        remoteDir: config.remoteDir || '/MontreeSync',
       })
     } else {
       updateConfig({ provider })
@@ -328,7 +328,7 @@ export function SyncSettingsSection(_props: SyncSettingsSectionProps) {
               type="text"
               value={config.remoteDir}
               onChange={(e) => updateConfig({ remoteDir: e.target.value })}
-              placeholder="/InkdownSync"
+              placeholder="/MontreeSync"
               className="font-mono text-xs"
             />
             <p className="text-[11px] text-muted-foreground">

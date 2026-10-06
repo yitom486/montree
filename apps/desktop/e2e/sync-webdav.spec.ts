@@ -104,9 +104,9 @@ test.describe('WebDAV 同步（本地 stub）', () => {
       // 立即同步：远端落下三份数据
       await dialog.getByRole('button', { name: '立即同步' }).click()
       await expect(window.getByText(/同步完成/)).toBeVisible({ timeout: 30_000 })
-      expect(stub.store.has('/dav/InkdownSync/reading-marks.json')).toBe(true)
-      expect(stub.store.has('/dav/InkdownSync/reading-progress.json')).toBe(true)
-      expect(stub.store.has('/dav/InkdownSync/quiz-records.jsonl')).toBe(true)
+      expect(stub.store.has('/dav/MontreeSync/reading-marks.json')).toBe(true)
+      expect(stub.store.has('/dav/MontreeSync/reading-progress.json')).toBe(true)
+      expect(stub.store.has('/dav/MontreeSync/quiz-records.jsonl')).toBe(true)
     } finally {
       await app.close()
       stub.server.close()

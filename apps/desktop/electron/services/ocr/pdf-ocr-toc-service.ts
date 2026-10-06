@@ -1,15 +1,15 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
 import {
   defaultPdfPageOffset,
   extractOcrTocFromText,
   ocrTocToReaderUnits,
-} from '@inkdown/ocr-core'
-import { cleanOcrWatermarks } from '@inkdown/ocr-core'
-import { buildSectionPageMap } from '@inkdown/ocr-core'
-import type { PdfOcrTocCache, RecognizePdfTocPayload } from '@inkdown/contracts'
-import { DEFAULT_PDF_TOC_SCALE } from '@inkdown/contracts'
+} from '@montree/ocr-core'
+import { cleanOcrWatermarks } from '@montree/ocr-core'
+import { buildSectionPageMap } from '@montree/ocr-core'
+import type { PdfOcrTocCache, RecognizePdfTocPayload } from '@montree/contracts'
+import { DEFAULT_PDF_TOC_SCALE } from '@montree/contracts'
 import { writePdfOcrTocCache } from './ocr-toc-cache'
 import { ensureInspectorOcrRuntime } from './inspector-ocr-runtime'
 

@@ -39,28 +39,28 @@ import {
   type OcrTocOperation,
   type TocOpLease,
 } from '@/lib/reader/pdf-ocr/ocr-toc-op'
-import { resolveDetectApply } from '@inkdown/ocr-core'
+import { resolveDetectApply } from '@montree/ocr-core'
 import {
   noticeForFreshRecognize,
   noticeForRestoredCache,
   placeOcrTocNotice,
   type OcrTocNotice,
 } from '@/lib/reader/pdf-ocr/ocr-toc-notice'
-import { assessPdfOcrTocCache } from '@inkdown/ocr-core'
-import { reassembleDirectoryText } from '@inkdown/ocr-core'
+import { assessPdfOcrTocCache } from '@montree/ocr-core'
+import { reassembleDirectoryText } from '@montree/ocr-core'
 import { ACP_MAX_IMAGE_BYTES, blobToBase64 } from '@/lib/agent/acp-composer'
 import type { TocPromptImage } from '@/lib/agent/toc-ai-session'
 import { renderPdfPagesToPng } from '@/lib/reader/pdf/pdf-page-image'
 import { formatRosettaBlocksForAgent } from '@/lib/reader/rosetta/rosetta-agent-text'
-import type { RosettaBookInfo, RosettaImportState } from '@inkdown/contracts'
+import type { RosettaBookInfo, RosettaImportState } from '@montree/contracts'
 import { usePdfPageOcr } from '@/hooks/reader/usePdfPageOcr'
 import { useReaderExportMenu } from '@/hooks/reader/useReaderExportMenu'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { registerSelectionProvider, commitReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
-import { DEFAULT_HIGHLIGHT_COLOR } from '@inkdown/reader-core'
+import { DEFAULT_HIGHLIGHT_COLOR } from '@montree/reader-core'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
-import { loadPdfOutlineInfo, formatPdfOutlineNotice, type PdfOutlineSource } from '@inkdown/reader-core'
+import { loadPdfOutlineInfo, formatPdfOutlineNotice, type PdfOutlineSource } from '@montree/reader-core'
 import { detectPdfDocumentProfile } from '@/lib/reader/pdf/pdf-scan-detector'
 import {
   clearPdfOcrCache,
@@ -82,7 +82,7 @@ import { pdfInspectorClient } from '@/lib/reader/pdf/pdf-inspector-client'
 declare global {
   interface Window {
     /** E2E 专用钩子（仅 E2E_PDF_STRUCTURE 门控开启时挂载） */
-    __inkdownE2ePdfStructure?: {
+    __montreeE2ePdfStructure?: {
       readCurrentPage: () => Promise<{ source: string; prefix: string }>
       status: () => { status: string; reason: string }
       inspectorStatus: () => { status: string; reason: string }
@@ -100,26 +100,26 @@ import {
 } from '@/components/reader/PdfToolbarMoreMenu'
 import { BodyWatermarkPreviewDialog } from '@/components/reader/BodyWatermarkPreviewDialog'
 import { TocAiPolishControl } from '@/components/reader/TocAiPolishControl'
-import type { OcrTocEntry } from '@inkdown/contracts'
+import type { OcrTocEntry } from '@montree/contracts'
 import {
   PDF_JUMP_SYNC_HOLD_MS,
   PDF_PAGE_GAP_PX,
   resolvePdfPageScrollTop,
   scalePdfPageCssSize,
   type PdfPageCssSize,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { openPdfDocument } from '@/lib/reader/pdf/pdf-document'
 import { findPdfMarksAtPoint, findPdfNoteMarkAtPoint } from '@/lib/reader/marks/pdf-reading-marks'
 import { shouldRenderPdfPage } from '@/lib/reader/pdf/pdf-render'
-import { findMarkForSelection, isClickNotDrag } from '@inkdown/reader-core'
-import { toCanonicalChapter } from '@inkdown/reader-core'
-import type { ReaderUnit } from '@inkdown/reader-core'
+import { findMarkForSelection, isClickNotDrag } from '@montree/reader-core'
+import { toCanonicalChapter } from '@montree/reader-core'
+import type { ReaderUnit } from '@montree/reader-core'
 import {
   getSelectionToolbarPosition,
   readPdfSelection,
   buildPdfSnapshotFromRange,
   type PdfSelectionSnapshot,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
@@ -128,7 +128,7 @@ import {
   bindDocumentSelectionCollapse,
   bindOutsideReaderPointerDismiss,
   clearWindowSelection,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { buildReadingFileFingerprint } from '@/lib/reader/adapter/reading-file-fingerprint'
 import { resolvePreferNativeImport, shouldOfferPageOcr } from '@/lib/reader/pdf/pdf-import-mode'
 import { resolvePdfAgentSearchBlock } from '@/lib/reader/pdf/pdf-agent-search-gate'
@@ -147,17 +147,17 @@ import {
   resolvePdfChapter,
   resolvePdfChapterByPage,
   tocFromPdfUnits,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { resolvePdfOcrPrefetchPages } from '@/lib/reader/pdf-ocr/pdf-ocr-prefetch'
 import { loadPersistedOcrPageCaches } from '@/lib/reader/pdf-ocr/pdf-ocr-page-hydrate'
 import { shouldAutoOcrViewportPage } from '@/lib/reader/pdf-ocr/pdf-page-auto-ocr'
-import { suggestTocPageOffset } from '@inkdown/reader-core'
+import { suggestTocPageOffset } from '@montree/reader-core'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { useReaderNavigationStore, useReaderNavTitles } from '@/stores/reader-navigation-store'
-import type { AppError } from '@inkdown/contracts'
-import type { ReadingMark } from '@inkdown/contracts'
-import { isOk } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import type { ReadingMark } from '@montree/contracts'
+import { isOk } from '@montree/contracts'
 import { toast } from 'sonner'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import { appApi } from '@/api/app-api'
@@ -1259,7 +1259,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !appApi.isE2EPdfStructure()) return
-    window.__inkdownE2ePdfStructure = {
+    window.__montreeE2ePdfStructure = {
       readCurrentPage: async () => {
         const result = await readAgentPageTextWithSourceRef.current(pageNumRef.current)
         return { source: result.source, prefix: result.text.slice(0, 200) }
@@ -1268,7 +1268,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
       inspectorStatus: () => pdfInspectorClient.getState(),
     }
     return () => {
-      delete window.__inkdownE2ePdfStructure
+      delete window.__montreeE2ePdfStructure
     }
   }, [filePath])
 

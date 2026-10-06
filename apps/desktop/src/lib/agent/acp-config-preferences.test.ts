@@ -4,7 +4,7 @@ import {
   listPreferredConfigPatches,
   rememberPreferredConfig,
 } from './acp-config-preferences'
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 
 describe('acp-config-preferences', () => {
   it('remembers and reads preferred values per runtime', () => {

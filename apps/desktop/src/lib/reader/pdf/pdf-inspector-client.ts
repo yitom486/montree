@@ -4,7 +4,7 @@
  * 调用方静默回退 WASM / pdf.js 路径。区别：文件由主进程直读，无需 transfer。
  */
 import { extractPdfBookMarkdown } from '@/api/pdf-inspect-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { splitMarkdownByPageMarkers } from './pdf-structure'
 
 /** 整档解析超时（主进程原生抽取通常秒级，大部头留足余量） */

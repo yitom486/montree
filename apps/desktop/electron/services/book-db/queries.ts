@@ -3,8 +3,8 @@ import {
   assessNativePageText,
   NATIVE_PAGE_QUALITY_SUGGEST_OCR,
   OCR_SUGGESTED_PAGES_CAP,
-} from '@inkdown/ocr-core'
-import type { BookBlockSource, BookBlockType, BookDbBlockHit, PdfPointBBox } from '@inkdown/contracts'
+} from '@montree/ocr-core'
+import type { BookBlockSource, BookBlockType, BookDbBlockHit, PdfPointBBox } from '@montree/contracts'
 import { getCompletedPages } from './import-book'
 
 /** FTS5 查询转义：包成双引号短语，防 `*`/`"`/OR 等语法字符炸查询 */

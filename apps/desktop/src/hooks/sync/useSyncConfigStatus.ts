@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/query-keys'
 import { syncApi } from '@/api/sync-api'
-import { isOk } from '@inkdown/contracts'
-import type { SyncConfig, SyncStatus } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import type { SyncConfig, SyncStatus } from '@montree/contracts'
 
 /**
  * 同步配置（表单种子）。仅初始读取；编辑态由组件本地管理，

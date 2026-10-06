@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { migrateBookDb } from './schema'
 import { importBookPages } from './import-book'
 import { getBookDbPath } from './open-book-db'
@@ -135,7 +135,7 @@ describe('inspectIndexedContentInDb', () => {
 
 describe('inspectIndexedContentFile 只读证明', () => {
   function makeFileDb(): { dir: string; dbPath: string } {
-    const dir = mkdtempSync(join(tmpdir(), 'inkdown-audit-'))
+    const dir = mkdtempSync(join(tmpdir(), 'montree-audit-'))
     const dbPath = getBookDbPath(dir, FINGERPRINT)
     mkdirSync(dirname(dbPath), { recursive: true })
     const db = new DatabaseSync(dbPath)
@@ -168,7 +168,7 @@ describe('inspectIndexedContentFile 只读证明', () => {
   }
 
   it('缺库直接报错且不创建任何文件', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'inkdown-audit-missing-'))
+    const dir = mkdtempSync(join(tmpdir(), 'montree-audit-missing-'))
     const dbPath = getBookDbPath(dir, 'ghost-fp')
     const result = inspectIndexedContentFile(dir, 'ghost-fp', '王道计', 10)
     expect(isOk(result)).toBe(false)

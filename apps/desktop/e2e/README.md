@@ -28,7 +28,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 ## 在线文档 Fixture
 
-不依赖外网。主进程在设置 `E2E_WEB_DOC_FIXTURE_DIR` 时，对 `e2e.inkdown.test` 域名从本地 HTML 返回页面：
+不依赖外网。主进程在设置 `E2E_WEB_DOC_FIXTURE_DIR` 时，对 `e2e.montree.test` 域名从本地 HTML 返回页面：
 
 ```
 apps/desktop/e2e/fixtures/web-doc/
@@ -44,7 +44,7 @@ apps/desktop/e2e/fixtures/web-doc/
 
 ```
 apps/desktop/e2e/fixtures/ocr/
-  scanned-hello.pdf  # 无文字层单页（Hello Inkdown OCR），供 OCR 链冒烟只验链路不验精度
+  scanned-hello.pdf  # 无文字层单页（Hello Montree OCR），供 OCR 链冒烟只验链路不验精度
 ```
 
 ## 辅助

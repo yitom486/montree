@@ -1,5 +1,5 @@
 /**
- * 跨格式深度回跳协议解析与构建（inkdown://open?file=...）
+ * 跨格式深度回跳协议解析与构建（montree://open?file=...）
  */
 
 export interface DeepLinkTarget {
@@ -15,12 +15,12 @@ export interface DeepLinkTarget {
   anchor?: string
 }
 
-export const DEEP_LINK_PROTOCOL = 'inkdown'
-export const DEEP_LINK_PREFIX = 'inkdown://open'
+export const DEEP_LINK_PROTOCOL = 'montree'
+export const DEEP_LINK_PREFIX = 'montree://open'
 
 /**
  * 构建深度回跳 URL
- * 示例：inkdown://open?file=books%2Fdemo.pdf&page=12
+ * 示例：montree://open?file=books%2Fdemo.pdf&page=12
  */
 export function buildDeepLinkUrl(target: DeepLinkTarget): string {
   const params = new URLSearchParams()
@@ -44,7 +44,7 @@ export function buildDeepLinkUrl(target: DeepLinkTarget): string {
 
 /**
  * 解析深度回跳 URL
- * 支持 inkdown://open?file=... 以及 http(s) 扩展伪协议
+ * 支持 montree://open?file=... 以及 http(s) 扩展伪协议
  */
 export function parseDeepLinkUrl(rawUrl: string): DeepLinkTarget | null {
   const trimmed = rawUrl.trim()
@@ -54,8 +54,8 @@ export function parseDeepLinkUrl(rawUrl: string): DeepLinkTarget | null {
 
   try {
     // 使用假协议头让 WHATWG URL 解析 query 参数；同时校验 path 必须为 /open，
-    // 避免 inkdown://任意路径 被当作回跳链接处理（main 侧原样转发）。
-    const parsed = new URL(trimmed.replace(/^inkdown:\/\//, 'http://localhost/'))
+    // 避免 montree://任意路径 被当作回跳链接处理（main 侧原样转发）。
+    const parsed = new URL(trimmed.replace(/^montree:\/\//, 'http://localhost/'))
     if (parsed.pathname !== '/open') {
       return null
     }
@@ -99,7 +99,7 @@ export function parseDeepLinkUrl(rawUrl: string): DeepLinkTarget | null {
 }
 
 /**
- * 判断链接是否为 inkdown 深度回跳链接
+ * 判断链接是否为 montree 深度回跳链接
  */
 export function isDeepLinkUrl(url: string): boolean {
   return url.trim().startsWith(`${DEEP_LINK_PROTOCOL}://`)

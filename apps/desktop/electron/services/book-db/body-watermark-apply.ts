@@ -2,19 +2,19 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { err, ok, type Result } from '@inkdown/contracts'
-import type { AppError } from '@inkdown/contracts'
-import type { BookBlockType } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@montree/contracts'
+import type { BookBlockType } from '@montree/contracts'
 import type {
   RosettaBodyWatermarkApplyPayload,
   RosettaBodyWatermarkApplyResult,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   computeBodyWatermarkPlanSignature,
   planBodyWatermarkPatches,
   type BodyBlockInput,
   type BodyWatermarkPatch,
-} from '@inkdown/ocr-core'
+} from '@montree/ocr-core'
 import { getBookDbPath } from './open-book-db'
 import { migrateBookDb } from './schema'
 import { getBookRecord } from './queries'

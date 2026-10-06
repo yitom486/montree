@@ -34,7 +34,7 @@ test.describe('在线文档阅读', () => {
 
       const frame = webDocFrame(window)
       await expect(frame.getByRole('heading', { name: 'Quick Start' })).toBeVisible({ timeout: 15_000 })
-      await expect(frame.getByText('Inkdown E2E fixture paragraph for online document smoke tests.')).toBeVisible()
+      await expect(frame.getByText('Montree E2E fixture paragraph for online document smoke tests.')).toBeVisible()
       await expect(frame.getByRole('heading', { name: 'Authentication Capabilities' })).toBeVisible()
       await expect(frame.locator('[data-component-part="field-name"]')).toHaveText('logout')
       await expect(frame.locator('[data-component-part="field-info-pill"]')).toHaveText('LogoutCapabilities Object')
@@ -96,7 +96,7 @@ test.describe('在线文档阅读', () => {
 
       const frame = webDocFrame(window)
       await expect(frame.getByRole('heading', { name: 'Installation' })).toBeVisible({ timeout: 15_000 })
-      await expect(frame.getByText('Inkdown E2E fixture second page content.')).toBeVisible()
+      await expect(frame.getByText('Montree E2E fixture second page content.')).toBeVisible()
     } finally {
       await app.close()
     }
@@ -120,7 +120,7 @@ test.describe('在线文档阅读', () => {
 
       await expect(panel.locator('input[placeholder="https://"]')).toHaveValue(E2E_WEB_DOC_INSTALL_URL)
       await expect(frame.getByRole('heading', { name: 'Installation' })).toBeVisible({ timeout: 15_000 })
-      await expect(frame.getByText('Inkdown E2E fixture second page content.')).toBeVisible()
+      await expect(frame.getByText('Montree E2E fixture second page content.')).toBeVisible()
 
       const readerFrame = window.frames().find((candidate) => candidate.url() === 'about:srcdoc')
       expect(readerFrame).toBeDefined()

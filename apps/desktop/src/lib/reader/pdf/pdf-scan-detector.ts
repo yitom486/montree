@@ -1,5 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { pageHasNativeText } from '@inkdown/ocr-core'
+import { pageHasNativeText } from '@montree/ocr-core'
 
 const HEAD_SAMPLE_PAGES = 3
 /** 除头部外再抽中间与尾部各 1 页：前 3 页全是文字但正文为扫描图的混合文档最常见 */

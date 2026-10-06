@@ -1,4 +1,4 @@
-import { INKDOWN_SETTLE_COMPLETE_KIND } from '@inkdown/contracts'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
 import { acpApi } from '@/api/acp-api'
 import { STREAM_FLUSH_MS, StreamCoalescer, isCoalescableAgentChunk } from '@/lib/agent/stream-coalescer'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
@@ -90,7 +90,7 @@ export function startAcpStreamHost(): () => void {
     // 再冻结；不进批注/副会话分流，不碰 prompting
     const updateKind =
       typeof event.update?.sessionUpdate === 'string' ? event.update.sessionUpdate : ''
-    if (updateKind === INKDOWN_SETTLE_COMPLETE_KIND) {
+    if (updateKind === MONTREE_SETTLE_COMPLETE_KIND) {
       flushAcpStreamBuffer()
       useAcpUiStore.getState().freezeSettledStreaming()
       return

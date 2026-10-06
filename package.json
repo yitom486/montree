@@ -1,7 +1,7 @@
 {
-  "name": "inkdown",
+  "name": "montree",
   "version": "0.4.3",
-  "description": "Inkdown — Markdown 编辑、电子书与在线文档阅读、Agent 助手",
+  "description": "Montree — Markdown 编辑、电子书与在线文档阅读、Agent 助手",
   "author": "Yitom <yitom486@gmail.com>",
   "main": "out/main/main.js",
   "type": "module",

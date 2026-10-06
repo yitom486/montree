@@ -43,7 +43,7 @@ function setupSdkRequest(handlers: {
     if (!handlers.onNew) throw RequestError.methodNotFound('session/new')
     return handlers.onNew() as never
   })
-  const appClient = client({ name: 'inkdown-test' })
+  const appClient = client({ name: 'montree-test' })
   const clientConn = appClient.connect(appAgent)
   liveConnections.push(clientConn)
   return {
@@ -186,7 +186,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
       seen.push(ctx.params)
       return {}
     })
-    const appClient = client({ name: 'inkdown-test' })
+    const appClient = client({ name: 'montree-test' })
     const clientConn = appClient.connect(appAgent)
     liveConnections.push(clientConn)
 
@@ -221,7 +221,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
       resumeSessionId: null,
       resumeSupported: false,
       loadSupported: false,
-      mcpServers: [{ type: 'http', name: 'inkdown', url: 'http://x' }],
+      mcpServers: [{ type: 'http', name: 'montree', url: 'http://x' }],
       retryDelayMs: 0,
       log: () => undefined,
     })
@@ -249,7 +249,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
         resumeSessionId: null,
         resumeSupported: false,
         loadSupported: false,
-        mcpServers: [{ type: 'http', name: 'inkdown', url: 'http://x' }],
+        mcpServers: [{ type: 'http', name: 'montree', url: 'http://x' }],
         retryDelayMs: 0,
         log: () => undefined,
       }),
@@ -283,7 +283,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
       resumeSessionId: 'old-1',
       resumeSupported: true,
       loadSupported: true,
-      mcpServers: [{ type: 'http', name: 'inkdown', url: 'http://x' }],
+      mcpServers: [{ type: 'http', name: 'montree', url: 'http://x' }],
       retryDelayMs: 0,
       log: () => undefined,
     })

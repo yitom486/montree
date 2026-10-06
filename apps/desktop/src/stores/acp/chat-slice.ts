@@ -1,8 +1,8 @@
 import type { StateCreator } from 'zustand'
 import {
   DEFAULT_ACP_RUNTIME_ID,
-  INKDOWN_SETTLE_COMPLETE_KIND,
-} from '@inkdown/contracts'
+  MONTREE_SETTLE_COMPLETE_KIND,
+} from '@montree/contracts'
 import {
   type AcpChatMessage,
   type AcpChatRole,
@@ -26,7 +26,7 @@ import {
   selectChapterMarkPlanOnMessages,
 } from '@/lib/agent/promote-chapter-mark-plans'
 import { isProposeMarkToolTitle } from '@/lib/agent/parse-mark-proposal'
-import type { MarkProposalStatus } from '@inkdown/annotations'
+import type { MarkProposalStatus } from '@montree/annotations'
 import {
   MAX_THREADS,
   type AcpChatThread,
@@ -412,7 +412,7 @@ export const createChatSlice: StateCreator<
     const kind =
       typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
 
-    if (kind === INKDOWN_SETTLE_COMPLETE_KIND) {
+    if (kind === MONTREE_SETTLE_COMPLETE_KIND) {
       // 主进程定居收尾：先把回放清洗悬垂落定（有则成泡、无则丢），再冻结残留，
       // 不新增空泡，不碰 prompting
       const st = get()

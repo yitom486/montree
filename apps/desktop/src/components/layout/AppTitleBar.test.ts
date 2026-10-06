@@ -32,7 +32,7 @@ describe('AppTitleBar', () => {
       )
     })
 
-    expect(container.textContent).toContain('Inkdown')
+    expect(container.textContent).toContain('Montree')
     expect(container.textContent).toContain('Ctrl P')
   })
 

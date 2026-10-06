@@ -432,7 +432,7 @@ body {
 }
 
 /* OCR 页标记 chip（与应用内预览同形；固定浅色纸张主题） */
-.markdown-preview .inkdown-page-marker {
+.markdown-preview .montree-page-marker {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -440,8 +440,8 @@ body {
   color: #6e7781;
   font-size: 9pt;
 }
-.markdown-preview .inkdown-page-marker::before,
-.markdown-preview .inkdown-page-marker::after {
+.markdown-preview .montree-page-marker::before,
+.markdown-preview .montree-page-marker::after {
   content: '';
   flex: 1;
   border-top: 1px dashed #d0d7de;

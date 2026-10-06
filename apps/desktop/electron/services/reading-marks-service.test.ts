@@ -18,17 +18,17 @@ import {
   listReadingMarks,
   updateReadingMark,
 } from './reading-marks-service'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 
 describe('reading-marks-service', () => {
   beforeEach(async () => {
     // 本文件锁定文件后端（同时证明回滚开关有效）；DB 后端由 marks-db.test.ts 覆盖
-    process.env.INKDOWN_MARKS_BACKEND = 'file'
+    process.env.MONTREE_MARKS_BACKEND = 'file'
     tempUserData = await mkdtemp(join(tmpdir(), 'reading-marks-'))
   })
 
   afterEach(() => {
-    delete process.env.INKDOWN_MARKS_BACKEND
+    delete process.env.MONTREE_MARKS_BACKEND
     // 文件后端无 DB 句柄，直接删目录；用后即焚，不留 tmp 堆积
     if (tempUserData) rmSync(tempUserData, { recursive: true, force: true })
     tempUserData = ''
@@ -134,7 +134,7 @@ describe('reading-marks-service', () => {
     const { searchReadingMarks, listReadingMarksByChapter } = await import(
       './reading-marks-service'
     )
-    const { toChapterKey } = await import('@inkdown/contracts')
+    const { toChapterKey } = await import('@montree/contracts')
     const created = await createReadingMark({
       filePath: 'D:\\books\\file-svc.epub',
       fileFingerprint: 'fp-file-svc',

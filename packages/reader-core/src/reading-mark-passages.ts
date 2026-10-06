@@ -1,4 +1,4 @@
-import type { ReadingAnchor, ReadingMark } from '@inkdown/contracts'
+import type { ReadingAnchor, ReadingMark } from '@montree/contracts'
 import { getReadingMarkKindLabel, getReadingMarkLabel } from './reading-mark-labels'
 import { normalizeHighlightColor } from './reading-mark-colors'
 

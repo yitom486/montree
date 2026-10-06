@@ -119,7 +119,7 @@ describe('buildMarkFlag', () => {
 
     const flag = buildMarkFlag(doc, 'mark-7', range, { background: 'rgb(1, 2, 3)' })
     expect(flag).not.toBeNull()
-    expect(flag!.getAttribute('data-inkdown-flag')).toBe('mark-7')
+    expect(flag!.getAttribute('data-montree-flag')).toBe('mark-7')
     expect(flag!.style.position).toBe('absolute')
     expect(flag!.style.left).toBe('80px')
     expect(flag!.style.top).toBe('54px')

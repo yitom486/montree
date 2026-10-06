@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 function makeRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'inkdown-ws-'))
+  const dir = mkdtempSync(join(tmpdir(), 'montree-ws-'))
   dirs.push(dir)
   return dir
 }

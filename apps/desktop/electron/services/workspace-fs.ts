@@ -8,9 +8,9 @@ import {
   cp,
 } from 'node:fs/promises'
 import { basename, dirname, join, resolve, sep } from 'node:path'
-import type { AppError } from '@inkdown/contracts'
-import { toAppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import { toAppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   WorkspaceFsCopyPayload,
   WorkspaceFsCreateDirPayload,
@@ -19,7 +19,7 @@ import type {
   WorkspaceFsMovePayload,
   WorkspaceFsPathResult,
   WorkspaceFsRenamePayload,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 
 export function assertInsideWorkspace(filePath: string, workspaceRoot: string): string {
   const root = resolve(workspaceRoot)

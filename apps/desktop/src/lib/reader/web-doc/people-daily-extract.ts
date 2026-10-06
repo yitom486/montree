@@ -1,4 +1,4 @@
-import { isPeopleDailyLayoutPath } from '@inkdown/web-doc'
+import { isPeopleDailyLayoutPath } from '@montree/web-doc'
 
 function normalizeText(text: string | null | undefined): string {
   return text?.replace(/\s+/g, ' ').trim() ?? ''

@@ -27,7 +27,7 @@ export interface MarkProposalItem {
   kind?: MarkProposalKind
 }
 
-/** inkdown_propose_mark 统一入参：单条或批量（marks 优先）。 */
+/** montree_propose_mark 统一入参：单条或批量（marks 优先）。 */
 export interface MarkProposalPayload {
   excerpt?: string
   note?: string

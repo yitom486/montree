@@ -1,11 +1,11 @@
 import type { StateCreator } from 'zustand'
-import { DEFAULT_ACP_RUNTIME_ID } from '@inkdown/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import type {
   AcpConfigOption,
   AcpConnectionStatus,
   AcpPromptCapabilities,
   AppErrorCode,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import {
   rememberPreferredConfig,
   type AcpPreferredConfigMap,

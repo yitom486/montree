@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { ok } from '@inkdown/contracts'
+import { ok } from '@montree/contracts'
 import { classifyPdfAsync } from '@firecrawl/pdf-inspector'
 import { migrateBookDb } from './schema'
 import { importScannedBookToDb } from './import-service'

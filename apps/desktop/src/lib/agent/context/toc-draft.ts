@@ -2,8 +2,8 @@ import {
   backfillMissingPages,
   isBareChapterTitle,
   isWatermarkTocEntry,
-} from '@inkdown/ocr-core'
-import type { OcrTocEntrySource } from '@inkdown/contracts'
+} from '@montree/ocr-core'
+import type { OcrTocEntrySource } from '@montree/contracts'
 
 /**
  * 目录 Agent 草稿本（渲染进程内存单例）。

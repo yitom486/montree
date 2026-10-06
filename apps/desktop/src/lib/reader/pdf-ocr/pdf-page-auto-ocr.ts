@@ -1,4 +1,4 @@
-import type { PdfOcrPageCache } from '@inkdown/contracts'
+import type { PdfOcrPageCache } from '@montree/contracts'
 
 /**
  * W3 当前页自动识别门（纯函数）：该页已上报无原生层（nativeCharCount<8，有原生层的

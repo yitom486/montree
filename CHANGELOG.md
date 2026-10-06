@@ -1,6 +1,6 @@
 # 更新日志
 
-记录 [Inkdown](README.md) 各版本**主要功能更新**。版本号与 Git tag 对齐。
+记录 [Montree](README.md) 各版本**主要功能更新**。版本号与 Git tag 对齐。
 
 **发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
 
@@ -248,7 +248,7 @@
 ### 产品
 
 - 应用正式定名为 **Inkdown**（窗口标题、欢迎页、安装包与关于对话框）
-- **应用内更新**：打包版启动后检查 [GitHub Releases](https://github.com/yitom486/inkdown/releases)，可下载并重启安装；关于 / 设置中也可手动检查
+- **应用内更新**：打包版启动后检查 [GitHub Releases](https://github.com/yitom486/montree/releases)，可下载并重启安装；关于 / 设置中也可手动检查
 - 关于对话框补充产品说明与仓库链接
 
 > **从 v0.2.x 升级**：安装包 appId 已变更，旧版「轻量阅读器」无法原地自动升级，请下载新安装包覆盖或并行安装；此后同 Inkdown 安装包之间可走应用内更新。
@@ -325,21 +325,21 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/inkdown/compare/v0.4.3...HEAD
-[0.4.3]: https://github.com/yitom486/inkdown/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/yitom486/inkdown/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/yitom486/inkdown/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/yitom486/inkdown/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/yitom486/inkdown/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/yitom486/inkdown/compare/v0.2.9...v0.3.0
-[0.2.9]: https://github.com/yitom486/inkdown/compare/v0.2.8...v0.2.9
-[0.2.8]: https://github.com/yitom486/inkdown/compare/v0.2.7...v0.2.8
-[0.2.7]: https://github.com/yitom486/inkdown/compare/v0.2.6...v0.2.7
-[0.2.6]: https://github.com/yitom486/inkdown/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/yitom486/inkdown/compare/v0.2.3...v0.2.5
-[0.2.3]: https://github.com/yitom486/inkdown/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/yitom486/inkdown/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/yitom486/inkdown/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/yitom486/inkdown/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/yitom486/inkdown/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/yitom486/inkdown/releases/tag/v0.1.0
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/yitom486/montree/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/yitom486/montree/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/yitom486/montree/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/yitom486/montree/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/yitom486/montree/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/yitom486/montree/compare/v0.2.9...v0.3.0
+[0.2.9]: https://github.com/yitom486/montree/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/yitom486/montree/compare/v0.2.7...v0.2.8
+[0.2.7]: https://github.com/yitom486/montree/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/yitom486/montree/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/yitom486/montree/compare/v0.2.3...v0.2.5
+[0.2.3]: https://github.com/yitom486/montree/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/yitom486/montree/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/yitom486/montree/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/yitom486/montree/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/yitom486/montree/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/yitom486/montree/releases/tag/v0.1.0

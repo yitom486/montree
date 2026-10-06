@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import type { AppError } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
 import { Button } from '@/components/ui/button'
 
 interface ErrorBannerProps {

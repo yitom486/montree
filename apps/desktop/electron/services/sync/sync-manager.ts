@@ -1,19 +1,19 @@
 import { mkdir } from 'node:fs/promises'
 import { BrowserWindow, app } from 'electron'
-import { IPC } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
-import { toAppError, type AppError } from '@inkdown/contracts'
+import { IPC } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
 import type {
   SyncConfig,
   SyncStatus,
   SyncExecuteResult,
   TestConnectionResult,
   SyncStats,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import { WebDavStorageAdapter } from './webdav-adapter'
 import { readSyncConfig } from './sync-config-service'
 import { readMarksStore, writeMarksStore } from '../reading-marks-service'
-import { mergeReadingMarks, type SyncMarksPayload } from '@inkdown/annotations'
+import { mergeReadingMarks, type SyncMarksPayload } from '@montree/annotations'
 import { readLocalProgress, writeLocalProgress } from './reading-progress-sync'
 import { mergeReadingProgress, type ReadingProgressSnapshot } from './mergers/progress-merger'
 import { readQuizJsonlForSync, writeQuizJsonlForSync } from '../quiz-service'
@@ -72,13 +72,13 @@ class SyncManager {
     const testRes = await adapter.testConnection()
     if (!testRes.ok) return testRes
 
-    const ensureRes = await adapter.ensureDir(config.remoteDir || '/InkdownSync')
+    const ensureRes = await adapter.ensureDir(config.remoteDir || '/MontreeSync')
     if (!ensureRes.ok) return ensureRes
 
     return ok({
       ok: true,
       latencyMs: testRes.value.latencyMs,
-      remoteDir: config.remoteDir || '/InkdownSync',
+      remoteDir: config.remoteDir || '/MontreeSync',
       message: '连接与目录权限校验成功',
     })
   }
@@ -103,7 +103,7 @@ class SyncManager {
     this.isSyncing = true
     this.broadcastStatus({ phase: 'syncing', message: '正在同步云端数据…', error: undefined })
 
-    const remoteDir = (config.remoteDir || '/InkdownSync').replace(/^\/+|\/+$/g, '')
+    const remoteDir = (config.remoteDir || '/MontreeSync').replace(/^\/+|\/+$/g, '')
     const stats: SyncStats = {
       marksAdded: 0,
       marksUpdated: 0,
@@ -172,7 +172,7 @@ class SyncManager {
       // 广播给渲染进程热载入最新进度
       this.broadcastRemoteProgress(progressMerge.merged)
 
-      // 4. 同步 AI 测验档案 (quiz-records.jsonl；本地后端可能是 inkdown.db，传输格式不变)
+      // 4. 同步 AI 测验档案 (quiz-records.jsonl；本地后端可能是 montree.db，传输格式不变)
       const remoteQuizPath = `${remoteDir}/quiz-records.jsonl`
       let localQuizJsonl = ''
       try {

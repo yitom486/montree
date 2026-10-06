@@ -102,7 +102,7 @@ export async function hydrateMermaidInElement(
     node.classList.remove('mermaid')
     node.classList.add('mermaid-hydrating')
 
-    const renderId = `inkdown-mmd-${++renderSeq}`
+    const renderId = `montree-mmd-${++renderSeq}`
     cleanupMermaidTempDom(renderId)
 
     mermaidLog(`${reason}:render-start`, {
@@ -134,7 +134,7 @@ export async function hydrateMermaidInElement(
       }
 
       node.innerHTML = svg
-      node.setAttribute('data-inkdown-mermaid', '1')
+      node.setAttribute('data-montree-mermaid', '1')
       node.removeAttribute('data-processed')
 
       const svgEl = node.querySelector('svg')

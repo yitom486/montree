@@ -17,7 +17,7 @@ import {
 
 describe('cursor resolveSpawnCommand（未安装预检）', () => {
   it('未安装返回 null：直接路径与 PATH 皆无', () => {
-    const emptyDir = mkdtempSync(join(tmpdir(), 'inkdown-cursor-empty-'))
+    const emptyDir = mkdtempSync(join(tmpdir(), 'montree-cursor-empty-'))
     try {
       const resolved = resolveCursorSpawnCommand({
         platform: 'win32',
@@ -43,7 +43,7 @@ describe('cursor resolveSpawnCommand（未安装预检）', () => {
   })
 
   it('已安装透传直接路径（win %LOCALAPPDATA%\\cursor-agent\\agent.cmd）', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-cursor-direct-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-cursor-direct-'))
     try {
       mkdirSync(join(local, 'cursor-agent'), { recursive: true })
       const cmd = join(local, 'cursor-agent', 'agent.cmd')
@@ -59,8 +59,8 @@ describe('cursor resolveSpawnCommand（未安装预检）', () => {
   })
 
   it('已安装透传 PATH 回落（posix agent）', () => {
-    const bin = mkdtempSync(join(tmpdir(), 'inkdown-cursor-path-'))
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-home-'))
+    const bin = mkdtempSync(join(tmpdir(), 'montree-cursor-path-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-home-'))
     try {
       writeFileSync(join(bin, 'agent'), '#!/bin/sh', 'utf8')
       const resolved = resolveCursorSpawnCommand({
@@ -76,7 +76,7 @@ describe('cursor resolveSpawnCommand（未安装预检）', () => {
   })
 
   it('已安装透传直接路径（posix ~/.local/bin/agent）', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-home2-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-home2-'))
     try {
       mkdirSync(join(home, '.local', 'bin'), { recursive: true })
       const agent = join(home, '.local', 'bin', 'agent')
@@ -103,7 +103,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   }
 
   it('posix auth.json 含 accessToken 判已登录', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-'))
     try {
       writePosixAuth(home, JSON.stringify({ accessToken: 'tok-123', refreshToken: '' }))
       const result = probeCursorAuth({ platform: 'linux', env: {}, home })
@@ -116,7 +116,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('posix auth.json 仅 refreshToken 也判已登录', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-r-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-r-'))
     try {
       writePosixAuth(home, JSON.stringify({ refreshToken: 'ref-abc' }))
       expect(
@@ -128,7 +128,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('posix 缺失判未登录（不下结论，由 gate try-first 兜底）', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-miss-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-miss-'))
     try {
       const result = probeCursorAuth({ platform: 'linux', env: {}, home })
       expect(result.hasAuthFile).toBe(false)
@@ -139,7 +139,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('posix 空文件判未登录：存在但去空白后为空', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-empty-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-empty-'))
     try {
       writePosixAuth(home, '   \n\t  \n')
       const result = probeCursorAuth({ platform: 'linux', env: {}, home })
@@ -151,7 +151,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('posix 坏 JSON / 无 token key 判未登录', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-bad-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-bad-'))
     try {
       writePosixAuth(home, '{not-json')
       expect(probeCursorAuth({ platform: 'linux', env: {}, home }).looksLoggedIn).toBe(false)
@@ -166,7 +166,7 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('环境变量 CURSOR_API_KEY / CURSOR_AUTH_TOKEN 命中判已登录', () => {
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-auth-env-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-auth-env-'))
     try {
       expect(
         probeCursorAuth({ platform: 'linux', env: { CURSOR_API_KEY: 'sk-x' }, home })
@@ -186,8 +186,8 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('win XDG 风格优先：%USERPROFILE%\\.config\\cursor\\auth.json 命中', () => {
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-cursor-win-p-'))
-    const roaming = mkdtempSync(join(tmpdir(), 'inkdown-cursor-win-r-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-cursor-win-p-'))
+    const roaming = mkdtempSync(join(tmpdir(), 'montree-cursor-win-r-'))
     try {
       const dir = join(profile, '.config', 'cursor')
       mkdirSync(dir, { recursive: true })
@@ -215,8 +215,8 @@ describe('probeCursorAuth（文件+环境双查）', () => {
   })
 
   it('win storage.json hint：旧 App 落盘存在即算命中', () => {
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-cursor-win-sp-'))
-    const roaming = mkdtempSync(join(tmpdir(), 'inkdown-cursor-win-sr-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-cursor-win-sp-'))
+    const roaming = mkdtempSync(join(tmpdir(), 'montree-cursor-win-sr-'))
     try {
       const dir = join(roaming, 'Cursor', 'User', 'globalStorage')
       mkdirSync(dir, { recursive: true })
@@ -273,7 +273,7 @@ describe('parseCursorCatalogOutput（agent models 同源，逐行首 token）', 
 describe('getCursorCatalogIds（未安装/失败一律 null，不抛）', () => {
   it('无 CLI（resolve null）返回 null', () => {
     clearCursorCatalogCache()
-    const emptyDir = mkdtempSync(join(tmpdir(), 'inkdown-cursor-catalog-miss-'))
+    const emptyDir = mkdtempSync(join(tmpdir(), 'montree-cursor-catalog-miss-'))
     try {
       expect(
         getCursorCatalogIds(undefined, {
@@ -288,9 +288,9 @@ describe('getCursorCatalogIds（未安装/失败一律 null，不抛）', () => 
   })
 
   it('进程级缓存：首次 null 后不再 spawn（换合法 CLI 仍返回 null）', () => {
-    const emptyDir = mkdtempSync(join(tmpdir(), 'inkdown-cursor-catalog-cache-'))
-    const bin = mkdtempSync(join(tmpdir(), 'inkdown-cursor-catalog-bin-'))
-    const home = mkdtempSync(join(tmpdir(), 'inkdown-cursor-catalog-home-'))
+    const emptyDir = mkdtempSync(join(tmpdir(), 'montree-cursor-catalog-cache-'))
+    const bin = mkdtempSync(join(tmpdir(), 'montree-cursor-catalog-bin-'))
+    const home = mkdtempSync(join(tmpdir(), 'montree-cursor-catalog-home-'))
     try {
       clearCursorCatalogCache()
       writeFileSync(join(bin, 'agent'), '#!/bin/sh', 'utf8')

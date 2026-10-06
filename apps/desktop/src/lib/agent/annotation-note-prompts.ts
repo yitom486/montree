@@ -78,7 +78,7 @@ const CHAT_RULES = [
   '你在阅读器的「批注助手」里与用户多轮讨论选区。',
   '默认是普通聊天：解答、讨论、追问都可以。',
   '全程使用用户的语言（通常为中文）；禁止输出 English: / Natural English: 等英译前缀或对照翻译。',
-  '不要调用 inkdown_propose_mark，除非用户已明确要求整理批注正文。',
+  '不要调用 montree_propose_mark，除非用户已明确要求整理批注正文。',
   '不要每次回复都输出「最终批注」。',
 ].join('\n')
 
@@ -87,7 +87,7 @@ const DRAFT_RULES = [
   '只输出批注正文本身，必须能直接贴进批注框。',
   '禁止：标题、markdown 围栏、「以下是批注」、English:/Natural English:、中英对照、思考过程、客套话。',
   '语言与用户一致（用户用中文就写中文）。',
-  '可调用 inkdown_propose_mark（仅传 note，用当前选区）提交草稿；不入库，等人确认后才写入。',
+  '可调用 montree_propose_mark（仅传 note，用当前选区）提交草稿；不入库，等人确认后才写入。',
 ].join('\n')
 
 const WRITE_INTENT_RE =

@@ -1,7 +1,7 @@
 {
-  "https://e2e.inkdown.test/docs/": "start.html",
-  "https://e2e.inkdown.test/docs/start": "start.html",
-  "https://e2e.inkdown.test/docs/card": "installation.html",
-  "https://e2e.inkdown.test/docs/installation": "installation.html",
-  "https://e2e.inkdown.test/docs/xss": "xss.html"
+  "https://e2e.montree.test/docs/": "start.html",
+  "https://e2e.montree.test/docs/start": "start.html",
+  "https://e2e.montree.test/docs/card": "installation.html",
+  "https://e2e.montree.test/docs/installation": "installation.html",
+  "https://e2e.montree.test/docs/xss": "xss.html"
 }

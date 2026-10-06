@@ -71,7 +71,7 @@ export function ChapterSuggestionCard({
         </div>
 
         <span className="rounded bg-teal-500/15 px-1.5 py-0.5 text-[9.5px] font-mono font-medium text-teal-700 dark:text-teal-300">
-          inkdown_suggest_chapters
+          montree_suggest_chapters
         </span>
       </div>
 

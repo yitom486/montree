@@ -1,9 +1,9 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { err, ok, type Result } from '@inkdown/contracts'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import type { SyncConfig } from '@inkdown/contracts'
+import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import type { SyncConfig } from '@montree/contracts'
 
 export const DEFAULT_SYNC_CONFIG: SyncConfig = {
   enabled: false,
@@ -11,7 +11,7 @@ export const DEFAULT_SYNC_CONFIG: SyncConfig = {
   serverUrl: 'https://dav.jianguoyun.com/dav/',
   username: '',
   password: '',
-  remoteDir: '/InkdownSync',
+  remoteDir: '/MontreeSync',
   syncOnStartup: true,
   ignoreTlsErrors: false,
 }

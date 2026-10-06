@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { flattenEpubToc } from '@inkdown/reader-core'
+import { flattenEpubToc } from '@montree/reader-core'
 import { useReaderNavigationStore, selectReaderNavTitles } from '@/stores/reader-navigation-store'
 
 describe('reader-navigation-store', () => {

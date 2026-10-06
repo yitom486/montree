@@ -3,7 +3,7 @@ import {
   DEFAULT_READER_TYPOGRAPHY,
   READER_FONT_SIZE_OPTIONS,
   READER_LINE_HEIGHT_OPTIONS,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { buildReaderLayoutCss, getEpubThemeRules } from './epub-themes'
 
 describe('reader typography defaults', () => {
@@ -26,6 +26,6 @@ describe('reader typography defaults', () => {
   it('主题 !important 规则豁免 M2 页边旗标（否则 fixed 定位被压成 static 全宽条）', () => {
     const typography = { fontSize: 18 as const, lineHeight: 1.85 as const }
     const css = buildReaderLayoutCss('dark', typography)
-    expect(css).toContain(':not([data-inkdown-flag])')
+    expect(css).toContain(':not([data-montree-flag])')
   })
 })

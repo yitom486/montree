@@ -1,4 +1,4 @@
-import type { WebDocTocEntry } from '@inkdown/contracts'
+import type { WebDocTocEntry } from '@montree/contracts'
 
 const MAX_TOC_ENTRIES = 240
 

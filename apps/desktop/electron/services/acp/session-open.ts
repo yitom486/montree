@@ -1,5 +1,5 @@
 import { RequestError } from '@agentclientprotocol/sdk'
-import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@inkdown/contracts'
+import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@montree/contracts'
 import { mergeTopLevelModelsIntoConfigOptions } from "@yitom/acp-client"
 
 export type AcpRpcRequest = (method: string, params?: unknown) => Promise<unknown>
@@ -11,7 +11,7 @@ export interface RestoreOrCreateSessionInput {
   resumeSessionId: string | null
   resumeSupported: boolean
   loadSupported: boolean
-  /** 客户端自带的 MCP server（Inkdown 工具）；Agent 不支持 HTTP 传输时传空数组 */
+  /** 客户端自带的 MCP server（Montree 工具）；Agent 不支持 HTTP 传输时传空数组 */
   mcpServers?: unknown[]
   /** session/load 回放期间回调（主进程用来压制 UI 更新） */
   onSuppressUpdates?: (suppress: boolean) => void

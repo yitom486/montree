@@ -33,7 +33,7 @@ test.describe('在线文档 XSS 防护（真浏览器）', () => {
       expect(frame).toBeDefined()
 
       // script / 事件处理器未执行
-      const flagOf = 'window.__inkdownXssFired'
+      const flagOf = 'window.__montreeXssFired'
       expect(
         await frame!.evaluate((flag) => (window as unknown as Record<string, unknown>)[flag], flagOf),
       ).toBeUndefined()

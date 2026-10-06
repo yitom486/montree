@@ -44,8 +44,8 @@ import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-a
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { registerSelectionProvider, commitReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
-import { DEFAULT_HIGHLIGHT_COLOR } from '@inkdown/reader-core'
-import { findMarkForSelection, isClickNotDrag } from '@inkdown/reader-core'
+import { DEFAULT_HIGHLIGHT_COLOR } from '@montree/reader-core'
+import { findMarkForSelection, isClickNotDrag } from '@montree/reader-core'
 import { buildWebDocReaderDocument } from '@/lib/reader/web-doc/web-doc-html'
 import { extractWebDocHeadings } from '@/lib/reader/web-doc/web-doc-outline'
 import {
@@ -61,7 +61,7 @@ import {
   resolveWebDocSiteId,
   resolveWebDocTocDiscoveryUrl,
   stripWebDocFragment,
-} from '@inkdown/web-doc'
+} from '@montree/web-doc'
 import {
   resolveWebDocClickHref,
   resolveWebDocFragment,
@@ -71,14 +71,14 @@ import {
   isCrossOriginIframeEscape,
 } from '@/lib/reader/web-doc/web-doc-link'
 import { logWebDoc } from '@/lib/reader/web-doc/web-doc-debug'
-import { findWebDocFlatIndex, normalizeWebDocNavUrl, webDocTocEntriesToReaderUnits } from '@inkdown/reader-core'
-import { toCanonicalChapter } from '@inkdown/reader-core'
+import { findWebDocFlatIndex, normalizeWebDocNavUrl, webDocTocEntriesToReaderUnits } from '@montree/reader-core'
+import { toCanonicalChapter } from '@montree/reader-core'
 import {
   iterateWebDocUnits,
   primeWebDocAgentTextCache,
   readWebDocUnitByIndex,
 } from '@/lib/reader/web-doc/web-doc-agent-content'
-import { readMobiSelection, buildMobiSnapshotFromRange } from '@inkdown/reader-core'
+import { readMobiSelection, buildMobiSnapshotFromRange } from '@montree/reader-core'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
@@ -89,19 +89,19 @@ import {
   removeMobiPendingSelectionHighlight,
   renderWebMarkOverlays,
 } from '@/lib/reader/marks/mobi-reading-marks'
-import { injectMobiMarkStyles } from '@inkdown/reader-core'
+import { injectMobiMarkStyles } from '@montree/reader-core'
 import {
   bindDocumentSelectionCollapse,
   bindOutsideReaderPointerDismiss,
   clearWindowSelection,
-} from '@inkdown/reader-core'
-import { copyTextToClipboard, type PdfSelectionSnapshot } from '@inkdown/reader-core'
+} from '@montree/reader-core'
+import { copyTextToClipboard, type PdfSelectionSnapshot } from '@montree/reader-core'
 import { applyCopyButtonFeedback, getCodeBlockTextFromCopyButton } from '@/lib/preview/code-block-copy'
 import { activateWebDocCodeTab } from '@/lib/reader/web-doc/web-doc-code-blocks'
 import {
   resolveWebChapter,
   tocFromWebUnits,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 import { reportAppError } from '@/lib/workspace/report-error'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
@@ -109,8 +109,8 @@ import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useWebDocStore } from '@/stores/web-doc-store'
 import { cn } from '@/lib/utils'
-import { isOk } from '@inkdown/contracts'
-import type { ReadingMark } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import { toast } from 'sonner'
 import '@/styles/web-doc-viewer.css'
 

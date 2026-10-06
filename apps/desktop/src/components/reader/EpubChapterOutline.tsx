@@ -1,5 +1,5 @@
 import { ReaderUnitOutline } from '@/components/reader/ReaderUnitOutline'
-import type { EpubChapter } from '@inkdown/reader-core'
+import type { EpubChapter } from '@montree/reader-core'
 
 interface EpubChapterOutlineProps {
   chapters: EpubChapter[]

@@ -9,9 +9,9 @@ import {
 
 describe('parse-mark-proposal', () => {
   it('识别 propose 工具名', () => {
-    expect(isProposeMarkToolTitle('inkdown_propose_note')).toBe(true)
-    expect(isProposeMarkToolTitle('inkdown_propose_mark')).toBe(true)
-    expect(isProposeMarkToolTitle('inkdown_create_note')).toBe(true)
+    expect(isProposeMarkToolTitle('montree_propose_note')).toBe(true)
+    expect(isProposeMarkToolTitle('montree_propose_mark')).toBe(true)
+    expect(isProposeMarkToolTitle('montree_create_note')).toBe(true)
     expect(isProposeMarkToolTitle('Read file')).toBe(false)
   })
 
@@ -36,7 +36,7 @@ describe('parse-mark-proposal', () => {
 
   it('从工具卡内容生成 ProposedMark', () => {
     const mark = parseMarkProposalFromTool(
-      'inkdown_propose_note',
+      'montree_propose_note',
       JSON.stringify({ proposed: true, note: '', excerpt: '关键句', message: '' }),
       'call-1',
     )
@@ -67,7 +67,7 @@ describe('parse-mark-proposal', () => {
       }),
     )
     expect(batch?.count).toBe(2)
-    const proposals = parseMarkProposalsFromTool('inkdown_propose_mark', JSON.stringify(batch), 'c1')
+    const proposals = parseMarkProposalsFromTool('montree_propose_mark', JSON.stringify(batch), 'c1')
     expect(proposals).toHaveLength(2)
     expect(proposals[1]?.kind).toBe('note')
   })

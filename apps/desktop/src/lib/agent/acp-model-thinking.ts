@@ -1,4 +1,4 @@
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 import { rankPrimary } from './acp-config-menu'
 
 /** 尾缀档位可设：思考类 key（`name[k=v,…]` 内嵌）与 `fast` 开关均编码在模型值尾缀。 */

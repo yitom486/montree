@@ -5,7 +5,7 @@ import {
   pickReaderNavLevel,
   resolveAdjacentFlatNav,
   resolveReaderChapterNav,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 describe('resolveAdjacentFlatNav', () => {
   const governanceToc = [

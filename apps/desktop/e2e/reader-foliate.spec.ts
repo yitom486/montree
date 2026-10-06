@@ -26,7 +26,7 @@ async function openWorkspaceFile(window: Page, fileName: string, query: string):
 
 test.describe('foliate 统一阅读器', () => {
   test('EPUB 章节正文可读（新链路）', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-foliate-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-foliate-'))
     const { epubName } = await writeReaderSmokeWorkspace(workspace)
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,
@@ -50,7 +50,7 @@ test.describe('foliate 统一阅读器', () => {
       })
       await expect(host).toHaveAttribute(
         'data-e2e-section-text',
-        /Inkdown E2E minimal EPUB paragraph\./,
+        /Montree E2E minimal EPUB paragraph\./,
       )
     } finally {
       await app.close()
@@ -58,7 +58,7 @@ test.describe('foliate 统一阅读器', () => {
   })
 
   test('MOBI 章节正文可读（新链路，与 EPUB 同一后端）', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'inkdown-e2e-foliate-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-foliate-'))
     await writeMinimalMobi(join(workspace, 'smoke-sample.mobi'))
     const app = await launchBuiltApp({
       E2E_AUTO_OPEN_PATH: workspace,
@@ -81,7 +81,7 @@ test.describe('foliate 统一阅读器', () => {
       })
       await expect(host).toHaveAttribute(
         'data-e2e-section-text',
-        /Inkdown E2E minimal MOBI paragraph\./,
+        /Montree E2E minimal MOBI paragraph\./,
       )
     } finally {
       await app.close()

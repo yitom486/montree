@@ -1,10 +1,10 @@
 import {
-  INKDOWN_VIRTUAL_RESOURCES,
-  isInkdownVirtualDirPath,
-  parseInkdownVirtualPath,
+  MONTREE_VIRTUAL_RESOURCES,
+  isMontreeVirtualDirPath,
+  parseMontreeVirtualPath,
   type AcpPermissionOutcome,
-  type InkdownVirtualResource,
-} from '@inkdown/contracts'
+  type MontreeVirtualResource,
+} from '@montree/contracts'
 import { methods, RequestError, type ClientApp } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from './acp-terminal'
@@ -12,8 +12,8 @@ import type { AcpTerminalManager } from './acp-terminal'
 export interface AcpClientHandlerDeps {
   getWorkspaceRoot: () => string | null
   terminals: AcpTerminalManager
-  /** 读取 Inkdown 虚拟文件：向渲染进程要内存快照，不碰磁盘 */
-  readSnapshot: (resource: InkdownVirtualResource) => Promise<string>
+  /** 读取 Montree 虚拟文件：向渲染进程要内存快照，不碰磁盘 */
+  readSnapshot: (resource: MontreeVirtualResource) => Promise<string>
   /**
    * Agent 审批：直接返回 bridge 结果（直返，无待决 Map）。
    * 无 bridge 时由 SDK 层直接 cancelled，禁静默 allow。
@@ -84,7 +84,7 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     if (!workspaceRoot || !filePath) {
       throw toInvalidParams('fs/read_text_file 需要 path 与已连接工作区')
     }
-    const virtualResource = parseInkdownVirtualPath(filePath, workspaceRoot)
+    const virtualResource = parseMontreeVirtualPath(filePath, workspaceRoot)
     if (virtualResource) {
       try {
         const content = await deps.readSnapshot(virtualResource)
@@ -94,12 +94,12 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
         })
         return { content }
       } catch (error) {
-        throw toServerError(error, '读取 Inkdown 快照失败')
+        throw toServerError(error, '读取 Montree 快照失败')
       }
     }
 
-    if (isInkdownVirtualDirPath(filePath, workspaceRoot)) {
-      throw toInvalidParams(`Inkdown 虚拟目录下可读：${INKDOWN_VIRTUAL_RESOURCES.join('、')}`)
+    if (isMontreeVirtualDirPath(filePath, workspaceRoot)) {
+      throw toInvalidParams(`Montree 虚拟目录下可读：${MONTREE_VIRTUAL_RESOURCES.join('、')}`)
     }
 
     try {

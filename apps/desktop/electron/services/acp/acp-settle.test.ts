@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent, client, methods } from '@agentclientprotocol/sdk'
-import { INKDOWN_SETTLE_COMPLETE_KIND, type AcpSessionUpdateEvent } from '@inkdown/contracts'
+import { MONTREE_SETTLE_COMPLETE_KIND, type AcpSessionUpdateEvent } from '@montree/contracts'
 import {
   acpState,
   armSuppressSettle,
@@ -98,7 +98,7 @@ describe('定居窗口单元（fake timers，只测转发层同步逻辑）', ()
       vi.advanceTimersByTime(SUPPRESS_SETTLE_WINDOW_MS)
       expect(acpState.suppressSettleUntil).toBe(0)
       expect(seen).toHaveLength(1)
-      expect(settleKindOf(seen[0]!)).toBe(INKDOWN_SETTLE_COMPLETE_KIND)
+      expect(settleKindOf(seen[0]!)).toBe(MONTREE_SETTLE_COMPLETE_KIND)
 
       // 收尾后不再重复：过期后的新 update 只放行
       emitSessionUpdate(replayParams('real'))
@@ -124,7 +124,7 @@ describe('定居窗口单元（fake timers，只测转发层同步逻辑）', ()
         sessionUpdate: 'agent_message_chunk',
         content: { type: 'text', text: 'late replay' },
       })
-      expect(settleKindOf(seen[1]!)).toBe(INKDOWN_SETTLE_COMPLETE_KIND)
+      expect(settleKindOf(seen[1]!)).toBe(MONTREE_SETTLE_COMPLETE_KIND)
       expect(acpState.suppressSettleUntil).toBe(0)
       // 挂起的计时器已被 disarm 清掉，推进时钟不再补发
       vi.advanceTimersByTime(SUPPRESS_SETTLE_WINDOW_MS * 2)
@@ -153,7 +153,7 @@ describe('定居窗口单元（fake timers，只测转发层同步逻辑）', ()
 
       vi.advanceTimersByTime(SUPPRESS_SETTLE_WINDOW_MS)
       expect(seen).toHaveLength(2)
-      expect(settleKindOf(seen[1]!)).toBe(INKDOWN_SETTLE_COMPLETE_KIND)
+      expect(settleKindOf(seen[1]!)).toBe(MONTREE_SETTLE_COMPLETE_KIND)
       expect(acpState.suppressSettleMonitorOnly).toBe(false)
     } finally {
       unsub()
@@ -184,7 +184,7 @@ describe('load 秒回 + 延迟重放（SDK 内存对接，沿 openSessionAfterAu
     const seen: AcpSessionUpdateEvent[] = []
     const unsub = onAcpSessionUpdate((event) => seen.push(event))
     try {
-      const appClient = client({ name: 'inkdown-test' })
+      const appClient = client({ name: 'montree-test' })
       registerAcpClientHandlers(appClient, {
         getWorkspaceRoot: () => '/ws',
         terminals: new AcpTerminalManager(),
@@ -247,7 +247,7 @@ describe('load 秒回 + 延迟重放（SDK 内存对接，沿 openSessionAfterAu
       expect(seen[0].update).toMatchObject({
         content: { type: 'text', text: 'new message' },
       })
-      expect(settleKindOf(seen[1]!)).toBe(INKDOWN_SETTLE_COMPLETE_KIND)
+      expect(settleKindOf(seen[1]!)).toBe(MONTREE_SETTLE_COMPLETE_KIND)
     } finally {
       unsub()
     }
@@ -257,7 +257,7 @@ describe('load 秒回 + 延迟重放（SDK 内存对接，沿 openSessionAfterAu
     const seen: AcpSessionUpdateEvent[] = []
     const unsub = onAcpSessionUpdate((event) => seen.push(event))
     try {
-      const appClient = client({ name: 'inkdown-test' })
+      const appClient = client({ name: 'montree-test' })
       registerAcpClientHandlers(appClient, {
         getWorkspaceRoot: () => '/ws',
         terminals: new AcpTerminalManager(),
@@ -323,7 +323,7 @@ describe('load 秒回 + 延迟重放（SDK 内存对接，沿 openSessionAfterAu
     try {
       const appAgent = agent({ name: 'fake-cursor' })
       appAgent.onRequest(methods.agent.session.prompt, async () => ({ stopReason: 'end_turn' }))
-      const appClient = client({ name: 'inkdown-test' })
+      const appClient = client({ name: 'montree-test' })
       const clientConn = appClient.connect(appAgent)
       liveConnections.push(clientConn)
 

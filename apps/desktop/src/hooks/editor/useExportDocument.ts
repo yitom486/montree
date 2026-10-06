@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { fileApi } from '@/api/file-api'
 import { buildExportHtml, getSuggestedExportName } from '@/lib/editor/export-document'
 import { reportAppError } from '@/lib/workspace/report-error'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 
 export function useExportDocument(content: string, filePath: string | undefined) {
   const exportHtml = useCallback(async () => {

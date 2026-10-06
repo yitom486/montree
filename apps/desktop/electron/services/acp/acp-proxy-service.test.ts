@@ -12,7 +12,7 @@ import {
 let dir: string
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'inkdown-acp-proxy-'))
+  dir = await mkdtemp(join(tmpdir(), 'montree-acp-proxy-'))
 })
 
 afterEach(async () => {

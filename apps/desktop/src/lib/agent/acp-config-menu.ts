@@ -1,4 +1,4 @@
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 import type { AcpPreferredConfigMap } from './acp-config-preferences'
 
 /** Agent 会话 configOption 的输入栏分类与排序（AgentPanel 纯逻辑出库，便于单测） */

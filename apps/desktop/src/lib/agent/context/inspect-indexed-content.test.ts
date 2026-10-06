@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { err, ok } from '@inkdown/contracts'
+import { err, ok } from '@montree/contracts'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { inspectIndexedContentForAgent } from './inspect-indexed-content'
 import { registerReaderContent } from './reader-content-registry'

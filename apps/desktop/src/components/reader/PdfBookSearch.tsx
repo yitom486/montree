@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
-import { err, isOk } from '@inkdown/contracts'
+import { err, isOk } from '@montree/contracts'
 import { rosettaApi } from '@/api/rosetta-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

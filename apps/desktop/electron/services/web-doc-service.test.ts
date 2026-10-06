@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,

@@ -1,5 +1,5 @@
 import { emitRailFocus } from '../rail-follow'
-import { normalizeLoadKey } from '@inkdown/reader-core'
+import { normalizeLoadKey } from '@montree/reader-core'
 import { findTextRangeInRoot } from './excerpt-text-match'
 
 /**
@@ -170,7 +170,7 @@ export function buildMarkFlag(
   const spot = flagSpotForRange(range, doc, size)
   if (!spot) return null
   const flag = doc.createElement('div')
-  flag.setAttribute('data-inkdown-flag', markId)
+  flag.setAttribute('data-montree-flag', markId)
   flag.style.cssText = `border-radius:9999px;background:${style.background};border:2px solid rgba(255,255,255,.9);box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;z-index:5;padding:0;margin:0;`
   flag.style.setProperty('position', 'absolute', 'important')
   flag.style.setProperty('left', `${spot.left}px`, 'important')

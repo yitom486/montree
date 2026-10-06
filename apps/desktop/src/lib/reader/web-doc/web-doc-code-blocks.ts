@@ -1,5 +1,5 @@
-import type { EpubThemeMode } from '@inkdown/reader-core'
-import { READER_PALETTE } from '@inkdown/reader-core'
+import type { EpubThemeMode } from '@montree/reader-core'
+import { READER_PALETTE } from '@montree/reader-core'
 import { buildCodeBlockToolbarHtml } from '@/lib/preview/code-block-chrome'
 
 const LANGUAGE_CLASS = /\blanguage-([\w-]+)\b/i

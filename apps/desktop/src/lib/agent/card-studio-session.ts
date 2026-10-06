@@ -1,5 +1,5 @@
 import { aiSessionApi } from '@/api/ai-session-api'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import {
   accumulateSubsessionUpdateFor,
   clearSubsessionSessions,
@@ -14,7 +14,7 @@ import {
 /**
  * AI 制卡一书一会话（P1，见 `.plan/ai-cards/01-card-studio-plan.md`）。
  * 统一副会话工厂的薄封装：purpose 固定 `'card'`、key 取书指纹；
- * 指针落 `inkdown.db ai_sessions`（重启不失）；轮转阈值沿 quiz 副会话
+ * 指针落 `montree.db ai_sessions`（重启不失）；轮转阈值沿 quiz 副会话
  * （2h 空闲 / 20 轮）；复用走 `loadSession(secondary)`，失败回 `session/new`。
  * 会话内存表、复用/轮转、自转重试语义一律由工厂保证，本文件只定身份与持久化。
  */

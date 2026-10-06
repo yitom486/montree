@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { registerReaderContent } from './reader-content-registry'
 import { readChapterByRef } from './read-chapter-by-ref'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
-import { EMPTY_READER_NAV } from '@inkdown/reader-core'
+import { EMPTY_READER_NAV } from '@montree/reader-core'
 
 afterEach(() => {
   useReaderNavigationStore.setState({

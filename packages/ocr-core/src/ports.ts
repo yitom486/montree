@@ -1,4 +1,4 @@
-import type { PdfOcrPageCache, PdfOcrTocCache } from '@inkdown/contracts'
+import type { PdfOcrPageCache, PdfOcrTocCache } from '@montree/contracts'
 
 /**
  * 单页 OCR 词缓存可替换服务接口（纯类型，零实现）。

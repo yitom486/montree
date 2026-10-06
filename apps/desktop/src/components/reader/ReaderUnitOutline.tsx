@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, ListTree, Pencil } from 'lucide-react'
-import type { ReaderUnit } from '@inkdown/reader-core'
+import type { ReaderUnit } from '@montree/reader-core'
 import {
   buildReaderUnitTree,
   shouldExpandReaderUnitNode,

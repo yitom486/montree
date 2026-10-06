@@ -44,15 +44,15 @@ describe('pdf-inspector-service', () => {
   })
 
   it('缺失文件返回 FILE_NOT_FOUND', async () => {
-    const result = await classifyPdfDocument(join(tmpdir(), 'inkdown-no-such.pdf'))
+    const result = await classifyPdfDocument(join(tmpdir(), 'montree-no-such.pdf'))
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.code).toBe('FILE_NOT_FOUND')
   })
 
   it('单页文本 PDF 分类为 TextBased 且无待 OCR 页', async () => {
-    dir = await mkdtemp(join(tmpdir(), 'inkdown-inspector-'))
+    dir = await mkdtemp(join(tmpdir(), 'montree-inspector-'))
     const filePath = join(dir, 'sample.pdf')
-    await writeFile(filePath, buildMinimalTextPdf(['Hello Inkdown TOC', 'Second line body']))
+    await writeFile(filePath, buildMinimalTextPdf(['Hello Montree TOC', 'Second line body']))
     const result = await classifyPdfDocument(filePath)
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -62,14 +62,14 @@ describe('pdf-inspector-service', () => {
   })
 
   it('按页抽取 Markdown（对外 1-indexed）', async () => {
-    dir = dir || (await mkdtemp(join(tmpdir(), 'inkdown-inspector-')))
+    dir = dir || (await mkdtemp(join(tmpdir(), 'montree-inspector-')))
     const filePath = join(dir, 'sample.pdf')
-    await writeFile(filePath, buildMinimalTextPdf(['Hello Inkdown TOC']))
+    await writeFile(filePath, buildMinimalTextPdf(['Hello Montree TOC']))
     const result = await extractPdfPagesMarkdown(filePath, [1])
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.pages).toHaveLength(1)
     expect(result.value.pages[0]?.page).toBe(1)
-    expect(result.value.pages[0]?.markdown).toContain('Hello Inkdown TOC')
+    expect(result.value.pages[0]?.markdown).toContain('Hello Montree TOC')
   })
 })

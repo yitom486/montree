@@ -1,8 +1,8 @@
 import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import { isOk } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
 import { buildAcpPromptBlocks, type ComposerAttachment } from '@/lib/agent/acp-composer'
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 import {
   accumulateSubsessionUpdate,
   ensureSubsessionSession,
@@ -39,10 +39,10 @@ let tocSessionId: string | null = null
 let tocPromptSeq = 0
 
 const TOC_TOOL_OVERVIEW =
-  'This is an Inkdown TOC task. The ACP client has already discovered the available toc_* MCP tools via MCP tools/list. Prefer toc_replace_all for a complete draft, toc_upsert_entry/toc_delete_entry for small fixes, and toc_list_draft to verify. Full parameters and limits are in the tool descriptions.'
+  'This is an Montree TOC task. The ACP client has already discovered the available toc_* MCP tools via MCP tools/list. Prefer toc_replace_all for a complete draft, toc_upsert_entry/toc_delete_entry for small fixes, and toc_list_draft to verify. Full parameters and limits are in the tool descriptions.'
 
 const TOC_SESSION_BOOTSTRAP =
-  'You are the one-shot Inkdown table-of-contents assistant. Work only on the supplied book TOC task, use the available toc_* tools, and never write the final cache directly; the user confirms the draft in the UI.'
+  'You are the one-shot Montree table-of-contents assistant. Work only on the supplied book TOC task, use the available toc_* tools, and never write the final cache directly; the user confirms the draft in the UI.'
 
 export function isTocPrompting(): boolean {
   return isSubsessionPrompting(TOC_PURPOSE)

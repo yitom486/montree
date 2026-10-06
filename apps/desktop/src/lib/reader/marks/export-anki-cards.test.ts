@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@inkdown/contracts'
+import type { ReadingMark } from '@montree/contracts'
 import {
   buildAnkiCardsExport,
   buildAnkiExportFileName,
@@ -10,7 +10,7 @@ import {
   findCurrentChapterRef,
   tocFromEpubUnits,
   resolveEpubChapter,
-} from '@inkdown/reader-core'
+} from '@montree/reader-core'
 
 function createMark(overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' | 'anchor'>): ReadingMark {
   return {
@@ -149,14 +149,14 @@ describe('export-anki-cards', () => {
         kind: 'basic',
         front: '问题 <重点>',
         back: '答案 & 原文',
-        tags: ['Inkdown'],
+        tags: ['Montree'],
         sourceTitle: '书名',
         chapterName: '第一章',
-        deepLinkUrl: 'inkdown://open?file=a.epub&anchor=1',
+        deepLinkUrl: 'montree://open?file=a.epub&anchor=1',
       })
       expect(html.front).toContain('问题 &lt;重点&gt;')
       expect(html.back).toContain('答案 &amp; 原文')
-      expect(html.back).toContain('inkdown://open?file=a.epub&amp;anchor=1')
+      expect(html.back).toContain('montree://open?file=a.epub&amp;anchor=1')
       expect(html.back).toContain('[📖 原书]')
     })
 
@@ -166,9 +166,9 @@ describe('export-anki-cards', () => {
         kind: 'cloze',
         front: '{{c1::堆 <区>}}',
         back: '',
-        tags: ['Inkdown'],
+        tags: ['Montree'],
         sourceTitle: 'JVM',
-        deepLinkUrl: 'inkdown://open?file=b.epub',
+        deepLinkUrl: 'montree://open?file=b.epub',
       })
       expect(html.front).toBe('{{c1::堆 &lt;区&gt;}}')
       expect(html.back).toContain('[📖 原书]')

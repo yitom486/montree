@@ -1,13 +1,13 @@
 import { app } from 'electron'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 import type {
   AiSessionGetPayload,
   AiSessionPutPayload,
   AiSessionRecord,
   AiSessionTouchPayload,
-} from '@inkdown/contracts'
-import { openInkdownDb } from './app-db/open-app-db'
+} from '@montree/contracts'
+import { openMontreeDb } from './app-db/open-app-db'
 
 /**
  * AI 会话指针 service（一书一会话，P1 制卡工作室用）。
@@ -46,7 +46,7 @@ export async function getAiSession(
   try {
     const fingerprint = payload.bookFingerprint.trim()
     if (!fingerprint) return ok(null)
-    const db = openInkdownDb(app.getPath('userData'))
+    const db = openMontreeDb(app.getPath('userData'))
     const row = db
       .prepare('SELECT * FROM ai_sessions WHERE book_fingerprint = ? AND purpose = ?')
       .get(fingerprint, purposeOf(payload)) as Parameters<typeof toRecord>[0] | undefined
@@ -65,7 +65,7 @@ export async function putAiSession(
       return err({ code: 'INVALID_ARGUMENT', message: '会话指纹与 id 不能为空' })
     }
     const now = Date.now()
-    const db = openInkdownDb(app.getPath('userData'))
+    const db = openMontreeDb(app.getPath('userData'))
     db.prepare(
       `INSERT INTO ai_sessions (
         book_fingerprint, purpose, session_id, prompt_count, last_used_at,
@@ -97,7 +97,7 @@ export async function touchAiSession(
   try {
     const fingerprint = payload.bookFingerprint.trim()
     if (!fingerprint) return ok(undefined)
-    const db = openInkdownDb(app.getPath('userData'))
+    const db = openMontreeDb(app.getPath('userData'))
     db.prepare(
       `UPDATE ai_sessions
        SET prompt_count = prompt_count + 1, last_used_at = ?, updated_at = ?

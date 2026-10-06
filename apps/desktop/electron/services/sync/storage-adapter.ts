@@ -1,5 +1,5 @@
-import type { AppError } from '@inkdown/contracts'
-import type { Result } from '@inkdown/contracts'
+import type { AppError } from '@montree/contracts'
+import type { Result } from '@montree/contracts'
 
 export interface StatResult {
   exists: boolean

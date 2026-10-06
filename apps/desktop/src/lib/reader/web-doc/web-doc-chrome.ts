@@ -1,7 +1,7 @@
-import type { WebDocSiteId } from '@inkdown/contracts'
+import type { WebDocSiteId } from '@montree/contracts'
 import { stripDisallowedWebDocEmbeds } from '@/lib/reader/web-doc/web-doc-embeds'
 import { stripHrttChrome } from '@/lib/reader/web-doc/hrtt-extract'
-import { INKDOWN_SOURCE_HREF_ATTR } from '@/lib/reader/web-doc/web-doc-link'
+import { MONTREE_SOURCE_HREF_ATTR } from '@/lib/reader/web-doc/web-doc-link'
 
 const EDIT_PAGE_LABEL =
   /编辑此页|编辑本页|在\s*github\s*上编辑|edit this page|edit this file|edit on github|improve this page/i
@@ -58,7 +58,7 @@ function hasTailwindDivideYUtility(element: Element): boolean {
 
 /**
  * 原站的 utility CSS 不会随正文进入 srcdoc。这里把 HTML 本身能表达的
- * 分组边界转换成 Inkdown 自己的语义类，避免依赖某个站点的 CSS 文件。
+ * 分组边界转换成 Montree 自己的语义类，避免依赖某个站点的 CSS 文件。
  * 只处理明确的边框语义，不猜测普通布局类，降低跨站误伤。
  */
 function normalizeWebDocDividers(root: HTMLElement): void {
@@ -194,7 +194,7 @@ export function normalizeWebDocCards(root: HTMLElement): void {
     card.removeAttribute('aria-hidden')
     if (card !== link) {
       const href = link.getAttribute('href')?.trim()
-      if (href) card.setAttribute(INKDOWN_SOURCE_HREF_ATTR, href)
+      if (href) card.setAttribute(MONTREE_SOURCE_HREF_ATTR, href)
       link.classList.add('web-doc-card-inner-link')
       link.setAttribute('aria-hidden', 'true')
       link.setAttribute('tabindex', '-1')

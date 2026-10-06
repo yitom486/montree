@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BookDbBlockHit } from '@inkdown/contracts'
+import type { BookDbBlockHit } from '@montree/contracts'
 import { formatRosettaBlocksForAgent } from './rosetta-agent-text'
 
 function hit(partial: Partial<BookDbBlockHit> & { content: string }): BookDbBlockHit {

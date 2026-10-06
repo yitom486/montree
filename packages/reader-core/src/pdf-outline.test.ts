@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadPdfOutlineUnits, loadPdfOutlineInfo } from '@inkdown/reader-core'
+import { loadPdfOutlineUnits, loadPdfOutlineInfo } from '@montree/reader-core'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 function createPdfMock(options: {
@@ -118,7 +118,7 @@ describe('loadPdfOutlineUnits', () => {
 
 describe('formatPdfOutlineNotice', () => {
   it('嵌入目录部分失败时提示', async () => {
-    const { formatPdfOutlineNotice } = await import('@inkdown/reader-core')
+    const { formatPdfOutlineNotice } = await import('@montree/reader-core')
     const notice = formatPdfOutlineNotice(
       {
         units: [],

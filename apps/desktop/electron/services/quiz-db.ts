@@ -3,13 +3,13 @@ import type {
   QuizAnswerSubmission,
   QuizQuestion,
   QuizSessionRecord,
-} from '@inkdown/contracts'
-import { parseQuizJsonl, serializeQuizSession } from '@inkdown/contracts'
-import { openInkdownDb } from './app-db/open-app-db'
+} from '@montree/contracts'
+import { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
+import { openMontreeDb } from './app-db/open-app-db'
 import { resolveFingerprintForFile } from './marks-db'
 
 /**
- * 测验 SQL 后端（[2]-02a）：全局 `inkdown.db` v1 的 quiz_sessions + quiz_questions。
+ * 测验 SQL 后端（[2]-02a）：全局 `montree.db` v1 的 quiz_sessions + quiz_questions。
  * API 语义与 JSONL 版一致（倒序、按文件过滤、坏行容错）；questions 数组拆行后
  * "错题本/按题统计"变普通查询，不再内存拆数组。
  * 同步远端格式不变（仍是 quiz-records.jsonl）：导出→合并（纯函数不变）→导入，
@@ -155,7 +155,7 @@ function insertSessionRow(
 
 /** 追加一场测验（幂等：同 id 重复追加返回 false，不覆写） */
 export function insertQuizSession(userDataDir: string, session: QuizSessionRecord): boolean {
-  const db = openInkdownDb(userDataDir)
+  const db = openMontreeDb(userDataDir)
   return insertSessionRow(db, session, fingerprintForFile(userDataDir, session.filePath))
 }
 
@@ -210,7 +210,7 @@ function loadQuestions(db: DatabaseSync, sessionIds: string[]): QuizQuestionRow[
 
 /** 全量历史（倒序，最新优先；与 JSONL 版排序语义一致） */
 export function listQuizSessions(userDataDir: string): QuizSessionRecord[] {
-  const db = openInkdownDb(userDataDir)
+  const db = openMontreeDb(userDataDir)
   const sessions = db
     .prepare('SELECT * FROM quiz_sessions ORDER BY created_at DESC, rowid DESC')
     .all() as unknown as QuizSessionRow[]
@@ -231,7 +231,7 @@ export function listQuizSessionsByFile(
   userDataDir: string,
   filePath: string,
 ): QuizSessionRecord[] {
-  const db = openInkdownDb(userDataDir)
+  const db = openMontreeDb(userDataDir)
   const fileCond = process.platform === 'win32' ? 'file_path = ? COLLATE NOCASE' : 'file_path = ?'
   const sessions = db
     .prepare(`SELECT * FROM quiz_sessions WHERE ${fileCond} ORDER BY created_at DESC, rowid DESC`)
@@ -260,7 +260,7 @@ export function importQuizJsonl(
   userDataDir: string,
   raw: string,
 ): { sessions: number; questions: number; skipped: number } {
-  const db = openInkdownDb(userDataDir)
+  const db = openMontreeDb(userDataDir)
   let sessions = 0
   let questions = 0
   let skipped = 0

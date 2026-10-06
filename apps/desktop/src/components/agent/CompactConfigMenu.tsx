@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { currentLabel } from '@/lib/agent/acp-config-menu'
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 
 /** 输入栏旁的紧凑配置下拉（primary 配置项专用）。 */
 export function CompactConfigMenu({

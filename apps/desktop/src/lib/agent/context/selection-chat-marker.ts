@@ -1,4 +1,4 @@
-/** 选区工具栏「加入对话」写入输入框的短标记；正文仍走 sticky / inkdown_get_selection */
+/** 选区工具栏「加入对话」写入输入框的短标记；正文仍走 sticky / montree_get_selection */
 export const SELECTION_CHAT_MARKER = '「选区」'
 
 export function appendSelectionChatMarker(draft: string): string {

@@ -22,8 +22,8 @@ import {
   type ComposerAttachment,
 } from '@/lib/agent/acp-composer'
 import { cn } from '@/lib/utils'
-import { isOk } from '@inkdown/contracts'
-import type { AcpContentBlock, AcpPromptCapabilities } from '@inkdown/contracts'
+import { isOk } from '@montree/contracts'
+import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
 import { toast } from 'sonner'
 
 export interface AgentComposerSubmitPayload {

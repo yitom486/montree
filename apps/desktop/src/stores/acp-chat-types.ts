@@ -1,6 +1,6 @@
-import type { AcpToolCallKind, AcpToolCallStatus } from '@inkdown/contracts'
-import type { ChapterMarkPlanEntry } from '@inkdown/annotations'
-import type { MarkProposalStatus, ProposedMark } from '@inkdown/annotations'
+import type { AcpToolCallKind, AcpToolCallStatus } from '@montree/contracts'
+import type { ChapterMarkPlanEntry } from '@montree/annotations'
+import type { MarkProposalStatus, ProposedMark } from '@montree/annotations'
 import type { AcpPlanEntry } from '@/lib/agent/acp-plan'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 
@@ -38,7 +38,7 @@ export interface AcpChatMessage {
   toolLocations?: Array<{ path: string; line?: number }>
   /** plan 卡片 */
   planEntries?: AcpPlanEntry[]
-  /** inkdown_propose_* 工具结果（promote 前） */
+  /** montree_propose_* 工具结果（promote 前） */
   markProposal?: ProposedMark
   markProposalStatus?: MarkProposalStatus
   /** promote 后挂在 Agent 回复下方的内嵌提议 */
@@ -47,7 +47,7 @@ export interface AcpChatMessage {
     status: MarkProposalStatus
     toolCallId?: string
   }>
-  /** inkdown_suggest_chapters 章级建议（promote 前在 tool，promote 后在 agent） */
+  /** montree_suggest_chapters 章级建议（promote 前在 tool，promote 后在 agent） */
   chapterMarkPlan?: ChapterMarkPlanEntry[]
   /** 交互经纬流转分步卡片（带对应章句穿透定位） */
   steps?: Array<{

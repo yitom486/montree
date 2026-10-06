@@ -1,8 +1,8 @@
-import type { ChapterMarkPlanEntry, ChapterMarkPlanToolResult } from '@inkdown/annotations'
-import { toChapterMarkPlanEntry } from '@inkdown/annotations'
+import type { ChapterMarkPlanEntry, ChapterMarkPlanToolResult } from '@montree/annotations'
+import { toChapterMarkPlanEntry } from '@montree/annotations'
 
 const SUGGEST_CHAPTERS_TOOL_PATTERN =
-  /inkdown_suggest_chapters|suggest.?chapters|章级建议|chapter.?plan/i
+  /montree_suggest_chapters|suggest.?chapters|章级建议|chapter.?plan/i
 
 export function isChapterMarkPlanToolTitle(title: string | undefined): boolean {
   if (!title?.trim()) return false

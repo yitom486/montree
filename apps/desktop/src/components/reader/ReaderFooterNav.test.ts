@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flattenEpubToc } from '@inkdown/reader-core'
+import { flattenEpubToc } from '@montree/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { ReaderFooterNav } from './ReaderFooterNav'
 

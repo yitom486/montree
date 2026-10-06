@@ -1,7 +1,7 @@
 import type {
   InspectorBookMarkdown,
   InspectorPdfClassification,
-} from '@inkdown/contracts'
+} from '@montree/contracts'
 import type { NativePagesExtraction, NativePdfClassification } from './native-types'
 import type { InspectorPagesMarkdown } from './models'
 

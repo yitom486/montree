@@ -3,7 +3,7 @@ import {
   buildAcpPromptBlocks,
   canSendComposer,
   fileNameFromPath,
-  INKDOWN_WORKSPACE_PATHS_MIME,
+  MONTREE_WORKSPACE_PATHS_MIME,
   isPathInsideWorkspace,
   mimeFromFileName,
   readWorkspacePathsFromDataTransfer,
@@ -76,7 +76,7 @@ describe('acp-composer', () => {
           id: '1',
           name: 'shot.png',
           base64: 'abc',
-          absolutePath: 'D:/ws/.inkdown/agent-pasted/x.png',
+          absolutePath: 'D:/ws/.montree/agent-pasted/x.png',
         }),
       ],
       promptCapabilities: { image: true },
@@ -86,7 +86,7 @@ describe('acp-composer', () => {
         type: 'image',
         data: 'abc',
         mimeType: 'image/png',
-        uri: 'file:///D:/ws/.inkdown/agent-pasted/x.png',
+        uri: 'file:///D:/ws/.montree/agent-pasted/x.png',
       },
     ])
   })
@@ -99,7 +99,7 @@ describe('acp-composer', () => {
           id: '1',
           name: 'shot.png',
           base64: 'abc',
-          absolutePath: 'D:/ws/.inkdown/agent-pasted/x.png',
+          absolutePath: 'D:/ws/.montree/agent-pasted/x.png',
         }),
       ],
       promptCapabilities: {},
@@ -107,7 +107,7 @@ describe('acp-composer', () => {
     expect(blocks[1]).toMatchObject({
       type: 'resource_link',
       name: 'shot.png',
-      uri: 'file:///D:/ws/.inkdown/agent-pasted/x.png',
+      uri: 'file:///D:/ws/.montree/agent-pasted/x.png',
     })
   })
 
@@ -137,7 +137,7 @@ describe('acp-composer', () => {
       'D:\\ws\\docs\\a.md',
       '',
     ])
-    expect(store.get(INKDOWN_WORKSPACE_PATHS_MIME)).toContain('D:\\\\ws\\\\docs\\\\a.md')
+    expect(store.get(MONTREE_WORKSPACE_PATHS_MIME)).toContain('D:\\\\ws\\\\docs\\\\a.md')
     expect(readWorkspacePathsFromDataTransfer(dt as unknown as DataTransfer)).toEqual([
       'D:\\ws\\docs\\a.md',
     ])

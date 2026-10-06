@@ -6,15 +6,15 @@ import {
   markProposalDevFail,
   markProposalDevLog,
 } from '@/lib/agent/context/mark-proposal-dev-log'
-import { resolveInkdownSnapshot } from '@/lib/agent/context/virtual-fs-resolver'
+import { resolveMontreeSnapshot } from '@/lib/agent/context/virtual-fs-resolver'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 
 /**
- * 挂在 App 根：应答主进程对 Inkdown 内存快照的请求。
- * MCP 工具调用与 Agent `fs/read .inkdown/agent/*` 最终都落在这里。
+ * 挂在 App 根：应答主进程对 Montree 内存快照的请求。
+ * MCP 工具调用与 Agent `fs/read .montree/agent/*` 最终都落在这里。
  */
-export function useInkdownSnapshotHost(): void {
+export function useMontreeSnapshotHost(): void {
   useEffect(() => {
     return acpApi.onSnapshotRequest((event) => {
       void (async () => {
@@ -31,7 +31,7 @@ export function useInkdownSnapshotHost(): void {
           })
         }
         try {
-          const content = await resolveInkdownSnapshot(event.resource, event.args)
+          const content = await resolveMontreeSnapshot(event.resource, event.args)
           if (isMarkProposal) {
             markProposalDevLog('snapshot:ok', {
               resource: event.resource,

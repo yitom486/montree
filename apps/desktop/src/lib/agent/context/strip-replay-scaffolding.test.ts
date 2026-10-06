@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { buildInkdownPromptPrefix } from './build-prompt-prefix'
+import { buildMontreePromptPrefix } from './build-prompt-prefix'
 import {
-  INKDOWN_BOOTSTRAP_CLOSE_TAG,
-  INKDOWN_BOOTSTRAP_OPEN_TAG,
-  INKDOWN_CLIENT_CLOSE_TAG,
-  INKDOWN_CLIENT_OPEN_TAG,
-  INKDOWN_STATIC_SKILL,
-  INKDOWN_TOOL_OVERVIEW,
-} from './inkdown-static-skill'
+  MONTREE_BOOTSTRAP_CLOSE_TAG,
+  MONTREE_BOOTSTRAP_OPEN_TAG,
+  MONTREE_CLIENT_CLOSE_TAG,
+  MONTREE_CLIENT_OPEN_TAG,
+  MONTREE_STATIC_SKILL,
+  MONTREE_TOOL_OVERVIEW,
+} from './montree-static-skill'
 import {
   formatTurnContextBlock,
-  INKDOWN_TURN_CONTEXT_CLOSE_TAG,
-  INKDOWN_TURN_CONTEXT_OPEN_TAG,
+  MONTREE_TURN_CONTEXT_CLOSE_TAG,
+  MONTREE_TURN_CONTEXT_OPEN_TAG,
 } from './turn-context'
 import {
   hasReplayScaffoldingMarkers,
@@ -23,11 +23,11 @@ const TURN_JSON = JSON.stringify({
   activeDocument: { path: '/books/dune.epub', kind: 'epub', name: 'dune.epub' },
   reading: { percent: 42, current: '第七章' },
 })
-const TURN_BLOCK = `${INKDOWN_TURN_CONTEXT_OPEN_TAG}\n${TURN_JSON}\n${INKDOWN_TURN_CONTEXT_CLOSE_TAG}`
+const TURN_BLOCK = `${MONTREE_TURN_CONTEXT_OPEN_TAG}\n${TURN_JSON}\n${MONTREE_TURN_CONTEXT_CLOSE_TAG}`
 const BOOTSTRAP_SKILL =
-  `${INKDOWN_BOOTSTRAP_OPEN_TAG}\n${INKDOWN_STATIC_SKILL}\n${INKDOWN_BOOTSTRAP_CLOSE_TAG}`
+  `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_STATIC_SKILL}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`
 const BOOTSTRAP_OVERVIEW =
-  `${INKDOWN_BOOTSTRAP_OPEN_TAG}\n${INKDOWN_TOOL_OVERVIEW}\n${INKDOWN_BOOTSTRAP_CLOSE_TAG}`
+  `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_TOOL_OVERVIEW}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`
 
 describe('stripReplayScaffolding', () => {
   it('无标记原文逐字不动（同一引用）', () => {
@@ -50,8 +50,8 @@ describe('stripReplayScaffolding', () => {
     // "## Other conventions …" 是静态 Skill 尾部，opening 留在更早的 chunk。
     const tail = [
       'keep diffs small.',
-      INKDOWN_CLIENT_CLOSE_TAG,
-      INKDOWN_BOOTSTRAP_CLOSE_TAG,
+      MONTREE_CLIENT_CLOSE_TAG,
+      MONTREE_BOOTSTRAP_CLOSE_TAG,
       TURN_BLOCK,
       '你好',
     ].join('\n')
@@ -66,8 +66,8 @@ describe('stripReplayScaffolding', () => {
     const cut = Math.floor(TURN_BLOCK.length / 2)
     const chunk1 = `你好\n${TURN_BLOCK.slice(0, cut)}`
     const chunk2 = `${TURN_BLOCK.slice(cut)}\n谢谢`
-    expect(chunk1).toContain(INKDOWN_TURN_CONTEXT_OPEN_TAG)
-    expect(chunk1).not.toContain(INKDOWN_TURN_CONTEXT_CLOSE_TAG)
+    expect(chunk1).toContain(MONTREE_TURN_CONTEXT_OPEN_TAG)
+    expect(chunk1).not.toContain(MONTREE_TURN_CONTEXT_CLOSE_TAG)
 
     const first = stripReplayScaffolding(chunk1)
     expect(first.dangling).toBe(true)
@@ -101,24 +101,24 @@ describe('stripReplayScaffolding', () => {
 
 describe('bootstrap 稳定标记（前后文本一致性：包含关系）', () => {
   it('静态 Skill 自带 client 内层标记', () => {
-    expect(INKDOWN_STATIC_SKILL.startsWith(INKDOWN_CLIENT_OPEN_TAG)).toBe(true)
-    expect(INKDOWN_STATIC_SKILL.trimEnd().endsWith(INKDOWN_CLIENT_CLOSE_TAG)).toBe(true)
+    expect(MONTREE_STATIC_SKILL.startsWith(MONTREE_CLIENT_OPEN_TAG)).toBe(true)
+    expect(MONTREE_STATIC_SKILL.trimEnd().endsWith(MONTREE_CLIENT_CLOSE_TAG)).toBe(true)
   })
 
-  it('buildInkdownPromptPrefix 用 bootstrap 外层包裹且内层语义逐字保留', () => {
-    const blocks = buildInkdownPromptPrefix('test-thread-strip', { includeBootstrap: true })
+  it('buildMontreePromptPrefix 用 bootstrap 外层包裹且内层语义逐字保留', () => {
+    const blocks = buildMontreePromptPrefix('test-thread-strip', { includeBootstrap: true })
     const texts = blocks.map((b) => (b.type === 'text' ? b.text : ''))
-    const skillBlock = texts.find((t) => t.includes(INKDOWN_CLIENT_OPEN_TAG))
+    const skillBlock = texts.find((t) => t.includes(MONTREE_CLIENT_OPEN_TAG))
     expect(skillBlock).toBeDefined()
-    expect(skillBlock!.startsWith(INKDOWN_BOOTSTRAP_OPEN_TAG)).toBe(true)
-    expect(skillBlock!.trimEnd().endsWith(INKDOWN_BOOTSTRAP_CLOSE_TAG)).toBe(true)
+    expect(skillBlock!.startsWith(MONTREE_BOOTSTRAP_OPEN_TAG)).toBe(true)
+    expect(skillBlock!.trimEnd().endsWith(MONTREE_BOOTSTRAP_CLOSE_TAG)).toBe(true)
     // 只加标记不改指令语义：新文本包含旧文本全文
-    expect(skillBlock).toContain(INKDOWN_STATIC_SKILL)
+    expect(skillBlock).toContain(MONTREE_STATIC_SKILL)
 
-    const overviewBlock = texts.find((t) => t.includes(INKDOWN_TOOL_OVERVIEW))
+    const overviewBlock = texts.find((t) => t.includes(MONTREE_TOOL_OVERVIEW))
     expect(overviewBlock).toBeDefined()
-    expect(overviewBlock!.startsWith(INKDOWN_BOOTSTRAP_OPEN_TAG)).toBe(true)
-    expect(overviewBlock!.trimEnd().endsWith(INKDOWN_BOOTSTRAP_CLOSE_TAG)).toBe(true)
+    expect(overviewBlock!.startsWith(MONTREE_BOOTSTRAP_OPEN_TAG)).toBe(true)
+    expect(overviewBlock!.trimEnd().endsWith(MONTREE_BOOTSTRAP_CLOSE_TAG)).toBe(true)
   })
 
   it('发送前缀整体可被清洗：prefix + turn + 原文 → 只剩原文', () => {

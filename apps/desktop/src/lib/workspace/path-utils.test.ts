@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basename, dirname, joinPath } from '@inkdown/contracts'
+import { basename, dirname, joinPath } from '@montree/contracts'
 
 describe('path-utils', () => {
   it('dirname 支持 Windows 与 POSIX 路径', () => {

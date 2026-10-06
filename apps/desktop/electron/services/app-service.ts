@@ -1,6 +1,6 @@
 import { app } from 'electron'
-import { toAppError, type AppError } from '@inkdown/contracts'
-import { err, ok, type Result } from '@inkdown/contracts'
+import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@montree/contracts'
 
 export function getAppVersion(): Result<string, AppError> {
   try {

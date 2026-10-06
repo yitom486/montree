@@ -39,8 +39,8 @@ function writeAuth(dir: string, content: string): string {
 
 describe('probeOpencodeAuth（Windows 路径修正）', () => {
   it('LOCALAPPDATA 命中判已登录，不再读 %APPDATA%', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-local-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-profile-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-local-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-profile-'))
     try {
       writeAuth(local, JSON.stringify({ type: 'api', key: 'sk-test' }))
       const result = probeOpencodeAuth({
@@ -64,8 +64,8 @@ describe('probeOpencodeAuth（Windows 路径修正）', () => {
   })
 
   it('USERPROFILE 回落：LOCALAPPDATA 无文件时用 %USERPROFILE%\\.local\\share', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-local-empty-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-profile-hit-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-local-empty-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-profile-hit-'))
     try {
       mkdirSync(join(profile, '.local', 'share', 'opencode'), { recursive: true })
       writeFileSync(
@@ -87,9 +87,9 @@ describe('probeOpencodeAuth（Windows 路径修正）', () => {
   })
 
   it('XDG_DATA_HOME 优先于 LOCALAPPDATA', () => {
-    const xdg = mkdtempSync(join(tmpdir(), 'inkdown-opencode-xdg-'))
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-local2-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-profile2-'))
+    const xdg = mkdtempSync(join(tmpdir(), 'montree-opencode-xdg-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-local2-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-profile2-'))
     try {
       writeAuth(xdg, JSON.stringify({ a: 1 }))
       const candidates = resolveOpencodeAuthCandidates({
@@ -110,8 +110,8 @@ describe('probeOpencodeAuth（Windows 路径修正）', () => {
   })
 
   it('空白文件判未登录（损坏先例）：存在但去空白后为空', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-blank-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-blank-p-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-blank-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-blank-p-'))
     try {
       writeAuth(local, '   \n\t  \n')
       const result = probeOpencodeAuth({
@@ -127,8 +127,8 @@ describe('probeOpencodeAuth（Windows 路径修正）', () => {
   })
 
   it('非法 JSON / 空对象判未登录', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-bad-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-bad-p-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-bad-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-bad-p-'))
     try {
       writeAuth(local, '{not-json')
       expect(
@@ -151,8 +151,8 @@ describe('probeOpencodeAuth（Windows 路径修正）', () => {
   })
 
   it('缺失判未登录', () => {
-    const local = mkdtempSync(join(tmpdir(), 'inkdown-opencode-miss-l-'))
-    const profile = mkdtempSync(join(tmpdir(), 'inkdown-opencode-miss-p-'))
+    const local = mkdtempSync(join(tmpdir(), 'montree-opencode-miss-l-'))
+    const profile = mkdtempSync(join(tmpdir(), 'montree-opencode-miss-p-'))
     try {
       const result = probeOpencodeAuth({
         platform: 'win32',

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
   app: {
-    getPath: (name: string) => (name === 'userData' ? 'C:\\tmp\\inkdown-userData' : name),
+    getPath: (name: string) => (name === 'userData' ? 'C:\\tmp\\montree-userData' : name),
   },
 }))
 

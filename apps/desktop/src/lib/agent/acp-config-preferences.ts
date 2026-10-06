@@ -1,4 +1,4 @@
-import type { AcpConfigOption } from '@inkdown/contracts'
+import type { AcpConfigOption } from '@montree/contracts'
 
 /** runtimeId → configId → 偏好值（string / boolean 序列化为 string 存储时可还原） */
 export type AcpPreferredConfigMap = Record<string, Record<string, string>>
