@@ -2,9 +2,12 @@ import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { handleInkdownMcpRpc as handleMontreeMcpRpc, type McpRpcMessage } from "@yitom/acp-client"
 import type {
-  InkdownMcpToolContext as MontreeMcpToolContext,
-  InkdownMcpToolDefinition as MontreeMcpToolDefinition,
+  InkdownMcpToolContext,
+  InkdownMcpToolDefinition,
 } from "@yitom/acp-client"
+
+export type MontreeMcpToolContext = InkdownMcpToolContext
+export type MontreeMcpToolDefinition = InkdownMcpToolDefinition
 import { callInkdownMcpTool as callMontreeMcpTool, INKDOWN_MCP_TOOLS as MONTREE_MCP_TOOLS } from "@yitom/acp-client"
 import {
   callInkdownTocTool as callMontreeTocTool,
@@ -57,6 +60,38 @@ function listen(server: Server): Promise<number> {
 }
 
 /**
+ * 将底层 @yitom/acp-client 的 inkdown_* 工具转译为标准的 montree_* 工具暴露给 Agent。
+ */
+export function adaptMontreeTools(
+  tools: readonly MontreeMcpToolDefinition[],
+): MontreeMcpToolDefinition[] {
+  return tools.map((tool) => {
+    if (tool.name.startsWith('inkdown_')) {
+      return {
+        ...tool,
+        name: tool.name.replace(/^inkdown_/, 'montree_'),
+        description: tool.description.replaceAll('inkdown_', 'montree_'),
+      }
+    }
+    return tool
+  })
+}
+
+/**
+ * 工具调用适配器：兼容 Agent 调用 montree_xxx 或历史 inkdown_xxx，统一映射到底层 SDK。
+ */
+export async function callAdaptedMontreeTool(
+  name: string,
+  context: MontreeMcpToolContext,
+  args?: Record<string, unknown>,
+) {
+  const sdkName = name.startsWith('montree_')
+    ? name.replace(/^montree_/, 'inkdown_')
+    : name
+  return await callMontreeMcpTool(sdkName, context, args)
+}
+
+/**
  * 进程内 MCP server（Streamable HTTP 的最小子集）。
  * 单例：一个 App 一个端点，工具调用最终落到渲染进程内存快照。
  */
@@ -64,7 +99,8 @@ export async function startMontreeMcpServer(
   context: MontreeMcpToolContext,
 ): Promise<MontreeMcpServerHandle> {
   if (handle) return handle
-  handle = await serveMcpServer(context, MONTREE_MCP_TOOLS, callMontreeMcpTool, 'montree')
+  const tools = adaptMontreeTools(MONTREE_MCP_TOOLS)
+  handle = await serveMcpServer(context, tools, callAdaptedMontreeTool, 'montree')
   return handle
 }
 
