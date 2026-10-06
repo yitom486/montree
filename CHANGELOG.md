@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- ### 全局品牌升级与重命名
+  - **产品正式更名为 Montree（山木）**：源自庄子《山木》哲思“Mont 山 + Tree 木”，应用名称、窗口标题、桌面图标、深链接协议（`montree://`）全面更新。
+  - **Monorepo 包架构迁移**：内部 6 个私有 workspace 包由 `@inkdown/*` 全量迁移为 `@montree/*`（`contracts`、`reader-core`、`pdf`、`ocr-core`、`annotations`、`web-doc`）。
+  - **MCP 工具转译与兼容**：MCP 服务端自动将底层工具映射为 `montree_*`（`montree_read`、`montree_get_selection` 等），与 Agent 提示词 1:1 对齐，并兼容历史调用。
+  - **用户数据库平滑迁移**：启动时自动将本地已有的 `inkdown.db` 无缝升级为 `montree.db`，划线与读书笔记平滑过渡。
+  - **阅读器 CSP 优化**：内容安全策略放行 `blob:` 协议的样式与字体，修复部分电子书内嵌字体与排版告警。
+
 ---
 
 ## [0.4.3] - 2026-09-23
