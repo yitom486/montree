@@ -15,8 +15,9 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 | 会话 | `session-open.ts` 留守；会话能力与选项解析已迁 `@yitom/acp-client` | `session/new`、能力、Mode/Model（resume→load→new + 瞬时错误重试 1 次，`session/new` 失败另有无 MCP（`mcpServers: []`）裸调重试 1 次（仍失败抛原错），超时 120s 由 `sdk-client.ts` 显式透传；`session/new`（及 load/resume）返回顶层 `models` 方言（数组 string / `{id\|value/name}` 对象 / `{availableModels, currentModelId}` 对象）且无 model 类 configOption 时合成一项 `model` 选项；initialize 的 `clientCapabilities` 另带 `session: { configOptions: { boolean: {} } }` 以解锁按 boolean 门控下发选项的 Agent） |
 | 回调 | `client-handlers.ts` 留守（含 `registerAcpClientHandlers`，SDK `onRequest`/`onNotification` 原生签名） | Agent → 客户端：权限（无桥接直接 cancelled，禁静默 allow）、fs、终端等；错误抛 `RequestError` |
 | IO | `acp-fs.ts` / `acp-terminal.ts` 留守；终端输出缓冲已迁 `@yitom/acp-client` | 虚拟/真实读文件、终端（虚拟文件定义见 `@montree/contracts`：`packages/contracts/src/agent/montree-virtual-fs.ts`，快照类型同目录 `packages/contracts/src/agent/montree-snapshot.ts`） |
-| MCP | `mcp/montree-mcp-server.ts` 留守（HTTP 挂载）；工具表与 RPC 已迁 `@yitom/acp-client` | 进程内 HTTP MCP（`montree_*` 工具）；随连接起停 |
+| MCP | `mcp/montree-mcp-server.ts` 留守（HTTP 挂载）；工具表与 RPC 已迁 `@yitom/acp-client` | 进程内 HTTP MCP（`montree_*` 工具）；随连接起停；默认固定冷门端口 39281/39291，支持自愈降级与跨重启鉴权稳定 |
 | 专篇 | `parameterized-model-picker.md` | cursor 参数化模型选择：两态、握手标记、Invalid params 根因与渲染三层设计 |
+| 专篇 | `mcp-endpoint-architecture.md` | MCP 本地端点架构：冷门固定端口（39281/39291）、端口冲突弹性顺延与跨重启鉴权稳定性设计 |
 
 `mcp/` 仅留传输挂载，不必再单独维护一份长 README；工具列表以 `@yitom/acp-client` 与 Skill 为准；目录副会话专用表见 `@yitom/acp-client`（`toc_*`，独立端点，仅 `toolScope: 'toc'` 的会话挂载）。
 

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { handleInkdownMcpRpc as handleMontreeMcpRpc, type McpRpcMessage } from "@yitom/acp-client"
@@ -16,6 +19,16 @@ import {
 
 const MCP_ENDPOINT_PATH = '/mcp'
 const MAX_BODY_BYTES = 256 * 1024
+
+/**
+ * MCP Server 默认使用的冷门本地端口：
+ * - 位于 1024-49151 注册端口段，避免与系统动态出站临时端口（49152-65535）碰撞。
+ * - 远离 3000、5173、8080 等前端/常见开发端口。
+ * - 主服务与 TOC 目录副服务分别使用独立的端口基数。
+ */
+export const DEFAULT_MONTREE_MCP_PORT = 39281
+export const DEFAULT_MONTREE_TOC_MCP_PORT = 39291
+const MAX_PORT_ATTEMPTS = 5
 
 export interface MontreeMcpServerHandle {
   url: string
@@ -47,15 +60,85 @@ function readBody(
   })
 }
 
-function listen(server: Server): Promise<number> {
+/**
+ * 获取或持久化稳定的本地 MCP 令牌。
+ * 存储于操作系统当前用户的临时目录下，文件仅当前用户有权限。
+ * 避免开发热重载或主进程短暂重启后，已有长会话因 token 改变而收到 401 报错。
+ */
+export function getOrCreateAuthToken(label: string): string {
+  try {
+    const tokenFile = join(tmpdir(), `montree-mcp-${label}-token.txt`)
+    if (existsSync(tokenFile)) {
+      const saved = readFileSync(tokenFile, 'utf-8').trim()
+      if (saved.length === 48 && /^[0-9a-f]+$/i.test(saved)) {
+        return saved
+      }
+    }
+    const token = randomBytes(24).toString('hex')
+    writeFileSync(tokenFile, token, { encoding: 'utf-8', mode: 0o600 })
+    return token
+  } catch {
+    return randomBytes(24).toString('hex')
+  }
+}
+
+/**
+ * 监听本地端口：
+ * 1. 优先绑定指定的冷门固定端口（或环境变量指定的端口）。
+ * 2. 若遇 EADDRINUSE，递增尝试若干备选端口（支持开发多实例或短暂占用）。
+ * 3. 若多次尝试均被占用，优雅降级为 0（由操作系统分配空闲端口），确保服务始终可用。
+ */
+export function listenWithFallback(server: Server, preferredPort?: number): Promise<number> {
   return new Promise((resolve, reject) => {
-    server.once('error', reject)
-    // 仅绑回环地址：不暴露到局域网
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      if (address && typeof address === 'object') resolve(address.port)
-      else reject(new Error('MCP server 未获得端口'))
-    })
+    if (!preferredPort) {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address()
+        if (address && typeof address === 'object') resolve(address.port)
+        else reject(new Error('MCP server 未获得端口'))
+      })
+      return
+    }
+
+    let currentPort = preferredPort
+    let attempts = 0
+
+    const tryListen = () => {
+      const onError = (err: NodeJS.ErrnoException) => {
+        server.removeListener('listening', onListening)
+        if (err.code === 'EADDRINUSE' && attempts < MAX_PORT_ATTEMPTS) {
+          attempts++
+          currentPort++
+          console.warn(`[acp-mcp] 端口 ${currentPort - 1} 被占用，尝试备选端口 ${currentPort}`)
+          tryListen()
+          return
+        }
+        if (err.code === 'EADDRINUSE') {
+          console.warn(`[acp-mcp] 冷门固定端口段均被占用，回退至系统动态端口 0`)
+          server.once('error', reject)
+          server.listen(0, '127.0.0.1', () => {
+            const address = server.address()
+            if (address && typeof address === 'object') resolve(address.port)
+            else reject(new Error('MCP server 未获得端口'))
+          })
+          return
+        }
+        reject(err)
+      }
+
+      const onListening = () => {
+        server.removeListener('error', onError)
+        const address = server.address()
+        if (address && typeof address === 'object') resolve(address.port)
+        else reject(new Error('MCP server 未获得端口'))
+      }
+
+      server.once('error', onError)
+      server.once('listening', onListening)
+      server.listen(currentPort, '127.0.0.1')
+    }
+
+    tryListen()
   })
 }
 
@@ -100,7 +183,9 @@ export async function startMontreeMcpServer(
 ): Promise<MontreeMcpServerHandle> {
   if (handle) return handle
   const tools = adaptMontreeTools(MONTREE_MCP_TOOLS)
-  handle = await serveMcpServer(context, tools, callAdaptedMontreeTool, 'montree')
+  const envPort = process.env.MONTREE_MCP_PORT ? Number(process.env.MONTREE_MCP_PORT) : undefined
+  const preferredPort = Number.isInteger(envPort) && (envPort ?? 0) > 0 ? envPort : DEFAULT_MONTREE_MCP_PORT
+  handle = await serveMcpServer(context, tools, callAdaptedMontreeTool, 'montree', preferredPort)
   return handle
 }
 
@@ -112,7 +197,9 @@ export async function startTocMcpServer(
   context: MontreeMcpToolContext,
 ): Promise<MontreeMcpServerHandle> {
   if (tocHandle) return tocHandle
-  tocHandle = await serveMcpServer(context, MONTREE_TOC_MCP_TOOLS, callMontreeTocTool, 'montree-toc')
+  const envPort = process.env.MONTREE_TOC_MCP_PORT ? Number(process.env.MONTREE_TOC_MCP_PORT) : undefined
+  const preferredPort = Number.isInteger(envPort) && (envPort ?? 0) > 0 ? envPort : DEFAULT_MONTREE_TOC_MCP_PORT
+  tocHandle = await serveMcpServer(context, MONTREE_TOC_MCP_TOOLS, callMontreeTocTool, 'montree-toc', preferredPort)
   return tocHandle
 }
 
@@ -121,8 +208,9 @@ async function serveMcpServer(
   tools: readonly MontreeMcpToolDefinition[],
   call: typeof callMontreeMcpTool,
   label: string,
+  preferredPort?: number,
 ): Promise<MontreeMcpServerHandle> {
-  const authToken = randomBytes(24).toString('hex')
+  const authToken = getOrCreateAuthToken(label)
 
   const server = createServer((request, response) => {
     void (async () => {
@@ -176,7 +264,7 @@ async function serveMcpServer(
     })()
   })
 
-  const port = await listen(server)
+  const port = await listenWithFallback(server, preferredPort)
   console.info('[acp-mcp] server 已启动', { server: label, port })
 
   return {
