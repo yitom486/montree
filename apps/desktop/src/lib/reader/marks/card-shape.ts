@@ -23,6 +23,8 @@ export function highlightColorForCategory(category: ReadingMarkCategory): Highli
       return 'yellow'
     case 'question':
       return 'orange'
+    case 'note':
+      return 'purple'
     case 'concept':
     default:
       return 'blue'

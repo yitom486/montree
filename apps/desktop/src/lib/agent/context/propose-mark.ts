@@ -29,6 +29,8 @@ export interface ProposeMarkOptions {
   excerpt?: string
   flatIndex?: number
   kind?: MarkProposalKind
+  category?: import('@montree/contracts').ReadingMarkCategory
+  title?: string
   filePath?: string
   fileFingerprint?: string
   locationHint?: string
@@ -52,6 +54,8 @@ export interface AdoptProposedMarkInput {
   excerpt?: string
   flatIndex?: number
   kind?: MarkProposalKind
+  category?: import('@montree/contracts').ReadingMarkCategory
+  title?: string
 }
 
 function resolveNote(payload: MarkProposalPayload | MarkProposalItem, fallback = ''): string {
@@ -78,6 +82,8 @@ export async function proposeMarkForAgent(
     excerpt,
     note: trimmed,
     kind: options.kind,
+    category: options.category,
+    title: options.title,
     locationHint: options.locationHint,
     flatIndex: options.flatIndex,
     source: options.source ?? 'agent',
@@ -118,6 +124,8 @@ function toToolResult(result: ProposeMarkResult): MarkProposalToolResult {
     note: result.note,
     excerpt: result.excerpt,
     message: result.message,
+    category: result.mark.category,
+    title: result.mark.title,
     locationHint: result.locationHint,
     kind: result.kind,
   }
@@ -155,6 +163,8 @@ export async function proposeMarkAtForAgent(
     locationHint: target.locationHint,
     flatIndex: target.flatIndex,
     kind: payload.kind,
+    category: payload.category,
+    title: payload.title,
   })
 }
 
@@ -177,6 +187,8 @@ export async function proposeMarksBatchForAgent(
         note: resolveNote(item),
         flatIndex: item.flatIndex ?? payload.flatIndex,
         kind: item.kind,
+        category: item.category ?? payload.category,
+        title: item.title ?? payload.title,
       },
       { ...options, silent: true },
     )
@@ -275,6 +287,8 @@ export async function adoptProposedMark(
         excerpt,
         note,
         flatIndex: payload.flatIndex,
+        category: payload.category,
+        title: payload.title,
       })
     } else {
       markProposalDevLog('adopt:path', { path: 'resolveMarkTarget' })
@@ -282,6 +296,8 @@ export async function adoptProposedMark(
         excerpt: '',
         note,
         flatIndex: payload.flatIndex,
+        category: payload.category,
+        title: payload.title,
       })
       if (!resolved.ok) {
         throw new Error(resolved.reason)
@@ -294,6 +310,8 @@ export async function adoptProposedMark(
           excerpt: target.excerpt,
           note: target.note,
           flatIndex: target.flatIndex,
+          category: payload.category,
+          title: payload.title,
         })
       }
     }

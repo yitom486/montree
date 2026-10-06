@@ -149,14 +149,59 @@ export function adaptMontreeTools(
   tools: readonly MontreeMcpToolDefinition[],
 ): MontreeMcpToolDefinition[] {
   return tools.map((tool) => {
+    let toolDef = tool
     if (tool.name.startsWith('inkdown_')) {
-      return {
+      toolDef = {
         ...tool,
         name: tool.name.replace(/^inkdown_/, 'montree_'),
         description: tool.description.replaceAll('inkdown_', 'montree_'),
       }
     }
-    return tool
+    if (toolDef.name === 'montree_propose_mark') {
+      const origProperties = (toolDef.inputSchema?.properties as Record<string, unknown>) ?? {}
+      const origMarks = (origProperties.marks as Record<string, unknown>) ?? {}
+      const origItems = (origMarks.items as Record<string, unknown>) ?? {}
+      const origItemProperties = (origItems.properties as Record<string, unknown>) ?? {}
+
+      const categorySchema = {
+        type: 'string',
+        enum: ['note', 'concept', 'quote', 'method', 'question', 'diagram'],
+        description: '卡片分类：note=批注心得；concept=关键概念；quote=金句引用；method=方法操作；question=疑问探讨；diagram=关系图谱',
+      }
+      const titleSchema = {
+        type: 'string',
+        description: '卡片标题（简明概括，生成结构化知识卡片时推荐提供）',
+      }
+
+      toolDef = {
+        ...toolDef,
+        description:
+          '唯一标记与知识卡片提议工具（高亮 / 批注 / 结构化卡片，不入库；用户「采用」后才写入）。' +
+          '单条：excerpt（原句）+ 可选 note（批注正文）+ 可选 category（卡片分类：note/concept/quote/method/question/diagram）+ 可选 title（卡片标题）。' +
+          '批量：marks 数组（每项支持 excerpt, note, category, title 等，单批≤10）。' +
+          '仅在用户明确要求保存高亮/批注或制作知识卡片时调用。',
+        inputSchema: {
+          ...toolDef.inputSchema,
+          properties: {
+            ...origProperties,
+            category: categorySchema,
+            title: titleSchema,
+            marks: {
+              ...origMarks,
+              items: {
+                ...origItems,
+                properties: {
+                  ...origItemProperties,
+                  category: categorySchema,
+                  title: titleSchema,
+                },
+              },
+            },
+          },
+        },
+      }
+    }
+    return toolDef
   })
 }
 
@@ -171,6 +216,35 @@ export async function callAdaptedMontreeTool(
   const sdkName = name.startsWith('montree_')
     ? name.replace(/^montree_/, 'inkdown_')
     : name
+
+  if (sdkName === 'inkdown_propose_mark') {
+    const marks = args?.marks
+    const excerpt = args?.excerpt
+    const note = typeof args?.note === 'string' ? args.note : ''
+    const noteOnly = typeof args?.note === 'string' && args.note.trim()
+    if ((!Array.isArray(marks) || marks.length === 0) && (typeof excerpt !== 'string' || !excerpt.trim()) && !noteOnly) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'montree_propose_mark 需要 excerpt、marks 之一，或有选区时仅传 note',
+          },
+        ],
+        isError: true,
+      }
+    }
+    const text = await context.readSnapshot('propose-mark', {
+      ...(typeof excerpt === 'string' ? { excerpt } : {}),
+      note,
+      kind: args?.kind === 'highlight' || args?.kind === 'note' || args?.kind === 'auto' ? args.kind : undefined,
+      ...(typeof args?.flatIndex === 'number' && Number.isFinite(args.flatIndex) ? { flatIndex: args.flatIndex } : {}),
+      ...(typeof args?.category === 'string' ? { category: args.category } : {}),
+      ...(typeof args?.title === 'string' ? { title: args.title } : {}),
+      ...(Array.isArray(marks) ? { marks } : {}),
+    } as any)
+    return { content: [{ type: 'text' as const, text }] }
+  }
+
   return await callMontreeMcpTool(sdkName, context, args)
 }
 

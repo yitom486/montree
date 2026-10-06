@@ -192,7 +192,7 @@ export interface WebReadingAnchor {
 
 export type ReadingAnchor = PdfReadingAnchor | EpubReadingAnchor | MobiReadingAnchor | WebReadingAnchor
 
-export type ReadingMarkCategory = 'concept' | 'quote' | 'method' | 'diagram' | 'question'
+export type ReadingMarkCategory = 'concept' | 'quote' | 'method' | 'diagram' | 'question' | 'note'
 
 export interface ReadingMark {
   id: string

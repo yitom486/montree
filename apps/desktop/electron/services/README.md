@@ -27,7 +27,7 @@
 | 文件 | 功能 |
 |------|------|
 | `reading-marks-service.ts` | 书签 / 高亮 / 批注 adapter（`userData`；默认走各书 `book.db` v5 `marks` 表，`MONTREE_MARKS_BACKEND=file` 回滚旧 JSON；纯核见 `@montree/annotations`：`marks-core`；提议模型同包：`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议） |
-| `marks-db.ts` | 卡片 SQL 后端（各书库 `marks` 行映射/CRUD、`chapter_key` 索引查询、trigram FTS + 短词 LIKE 兜底、导出/导入/存量迁移，`resolveFingerprintForFile` 供 quiz 回填复用；记忆卡回填与读写入口亦收敛于此，行操作见 `flashcards-db`） |
+| `marks-db.ts` | 卡片 SQL 后端（各书库 `marks` 行映射/CRUD、`chapter_key` 索引查询、trigram FTS + 短词 LIKE 兜底、导出/导入/存量迁移，`resolveFingerprintForFile` 具备同路径精准指纹择优与副库数据自动合并；记忆卡回填与读写入口亦收敛于此，行操作见 `flashcards-db`；集成测试见 `mark-proposal-db.integration.test.ts`） |
 | `flashcards-db.ts` | 记忆卡片行操作（本书库 `flashcards` 派生 upsert/标脏 + `review_log` 落盘/待复习查询；快照口径与 Anki 导出一致；userDataDir 感知入口在 `marks-db`，本模块无循环依赖；线上传输类型归 `@montree/contracts` 的 `types/flashcard`） |
 | `quiz-service.ts` | AI 测验与答题打分记录 adapter（`userData`；默认走全局 `montree.db` v1，`MONTREE_QUIZ_BACKEND=file` 回滚旧 JSONL；`parse`/`serialize` 已下沉 `@montree/contracts`，本模块兼容再导出；`readQuizJsonlForSync`/`writeQuizJsonlForSync` 供同步传输层） |
 | `quiz-db.ts` | 测验 SQL 后端（全局库 sessions/questions 行映射·组装、幂等追加/灌库、导出/导入 JSONL，`correct_count` 按 60 分及格线派生） |

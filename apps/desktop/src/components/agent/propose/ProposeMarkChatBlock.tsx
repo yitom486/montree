@@ -194,6 +194,8 @@ export function ProposeMarkBlockList({
               excerpt: row.proposal.excerpt,
               flatIndex: row.proposal.flatIndex,
               kind: row.proposal.kind,
+              category: row.proposal.category,
+              title: row.proposal.title,
             })
           }
           onResolved?.(row.proposal.id, 'adopted')

@@ -1604,7 +1604,12 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
   }, [createMark, fileFingerprint, filePath, marksToc, nav.current?.label, numPages, pageNum])
 
   const handleSaveAnnotation = useCallback(
-    async (note: string, color = DEFAULT_HIGHLIGHT_COLOR) => {
+    async (
+      note: string,
+      color = DEFAULT_HIGHLIGHT_COLOR,
+      overrideCategory?: import('@montree/contracts').ReadingMarkCategory,
+      overrideTitle?: string,
+    ) => {
       const snapshot = selectionTransactionRef.current
       if (!snapshot) {
         throw new Error('当前没有可用选区，请先划选文本')
@@ -1631,8 +1636,8 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
                 kind: existing.kind === 'highlight' ? ('highlight' as const) : ('note' as const),
               }
             : {}),
-          ...(meta.category ? { category: meta.category } : {}),
-          ...(meta.title ? { title: meta.title } : {}),
+          ...((overrideCategory ?? meta.category) ? { category: overrideCategory ?? meta.category } : {}),
+          ...((overrideTitle ?? meta.title) ? { title: overrideTitle ?? meta.title } : {}),
           ...(meta.aiSummary ? { aiSummary: meta.aiSummary } : {}),
           ...(meta.keyPoints ? { keyPoints: meta.keyPoints } : {}),
           ...(meta.diagramId ? { diagramId: meta.diagramId } : {}),
@@ -1666,8 +1671,8 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         ) ?? undefined,
         excerpt: snapshot.text,
         note: meta.note,
-        category: meta.category,
-        title: meta.title,
+        category: overrideCategory ?? meta.category,
+        title: overrideTitle ?? meta.title,
         aiSummary: meta.aiSummary,
         keyPoints: meta.keyPoints,
         diagramId: meta.diagramId,
@@ -1708,7 +1713,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
   })
 
   const handleCreateMarkAt = useCallback(
-    async ({ excerpt, note, flatIndex }: CreateMarkAtParams) => {
+    async ({ excerpt, note, flatIndex, category, title }: CreateMarkAtParams) => {
       if (typeof flatIndex === 'number' && flatIndex >= 0) {
         const navState = useReaderNavigationStore.getState().nav
         if (flatIndex !== navState.flatIndex) {
@@ -1747,7 +1752,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
       }
 
       captureSelectionSnapshot(snapshot)
-      return handleSaveAnnotation(note)
+      return handleSaveAnnotation(note, DEFAULT_HIGHLIGHT_COLOR, category, title)
     },
     [captureSelectionSnapshot, goToFlatIndex, handleSaveAnnotation, jumpToPage, numPages],
   )

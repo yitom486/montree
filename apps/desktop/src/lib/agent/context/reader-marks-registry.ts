@@ -2,6 +2,8 @@ export interface CreateMarkAtParams {
   excerpt: string
   note: string
   flatIndex?: number
+  category?: import('@montree/contracts').ReadingMarkCategory
+  title?: string
 }
 
 export interface ReaderMarksProvider {

@@ -1,4 +1,6 @@
-/** AI 提议的阅读标记（批注 / 高亮），须用户确认后才写入 marks 文件。 */
+import type { ReadingMarkCategory } from '@montree/contracts'
+
+/** AI 提议的阅读标记（批注 / 高亮 / 知识卡片），须用户确认后才写入 marks 文件。 */
 
 export type ProposedMarkKind = 'highlight' | 'note'
 
@@ -12,6 +14,8 @@ export type MarkProposalKind = 'highlight' | 'note' | 'auto'
 export interface ProposedMark {
   id: string
   kind: ProposedMarkKind
+  category?: ReadingMarkCategory
+  title?: string
   excerpt: string
   note: string
   locationHint?: string
@@ -23,6 +27,8 @@ export interface ProposedMark {
 export interface MarkProposalItem {
   excerpt: string
   note?: string
+  category?: ReadingMarkCategory
+  title?: string
   flatIndex?: number
   kind?: MarkProposalKind
 }
@@ -31,6 +37,8 @@ export interface MarkProposalItem {
 export interface MarkProposalPayload {
   excerpt?: string
   note?: string
+  category?: ReadingMarkCategory
+  title?: string
   flatIndex?: number
   kind?: MarkProposalKind
   marks?: MarkProposalItem[]
@@ -43,6 +51,8 @@ export interface MarkProposalToolResult {
   note: string
   excerpt: string
   message: string
+  category?: ReadingMarkCategory
+  title?: string
   locationHint?: string
   kind?: ProposedMarkKind
 }
@@ -74,12 +84,16 @@ export function toProposedMark(
     flatIndex?: number
     source?: ProposedMarkSource
     kind?: MarkProposalKind
+    category?: ReadingMarkCategory
+    title?: string
   },
 ): ProposedMark {
   const note = payload.note ?? ''
   return {
     id: payload.id ?? `mark-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     kind: resolveMarkProposalKind(note, payload.kind),
+    category: payload.category,
+    title: payload.title,
     excerpt: payload.excerpt ?? '',
     note,
     locationHint: payload.locationHint,

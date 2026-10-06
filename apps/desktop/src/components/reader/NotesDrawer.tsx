@@ -119,7 +119,7 @@ function NotesDrawerBody({
   const resolveCategory = (m: ReadingMark): ReadingMarkCategory => {
     if (m.category) return m.category
     if (m.diagramId) return 'diagram'
-    if (m.kind === 'note') return 'concept'
+    if (m.kind === 'note') return 'note'
     return 'quote'
   }
 
@@ -248,6 +248,7 @@ ${m.aiSummary ? `- **AI 洞见**: ${m.aiSummary}` : ''}
             {(
               [
                 { id: 'all', label: '全部' },
+                { id: 'note', label: '批注' },
                 { id: 'concept', label: '概念' },
                 { id: 'quote', label: '引用' },
                 { id: 'method', label: '方法' },

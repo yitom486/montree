@@ -260,53 +260,125 @@ function closeQuietly(db: DatabaseSync | null): void {
 
 /**
  * filePath → fingerprint：先查各库 books.source_path（索引入库的书），
- * 再退化查 marks.file_path（有卡但未索引的书）。书架量级下全量开库可接受。
+ * 再退化查 marks.file_path（有卡但未索引的书）。
+ * 若同一书籍因指纹格式演进（如裸路径升级为 路径|大小）分散在多个库，
+ * 优先选定精准主库，并自动将旧库卡片合并至主库，杜绝双库幽灵隔离。
  */
 export function resolveFingerprintForFile(
   userDataDir: string,
   filePath: string,
 ): string | null {
   const wanted = normalizeFilePath(filePath)
-  let fallback: string | null = null
+  const candidates: Array<{
+    dirName: string
+    fingerprint: string
+    isDirectBook: boolean
+    markCount: number
+    latestUpdatedAt: number
+  }> = []
+
   for (const dirName of listBookDbFiles(userDataDir)) {
     const db = openDbProbe(userDataDir, dirName)
     if (!db) continue
     try {
-      let direct: string | null = null
+      let directFingerprint: string | null = null
       try {
         const rows = db
           .prepare('SELECT fingerprint, source_path FROM books')
           .all() as Array<{ fingerprint: string; source_path: string }>
-        direct = rows.find((row) => normalizeFilePath(row.source_path) === wanted)?.fingerprint ?? null
+        directFingerprint = rows.find((row) => normalizeFilePath(row.source_path) === wanted)?.fingerprint ?? null
       } catch {
-        // 无 books 表的老库：走 marks 兜底
+        // 无 books 表的老库
       }
-      if (!direct) {
-        try {
-          const rows = db
-            .prepare(
-              'SELECT DISTINCT file_fingerprint, file_path FROM marks WHERE deleted_at IS NULL',
-            )
-            .all() as Array<{ file_fingerprint: string; file_path: string }>
-          const hit = rows.find((row) => normalizeFilePath(row.file_path) === wanted)
-          if (hit) {
-            // books 命中优先于 marks 兜底：后者可能是搬家前的旧路径
-            if (direct) continue
-            fallback = fallback ?? hit.file_fingerprint
-            continue
-          }
-        } catch {
-          // 无 marks 表（v5 前）：忽略
+
+      let marksFingerprint: string | null = null
+      let markCount = 0
+      let latestUpdatedAt = 0
+      try {
+        const rows = db
+          .prepare(
+            'SELECT file_fingerprint, file_path, updated_at FROM marks WHERE deleted_at IS NULL',
+          )
+          .all() as Array<{ file_fingerprint: string; file_path: string; updated_at: number }>
+        const matching = rows.filter((row) => normalizeFilePath(row.file_path) === wanted)
+        if (matching.length > 0) {
+          markCount = matching.length
+          marksFingerprint = matching[0]!.file_fingerprint
+          latestUpdatedAt = Math.max(...matching.map((m) => m.updated_at ?? 0))
         }
+      } catch {
+        // 无 marks 表
       }
-      if (direct) return direct
+
+      const hitFp = directFingerprint ?? marksFingerprint
+      if (hitFp) {
+        candidates.push({
+          dirName,
+          fingerprint: hitFp,
+          isDirectBook: Boolean(directFingerprint),
+          markCount,
+          latestUpdatedAt,
+        })
+      }
     } catch {
-      // 单库损坏不阻断整书架
+      // 单库异常不阻断
     } finally {
       closeQuietly(db)
     }
   }
-  return fallback
+
+  if (candidates.length === 0) return null
+  if (candidates.length === 1) return candidates[0]!.fingerprint
+
+  // 多个候选库（历史指纹演化）：优选主指纹
+  // 优先级：1. 带 | 大小后缀的精准指纹 2. 属于 books 索引表直接登记 3. 卡片数多 4. 最近更新
+  candidates.sort((a, b) => {
+    const aHasPipe = a.fingerprint.includes('|') ? 1 : 0
+    const bHasPipe = b.fingerprint.includes('|') ? 1 : 0
+    if (aHasPipe !== bHasPipe) return bHasPipe - aHasPipe
+
+    const aDirect = a.isDirectBook ? 1 : 0
+    const bDirect = b.isDirectBook ? 1 : 0
+    if (aDirect !== bDirect) return bDirect - aDirect
+
+    if (a.markCount !== b.markCount) return b.markCount - a.markCount
+    return b.latestUpdatedAt - a.latestUpdatedAt
+  })
+
+  const primary = candidates[0]!
+
+  // 将其它副库中属于该书的卡片自动迁移汇聚到主库，确保全部历史与新卡合体
+  try {
+    const primaryDb = openBookDb(userDataDir, primary.fingerprint)
+    for (let i = 1; i < candidates.length; i++) {
+      const secondary = candidates[i]!
+      if (secondary.markCount === 0) continue
+      const secDb = openDbProbe(userDataDir, secondary.dirName)
+      if (!secDb) continue
+      try {
+        const secRows = secDb
+          .prepare('SELECT * FROM marks WHERE deleted_at IS NULL')
+          .all() as unknown as MarksRow[]
+        for (const row of secRows) {
+          if (normalizeFilePath(row.file_path) !== wanted) continue
+          if (!getMarkRow(primaryDb, row.id)) {
+            const mark = rowToReadingMark(row)
+            insertMarkRow(primaryDb, {
+              ...mark,
+              fileFingerprint: primary.fingerprint,
+            })
+            syncFlashcardForMark(userDataDir, primary.fingerprint, primaryDb, mark)
+          }
+        }
+      } finally {
+        closeQuietly(secDb)
+      }
+    }
+  } catch {
+    // 合并不阻断主流程
+  }
+
+  return primary.fingerprint
 }
 
 /** mark id → 所在库（更新/删除路径用；低频，全量扫描可接受） */

@@ -5,7 +5,14 @@ import {
   PanelRightClose,
   FoldVertical,
   UnfoldVertical,
+  ChevronDown,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
 import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { KnowledgeCardItem } from './KnowledgeCardItem'
@@ -85,11 +92,94 @@ export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
     return marks.filter((m) => chapterKeyOf(m) === currentChapterKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marks, scope, canScopeByChapter, currentChapterKey])
+  const notes = scopeMarks.filter((m) => resolveCategory(m) === 'note')
   const concepts = scopeMarks.filter((m) => resolveCategory(m) === 'concept')
   const quotes = scopeMarks.filter((m) => resolveCategory(m) === 'quote')
   const methods = scopeMarks.filter((m) => resolveCategory(m) === 'method')
   const diagrams = scopeMarks.filter((m) => resolveCategory(m) === 'diagram')
   const questions = scopeMarks.filter((m) => resolveCategory(m) === 'question')
+
+  const categoryPills = useMemo(
+    () => [
+      {
+        id: 'note' as const,
+        label: '批注',
+        count: notes.length,
+        bgVar: 'hsl(var(--primary) / 0.15)',
+        textVar: 'hsl(var(--primary))',
+        borderVar: 'hsl(var(--primary) / 0.4)',
+      },
+      {
+        id: 'diagram' as const,
+        label: '图谱',
+        count: diagrams.length,
+        bgVar: 'var(--card-diagram-bg)',
+        textVar: 'var(--card-diagram-text)',
+        borderVar: 'var(--card-diagram-text)',
+      },
+      {
+        id: 'concept' as const,
+        label: '概念',
+        count: concepts.length,
+        bgVar: 'var(--card-concept-bg)',
+        textVar: 'var(--card-concept-text)',
+        borderVar: 'var(--card-concept-text)',
+      },
+      {
+        id: 'quote' as const,
+        label: '引用',
+        count: quotes.length,
+        bgVar: 'var(--card-quote-bg)',
+        textVar: 'var(--card-quote-text)',
+        borderVar: 'var(--card-quote-text)',
+      },
+      {
+        id: 'method' as const,
+        label: '方法',
+        count: methods.length,
+        bgVar: 'var(--card-method-bg)',
+        textVar: 'var(--card-method-text)',
+        borderVar: 'var(--card-method-text)',
+      },
+      {
+        id: 'question' as const,
+        label: '思考',
+        count: questions.length,
+        bgVar: 'var(--card-question-bg)',
+        textVar: 'var(--card-question-text)',
+        borderVar: 'var(--card-question-text)',
+      },
+    ],
+    [notes.length, diagrams.length, concepts.length, quotes.length, methods.length, questions.length],
+  )
+
+  // 智能药丸收纳（方案三：高频前置 + 更多下拉收纳）：
+  // 1. 前排常驻「全部」+ 最多 3 个高频分类药丸，确保在 296px 宽度内绝不溢出；
+  // 2. 当前被激活的 Tab 优先排在前排，其余分类按卡片数量降序排序；
+  // 3. 超出 3 个的分类自动收纳进「更多 (N) ▾」下拉菜单中，选择即置换高亮。
+  const MAX_VISIBLE_PILLS = 3
+
+  const { visiblePills, overflowPills } = useMemo(() => {
+    const hasAny = categoryPills.some((p) => p.count > 0)
+    const candidates = hasAny
+      ? categoryPills.filter((p) => p.count > 0 || p.id === activeTab)
+      : categoryPills
+
+    const sorted = [...candidates].sort((a, b) => {
+      if (a.id === activeTab) return -1
+      if (b.id === activeTab) return 1
+      return b.count - a.count
+    })
+
+    if (sorted.length <= MAX_VISIBLE_PILLS) {
+      return { visiblePills: sorted, overflowPills: [] }
+    }
+
+    return {
+      visiblePills: sorted.slice(0, MAX_VISIBLE_PILLS),
+      overflowPills: sorted.slice(MAX_VISIBLE_PILLS),
+    }
+  }, [categoryPills, activeTab])
 
   const filteredMarks = marks.filter((m) => {
     if (scope === 'chapter' && canScopeByChapter) {
@@ -268,89 +358,58 @@ export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
           >
             全部 ({scopeMarks.length})
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('concept')}
-            className={`px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
-              activeTab === 'concept'
-                ? 'font-semibold border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{
-              backgroundColor: activeTab === 'concept' ? 'var(--card-concept-bg)' : undefined,
-              color: activeTab === 'concept' ? 'var(--card-concept-text)' : undefined,
-              borderColor: activeTab === 'concept' ? 'var(--card-concept-text)' : undefined,
-            }}
-          >
-            概念 ({concepts.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('quote')}
-            className={`px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
-              activeTab === 'quote'
-                ? 'font-semibold border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{
-              backgroundColor: activeTab === 'quote' ? 'var(--card-quote-bg)' : undefined,
-              color: activeTab === 'quote' ? 'var(--card-quote-text)' : undefined,
-              borderColor: activeTab === 'quote' ? 'var(--card-quote-text)' : undefined,
-            }}
-          >
-            引用 ({quotes.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('method')}
-            className={`px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
-              activeTab === 'method'
-                ? 'font-semibold border'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{
-              backgroundColor: activeTab === 'method' ? 'var(--card-method-bg)' : undefined,
-              color: activeTab === 'method' ? 'var(--card-method-text)' : undefined,
-              borderColor: activeTab === 'method' ? 'var(--card-method-text)' : undefined,
-            }}
-          >
-            方法 ({methods.length})
-          </button>
-          {diagrams.length > 0 && (
+          {visiblePills.map((pill) => (
             <button
+              key={pill.id}
               type="button"
-              onClick={() => setActiveTab('diagram')}
+              onClick={() => setActiveTab(pill.id)}
               className={`px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
-                activeTab === 'diagram'
+                activeTab === pill.id
                   ? 'font-semibold border'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               style={{
-                backgroundColor: activeTab === 'diagram' ? 'var(--card-diagram-bg)' : undefined,
-                color: activeTab === 'diagram' ? 'var(--card-diagram-text)' : undefined,
-                borderColor: activeTab === 'diagram' ? 'var(--card-diagram-text)' : undefined,
+                backgroundColor: activeTab === pill.id ? pill.bgVar : undefined,
+                color: activeTab === pill.id ? pill.textVar : undefined,
+                borderColor: activeTab === pill.id ? pill.borderVar : undefined,
               }}
             >
-              图谱 ({diagrams.length})
+              {pill.label} ({pill.count})
             </button>
-          )}
-          {questions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('question')}
-              className={`px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
-                activeTab === 'question'
-                  ? 'font-semibold border'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'question' ? 'var(--card-question-bg)' : undefined,
-                color: activeTab === 'question' ? 'var(--card-question-text)' : undefined,
-                borderColor: activeTab === 'question' ? 'var(--card-question-text)' : undefined,
-              }}
-            >
-              思考 ({questions.length})
-            </button>
+          ))}
+          {overflowPills.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted text-[11px] border border-transparent hover:border-border"
+                  title="查看更多卡片分类"
+                >
+                  <span>更多 ({overflowPills.length})</span>
+                  <ChevronDown className="w-3 h-3 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36 text-xs p-1">
+                {overflowPills.map((pill) => (
+                  <DropdownMenuItem
+                    key={pill.id}
+                    onClick={() => setActiveTab(pill.id)}
+                    className="flex items-center justify-between cursor-pointer py-1.5 px-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="size-2 rounded-full shrink-0"
+                        style={{ backgroundColor: pill.textVar }}
+                      />
+                      <span>{pill.label}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {pill.count}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

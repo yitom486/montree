@@ -809,6 +809,7 @@ export const FloatingAIHud = memo(function FloatingAIHud({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {(
                     [
+                      ['note', '批注'],
                       ['concept', '概念'],
                       ['quote', '引用'],
                       ['method', '方法'],

@@ -416,7 +416,12 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
   }, [createMark, data?.content.title, documentId, fileFingerprint, nav.current?.label, normalizedPageUrl])
 
   const handleSaveAnnotation = useCallback(
-    async (note: string, color = DEFAULT_HIGHLIGHT_COLOR) => {
+    async (
+      note: string,
+      color = DEFAULT_HIGHLIGHT_COLOR,
+      overrideCategory?: import('@montree/contracts').ReadingMarkCategory,
+      overrideTitle?: string,
+    ) => {
       const snapshot = selectionSnapshotRef.current
       if (!snapshot) {
         throw new Error('当前没有可用选区，请先划选文本')
@@ -443,8 +448,8 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
                 kind: existing.kind === 'highlight' ? ('highlight' as const) : ('note' as const),
               }
             : {}),
-          ...(meta.category ? { category: meta.category } : {}),
-          ...(meta.title ? { title: meta.title } : {}),
+          ...((overrideCategory ?? meta.category) ? { category: overrideCategory ?? meta.category } : {}),
+          ...((overrideTitle ?? meta.title) ? { title: overrideTitle ?? meta.title } : {}),
           ...(meta.aiSummary ? { aiSummary: meta.aiSummary } : {}),
           ...(meta.keyPoints ? { keyPoints: meta.keyPoints } : {}),
           ...(meta.diagramId ? { diagramId: meta.diagramId } : {}),
@@ -475,8 +480,8 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         ) ?? undefined,
         excerpt: snapshot.text,
         note: meta.note,
-        category: meta.category,
-        title: meta.title,
+        category: overrideCategory ?? meta.category,
+        title: overrideTitle ?? meta.title,
         aiSummary: meta.aiSummary,
         keyPoints: meta.keyPoints,
         diagramId: meta.diagramId,
@@ -512,7 +517,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
   })
 
   const handleCreateMarkAt = useCallback(
-    async ({ excerpt, note, flatIndex }: CreateMarkAtParams) => {
+    async ({ excerpt, note, flatIndex, category, title }: CreateMarkAtParams) => {
       const navState = useReaderNavigationStore.getState().nav
       if (typeof flatIndex === 'number' && flatIndex >= 0 && flatIndex !== navState.flatIndex) {
         const unit = unitsRef.current[flatIndex]
@@ -550,7 +555,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
 
       selectionSnapshotRef.current = snapshot
       setSelectionSnapshot(snapshot)
-      return handleSaveAnnotation(note)
+      return handleSaveAnnotation(note, DEFAULT_HIGHLIGHT_COLOR, category, title)
     },
     [handleSaveAnnotation, navigateToUrl],
   )

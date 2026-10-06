@@ -17,10 +17,17 @@ function parseSingleToolResult(row: Record<string, unknown>): MarkProposalToolRe
   if (row.proposed !== true) return null
   const note = typeof row.note === 'string' ? row.note : ''
   const excerpt = typeof row.excerpt === 'string' ? row.excerpt : ''
+  const category =
+    typeof row.category === 'string'
+      ? (row.category as import('@montree/contracts').ReadingMarkCategory)
+      : undefined
+  const title = typeof row.title === 'string' ? row.title : undefined
   return {
     proposed: true,
     note,
     excerpt,
+    category,
+    title,
     message: typeof row.message === 'string' ? row.message : '',
     locationHint: typeof row.locationHint === 'string' ? row.locationHint : undefined,
     kind: note.trim() ? 'note' : 'highlight',
@@ -74,6 +81,8 @@ export function parseMarkProposalsFromTool(
         id: toolCallId ? `tool:${toolCallId}:${index}` : undefined,
         excerpt: item.excerpt,
         note: item.note,
+        category: item.category,
+        title: item.title,
         locationHint: item.locationHint,
         kind: item.kind,
         source: 'agent',
@@ -88,6 +97,8 @@ export function parseMarkProposalsFromTool(
         id: toolCallId ? `tool:${toolCallId}` : undefined,
         excerpt: parsed.excerpt,
         note: parsed.note,
+        category: parsed.category,
+        title: parsed.title,
         locationHint: parsed.locationHint,
         kind: parsed.kind,
         source: 'agent',

@@ -62,6 +62,8 @@ export function ProposeMarkCard({
           note: trimmed,
           excerpt: proposal.excerpt,
           flatIndex: proposal.flatIndex,
+          category: proposal.category,
+          title: proposal.title,
         })
       }
       onResolved?.('adopted')

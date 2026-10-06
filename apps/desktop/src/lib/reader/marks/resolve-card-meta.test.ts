@@ -36,7 +36,7 @@ describe('resolveCardMeta', () => {
     expect(resolved.displayNote).toBeUndefined() // Raw JSON 必须被消除，绝不直接显示！
   })
 
-  it('keeps normal human note intact if note is plain text', () => {
+  it('keeps normal human note intact if note is plain text and classifies it as note category', () => {
     const mark: ReadingMark = {
       ...baseMark,
       note: '这是一条读者手写的纯文本思考。',
@@ -45,7 +45,22 @@ describe('resolveCardMeta', () => {
     const resolved = resolveCardMeta(mark)
 
     expect(resolved.displayNote).toBe('这是一条读者手写的纯文本思考。')
-    expect(resolved.category).toBe('concept')
+    expect(resolved.category).toBe('note')
+  })
+
+  it('respects mark.category and mark.title when explicitly provided', () => {
+    const mark: ReadingMark = {
+      ...baseMark,
+      category: 'quote',
+      title: '警句卡片',
+      note: '思考内容',
+    }
+
+    const resolved = resolveCardMeta(mark)
+
+    expect(resolved.category).toBe('quote')
+    expect(resolved.title).toBe('警句卡片')
+    expect(resolved.displayNote).toBe('思考内容')
   })
 })
 

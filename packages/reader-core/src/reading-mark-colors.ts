@@ -34,6 +34,13 @@ export const HIGHLIGHT_COLORS = [
     light: 'rgba(251, 146, 60, 0.34)',
     dark: 'rgba(253, 186, 116, 0.24)',
   },
+  {
+    id: 'purple',
+    label: '紫',
+    swatch: '#c084fc',
+    light: 'rgba(192, 132, 252, 0.32)',
+    dark: 'rgba(216, 180, 254, 0.24)',
+  },
 ] as const
 
 export type HighlightColorId = (typeof HIGHLIGHT_COLORS)[number]['id']

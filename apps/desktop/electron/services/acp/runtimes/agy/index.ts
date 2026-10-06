@@ -24,11 +24,12 @@ export interface AgyPathOverrides {
   existsSync?: (path: string) => boolean
 }
 
-function agyLocalAppData(env: NodeJS.ProcessEnv): string {
+function agyLocalAppData(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): string {
+  const pathLib = platform === 'win32' ? win32 : posix
   const local = env.LOCALAPPDATA?.trim()
   if (local) return local
   const profile = env.USERPROFILE?.trim()
-  return profile ? join(profile, 'AppData', 'Local') : ''
+  return profile ? pathLib.join(profile, 'AppData', 'Local') : ''
 }
 
 function isAgyOnPath(
@@ -37,6 +38,7 @@ function isAgyOnPath(
   platform: NodeJS.Platform,
   existsFn: (p: string) => boolean = existsSync,
 ): boolean {
+  const pathLib = platform === 'win32' ? win32 : posix
   const pathValue = env.PATH ?? env.Path ?? ''
   if (!pathValue.trim()) return false
   const sep = platform === 'win32' ? ';' : delimiter
@@ -44,7 +46,7 @@ function isAgyOnPath(
     const trimmed = dir.trim().replace(/^"|"$/g, '')
     if (!trimmed) continue
     try {
-      if (existsFn(join(trimmed, command))) return true
+      if (existsFn(pathLib.join(trimmed, command))) return true
     } catch {
       // 容错继续下一条
     }
@@ -83,7 +85,7 @@ export function resolveAgyCliBin(overrides?: AgyPathOverrides): string | null {
   const pathLib = platform === 'win32' ? win32 : posix
   const candidates: string[] = []
   if (platform === 'win32') {
-    const localAppData = agyLocalAppData(env)
+    const localAppData = agyLocalAppData(env, platform)
     if (localAppData) {
       candidates.push(pathLib.join(localAppData, 'agy', 'bin', 'agy.exe'))
     }
@@ -114,13 +116,14 @@ export function resolveAgyRuntimeEnv(overrides?: AgyPathOverrides): Record<strin
   const bin = resolveAgyCliBin(overrides)
   if (!bin) return {}
   const platform = overrides?.platform ?? process.platform
+  const pathLib = platform === 'win32' ? win32 : posix
   const env = overrides?.env ?? process.env
   const sep = platform === 'win32' ? ';' : delimiter
   const existingPath = env.PATH ?? env.Path ?? ''
 
   // 如果解析到的是完整路径且不是 PATH 中的纯命令名，补全 AGY_BIN 并注入 PATH
   if (bin.includes('/') || bin.includes('\\')) {
-    const binDir = dirname(bin)
+    const binDir = pathLib.dirname(bin)
     const newPath = existingPath.includes(binDir) ? existingPath : `${binDir}${sep}${existingPath}`
     // 同步更新主进程自身环境变量
     if (!overrides) {

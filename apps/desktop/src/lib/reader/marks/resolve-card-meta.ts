@@ -50,10 +50,12 @@ export function parseNoteToCardMeta(rawNote?: string): ParsedNoteCardMeta {
  * 支持平铺字段与 note 内嵌结构化 JSON 的平滑反序列化，确保杜绝原始 JSON 字符串暴露在 UI 上。
  */
 export function resolveCardMeta(mark: ReadingMark): ResolvedCardMeta {
+  const nestedCardMeta = (mark as unknown as { cardMeta?: { category?: ReadingMarkCategory; title?: string } }).cardMeta
   let category: ReadingMarkCategory =
     mark.category ||
-    (mark.diagramId ? 'diagram' : mark.kind === 'note' ? 'concept' : 'quote')
-  let title: string | undefined = mark.title || mark.label
+    nestedCardMeta?.category ||
+    (mark.diagramId ? 'diagram' : mark.kind === 'note' ? 'note' : 'quote')
+  let title: string | undefined = mark.title || mark.label || nestedCardMeta?.title
   let aiSummary: string | undefined = mark.aiSummary
   let keyPoints: string[] | undefined = mark.keyPoints
   let diagramId: string | undefined = mark.diagramId

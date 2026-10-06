@@ -79,6 +79,11 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
           style: { backgroundColor: 'var(--card-question-bg)', color: 'var(--card-question-text)' },
           label: '思考',
         }
+      case 'note':
+        return {
+          style: { backgroundColor: 'hsl(var(--primary) / 0.12)', color: 'hsl(var(--primary))' },
+          label: '批注',
+        }
       default:
         return {
           style: { backgroundColor: 'var(--muted)', color: 'var(--foreground)' },

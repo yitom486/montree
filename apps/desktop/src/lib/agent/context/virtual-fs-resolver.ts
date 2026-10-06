@@ -1,6 +1,7 @@
 import type {
   MontreeSnapshotArgs,
   MontreeSnapshotResource,
+  ReadingMarkCategory,
 } from '@montree/contracts'
 import type { MarkProposalItem, MarkProposalKind, MarkProposalPayload } from '@montree/annotations'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
@@ -42,6 +43,12 @@ function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload 
             item.kind === 'highlight' || item.kind === 'note' || item.kind === 'auto'
               ? (item.kind as MarkProposalKind)
               : undefined
+          const category =
+            typeof item.category === 'string' &&
+            ['note', 'concept', 'quote', 'method', 'question', 'diagram'].includes(item.category)
+              ? (item.category as ReadingMarkCategory)
+              : undefined
+          const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim() : undefined
           return {
             excerpt,
             note: typeof item.note === 'string' ? item.note : undefined,
@@ -50,6 +57,8 @@ function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload 
                 ? item.flatIndex
                 : undefined,
             kind,
+            category,
+            title,
           }
         })
         .filter((row): row is MarkProposalItem => row !== null)
@@ -60,11 +69,21 @@ function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload 
       ? args.kind
       : undefined
 
+  const rawArgs = args as Record<string, unknown> | undefined
+  const category =
+    typeof rawArgs?.category === 'string' &&
+    ['note', 'concept', 'quote', 'method', 'question', 'diagram'].includes(rawArgs.category)
+      ? (rawArgs.category as ReadingMarkCategory)
+      : undefined
+  const title = typeof rawArgs?.title === 'string' && rawArgs.title.trim() ? rawArgs.title.trim() : undefined
+
   return {
     excerpt: args?.excerpt,
     note: args?.note,
     flatIndex: args?.flatIndex,
     kind,
+    category,
+    title,
     marks: marks?.length ? marks : undefined,
   }
 }
