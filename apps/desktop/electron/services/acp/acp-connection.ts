@@ -53,7 +53,7 @@ import {
 /**
  * 多运行时模板解析（防御性）：
  * 约定接口 `findBuiltinAcpRuntime(id) -> { command, args }` 为唯一真相源。
- * 优先走 `@inkdown/acp` 注册表（其内部同样委托该函数），若其滞后则直读 contracts 回落。
+ * 优先走 `@yitom/acp-client` 注册表（其内部同样委托该函数），若其滞后则直读 contracts 回落。
  * 下游 contracts 展开 8 模板前，未知 id 在此直接判错，不触达 spawn。
  */
 // TODO(下游 contracts 未就绪): 8 运行时模板

@@ -145,7 +145,7 @@ export const IPC = {
   AI_SESSIONS_TOUCH: 'ai-sessions:touch',
 
   /* ================================================================
-   * ACP Agent（acp:*）：协议见 @inkdown/acp，默认运行时 codex-acp
+   * ACP Agent（acp:*）：协议见 @yitom/acp-client，默认运行时 codex-acp
    * ================================================================ */
   /** invoke：列出可用 ACP Agent 运行时（如 codex-acp） */
   ACP_LIST_RUNTIMES: 'acp:list-runtimes',

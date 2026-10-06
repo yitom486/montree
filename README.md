@@ -231,13 +231,14 @@ inkdown/
 | `@inkdown/reader-core` | 阅读纯逻辑：导航 / TOC / 选区 / 标记几何 / 主题排版与阅读模型 |
 | `@inkdown/pdf` | PDF 原生结果归一与拼装（页码归一 / 分类映射 / 整档拼装，`normalize` / `models` / `ports`） |
 | `@inkdown/ocr-core` | OCR 纯逻辑：目录抽取与重组 / 水印清洗 / 页词与质量判断，另含 `pdf-bytes` 与缓存 `ports`、外部运行时版本 pin（`inspector-pins`） |
-| `@inkdown/acp` | ACP 协议纯逻辑：stdio JSON-RPC 传输 / 认证决策链 / 会话能力与 registry / 终端缓冲 / MCP RPC 与工具表（子进程与会话编排留守主进程） |
 | `@inkdown/annotations` | 标注纯逻辑：标记合并 / 纯核 / Anki 构建 / Flashcard 模型与复习，另含标记提议模型（`mark-proposal` 单条·批量、`chapter-mark-plan` 章级建议） |
 | `@inkdown/web-doc` | 在线文档纯逻辑：目录抽取（`extract-toc-links` / `extract-llms-toc`）与站点谓词（`hrtt` / `people-daily`） |
 
+> 注：ACP 协议客户端纯逻辑已完全独立为外部包 `@yitom/acp-client`（stdio JSON-RPC 传输 / 认证决策链 / 会话能力与 registry / 终端缓冲 / MCP RPC 与工具表），不再作为内部 workspace 包维护。
+
 ### shared/ 已删声明
 
-`shared/` **已清空**（仅剩无文件的空目录，阶段 10 删除）：全部契约与纯逻辑已分别迁入 `@inkdown/contracts` / `@inkdown/reader-core` / `@inkdown/pdf` / `@inkdown/ocr-core` / `@inkdown/acp` / `@inkdown/annotations` / `@inkdown/web-doc`。新代码一律走 `@inkdown/*`，**禁止引用 `@shared`**。各目录 README 中的“原 `shared/…`”仅为迁移溯源备注。
+`shared/` **已清空**（仅剩无文件的空目录，阶段 10 删除）：全部契约与纯逻辑已分别迁入 `@inkdown/contracts` / `@inkdown/reader-core` / `@inkdown/pdf` / `@inkdown/ocr-core` / `@inkdown/annotations` / `@inkdown/web-doc`（ACP 已独立为外部包 `@yitom/acp-client`）。新代码一律走 `@inkdown/*`，**禁止引用 `@shared`**。各目录 README 中的“原 `shared/…`”仅为迁移溯源备注。
 
 ### 路径别名
 

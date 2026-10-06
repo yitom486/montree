@@ -1,6 +1,6 @@
 /**
  * ACP 运行时适配器矩阵（门面）。
- * 核心适配器实现与解析已下沉到 `@inkdown/acp`，此处提供完全重导出与兼容别名。
+ * 核心适配器实现与解析已下沉到 `@yitom/acp-client`，此处提供完全重导出与兼容别名。
  */
 export {
   type GenericRuntimeAdapter,

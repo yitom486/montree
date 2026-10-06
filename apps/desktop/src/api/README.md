@@ -8,7 +8,7 @@
 |------|------|
 | `file-api.ts` | 打开/保存/读写文件、工作区、导出、粘贴图等 |
 | `app-api.ts` | 应用级：窗口/标题/关闭确认、更新、外部文件与链接、日志、E2E 门控、工作区监听等 |
-| `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@inkdown/contracts`，传输/认证/MCP 纯逻辑见 `@inkdown/acp`，主进程留守见 `apps/desktop/electron/services/acp/`） |
+| `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@inkdown/contracts`，传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`，主进程留守见 `apps/desktop/electron/services/acp/`） |
 | `reading-marks-api.ts` | 书签 / 高亮 / 批注 CRUD + 本书全文搜 + 按章查询 |
 | `flashcards-api.ts` | 记忆卡片：待复习列表、复习评分落盘 |
 | `ai-session-api.ts` | AI 会话指针（一书一会话）：行存取，轮转决策在调用方 |

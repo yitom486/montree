@@ -18,7 +18,6 @@
   "scripts": {
     "dev": "electron-vite dev --config apps/desktop/electron.vite.config.ts",
     "build": "electron-vite build --config apps/desktop/electron.vite.config.ts",
-    "build:acp": "bun build ./packages/acp/src/index.ts --outdir ./packages/acp/dist --format esm --target node --external @agentclientprotocol/sdk && bun build ./packages/acp/src/index.ts --outfile ./packages/acp/dist/index.cjs --format cjs --target node --external @agentclientprotocol/sdk && bunx tsc -p packages/acp/tsconfig.json",
     "preview": "electron-vite preview --config apps/desktop/electron.vite.config.ts",
     "pack": "bun run build && electron-builder --config apps/desktop/electron-builder.yml --publish never",
     "pack:win": "bun run build && electron-builder --config apps/desktop/electron-builder.yml --win --publish never",

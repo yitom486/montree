@@ -11,7 +11,7 @@
 | `workspace/` | 工作区壳：打开/保存文件、文件树、侧栏折叠、全局错误 |
 | `quiz/` | AI 测验历史读取（TanStack Query） |
 | `sync/` | 云同步配置/状态（配置种子 + 状态推送写回） |
-| `agent/` | ACP Agent 会话（协议/传输/认证/MCP 纯逻辑见 `@inkdown/acp`） |
+| `agent/` | ACP Agent 会话（协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`） |
 
 ---
 

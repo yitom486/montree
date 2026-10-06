@@ -10,7 +10,6 @@ export default defineConfig({
       '@inkdown/reader-core': resolve('packages/reader-core/src/index'),
       '@inkdown/pdf': resolve('packages/pdf/src/index'),
       '@inkdown/ocr-core': resolve('packages/ocr-core/src/index'),
-      '@inkdown/acp': resolve('packages/acp/src/index'),
       '@inkdown/annotations': resolve('packages/annotations/src/index'),
       '@inkdown/web-doc': resolve('packages/web-doc/src/index'),
     },
