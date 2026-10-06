@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.4] - 2026-10-06
+
 - ### 全局品牌升级与重命名
   - **产品正式更名为 Montree（山木）**：源自庄子《山木》哲思“Mont 山 + Tree 木”，应用名称、窗口标题、桌面图标、深链接协议（`montree://`）全面更新。
   - **Monorepo 包架构迁移**：内部 6 个私有 workspace 包由 `@inkdown/*` 全量迁移为 `@montree/*`（`contracts`、`reader-core`、`pdf`、`ocr-core`、`annotations`、`web-doc`）。
@@ -332,7 +336,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.3...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/yitom486/montree/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/yitom486/montree/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/yitom486/montree/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/yitom486/montree/compare/v0.4.0...v0.4.1
