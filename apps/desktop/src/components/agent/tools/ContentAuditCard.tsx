@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import type { ContentAuditHit } from '@montree/contracts'
 
 export interface ContentAuditPayload {
@@ -93,9 +94,7 @@ export function ContentAuditCard({
     if (onHighlightAnchor) {
       onHighlightAnchor(hit.text)
     } else {
-      window.dispatchEvent(
-        new CustomEvent('montree:anchor-highlight', { detail: hit.text }),
-      )
+      emitAnchorHighlight(hit.text)
     }
   }
 

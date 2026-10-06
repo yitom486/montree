@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bookmark, ChevronLeft } from 'lucide-react'
 import { ReadingMarkPanel } from '@/components/reader/ReadingMarkPanel'
 import { ReaderUnitOutline } from '@/components/reader/ReaderUnitOutline'
 import { MarginaliaBar } from '@/components/reader/MarginaliaBar'
@@ -28,6 +27,7 @@ import type { ReadingMark } from '@montree/contracts'
 import { isOk, toChapterKey } from '@montree/contracts'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { narrowChapterScopeMarks } from '@/lib/reader/marks/chapter-scope'
+import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 import type { DiagramVisualStep } from '@/components/agent/tools/DiagramViewerCard'
 import { toast } from 'sonner'
 
@@ -379,7 +379,17 @@ export function ReaderContentShell({
             if (m) onDeleteMark(m)
           }}
           onOpenDiagram={(diagramId) => {
-            const m = marks.find((item) => item.diagramId === diagramId)
+            const m = marks.find(
+              (item) => item.diagramId === diagramId || item.id === diagramId,
+            )
+            if (m) {
+              const parsed = parseDiagramFromMark(m)
+              if (parsed) {
+                setSelectedDiagram(parsed)
+                return
+              }
+            }
+
             const fallbackSteps: DiagramVisualStep[] =
               m?.keyPoints && m.keyPoints.length > 0
                 ? m.keyPoints.map((kp, idx) => ({
@@ -407,9 +417,7 @@ export function ReaderContentShell({
               diagramId,
               diagramType: 'sequence',
               title: m?.title ?? '时序流转交互图谱',
-              mermaidCode: m?.note?.includes('mermaid')
-                ? m.note.replace(/```mermaid\n?|\n?```/g, '').trim()
-                : 'sequenceDiagram\n  autonumber\n  Reader->>AI: 提出概念追问\n  AI-->>Reader: 返回分步交互图解',
+              mermaidCode: 'sequenceDiagram\n  autonumber\n  Reader->>AI: 提出概念追问\n  AI-->>Reader: 返回分步交互图解',
               summary: m?.aiSummary ?? m?.excerpt,
               visualSteps: fallbackSteps,
             })
@@ -421,22 +429,6 @@ export function ReaderContentShell({
           className="h-full"
         />
       ) : null}
-
-      {/* 知识卡轨折叠收起时，右边沿悬浮微晶书签浮纽 */}
-      {!zenMode && !isCardRailOpen && marks.length > 0 && (
-        <button
-          type="button"
-          onClick={() => preserveScrollAnchor(() => setIsCardRailOpen(true))}
-          className={`fixed top-20 z-40 px-3 py-1.5 rounded-full bg-background/90 backdrop-blur-md border border-border shadow-lg hover:border-primary text-foreground hover:text-primary transition-all cursor-pointer flex items-center gap-1.5 text-xs font-serif group animate-in fade-in ${
-            panelOpen && hudDisplayMode === 'docked' ? 'right-[400px]' : 'right-4'
-          }`}
-          title="展开知识卡片栏"
-        >
-          <Bookmark className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
-          <span>知识卡片 ({marks.length})</span>
-          <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
-      )}
 
       <FlashcardReviewDialog
         open={reviewOpen}

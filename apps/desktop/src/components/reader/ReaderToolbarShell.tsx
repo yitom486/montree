@@ -27,6 +27,7 @@ interface ReaderToolbarShellProps {
   onMarksToggle: () => void
   onAddBookmark: () => void
   addBookmarkDisabled?: boolean
+  cardCount?: number
   center?: ReactNode
   trailing?: ReactNode
 }
@@ -53,6 +54,7 @@ export function ReaderToolbarShell({
   onMarksToggle,
   onAddBookmark,
   addBookmarkDisabled = false,
+  cardCount,
   center,
   trailing,
 }: ReaderToolbarShellProps) {
@@ -172,6 +174,18 @@ export function ReaderToolbarShell({
                 <PanelRightOpen className="size-3.5" />
               )}
               <span>卡片流</span>
+              {typeof cardCount === 'number' && cardCount > 0 ? (
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.2 font-mono text-[10px] leading-tight transition-colors',
+                    isCardRailOpen
+                      ? 'bg-primary/20 text-primary font-semibold'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {cardCount}
+                </span>
+              ) : null}
             </Button>
           </ToolbarTip>
 

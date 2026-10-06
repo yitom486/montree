@@ -141,6 +141,7 @@ import {
   runRevealPlan,
   scrollElementTextIntoView,
   subscribeRevealMark,
+  subscribeAnchorHighlight,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
 import {
@@ -1830,6 +1831,40 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     })
   }, [handleSelectMark])
 
+  // Agent 卡片与审计探针 anchor 原文定位请求：平滑定位原文并高亮选区
+  useEffect(() => {
+    return subscribeAnchorHighlight((excerpt) => {
+      // 1. 优先尝试当前页
+      const currentEl = pageAnchorRefs.current.get(pageNumRef.current)
+      if (currentEl) {
+        const range = scrollElementTextIntoView(currentEl, excerpt)
+        if (range) {
+          try {
+            const selection = window.getSelection()
+            selection?.removeAllRanges()
+            selection?.addRange(range.cloneRange())
+          } catch {}
+          return
+        }
+      }
+
+      // 2. 若当前页未命中，遍历已渲染挂载的各页
+      for (const [page, el] of pageAnchorRefs.current.entries()) {
+        if (page === pageNumRef.current) continue
+        const range = scrollElementTextIntoView(el, excerpt)
+        if (range) {
+          jumpToPage(page)
+          try {
+            const selection = window.getSelection()
+            selection?.removeAllRanges()
+            selection?.addRange(range.cloneRange())
+          } catch {}
+          return
+        }
+      }
+    })
+  }, [jumpToPage])
+
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
       await deleteMark(mark.id)
@@ -2239,6 +2274,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
       <ReaderToolbarShell
         ready={ready}
         tocDisabled={!hasChapterToc}
+        cardCount={marks.length}
         onTocToggle={() => {          setMarksOpen(false)
           setTocOpen((value) => !value)
         }}

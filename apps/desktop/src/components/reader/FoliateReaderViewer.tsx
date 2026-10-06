@@ -52,8 +52,10 @@ import {
   overlayerKeyForMark,
   runRevealPlan,
   subscribeRevealMark,
+  subscribeAnchorHighlight,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
+import { searchReaderContent } from '@/lib/agent/context/search-reader-content'
 import { toCanonicalChapter } from '@montree/reader-core'
 import { parse as parseFoliateCfi, toRange as foliateCfiToRange } from '@foliate/epubcfi.js'
 import type { FoliateViewElement } from '@foliate/view.js'
@@ -804,6 +806,30 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
       if (mark) handleSelectMark(mark)
     })
   }, [handleSelectMark])
+
+  // Agent 卡片与审计探针 anchor 原文定位请求：平滑定位原文并高亮选区
+  useEffect(() => {
+    return subscribeAnchorHighlight(async (excerpt) => {
+      const ok = revealExcerptInFoliateDocs(excerpt)
+      if (ok) return
+
+      // 若当前渲染节未命中，尝试通过全文索引定位章节并跳转后重试
+      try {
+        const query = excerpt.slice(0, 40).trim()
+        if (!query) return
+        const res = await searchReaderContent(query)
+        const hit = res.hits[0]
+        if (hit?.label) {
+          handleJumpToLabel(hit.label)
+          setTimeout(() => {
+            revealExcerptInFoliateDocs(excerpt)
+          }, 350)
+        }
+      } catch {
+        // 跨章搜索异常忽略
+      }
+    })
+  }, [handleJumpToLabel, revealExcerptInFoliateDocs])
 
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
@@ -1704,6 +1730,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
       <ReaderToolbarShell
         ready={ready}
         tocDisabled={chapters.length === 0}
+        cardCount={marks.length}
         onTocToggle={toggleToc}
         onMarksToggle={toggleMarks}
         onAddBookmark={() => void addBookmarkAtCurrent()}

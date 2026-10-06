@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 import {
+  emitAnchorHighlight,
   emitRevealMark,
   locateExcerptInDocuments,
   scrollElementTextIntoView,
+  subscribeAnchorHighlight,
   subscribeRevealMark,
 } from './mark-linkage'
 
@@ -101,5 +103,24 @@ describe('reveal 事件通道', () => {
       offA()
       offB()
     }
+  })
+})
+
+describe('anchor-highlight 事件通道', () => {
+  it('派发后订阅者收到摘录文本；空文本不派发；退订后不收到', () => {
+    const handler = vi.fn()
+    const off = subscribeAnchorHighlight(handler)
+
+    emitAnchorHighlight('义和团运动的起源')
+    expect(handler).toHaveBeenCalledWith('义和团运动的起源')
+
+    handler.mockClear()
+    emitAnchorHighlight('')
+    emitAnchorHighlight('   ')
+    expect(handler).not.toHaveBeenCalled()
+
+    off()
+    emitAnchorHighlight('再次定位')
+    expect(handler).not.toHaveBeenCalled()
   })
 })

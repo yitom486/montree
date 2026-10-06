@@ -111,6 +111,36 @@ export type AgentTimelineItem =
   | { type: 'single'; message: AcpChatMessage }
   | { type: 'activity'; messages: AcpChatMessage[] }
 
+/**
+ * 判断是否是包含可视化富卡片的 tool 消息（图表/互引/全文审查/章节建议等）。
+ * 这类组件具备高交互价值与精美视觉，不应被折叠进后台活动盒（ActivityGroup），
+ * 而应提升（Promote）到聊天主流中直接向用户展示。
+ */
+export function isRichToolMessage(msg: AcpChatMessage): boolean {
+  if (msg.role !== 'tool') return false
+  const title = msg.toolTitle || ''
+  const detail = msg.toolContentText || msg.text || ''
+
+  // 1. 图表推演卡片（Mermaid / 流程推演）
+  if (title.includes('montree_generate_diagram') || detail.includes('mermaidCode')) {
+    return true
+  }
+  // 2. 跨章互引卡片
+  if (title.includes('montree_cross_reference') || detail.includes('chapterDistribution')) {
+    return true
+  }
+  // 3. 全文审查卡片
+  if (title.includes('montree_inspect_content') || detail.includes('"hits"')) {
+    return true
+  }
+  // 4. 章节建议卡片
+  if (title.includes('montree_suggest_chapters') || detail.includes('"chapters"')) {
+    return true
+  }
+
+  return false
+}
+
 /** 将连续 thought/tool 收成活动组，对齐 Cursor「Worked for」 */
 export function groupAgentMessages(messages: AcpChatMessage[]): AgentTimelineItem[] {
   const items: AgentTimelineItem[] = []
@@ -158,6 +188,12 @@ export function groupAgentMessages(messages: AcpChatMessage[]): AgentTimelineIte
           flush()
           items.push({ type: 'single', message: msg })
         }
+        continue
+      }
+      // 富交互卡片（思维导图、架构推演图、实体互引等）提升至主时间线
+      if (isRichToolMessage(msg)) {
+        flush()
+        items.push({ type: 'single', message: msg })
         continue
       }
       buffer.push(msg)

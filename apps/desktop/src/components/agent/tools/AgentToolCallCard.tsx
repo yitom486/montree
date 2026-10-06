@@ -14,7 +14,11 @@ import {
   Wrench,
   XCircle,
 } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/api/query-keys'
+import { readingMarksApi } from '@/api/reading-marks-api'
+import { useActiveDocumentStore } from '@/stores/active-document-store'
 import {
   AgentChatItem,
   AgentChatItemBody,
@@ -33,6 +37,7 @@ import {
 } from '@/lib/agent/mark-proposal-failure'
 import { explainToolFailure } from '@/lib/agent/tool-failure-message'
 import { toast } from 'sonner'
+import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import {
   DiagramViewerCard,
   type DiagramPayload,
@@ -55,6 +60,37 @@ import {
   type AcpToolLocation,
 } from '@/stores/acp-chat-types'
 import { useAcpPendingPermission } from '@/stores/acp-ui-store'
+import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
+import { normalizeLoadKey } from '@montree/reader-core'
+import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+
+export function buildNoteFromDiagram(payload: DiagramPayload): string {
+  const lines: string[] = []
+  if (payload.summary) {
+    lines.push(`> **核心解读**：${payload.summary}\n`)
+  }
+  if (payload.visualSteps && payload.visualSteps.length > 0) {
+    lines.push('### 推演流转步骤')
+    payload.visualSteps.forEach((step, idx) => {
+      const parts = [`${idx + 1}. **${step.action}**`]
+      if (step.from && step.to && (step.from !== 'Client' || step.to !== 'Agent')) {
+        parts.push(`（${step.from} → ${step.to}）`)
+      }
+      if (step.desc) {
+        parts.push(`：${step.desc}`)
+      }
+      lines.push(parts.join(''))
+    })
+    lines.push('')
+  }
+  if (payload.mermaidCode) {
+    lines.push('### 架构图表')
+    lines.push('```mermaid')
+    lines.push(payload.mermaidCode.trim())
+    lines.push('```')
+  }
+  return lines.join('\n')
+}
 
 function parseDiagramPayload(text?: string, title?: string): DiagramPayload | null {
   if (!text || (!text.includes('mermaidCode') && !title?.includes('montree_generate_diagram'))) {
@@ -170,6 +206,24 @@ interface AgentToolCallCardProps {
   message: AcpChatMessage
 }
 
+function buildFallbackAnchor(
+  filePath: string,
+  selectedText?: string,
+  chapterHref?: string,
+): ReadingAnchor {
+  const lower = filePath.toLowerCase()
+  if (lower.endsWith('.pdf')) {
+    return { format: 'pdf', page: 1, selectedText }
+  }
+  if (lower.endsWith('.mobi') || lower.endsWith('.azw3')) {
+    return { format: 'mobi', chapterId: chapterHref || '', selectedText }
+  }
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    return { format: 'web', url: filePath, selectedText }
+  }
+  return { format: 'epub', cfi: '', href: chapterHref || undefined, selectedText }
+}
+
 export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
   const pendingPermission = useAcpPendingPermission()
   const needsApproval = toolMessageNeedsApproval(message, pendingPermission)
@@ -200,6 +254,66 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
     Boolean(auditPayload) ||
     Boolean(suggestionPayload)
   const [open, setOpen] = useAgentChatOpen(active)
+  const queryClient = useQueryClient()
+  const activeFilePath = useActiveDocumentStore((s) => s.filePath)
+  const [savedDiagramIds, setSavedDiagramIds] = useState<Set<string>>(new Set())
+
+  const handleSaveAsKnowledgeCard = async (payload: DiagramPayload): Promise<boolean> => {
+    if (!activeFilePath) {
+      toast.error('未检测到当前打开的图书文档，无法沉淀知识卡片')
+      return false
+    }
+    const excerpt =
+      payload.anchorExcerpt || payload.visualSteps?.[0]?.anchorExcerpt || payload.title
+    const noteContent = buildNoteFromDiagram(payload)
+
+    // 读取当前阅读章节状态，确保卡片准确归属于本章
+    const navState = useReaderNavigationStore.getState()
+    const currentUnit =
+      navState.nav.flatIndex >= 0
+        ? navState.units[navState.nav.flatIndex]
+        : navState.nav.current
+    const chapterLabel = currentUnit?.label || navState.nav.current?.label || '当前章节'
+    const rawHref =
+      (currentUnit && 'href' in currentUnit && currentUnit.href
+        ? currentUnit.href
+        : navState.nav.current?.href) || ''
+    const chapterKey = rawHref ? toChapterKey(normalizeLoadKey(rawHref)) : undefined
+    const chapterIndex = navState.nav.flatIndex >= 0 ? navState.nav.flatIndex : 0
+
+    const chapterRef = chapterKey
+      ? {
+          key: chapterKey,
+          label: chapterLabel,
+          index: chapterIndex,
+        }
+      : null
+
+    const res = await readingMarksApi.create({
+      filePath: activeFilePath,
+      fileFingerprint: activeFilePath,
+      kind: 'note',
+      category: 'diagram',
+      title: payload.title,
+      aiSummary: payload.summary,
+      diagramId: payload.diagramId,
+      excerpt,
+      chapter: chapterRef,
+      anchor: buildFallbackAnchor(activeFilePath, excerpt, rawHref),
+      note: noteContent,
+      tags: ['知识卡片', payload.diagramType],
+    })
+
+    if (!res.ok) {
+      toast.error('存入知识卡片失败：' + res.error.message)
+      return false
+    }
+
+    setSavedDiagramIds((prev) => new Set(prev).add(payload.diagramId))
+    void queryClient.invalidateQueries({ queryKey: queryKeys.readingMarks(activeFilePath) })
+    toast.success(`已将「${payload.title}」存入本书知识卡片（${chapterLabel}）`)
+    return true
+  }
   const locations = message.toolLocations ?? []
   const failed = message.toolStatus === 'failed'
   const failureExplain = failed
@@ -229,7 +343,15 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
     Boolean(crossRefPayload) ||
     Boolean(auditPayload) ||
     Boolean(suggestionPayload)
-  const title = message.toolTitle || '工具调用'
+  const title = diagramPayload
+    ? `图谱卡片 · ${diagramPayload.title}`
+    : crossRefPayload
+      ? `跨章互引 · ${crossRefPayload.entity}`
+      : auditPayload
+        ? `内容审查 · ${auditPayload.query}`
+        : suggestionPayload
+          ? `章节速览建议`
+          : message.toolTitle || '工具调用'
   const locationHint =
     diffs.length === 1
       ? basename(diffs[0]!.path)
@@ -308,11 +430,11 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
             <div className="mt-1">
               <DiagramViewerCard
                 payload={diagramPayload}
+                isSavedAsCard={savedDiagramIds.has(diagramPayload.diagramId)}
+                onSaveAsKnowledgeCard={handleSaveAsKnowledgeCard}
                 onHighlightAnchor={(anchor: string) => {
                   toast.message(`正在定位原文：「${anchor.slice(0, 24)}...」`)
-                  window.dispatchEvent(
-                    new CustomEvent('montree:anchor-highlight', { detail: anchor }),
-                  )
+                  emitAnchorHighlight(anchor)
                 }}
                 onPinToDoc={(p: DiagramPayload) => {
                   void navigator.clipboard.writeText(
@@ -332,9 +454,7 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
                     void openChapterForMarkRecovery(flatIndex)
                   }
                   if (excerpt) {
-                    window.dispatchEvent(
-                      new CustomEvent('montree:anchor-highlight', { detail: excerpt }),
-                    )
+                    emitAnchorHighlight(excerpt)
                   }
                 }}
               />
@@ -346,9 +466,7 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
                 payload={auditPayload}
                 onHighlightAnchor={(anchor: string) => {
                   toast.message(`正在定位原句：「${anchor.slice(0, 24)}...」`)
-                  window.dispatchEvent(
-                    new CustomEvent('montree:anchor-highlight', { detail: anchor }),
-                  )
+                  emitAnchorHighlight(anchor)
                 }}
               />
             </div>

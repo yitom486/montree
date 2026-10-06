@@ -2,6 +2,8 @@ import { useState } from 'react'
 import {
   Activity,
   ArrowRight,
+  BookmarkCheck,
+  BookmarkPlus,
   BookOpen,
   Check,
   Code2,
@@ -47,6 +49,8 @@ export interface DiagramViewerCardProps {
   payload: DiagramPayload
   onHighlightAnchor?: (anchorExcerpt: string) => void
   onPinToDoc?: (payload: DiagramPayload) => void
+  onSaveAsKnowledgeCard?: (payload: DiagramPayload) => Promise<boolean> | boolean
+  isSavedAsCard?: boolean
   isPinned?: boolean
   className?: string
 }
@@ -55,6 +59,8 @@ export function DiagramViewerCard({
   payload,
   onHighlightAnchor,
   onPinToDoc,
+  onSaveAsKnowledgeCard,
+  isSavedAsCard = false,
   isPinned = false,
   className,
 }: DiagramViewerCardProps) {
@@ -65,6 +71,19 @@ export function DiagramViewerCard({
   const [copied, setCopied] = useState(false)
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(0)
   const [expandedPayloadIndex, setExpandedPayloadIndex] = useState<number | null>(null)
+  const [isSavingCard, setIsSavingCard] = useState(false)
+  const [savedLocally, setSavedLocally] = useState(isSavedAsCard)
+
+  const handleSaveCard = async () => {
+    if (!onSaveAsKnowledgeCard || isSavingCard || savedLocally) return
+    setIsSavingCard(true)
+    try {
+      const ok = await onSaveAsKnowledgeCard(payload)
+      if (ok) setSavedLocally(true)
+    } finally {
+      setIsSavingCard(false)
+    }
+  }
 
   const copyMermaid = async () => {
     if (!payload.mermaidCode) return
@@ -337,22 +356,51 @@ export function DiagramViewerCard({
           <span>点击流转步骤，正文平滑穿透定位</span>
         </span>
 
-        {onPinToDoc ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onPinToDoc(payload)}
-            className={cn(
-              'h-6 gap-1 px-2 text-[10px]',
-              isPinned
-                ? 'bg-foreground/10 text-foreground border border-border'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Pin className="size-3" />
-            <span>{isPinned ? '已编入正文' : '固定至正文'}</span>
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          {onSaveAsKnowledgeCard ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isSavingCard || savedLocally}
+              onClick={() => void handleSaveCard()}
+              className={cn(
+                'h-6 gap-1 px-2 text-[10px] transition-colors',
+                savedLocally
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              {savedLocally ? (
+                <>
+                  <BookmarkCheck className="size-3 text-emerald-500" />
+                  <span>已存为卡片</span>
+                </>
+              ) : (
+                <>
+                  <BookmarkPlus className="size-3 text-primary" />
+                  <span>{isSavingCard ? '正在保存…' : '存为知识卡片'}</span>
+                </>
+              )}
+            </Button>
+          ) : null}
+
+          {onPinToDoc ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onPinToDoc(payload)}
+              className={cn(
+                'h-6 gap-1 px-2 text-[10px]',
+                isPinned
+                  ? 'bg-foreground/10 text-foreground border border-border'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Pin className="size-3" />
+              <span>{isPinned ? '已编入正文' : '固定至正文'}</span>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   )

@@ -32,6 +32,7 @@ import {
   runRevealPlan,
   scrollElementTextIntoView,
   subscribeRevealMark,
+  subscribeAnchorHighlight,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
 import { useReaderExportMenu } from '@/hooks/reader/useReaderExportMenu'
@@ -1053,6 +1054,28 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
     })
   }, [handleSelectMark])
 
+  // Agent 卡片与审计探针 anchor 原文定位请求：平滑定位原文并高亮选区
+  useEffect(() => {
+    return subscribeAnchorHighlight((excerpt) => {
+      let doc: Document | null | undefined
+      try {
+        doc = iframeRef.current?.contentDocument
+      } catch {
+        return
+      }
+      if (!doc?.body) return
+      const range = scrollElementTextIntoView(doc.body, excerpt)
+      if (!range) return
+      try {
+        const selection = doc.defaultView?.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range.cloneRange())
+      } catch {
+        // 选区失败不否定滚动定位
+      }
+    })
+  }, [])
+
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
       await deleteMark(mark.id)
@@ -1111,6 +1134,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       <ReaderToolbarShell
         ready={ready}
         tocDisabled={units.length === 0}
+        cardCount={marks.length}
         onTocToggle={toggleToc}
         onMarksToggle={toggleMarks}
         onAddBookmark={() => void addPageBookmark()}

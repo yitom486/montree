@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { AgentPanel } from '@/components/agent/AgentPanel'
 import { KnowledgeCardItem } from '@/components/reader/KnowledgeCardItem'
+import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
@@ -29,7 +30,7 @@ import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { getReaderContentProvider } from '@/lib/agent/context/reader-content-registry'
 import { sortCardsByDocumentPosition } from '@/lib/reader/marks/card-order-from-units'
-import { emitRevealMark } from '@/lib/reader/marks/mark-linkage'
+import { emitRevealMark, emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import { toast } from 'sonner'
 import { BUILTIN_ACP_RUNTIMES, type ReadingMarkCategory } from '@montree/contracts'
 import { isOk } from '@montree/contracts'
@@ -619,13 +620,16 @@ export const FloatingAIHud = memo(function FloatingAIHud({
                       }
                       onDelete={() => void deleteMark(mark.id)}
                       onOpenDiagram={(diagramId) => {
+                        const parsed = parseDiagramFromMark(mark)
+                        if (parsed) {
+                          setSelectedDiagram(parsed)
+                          return
+                        }
                         setSelectedDiagram({
                           diagramId,
                           diagramType: 'sequence',
                           title: mark.title ?? '时序流转交互图谱',
-                          mermaidCode: mark.note?.includes('mermaid')
-                            ? mark.note.replace(/```mermaid\n?|\n?```/g, '').trim()
-                            : 'sequenceDiagram\n  autonumber\n  Reader->>AI: 提出概念追问\n  AI-->>Reader: 返回分步交互图解',
+                          mermaidCode: 'sequenceDiagram\n  autonumber\n  Reader->>AI: 提出概念追问\n  AI-->>Reader: 返回分步交互图解',
                           summary: mark.aiSummary ?? mark.excerpt,
                         })
                       }}
@@ -749,11 +753,7 @@ export const FloatingAIHud = memo(function FloatingAIHud({
                             type="button"
                             onClick={() => {
                               toast.message('正在定位规约原句')
-                              window.dispatchEvent(
-                                new CustomEvent('montree:anchor-highlight', {
-                                  detail: hit.quote,
-                                }),
-                              )
+                              emitAnchorHighlight(hit.quote)
                             }}
                             className="px-2 py-0.5 rounded text-[10.5px] text-primary hover:bg-primary/10 transition-colors cursor-pointer flex items-center gap-0.5"
                           >

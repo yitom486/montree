@@ -66,4 +66,20 @@ describe('ReaderToolbarShell', () => {
     await act(async () => {})
     expect(useAcpUiStore.getState().panelOpen).toBe(false)
   })
+
+  it('展示卡片流数量角标', async () => {
+    await act(async () => {
+      root.render(
+        createElement(ReaderToolbarShell, {
+          onTocToggle: vi.fn(),
+          onMarksToggle: vi.fn(),
+          onAddBookmark: vi.fn(),
+          cardCount: 5,
+        }),
+      )
+    })
+    const text = container.textContent ?? ''
+    expect(text).toContain('卡片流')
+    expect(text).toContain('5')
+  })
 })

@@ -202,3 +202,24 @@ export function subscribeRevealMark(handler: (markId: string) => void): () => vo
   window.addEventListener(REVEAL_MARK_EVENT, onReveal)
   return () => window.removeEventListener(REVEAL_MARK_EVENT, onReveal)
 }
+
+/**
+ * 跨面板 anchor 高亮请求通道：Agent 卡片/探针点定位即 emit，
+ * 各 Viewer（Foliate / Pdf / WebDoc）订阅后按摘录文本平滑居中滚动并设置选区高亮。
+ */
+export const ANCHOR_HIGHLIGHT_EVENT = 'montree:anchor-highlight'
+
+export function emitAnchorHighlight(excerpt: string): void {
+  if (typeof window === 'undefined' || !excerpt) return
+  window.dispatchEvent(new CustomEvent<string>(ANCHOR_HIGHLIGHT_EVENT, { detail: excerpt }))
+}
+
+export function subscribeAnchorHighlight(handler: (excerpt: string) => void): () => void {
+  if (typeof window === 'undefined') return () => undefined
+  const onHighlight = (e: Event) => {
+    const text = (e as CustomEvent<string>).detail
+    if (typeof text === 'string' && text.trim()) handler(text.trim())
+  }
+  window.addEventListener(ANCHOR_HIGHLIGHT_EVENT, onHighlight)
+  return () => window.removeEventListener(ANCHOR_HIGHLIGHT_EVENT, onHighlight)
+}
