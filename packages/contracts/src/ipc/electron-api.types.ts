@@ -110,6 +110,13 @@ import type {
   TtsCacheStats,
   TtsTestKeyPayload,
   TtsTestKeyResult,
+  TtsRemoteModelItem,
+  TtsVoiceInfo,
+  TtsBatchCreatePayload,
+  TtsBatchJobStatus,
+  TtsStreamChunkPayload,
+  TtsStreamEndPayload,
+  TtsStreamErrorPayload,
 } from '../types/tts'
 import type {
   RosettaActiveImport,
@@ -469,10 +476,39 @@ export interface ElectronAPI {
   synthesizeTts: (
     payload: TtsSynthesizePayload,
   ) => Promise<Result<TtsSynthesizeResult, AppError>>
+  /** 启动流式语音合成（首包即播 + 边播边拼装） */
+  synthesizeTtsStream: (
+    payload: TtsSynthesizePayload & { streamId: string },
+  ) => Promise<Result<{ started: boolean; fromCache?: boolean; cachedResult?: TtsSynthesizeResult }, AppError>>
+  /** 取消当前流式语音合成 */
+  cancelTtsStream: (streamId: string) => Promise<Result<void, AppError>>
+  /** 订阅 TTS 流式音频分片 */
+  onTtsStreamChunk: (callback: (payload: TtsStreamChunkPayload) => void) => () => void
+  /** 订阅 TTS 流式合成完成 */
+  onTtsStreamEnd: (callback: (payload: TtsStreamEndPayload) => void) => () => void
+  /** 订阅 TTS 流式合成出错 */
+  onTtsStreamError: (callback: (payload: TtsStreamErrorPayload) => void) => () => void
   /** 测试指定 API Key 有效性 */
   testTtsKey: (payload: TtsTestKeyPayload) => Promise<Result<TtsTestKeyResult, AppError>>
   /** 获取本地音频缓存统计 */
   getTtsCacheStats: () => Promise<Result<TtsCacheStats, AppError>>
   /** 清空本地音频缓存 */
   clearTtsCache: () => Promise<Result<void, AppError>>
+  /** 拉取云端实际可用的语音模型列表 */
+  listTtsModels: (apiKey?: string) => Promise<Result<TtsRemoteModelItem[], AppError>>
+  /** 拉取云端/厂商可用的音色列表 */
+  listTtsVoices: (
+    provider?: string,
+    apiKey?: string,
+    region?: string,
+  ) => Promise<Result<TtsVoiceInfo[], AppError>>
+  /** 创建异步批量语音合成任务 (Batch API，半价折扣) */
+  createTtsBatchJob: (payload: TtsBatchCreatePayload) => Promise<Result<TtsBatchJobStatus, AppError>>
+  /** 查询异步批量任务状态与结果 */
+  getTtsBatchJob: (name: string, apiKey?: string) => Promise<Result<TtsBatchJobStatus, AppError>>
+  /** 取消异步批量任务 */
+  cancelTtsBatchJob: (
+    name: string,
+    apiKey?: string,
+  ) => Promise<Result<{ name: string; cancelled: boolean }, AppError>>
 }

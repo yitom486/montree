@@ -315,12 +315,32 @@ export const IPC = {
   TTS_SAVE_CONFIG: 'tts:save-config',
   /** invoke：语音合成（带本地磁盘缓存与双 Key 容灾） */
   TTS_SYNTHESIZE: 'tts:synthesize',
+  /** invoke：启动流式语音合成（首包即播 + 边播边拼装） */
+  TTS_SYNTHESIZE_STREAM: 'tts:synthesize-stream',
+  /** send / invoke：取消当前流式合成 */
+  TTS_CANCEL_STREAM: 'tts:cancel-stream',
+  /** main→renderer：TTS 流式音频分片推送 */
+  TTS_STREAM_CHUNK: 'tts:stream-chunk',
+  /** main→renderer：TTS 流式合成完成推送（携带完整音频） */
+  TTS_STREAM_END: 'tts:stream-end',
+  /** main→renderer：TTS 流式合成出错推送 */
+  TTS_STREAM_ERROR: 'tts:stream-error',
   /** invoke：测试指定 API Key 有效性 */
   TTS_TEST_KEY: 'tts:test-key',
   /** invoke：获取本地音频缓存统计 */
   TTS_GET_CACHE_STATS: 'tts:get-cache-stats',
   /** invoke：清空本地音频缓存 */
   TTS_CLEAR_CACHE: 'tts:clear-cache',
+  /** invoke：获取云端实际可用的语音模型列表 */
+  TTS_LIST_MODELS: 'tts:list-models',
+  /** invoke：获取指定厂商的可用音色列表 */
+  TTS_LIST_VOICES: 'tts:list-voices',
+  /** invoke：创建异步批量语音合成任务 (Batch API，半价折扣) */
+  TTS_CREATE_BATCH_JOB: 'tts:create-batch-job',
+  /** invoke：查询异步批量任务状态与结果 */
+  TTS_GET_BATCH_JOB: 'tts:get-batch-job',
+  /** invoke：取消异步批量任务 */
+  TTS_CANCEL_BATCH_JOB: 'tts:cancel-batch-job',
 } as const
 
 /** `IPC` 全部通道字符串的联合类型，用于约束 handle/on/invoke 的 channel 参数 */

@@ -1,10 +1,17 @@
 import type {
+  TtsBatchCreatePayload,
+  TtsBatchJobStatus,
   TtsCacheStats,
   TtsConfig,
+  TtsRemoteModelItem,
   TtsSynthesizePayload,
   TtsSynthesizeResult,
   TtsTestKeyPayload,
   TtsTestKeyResult,
+  TtsVoiceInfo,
+  TtsStreamChunkPayload,
+  TtsStreamEndPayload,
+  TtsStreamErrorPayload,
 } from '@montree/contracts'
 import type { AppError } from '@montree/contracts'
 import { err, ok, type Result } from '@montree/contracts'
@@ -81,6 +88,106 @@ export const ttsApi = {
     }
   },
 
+  synthesizeStream(
+    payload: TtsSynthesizePayload & { streamId: string },
+    callbacks: {
+      onChunk?: (chunk: TtsStreamChunkPayload) => void
+      onEnd?: (end: TtsStreamEndPayload) => void
+      onError?: (err: TtsStreamErrorPayload) => void
+    },
+  ): {
+    cancel: () => Promise<Result<void, AppError>>
+    promise: Promise<Result<{ started: boolean; fromCache?: boolean; cachedResult?: TtsSynthesizeResult }, AppError>>
+  } {
+    const api = requireElectronAPI()
+    if (!api.ok) {
+      return {
+        cancel: async () => ok(undefined),
+        promise: Promise.resolve(api),
+      }
+    }
+
+    const unsubs: Array<() => void> = []
+
+    const cleanup = () => {
+      while (unsubs.length) {
+        try {
+          unsubs.pop()?.()
+        } catch {}
+      }
+    }
+
+    if (callbacks.onChunk && typeof api.value.onTtsStreamChunk === 'function') {
+      unsubs.push(
+        api.value.onTtsStreamChunk((chunk) => {
+          if (chunk.streamId === payload.streamId) {
+            callbacks.onChunk?.(chunk)
+          }
+        }),
+      )
+    }
+
+    if (callbacks.onEnd && typeof api.value.onTtsStreamEnd === 'function') {
+      unsubs.push(
+        api.value.onTtsStreamEnd((end) => {
+          if (end.streamId === payload.streamId) {
+            cleanup()
+            callbacks.onEnd?.(end)
+          }
+        }),
+      )
+    }
+
+    if (callbacks.onError && typeof api.value.onTtsStreamError === 'function') {
+      unsubs.push(
+        api.value.onTtsStreamError((errPayload) => {
+          if (errPayload.streamId === payload.streamId) {
+            cleanup()
+            callbacks.onError?.(errPayload)
+          }
+        }),
+      )
+    }
+
+    const cancel = async () => {
+      cleanup()
+      if (typeof api.value.cancelTtsStream === 'function') {
+        return await api.value.cancelTtsStream(payload.streamId)
+      }
+      return ok(undefined)
+    }
+
+    const promise = (async () => {
+      try {
+        if (typeof api.value.synthesizeTtsStream !== 'function') {
+          cleanup()
+          return err({
+            code: 'API_UNAVAILABLE' as const,
+            message: '流式 TTS 合成服务尚未加载，请重启应用',
+          })
+        }
+        const res = await api.value.synthesizeTtsStream(payload)
+        return res
+      } catch (cause: any) {
+        cleanup()
+        return err({ code: 'API_UNAVAILABLE' as const, message: cause?.message || 'TTS 流式合成调用失败' })
+      }
+    })()
+
+    return { cancel, promise }
+  },
+
+  async cancelStream(streamId: string): Promise<Result<void, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.cancelTtsStream !== 'function') return ok(undefined)
+    try {
+      return await api.value.cancelTtsStream(streamId)
+    } catch {
+      return ok(undefined)
+    }
+  },
+
   async testKey(payload: TtsTestKeyPayload): Promise<Result<TtsTestKeyResult, AppError>> {
     const api = requireElectronAPI()
     if (!api.ok) return api
@@ -120,6 +227,83 @@ export const ttsApi = {
       return await api.value.clearTtsCache()
     } catch (cause: any) {
       return err({ code: 'API_UNAVAILABLE', message: cause?.message || '清空缓存失败' })
+    }
+  },
+
+  async listModels(apiKey?: string): Promise<Result<TtsRemoteModelItem[], AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.listTtsModels !== 'function') {
+      return ok([])
+    }
+    try {
+      return await api.value.listTtsModels(apiKey)
+    } catch (cause: any) {
+      return err({ code: 'API_UNAVAILABLE', message: cause?.message || '拉取语音模型列表失败' })
+    }
+  },
+
+  async listVoices(
+    provider?: string,
+    apiKey?: string,
+    region?: string,
+  ): Promise<Result<TtsVoiceInfo[], AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.listTtsVoices !== 'function') {
+      return ok([])
+    }
+    try {
+      return await api.value.listTtsVoices(provider, apiKey, region)
+    } catch (cause: any) {
+      return err({ code: 'API_UNAVAILABLE', message: cause?.message || '拉取发音人列表失败' })
+    }
+  },
+
+  async createBatchJob(
+    payload: TtsBatchCreatePayload,
+  ): Promise<Result<TtsBatchJobStatus, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.createTtsBatchJob !== 'function') {
+      return err({ code: 'API_UNAVAILABLE', message: '批量语音服务未加载，请重启应用' })
+    }
+    try {
+      return await api.value.createTtsBatchJob(payload)
+    } catch (cause: any) {
+      return err({ code: 'API_UNAVAILABLE', message: cause?.message || '创建批量语音任务失败' })
+    }
+  },
+
+  async getBatchJob(
+    name: string,
+    apiKey?: string,
+  ): Promise<Result<TtsBatchJobStatus, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.getTtsBatchJob !== 'function') {
+      return err({ code: 'API_UNAVAILABLE', message: '批量语音服务未加载，请重启应用' })
+    }
+    try {
+      return await api.value.getTtsBatchJob(name, apiKey)
+    } catch (cause: any) {
+      return err({ code: 'API_UNAVAILABLE', message: cause?.message || '查询批量语音任务失败' })
+    }
+  },
+
+  async cancelBatchJob(
+    name: string,
+    apiKey?: string,
+  ): Promise<Result<{ name: string; cancelled: boolean }, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    if (typeof api.value.cancelTtsBatchJob !== 'function') {
+      return err({ code: 'API_UNAVAILABLE', message: '批量语音服务未加载，请重启应用' })
+    }
+    try {
+      return await api.value.cancelTtsBatchJob(name, apiKey)
+    } catch (cause: any) {
+      return err({ code: 'API_UNAVAILABLE', message: cause?.message || '取消批量任务失败' })
     }
   },
 }

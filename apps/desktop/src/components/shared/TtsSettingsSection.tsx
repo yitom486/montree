@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Loader2,
   Play,
+  RefreshCw,
   RotateCcw,
   Save,
   SlidersHorizontal,
@@ -23,40 +24,31 @@ import { useTtsStore } from '@/stores/tts-store'
 import { ttsApi } from '@/api/tts-api'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { TtsProviderType } from '@montree/contracts'
+import type { TtsProviderType, TtsRemoteModelItem, TtsVoiceInfo } from '@montree/contracts'
 
-const GEMINI_MODELS = [
-  { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS', desc: 'Google 官方语音合成与朗读专属模型 (推荐)' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Google 2.0 实时多模态音频模型' },
+const FALLBACK_GEMINI_MODELS = [
+  {
+    id: 'gemini-3.8-flash-lite-tts',
+    name: 'Gemini 3.8 Flash Lite TTS',
+    badge: '极速低延时 · 听书推荐',
+    desc: 'Google 官方轻量语音模型，响应速度快 (~4s)，最适合长文与连续听书',
+  },
+  {
+    id: 'gemini-3.8-flash-tts',
+    name: 'Gemini 3.8 Flash TTS',
+    badge: '高保真全功能 · 精读推荐',
+    desc: 'Google 官方标准语音模型，语调自然细腻、音质饱满，适合精读精听',
+  },
 ]
 
-const GEMINI_VOICES = [
-  { id: 'Aoede', name: 'Aoede', desc: '优雅知性 · 女声 (推荐)', gender: 'female' },
-  { id: 'Puck', name: 'Puck', desc: '阳光活力 · 男声 (推荐)', gender: 'male' },
-  { id: 'Charon', name: 'Charon', desc: '低沉沉稳 · 男声', gender: 'male' },
-  { id: 'Kore', name: 'Kore', desc: '温柔治愈 · 女声', gender: 'female' },
-  { id: 'Fenrir', name: 'Fenrir', desc: '雄浑有力 · 男声', gender: 'male' },
-  { id: 'Leda', name: 'Leda', desc: '清澈明朗 · 女声', gender: 'female' },
+const FALLBACK_GEMINI_VOICES: TtsVoiceInfo[] = [
+  { id: 'Aoede', name: 'Aoede', description: '优雅知性 · 女声 (推荐)', gender: 'female' },
+  { id: 'Puck', name: 'Puck', description: '阳光活力 · 男声 (推荐)', gender: 'male' },
+  { id: 'Charon', name: 'Charon', description: '低沉沉稳 · 男声', gender: 'male' },
+  { id: 'Kore', name: 'Kore', description: '温柔治愈 · 女声', gender: 'female' },
+  { id: 'Fenrir', name: 'Fenrir', description: '雄浑有力 · 男声', gender: 'male' },
+  { id: 'Leda', name: 'Leda', description: '清澈明朗 · 女声', gender: 'female' },
 ]
-
-function formatUiErrorMessage(msg: string): string {
-  if (!msg) return '未知错误'
-  try {
-    const match = msg.match(/\{[\s\S]*"error"[\s\S]*\}/)
-    if (match) {
-      const parsed = JSON.parse(match[0])
-      const m = parsed?.error?.message || ''
-      if (m.includes('This model only supports text output') || m.includes('supports text output')) {
-        return '当前模型为纯文本模型，不支持语音输出。已自动为您切换为官方语音模型 gemini-3.8-flash-tts。'
-      }
-      if (m) return m
-    }
-  } catch {}
-  if (msg.includes('This model only supports text output') || msg.includes('supports text output')) {
-    return '当前模型为纯文本模型，不支持语音输出。请切换为官方语音模型 gemini-3.8-flash-tts。'
-  }
-  return msg
-}
 
 const AZURE_REGIONS = [
   { id: 'eastasia', name: '东亚 (East Asia / 香港)' },
@@ -155,10 +147,57 @@ export function TtsSettingsSection() {
   const [cacheStats, setCacheStats] = useState<{ count: number; totalBytes: number } | null>(null)
   const [clearingCache, setClearingCache] = useState(false)
 
+  // 远端模型与音色动态状态
+  const [remoteModels, setRemoteModels] = useState<TtsRemoteModelItem[]>([])
+  const [remoteVoices, setRemoteVoices] = useState<TtsVoiceInfo[]>([])
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [loadingVoices, setLoadingVoices] = useState(false)
+
   // 试听状态
   const [previewText, setPreviewText] = useState('您好，欢迎使用 Montree 智能伴读。今天也一起静心阅读吧。')
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null)
+
+  const handleSyncRemoteModels = async (quiet = false, explicitKey?: string) => {
+    const key = (explicitKey || primaryApiKey || secondaryApiKey || '').trim()
+    if (!key) {
+      if (!quiet) toast.warning('请先填写有效的 Gemini API Key 再同步远端模型')
+      return
+    }
+    setLoadingModels(true)
+    try {
+      const res = await ttsApi.listModels(key)
+      if (res.ok && res.value.length > 0) {
+        setRemoteModels(res.value)
+        if (!quiet) {
+          toast.success(`已从 Google 接口同步 ${res.value.length} 个最新可用语音模型`)
+        }
+      } else if (!res.ok && !quiet) {
+        toast.error(`拉取远端模型失败: ${res.error.message}`)
+      }
+    } catch (e: any) {
+      if (!quiet) {
+        toast.error(`拉取模型失败: ${e?.message || '未知错误'}`)
+      }
+    } finally {
+      setLoadingModels(false)
+    }
+  }
+
+  const handleSyncRemoteVoices = async (quiet = false, explicitKey?: string) => {
+    const key = (explicitKey || (provider === 'azure' ? azureApiKey : (primaryApiKey || secondaryApiKey)) || '').trim()
+    setLoadingVoices(true)
+    try {
+      const res = await ttsApi.listVoices(provider, key, azureRegion)
+      if (res.ok && res.value.length > 0) {
+        setRemoteVoices(res.value)
+      }
+    } catch {
+      // quiet failover
+    } finally {
+      setLoadingVoices(false)
+    }
+  }
 
   const refreshCacheStats = async () => {
     try {
@@ -173,12 +212,43 @@ export function TtsSettingsSection() {
 
   useEffect(() => {
     void refreshCacheStats()
+    if (primaryApiKey || secondaryApiKey) {
+      void handleSyncRemoteModels(true)
+      void handleSyncRemoteVoices(true)
+    }
+    void ttsApi.saveConfig({
+      enabled: true,
+      provider,
+      primaryApiKey,
+      secondaryApiKey,
+      voiceName,
+      voiceNameMale: useTtsStore.getState().voiceNameMale,
+      voiceNameFemale: useTtsStore.getState().voiceNameFemale,
+      modelId,
+      azureApiKey,
+      azureRegion,
+      azureVoice,
+      localEndpoint,
+      localApiKey,
+      localModel,
+      localVoice,
+      rate,
+      saveAudioCache,
+      filterFootnotesAndCitations,
+      filterLinksAndTechnicalMarkup,
+    })
   }, [])
 
-  // 针对历史旧版本配置脏数据进行自动自愈（将纯文本模型自动纠正为语音专属模型）
+  // 针对历史旧版本配置脏数据进行自动自愈（仅将不支持语音的纯文本模型纠正为语音模型）
   useEffect(() => {
-    if (!modelId || modelId.includes('gemini-2.5') || modelId.includes('gemini-1.5') || !modelId.includes('gemini-')) {
-      setModelId('gemini-3.8-flash-tts')
+    if (
+      !modelId ||
+      modelId === 'gemini-2.5-flash' ||
+      modelId === 'gemini-1.5-pro' ||
+      modelId === 'gemini-1.5-flash' ||
+      modelId === 'gemini-2.0-flash'
+    ) {
+      setModelId('gemini-3.8-flash-lite-tts')
     }
   }, [modelId, setModelId])
 
@@ -225,7 +295,7 @@ export function TtsSettingsSection() {
       })
 
       if (!res.ok) {
-        toast.error(`测试失败: ${formatUiErrorMessage(res.error.message)}`)
+        toast.error(`测试失败: ${res.error.message}`)
         return
       }
 
@@ -233,6 +303,13 @@ export function TtsSettingsSection() {
       if (res.value.audioBase64) {
         const audio = new Audio(`data:${res.value.mimeType};base64,${res.value.audioBase64}`)
         void audio.play()
+      }
+
+      if (prov === 'gemini') {
+        void handleSyncRemoteModels(true, key)
+        void handleSyncRemoteVoices(true, key)
+      } else if (prov === 'azure') {
+        void handleSyncRemoteVoices(true, key)
       }
     } catch (err: any) {
       toast.error(`测试发生错误: ${err?.message || '未知错误'}`)
@@ -279,13 +356,21 @@ export function TtsSettingsSection() {
         voiceName: provider === 'azure' ? (azureVoice || 'zh-CN-XiaoxiaoNeural') : voiceName,
         modelId,
         rate,
+        primaryApiKey,
+        secondaryApiKey,
         azureApiKey,
         azureRegion,
         localEndpoint,
+        localApiKey,
+        localModel,
+        localVoice,
       })
 
-      if (!res.ok || !res.value.audioBase64) {
-        throw new Error(res.ok ? '未获取到音频数据' : res.error.message)
+      if (!res.ok) {
+        throw new Error(res.error.message)
+      }
+      if (!res.value.audioBase64) {
+        throw new Error('未获取到音频数据')
       }
 
       const audio = new Audio(`data:${res.value.mimeType};base64,${res.value.audioBase64}`)
@@ -330,6 +415,26 @@ export function TtsSettingsSection() {
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
   }
+
+  const displayModels = remoteModels.length > 0
+    ? remoteModels.map((m) => {
+        const matchedDefault = FALLBACK_GEMINI_MODELS.find((d) => d.id === m.id)
+        let badge = m.isRecommended ? '推荐' : m.tier || '官方'
+        if (m.id.includes('lite')) badge = '极速 Lite · 听书推荐'
+        else if (m.id.includes('3.8-flash-tts')) badge = '高保真 · 精读推荐'
+        else if (m.id.includes('preview')) badge = '预览版'
+        return {
+          id: m.id,
+          name: m.name || m.id,
+          badge,
+          desc: m.description || matchedDefault?.desc || `Google 官方语音生成模型 (${m.tier || 'standard'})`,
+        }
+      })
+    : FALLBACK_GEMINI_MODELS
+
+  const displayVoices = remoteVoices.length > 0
+    ? remoteVoices
+    : FALLBACK_GEMINI_VOICES
 
   return (
     <div className="space-y-6">
@@ -651,34 +756,100 @@ export function TtsSettingsSection() {
 
         {modelSectionOpen && (
           <div className="p-4 pt-2 border-t border-border/50 space-y-4">
-            {/* Gemini 专属语音模型选择 */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Gemini 语音生成专属模型</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {GEMINI_MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setModelId(m.id)}
-                    className={cn(
-                      'flex flex-col text-left p-2.5 rounded-lg border text-xs transition-colors cursor-pointer',
-                      modelId === m.id
-                        ? 'border-primary/50 bg-primary/10 text-primary font-medium'
-                        : 'border-border/50 hover:bg-muted/50 text-foreground',
-                    )}
-                  >
-                    <span className="font-semibold">{m.name}</span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</span>
-                  </button>
-                ))}
+            {/* Gemini 专属语音模型选择与下拉 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground">Gemini 语音生成模型选择</label>
+                  {remoteModels.length > 0 && (
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 font-medium">
+                      云端已同步 {remoteModels.length} 个模型
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSyncRemoteModels(false)}
+                  disabled={loadingModels}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="调用 Google API 获取当前 Key 可用的最新语音模型列表"
+                >
+                  <RefreshCw className={cn('size-3', loadingModels && 'animate-spin')} />
+                  {loadingModels ? '正在查询云端…' : '从 Google 同步可用模型'}
+                </button>
               </div>
+
+              {/* 下拉选择器 */}
+              <select
+                value={displayModels.some((m) => m.id === modelId) ? modelId : 'custom'}
+                onChange={(e) => {
+                  if (e.target.value !== 'custom') {
+                    setModelId(e.target.value)
+                  }
+                }}
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-input bg-background text-foreground cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-primary"
+              >
+                {displayModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.badge})
+                  </option>
+                ))}
+                <option value="custom">✏️ 自定义输入模型 ID…</option>
+              </select>
+
+              {/* 自定义模型输入框 */}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder="输入 Gemini 语音模型 ID..."
+                  value={modelId}
+                  onChange={(e) => setModelId(e.target.value.trim())}
+                  className="h-8 font-mono text-xs flex-1"
+                />
+              </div>
+
+              {/* 模型特性提示 */}
+              {(() => {
+                const matched = displayModels.find((m) => m.id === modelId)
+                if (matched) {
+                  return (
+                    <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/40 p-2 rounded-md border border-border/40">
+                      💡 <strong>{matched.name}</strong>：{matched.desc}
+                    </p>
+                  )
+                }
+                return (
+                  <p className="text-[11px] text-amber-500/90 leading-relaxed bg-amber-500/10 p-2 rounded-md border border-amber-500/20">
+                    ⚙️ 正在使用自定义模型 ID。请确保该模型在您的 Google API 项目中支持 <code>responseModalities: ["AUDIO"]</code>。
+                  </p>
+                )
+              })()}
             </div>
 
             {/* 音色音质选择 */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">发音人音色选择</label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground">发音人音色选择</label>
+                  {remoteVoices.length > 0 && (
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 font-medium">
+                      云端返回 {remoteVoices.length} 个音色
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSyncRemoteVoices(false)}
+                  disabled={loadingVoices}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="从远端接口刷新可用音色库"
+                >
+                  <RefreshCw className={cn('size-3', loadingVoices && 'animate-spin')} />
+                  {loadingVoices ? '正在同步…' : '刷新音色库'}
+                </button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {GEMINI_VOICES.map((v) => (
+                {displayVoices.map((v) => (
                   <button
                     key={v.id}
                     type="button"
@@ -691,7 +862,7 @@ export function TtsSettingsSection() {
                     )}
                   >
                     <span className="font-semibold">{v.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{v.desc}</span>
+                    <span className="text-[10px] text-muted-foreground">{v.description || v.id}</span>
                   </button>
                 ))}
               </div>

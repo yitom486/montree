@@ -40,10 +40,15 @@ export interface TtsSynthesizePayload {
   unitLabel?: string
   forceKeyType?: 'primary' | 'secondary'
 
-  // 可选厂商特定参数
+  // 可选厂商特定参数与密钥实时覆盖
+  primaryApiKey?: string
+  secondaryApiKey?: string
   azureApiKey?: string
   azureRegion?: string
   localEndpoint?: string
+  localApiKey?: string
+  localModel?: string
+  localVoice?: string
 }
 
 export interface TtsSynthesizeResult {
@@ -52,6 +57,28 @@ export interface TtsSynthesizeResult {
   fromCache: boolean
   keyUsed?: 'primary' | 'secondary' | 'system'
   cooldownActivated?: boolean
+}
+
+export interface TtsStreamChunkPayload {
+  streamId: string
+  chunkIndex: number
+  audioBase64: string
+  mimeType: string
+}
+
+export interface TtsStreamEndPayload {
+  streamId: string
+  totalChunks: number
+  audioBase64: string
+  mimeType: string
+  fromCache: boolean
+  keyUsed?: 'primary' | 'secondary' | 'system'
+}
+
+export interface TtsStreamErrorPayload {
+  streamId: string
+  error: string
+  canFallbackToSystem?: boolean
 }
 
 export interface TtsCacheStats {
@@ -81,3 +108,44 @@ export interface TtsVoiceInfo {
   gender: 'male' | 'female' | 'neutral'
   description: string
 }
+
+export interface TtsRemoteModelItem {
+  id: string
+  name: string
+  description?: string
+  isRecommended?: boolean
+  tier?: string
+}
+
+export interface TtsBatchItemPayload {
+  key: string
+  text: string
+  voiceName?: string
+  speechMetadata?: string
+}
+
+export interface TtsBatchCreatePayload {
+  provider?: TtsProviderType
+  apiKey?: string
+  model?: string
+  voiceName?: string
+  displayName?: string
+  items: TtsBatchItemPayload[]
+}
+
+export interface TtsBatchItemResult {
+  key: string
+  ok: boolean
+  audioBase64?: string
+  mimeType?: string
+  error?: string
+}
+
+export interface TtsBatchJobStatus {
+  name: string
+  state: string
+  model?: string
+  displayName?: string
+  results?: TtsBatchItemResult[]
+}
+

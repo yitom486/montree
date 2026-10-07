@@ -61,14 +61,26 @@ import type { SyncConfig } from '@montree/contracts'
 import { syncManager } from '../services/sync/sync-manager'
 import { readSyncConfig, writeSyncConfig } from '../services/sync/sync-config-service'
 import { writeLocalProgress } from '../services/sync/reading-progress-sync'
-import type { TtsConfig, TtsSynthesizePayload, TtsTestKeyPayload } from '@montree/contracts'
+import type {
+  TtsConfig,
+  TtsSynthesizePayload,
+  TtsTestKeyPayload,
+  TtsBatchCreatePayload,
+} from '@montree/contracts'
 import {
   readTtsConfig,
   writeTtsConfig,
   synthesizeTts,
+  synthesizeTtsStream,
+  cancelTtsStream,
   testTtsKey,
   getTtsCacheStats,
   clearTtsCache,
+  listTtsModels,
+  listTtsVoices,
+  createTtsBatchJob,
+  getTtsBatchJob,
+  cancelTtsBatchJob,
 } from '../services/tts/tts-service'
 import {
   exportHtmlDocument,
@@ -938,9 +950,38 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.TTS_SYNTHESIZE, async (_event, payload: TtsSynthesizePayload) =>
     synthesizeTts(payload),
   )
+  ipcMain.handle(
+    IPC.TTS_SYNTHESIZE_STREAM,
+    async (event, payload: TtsSynthesizePayload & { streamId: string }) =>
+      synthesizeTtsStream(event.sender, payload),
+  )
+  ipcMain.handle(IPC.TTS_CANCEL_STREAM, async (_event, streamId: string) =>
+    cancelTtsStream(streamId),
+  )
   ipcMain.handle(IPC.TTS_TEST_KEY, async (_event, payload: TtsTestKeyPayload) =>
     testTtsKey(payload),
   )
   ipcMain.handle(IPC.TTS_GET_CACHE_STATS, async () => getTtsCacheStats())
   ipcMain.handle(IPC.TTS_CLEAR_CACHE, async () => clearTtsCache())
+  ipcMain.handle(IPC.TTS_LIST_MODELS, async (_event, apiKey?: string) =>
+    listTtsModels(apiKey),
+  )
+  ipcMain.handle(
+    IPC.TTS_LIST_VOICES,
+    async (_event, provider?: string, apiKey?: string, region?: string) =>
+      listTtsVoices(provider, apiKey, region),
+  )
+  ipcMain.handle(
+    IPC.TTS_CREATE_BATCH_JOB,
+    async (_event, payload: TtsBatchCreatePayload) =>
+      createTtsBatchJob(payload),
+  )
+  ipcMain.handle(IPC.TTS_GET_BATCH_JOB, async (_event, name: string, apiKey?: string) =>
+    getTtsBatchJob(name, apiKey),
+  )
+  ipcMain.handle(
+    IPC.TTS_CANCEL_BATCH_JOB,
+    async (_event, name: string, apiKey?: string) =>
+      cancelTtsBatchJob(name, apiKey),
+  )
 }

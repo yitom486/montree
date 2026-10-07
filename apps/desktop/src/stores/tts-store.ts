@@ -11,6 +11,7 @@ import {
   sanitizeReaderText,
   type SentenceItem,
 } from '@/lib/reader/tts/text-sanitizer'
+import { PcmStreamPlayer, base64ToBytes } from 'gemini-tts-studio/client'
 
 export interface TtsStoreState extends TtsConfig {
   // 运行时播放状态
@@ -75,10 +76,25 @@ export interface TtsStoreState extends TtsConfig {
 }
 
 let activeAudio: HTMLAudioElement | null = null
+let activePcmPlayer: PcmStreamPlayer | null = null
+let activeCancelStream: (() => Promise<unknown>) | null = null
+let streamProgressTimer: any = null
 let currentUtterance: SpeechSynthesisUtterance | null = null
 let systemSentenceIndex = 0
 
 function stopAllPlayback(): void {
+  if (streamProgressTimer) {
+    clearInterval(streamProgressTimer)
+    streamProgressTimer = null
+  }
+  if (activeCancelStream) {
+    void activeCancelStream()
+    activeCancelStream = null
+  }
+  if (activePcmPlayer) {
+    void activePcmPlayer.close()
+    activePcmPlayer = null
+  }
   if (activeAudio) {
     activeAudio.pause()
     activeAudio.removeAttribute('src')
@@ -91,6 +107,60 @@ function stopAllPlayback(): void {
   }
 }
 
+function prefetchNextChapter(): void {
+  const provider = getReaderContentProvider()
+  if (!provider) return
+
+  setTimeout(async () => {
+    try {
+      let nextText = ''
+      let nextLabel = '下一章节'
+
+      if (typeof provider.iterateUnits === 'function') {
+        let foundCurrent = false
+        for await (const unit of provider.iterateUnits()) {
+          if (foundCurrent) {
+            nextText = unit.text
+            nextLabel = unit.label
+            break
+          }
+          if (unit.label === useTtsStore.getState().currentTitle) {
+            foundCurrent = true
+          }
+        }
+      }
+
+      if (nextText && nextText.trim()) {
+        const state = useTtsStore.getState()
+        const { fullCleanText } = sanitizeReaderText(nextText, {
+          filterFootnotesAndCitations: state.filterFootnotesAndCitations,
+          filterLinksAndTechnicalMarkup: state.filterLinksAndTechnicalMarkup,
+        })
+        if (fullCleanText) {
+          void ttsApi.synthesize({
+            text: fullCleanText,
+            provider: state.provider,
+            voiceName: state.voiceName,
+            modelId: state.modelId,
+            rate: state.rate,
+            unitLabel: nextLabel,
+            primaryApiKey: state.primaryApiKey,
+            secondaryApiKey: state.secondaryApiKey,
+            azureApiKey: state.azureApiKey,
+            azureRegion: state.azureRegion,
+            localEndpoint: state.localEndpoint,
+            localApiKey: state.localApiKey,
+            localModel: state.localModel,
+            localVoice: state.localVoice,
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('[TTS] 后台预取下一章跳过:', e)
+    }
+  }, 2000)
+}
+
 export const useTtsStore = create<TtsStoreState>()(
   persist(
     (set, get) => ({
@@ -101,7 +171,7 @@ export const useTtsStore = create<TtsStoreState>()(
       voiceName: 'Aoede',
       voiceNameMale: 'Puck',
       voiceNameFemale: 'Aoede',
-      modelId: 'gemini-3.8-flash-tts',
+      modelId: 'gemini-3.8-flash-lite-tts',
       azureApiKey: '',
       azureRegion: 'eastasia',
       azureVoice: 'zh-CN-XiaoxiaoNeural',
@@ -251,143 +321,226 @@ export const useTtsStore = create<TtsStoreState>()(
         })
 
         const state = get()
+
+        const startSystemSpeech = (startIndex: number) => {
+          if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+            toast.error('当前系统不支持语音播放')
+            set({ isLoading: false, isSpeaking: false })
+            return
+          }
+
+          set({
+            isLoading: false,
+            keyUsed: 'system',
+            isFromCache: false,
+            duration: sentences.length * 3, // 估算
+            currentSentenceIndex: startIndex,
+            isSpeaking: true,
+            isPaused: false,
+          })
+
+          systemSentenceIndex = startIndex
+          const speakNextSentence = (idx: number) => {
+            if (idx >= sentences.length) {
+              set({ isSpeaking: false, isPaused: false })
+              toast.success('本章朗读完毕')
+              return
+            }
+
+            set({ currentSentenceIndex: idx })
+            get().saveChapterProgress(get().currentTitle, idx)
+            const item = sentences[idx]
+            const utt = new SpeechSynthesisUtterance(item.text)
+            currentUtterance = utt
+            utt.rate = state.rate
+
+            utt.onend = () => {
+              speakNextSentence(idx + 1)
+            }
+
+            utt.onerror = (e) => {
+              if (e.error !== 'canceled') {
+                console.warn('[TTS Web Speech Error]', e)
+              }
+            }
+
+            window.speechSynthesis.speak(utt)
+          }
+
+          speakNextSentence(startIndex)
+        }
+
         const shouldUseOnlineTts =
           (state.provider === 'gemini' && Boolean(state.primaryApiKey.trim() || state.secondaryApiKey.trim())) ||
           (state.provider === 'azure' && Boolean(state.azureApiKey?.trim())) ||
           (state.provider === 'local' && Boolean(state.localEndpoint?.trim()))
 
         if (shouldUseOnlineTts) {
-          try {
-            const result = await ttsApi.synthesize({
-              text: fullCleanText,
-              provider: state.provider,
-              voiceName: state.provider === 'azure' ? state.azureVoice : state.provider === 'local' ? state.localVoice : state.voiceName,
-              modelId: state.provider === 'local' ? state.localModel : state.modelId,
-              rate: state.rate,
-              unitLabel: title,
-              azureApiKey: state.azureApiKey,
-              azureRegion: state.azureRegion,
-              localEndpoint: state.localEndpoint,
-            })
+          const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
+          let pcmPlayer: PcmStreamPlayer | null = null
 
-            if (!result.ok) {
-              throw new Error(result.error.message)
+          if (state.provider === 'gemini') {
+            try {
+              pcmPlayer = new PcmStreamPlayer(24000)
+              await pcmPlayer.resume()
+              activePcmPlayer = pcmPlayer
+            } catch (audioCtxErr) {
+              console.warn('[TTS] Web Audio Context 初始化失败，将等待完整包播放:', audioCtxErr)
+              pcmPlayer = null
             }
+          }
 
-            const data = result.value
-            if (data.cooldownActivated) {
-              set({ cooldownUntil: Date.now() + 60_000 })
-              toast.info('主用 API 触发频率限制，已自动切换备用 Key 接管（60 秒后恢复免费 Key）')
-            }
+          let streamCompleted = false
 
-            if (data.keyUsed === 'system' || !data.audioBase64) {
-              // 自动回退系统语音
-              throw new Error('未获取到音频数据，回退至系统语音')
-            }
-
-            // 加载 base64 WAV 音频
-            const audio = new Audio(`data:${data.mimeType};base64,${data.audioBase64}`)
-            activeAudio = audio
-            audio.playbackRate = state.rate
-
-            audio.onloadedmetadata = () => {
-              const dur = audio.duration || 0
-              const timedSentences = allocateSentenceTimeline(sentences, dur)
-              const startItem = timedSentences[initialIndex]
-              const startSeek = startItem?.startTime || 0
-              if (startSeek > 0) {
-                audio.currentTime = startSeek
-              }
-
-              set({
-                duration: dur,
-                sentences: timedSentences,
-                currentTime: startSeek,
-                currentSentenceIndex: initialIndex,
-                isFromCache: data.fromCache,
-                keyUsed: data.keyUsed ?? 'primary',
-                isLoading: false,
-              })
-              audio.play().catch((err) => {
-                toast.error(`播放失败: ${err?.message || '未知错误'}`)
-                set({ isSpeaking: false })
-              })
-            }
-
-            audio.ontimeupdate = () => {
-              const cur = audio.currentTime
+          if (pcmPlayer) {
+            if (streamProgressTimer) clearInterval(streamProgressTimer)
+            streamProgressTimer = setInterval(() => {
+              if (activePcmPlayer !== pcmPlayer || get().isPaused) return
+              const played = pcmPlayer.playedSeconds
               const curSentences = get().sentences
-              const curIdx = findCurrentSentenceIndex(curSentences, cur)
+              const curIdx = findCurrentSentenceIndex(curSentences, played)
               const prevIdx = get().currentSentenceIndex
               set({
-                currentTime: cur,
+                currentTime: played,
                 currentSentenceIndex: curIdx,
               })
               if (curIdx !== prevIdx) {
                 get().saveChapterProgress(get().currentTitle, curIdx)
               }
-            }
-
-            audio.onended = () => {
-              set({ isSpeaking: false, isPaused: false })
-              toast.success('本章朗读完毕')
-            }
-
-            audio.onerror = () => {
-              toast.error('音频解码播放失败')
-              set({ isSpeaking: false, isLoading: false })
-            }
-
-            return
-          } catch (err: any) {
-            console.warn('[TTS] Gemini 合成失败，尝试降级系统原生语音:', err)
-            toast.error(`Gemini 合成失败（${err?.message || '未知'}），已无缝切换系统原生语音兜底`)
+            }, 150)
           }
-        }
 
-        // 2. 兜底回退：系统原生 Web Speech API
-        if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-          toast.error('当前系统不支持语音播放')
-          set({ isLoading: false, isSpeaking: false })
+          const { cancel, promise } = ttsApi.synthesizeStream(
+            {
+              streamId,
+              text: fullCleanText,
+              provider: state.provider,
+              voiceName: state.provider === 'azure' ? state.azureVoice : state.provider === 'local' ? state.localVoice : state.voiceName,
+              modelId: state.provider === 'local' ? state.localModel : (state.modelId || 'gemini-3.8-flash-lite-tts'),
+              rate: state.rate,
+              unitLabel: title,
+              primaryApiKey: state.primaryApiKey,
+              secondaryApiKey: state.secondaryApiKey,
+              azureApiKey: state.azureApiKey,
+              azureRegion: state.azureRegion,
+              localEndpoint: state.localEndpoint,
+              localApiKey: state.localApiKey,
+              localModel: state.localModel,
+              localVoice: state.localVoice,
+            },
+            {
+              onChunk: (chunk) => {
+                if (!pcmPlayer || activePcmPlayer !== pcmPlayer) return
+                try {
+                  const bytes = base64ToBytes(chunk.audioBase64)
+                  pcmPlayer.pushChunk(bytes)
+                  if (get().isLoading) {
+                    set({ isLoading: false, isSpeaking: true })
+                  }
+                } catch (decErr) {
+                  console.warn('[TTS] PCM 分片解码推送失败:', decErr)
+                }
+              },
+              onEnd: (end) => {
+                streamCompleted = true
+                const isCacheHit = end.fromCache
+                set({
+                  isFromCache: isCacheHit,
+                  keyUsed: end.keyUsed ?? 'primary',
+                })
+
+                const audio = new Audio(`data:${end.mimeType};base64,${end.audioBase64}`)
+                audio.playbackRate = get().rate
+                activeAudio = audio
+
+                audio.onloadedmetadata = () => {
+                  const dur = audio.duration || 0
+                  const timedSentences = allocateSentenceTimeline(get().sentences, dur)
+                  set({
+                    duration: dur,
+                    sentences: timedSentences,
+                    isLoading: false,
+                  })
+
+                  if (isCacheHit || !pcmPlayer) {
+                    if (pcmPlayer) {
+                      void pcmPlayer.close()
+                      activePcmPlayer = null
+                    }
+                    if (streamProgressTimer) {
+                      clearInterval(streamProgressTimer)
+                      streamProgressTimer = null
+                    }
+                    const startItem = timedSentences[initialIndex]
+                    const startSeek = startItem?.startTime || 0
+                    if (startSeek > 0) {
+                      audio.currentTime = startSeek
+                    }
+                    set({
+                      currentTime: startSeek,
+                      currentSentenceIndex: initialIndex,
+                    })
+                    audio.play().catch((err) => {
+                      toast.error(`播放失败: ${err?.message || '未知错误'}`)
+                      set({ isSpeaking: false })
+                    })
+                  }
+                }
+
+                audio.ontimeupdate = () => {
+                  if (activePcmPlayer) return
+                  const cur = audio.currentTime
+                  const curSentences = get().sentences
+                  const curIdx = findCurrentSentenceIndex(curSentences, cur)
+                  const prevIdx = get().currentSentenceIndex
+                  set({
+                    currentTime: cur,
+                    currentSentenceIndex: curIdx,
+                  })
+                  if (curIdx !== prevIdx) {
+                    get().saveChapterProgress(get().currentTitle, curIdx)
+                  }
+                }
+
+                audio.onended = () => {
+                  set({ isSpeaking: false, isPaused: false })
+                  toast.success('本章朗读完毕')
+                  prefetchNextChapter()
+                }
+
+                audio.onerror = () => {
+                  if (activePcmPlayer) return
+                  toast.error('音频解码播放失败')
+                  set({ isSpeaking: false, isLoading: false })
+                }
+
+                prefetchNextChapter()
+              },
+              onError: (errPayload) => {
+                console.warn('[TTS] 流式合成失败，准备降级系统语音:', errPayload.error)
+                stopAllPlayback()
+                toast.error(`Gemini 合成失败（${errPayload.error || '未知'}），已无缝切换系统原生语音兜底`)
+                startSystemSpeech(initialIndex)
+              },
+            },
+          )
+
+          activeCancelStream = cancel
+
+          const startRes = await promise
+          if (!startRes.ok) {
+            console.warn('[TTS] 流式启动调用未成功，降级系统语音:', startRes.error.message)
+            stopAllPlayback()
+            toast.error(`Gemini 合成失败（${startRes.error.message}），已无缝切换系统原生语音兜底`)
+            startSystemSpeech(initialIndex)
+            return
+          }
+
           return
         }
 
-        set({
-          isLoading: false,
-          keyUsed: 'system',
-          isFromCache: false,
-          duration: sentences.length * 3, // 估算
-        })
-
-        systemSentenceIndex = initialIndex
-        const speakNextSentence = (idx: number) => {
-          if (idx >= sentences.length) {
-            set({ isSpeaking: false, isPaused: false })
-            toast.success('本章朗读完毕')
-            return
-          }
-
-          set({ currentSentenceIndex: idx })
-          get().saveChapterProgress(get().currentTitle, idx)
-          const item = sentences[idx]
-          const utt = new SpeechSynthesisUtterance(item.text)
-          currentUtterance = utt
-          utt.rate = state.rate
-
-          utt.onend = () => {
-            speakNextSentence(idx + 1)
-          }
-
-          utt.onerror = (e) => {
-            if (e.error !== 'canceled') {
-              console.warn('[TTS Web Speech Error]', e)
-            }
-          }
-
-          window.speechSynthesis.speak(utt)
-        }
-
-        speakNextSentence(initialIndex)
+        // 2. 兜底回退：系统原生 Web Speech API
+        startSystemSpeech(initialIndex)
       },
 
       playFromSnippet: async (snippet: string, title?: string) => {
@@ -474,6 +627,17 @@ export const useTtsStore = create<TtsStoreState>()(
         const { isPaused, isSpeaking } = get()
         if (!isSpeaking && !isPaused) return
 
+        if (activePcmPlayer) {
+          if (isPaused) {
+            void activePcmPlayer.resume()
+            set({ isPaused: false, isSpeaking: true })
+          } else {
+            void activePcmPlayer.pause()
+            set({ isPaused: true, isSpeaking: false })
+          }
+          return
+        }
+
         if (activeAudio) {
           if (isPaused) {
             activeAudio.play().catch(() => {})
@@ -501,6 +665,15 @@ export const useTtsStore = create<TtsStoreState>()(
         if (index < 0 || index >= sentences.length) return
 
         get().saveChapterProgress(get().currentTitle, index)
+
+        if (activePcmPlayer && activeAudio) {
+          void activePcmPlayer.close()
+          activePcmPlayer = null
+          if (streamProgressTimer) {
+            clearInterval(streamProgressTimer)
+            streamProgressTimer = null
+          }
+        }
 
         if (activeAudio) {
           const target = sentences[index]
@@ -599,6 +772,31 @@ export const useTtsStore = create<TtsStoreState>()(
         isPlayerCollapsed: state.isPlayerCollapsed,
         chapterProgress: state.chapterProgress,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          void ttsApi.saveConfig({
+            enabled: state.enabled,
+            provider: state.provider,
+            primaryApiKey: state.primaryApiKey,
+            secondaryApiKey: state.secondaryApiKey,
+            voiceName: state.voiceName,
+            voiceNameMale: state.voiceNameMale,
+            voiceNameFemale: state.voiceNameFemale,
+            modelId: state.modelId,
+            azureApiKey: state.azureApiKey,
+            azureRegion: state.azureRegion,
+            azureVoice: state.azureVoice,
+            localEndpoint: state.localEndpoint,
+            localApiKey: state.localApiKey,
+            localModel: state.localModel,
+            localVoice: state.localVoice,
+            rate: state.rate,
+            saveAudioCache: state.saveAudioCache,
+            filterFootnotesAndCitations: state.filterFootnotesAndCitations,
+            filterLinksAndTechnicalMarkup: state.filterLinksAndTechnicalMarkup,
+          })
+        }
+      },
     },
   ),
 )

@@ -305,9 +305,45 @@ const electronAPI: ElectronAPI = {
   getTtsConfig: () => ipcRenderer.invoke(IPC.TTS_GET_CONFIG),
   saveTtsConfig: (config) => ipcRenderer.invoke(IPC.TTS_SAVE_CONFIG, config),
   synthesizeTts: (payload) => ipcRenderer.invoke(IPC.TTS_SYNTHESIZE, payload),
+  synthesizeTtsStream: (payload) => ipcRenderer.invoke(IPC.TTS_SYNTHESIZE_STREAM, payload),
+  cancelTtsStream: (streamId) => ipcRenderer.invoke(IPC.TTS_CANCEL_STREAM, streamId),
+  onTtsStreamChunk: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => {
+      callback(payload)
+    }
+    ipcRenderer.on(IPC.TTS_STREAM_CHUNK, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC.TTS_STREAM_CHUNK, handler)
+    }
+  },
+  onTtsStreamEnd: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => {
+      callback(payload)
+    }
+    ipcRenderer.on(IPC.TTS_STREAM_END, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC.TTS_STREAM_END, handler)
+    }
+  },
+  onTtsStreamError: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => {
+      callback(payload)
+    }
+    ipcRenderer.on(IPC.TTS_STREAM_ERROR, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC.TTS_STREAM_ERROR, handler)
+    }
+  },
   testTtsKey: (payload) => ipcRenderer.invoke(IPC.TTS_TEST_KEY, payload),
   getTtsCacheStats: () => ipcRenderer.invoke(IPC.TTS_GET_CACHE_STATS),
   clearTtsCache: () => ipcRenderer.invoke(IPC.TTS_CLEAR_CACHE),
+  listTtsModels: (apiKey?: string) => ipcRenderer.invoke(IPC.TTS_LIST_MODELS, apiKey),
+  listTtsVoices: (provider?: string, apiKey?: string, region?: string) =>
+    ipcRenderer.invoke(IPC.TTS_LIST_VOICES, provider, apiKey, region),
+  createTtsBatchJob: (payload) => ipcRenderer.invoke(IPC.TTS_CREATE_BATCH_JOB, payload),
+  getTtsBatchJob: (name, apiKey) => ipcRenderer.invoke(IPC.TTS_GET_BATCH_JOB, name, apiKey),
+  cancelTtsBatchJob: (name, apiKey) =>
+    ipcRenderer.invoke(IPC.TTS_CANCEL_BATCH_JOB, name, apiKey),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

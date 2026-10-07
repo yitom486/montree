@@ -13,14 +13,14 @@ describe('tts-service', () => {
     expect(DEFAULT_TTS_CONFIG.voiceName).toBe('Aoede')
     expect(DEFAULT_TTS_CONFIG.voiceNameMale).toBe('Puck')
     expect(DEFAULT_TTS_CONFIG.voiceNameFemale).toBe('Aoede')
-    expect(DEFAULT_TTS_CONFIG.modelId).toBe('gemini-3.8-flash-tts')
+    expect(DEFAULT_TTS_CONFIG.modelId).toBe('gemini-3.8-flash-lite-tts')
     expect(DEFAULT_TTS_CONFIG.saveAudioCache).toBe(true)
   })
 
   it('应当自动将纯文本模型纠正为语音专属模型', () => {
-    expect(resolveTtsModelId('gemini-2.5-flash')).toBe('gemini-3.8-flash-tts')
-    expect(resolveTtsModelId('gemini-1.5-pro')).toBe('gemini-3.8-flash-tts')
-    expect(resolveTtsModelId('')).toBe('gemini-3.8-flash-tts')
+    expect(resolveTtsModelId('gemini-2.5-flash')).toBe('gemini-3.8-flash-lite-tts')
+    expect(resolveTtsModelId('gemini-1.5-pro')).toBe('gemini-3.8-flash-lite-tts')
+    expect(resolveTtsModelId('')).toBe('gemini-3.8-flash-lite-tts')
     expect(resolveTtsModelId('gemini-2.0-flash')).toBe('gemini-2.0-flash')
     expect(resolveTtsModelId('gemini-3.8-flash-tts')).toBe('gemini-3.8-flash-tts')
   })
