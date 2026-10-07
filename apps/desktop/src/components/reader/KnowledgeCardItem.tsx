@@ -13,11 +13,15 @@ import {
   Maximize2,
   Layers,
   GitCommit,
+  Brain,
 } from 'lucide-react'
 import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
 import { filterRedundantKeyPoints, resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 import { renderAgentMarkdown } from '@/lib/agent/agent-markdown'
+import { MarkdownContent } from '@/components/markdown/MarkdownContent'
+import '@/styles/markdown-preview.css'
+import { cn } from '@/lib/utils'
 
 export interface KnowledgeCardItemProps {
   mark: ReadingMark
@@ -29,6 +33,8 @@ export interface KnowledgeCardItemProps {
   onAnchorClick?: () => void
   onCardClick?: () => void
   onHover?: (hovering: boolean) => void
+  onQuiz?: () => void
+  onReview?: () => void
   /** 出处：卡片主人的章节归属（如“第一章 北美的外貌”），缺省不显示 */
   sourceLabel?: string
 }
@@ -43,6 +49,8 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
   onAnchorClick,
   onCardClick,
   onHover,
+  onQuiz,
+  onReview,
   sourceLabel,
 }) => {
   const [copied, setCopied] = useState(false)
@@ -413,12 +421,29 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
           <div className="mb-2">
             <div
               className={`text-foreground text-[11px] leading-relaxed transition-all ${
-                !isNoteExpanded && resolved.displayNote.length > 150 ? 'line-clamp-4' : ''
+                !isNoteExpanded && resolved.displayNote.length > 150 ? 'max-h-28 overflow-hidden relative' : ''
               }`}
-              dangerouslySetInnerHTML={{
-                __html: renderAgentMarkdown(resolved.displayNote),
-              }}
-            />
+            >
+              <MarkdownContent
+                html={renderAgentMarkdown(resolved.displayNote)}
+                deferMermaid={false}
+                className={cn(
+                  'markdown-preview agent-md text-[11px] leading-relaxed text-foreground min-w-0 max-w-full break-words [overflow-wrap:anywhere]',
+                  '[&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
+                  '[&_h1]:text-xs [&_h1]:font-bold [&_h1]:my-1.5',
+                  '[&_h2]:text-xs [&_h2]:font-bold [&_h2]:my-1',
+                  '[&_h3]:text-[11px] [&_h3]:font-semibold [&_h3]:my-0.5',
+                  '[&_blockquote]:my-1.5 [&_blockquote]:py-1 [&_blockquote]:px-2.5 [&_blockquote]:text-[10.5px] [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:bg-primary/5 [&_blockquote]:rounded-r-md',
+                  '[&_ul]:my-1 [&_ul]:pl-3.5 [&_ol]:my-1 [&_ol]:pl-3.5 [&_li]:my-0.5',
+                  '[&_code]:text-[10px] [&_code]:px-1 [&_code]:py-0.5 [&_code]:bg-muted/80 [&_code]:rounded',
+                  '[&_pre]:my-1.5 [&_pre]:p-2 [&_pre]:text-[10px] [&_pre]:rounded-md [&_pre]:bg-muted/60',
+                  '[&_.mermaid]:my-2 [&_.mermaid]:overflow-x-auto [&_.mermaid]:rounded-lg [&_.mermaid]:border [&_.mermaid]:border-border/60 [&_.mermaid]:bg-card/90 [&_.mermaid]:p-2',
+                )}
+              />
+              {!isNoteExpanded && resolved.displayNote.length > 150 && (
+                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+              )}
+            </div>
             {resolved.displayNote.length > 150 && (
               <button
                 type="button"
@@ -483,6 +508,45 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
             <span>展开时序图大图</span>
             <ChevronRight className="w-3 h-3" />
           </button>
+        </div>
+      )}
+
+      {/* 底部微晶交互栏：AI 针对本卡出题 + 3D 闪卡抽认 */}
+      {(onQuiz || onReview) && (
+        <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[10px]">
+          <div className="flex items-center gap-1.5">
+            {onQuiz && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onQuiz()
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors cursor-pointer font-medium"
+                title="让 AI 考官专门针对该卡片的核心知识点出题考我"
+              >
+                <Sparkles className="size-3 text-primary" />
+                <span>考考我</span>
+              </button>
+            )}
+            {onReview && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReview()
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 transition-colors cursor-pointer font-medium"
+                title="以 3D 闪卡形式抽认复习此卡"
+              >
+                <Brain className="size-3 text-amber-500" />
+                <span>闪卡</span>
+              </button>
+            )}
+          </div>
+          <span className="text-[9.5px] text-muted-foreground/70 font-mono">
+            知识内化
+          </span>
         </div>
       )}
     </div>

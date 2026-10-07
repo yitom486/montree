@@ -307,4 +307,87 @@ describe('quiz-db（[2]-02a 测验全局库后端）', () => {
     const count = (db.prepare('SELECT COUNT(*) AS c FROM quiz_sessions').get() as { c: number }).c
     expect(count).toBe(0)
   })
+
+  it('多题型（选择/设计）与 AI 整卷建议 overallFeedback 持久化 round-trip 保真', async () => {
+    const sessionWithFeedback: QuizSessionRecord = {
+      id: 'session-rich-1',
+      bookTitle: '深度架构实战',
+      filePath: 'D:/books/architecture.pdf',
+      createdAt: '2026-09-10T10:00:00.000Z',
+      totalScore: 92,
+      grade: 'A',
+      overallFeedback: '整卷表现优异！在客观选择与系统设计上均展现出扎实的工程权衡能力，建议继续保持。',
+      questions: [
+        {
+          id: 'q-choice',
+          title: '一致性协议选型',
+          prompt: '在分区容错场景下，以下哪种方案最适合强一致读？',
+          type: 'choice',
+          options: ['A. Raft 租约读', 'B. 最终一致异步复制', 'C. 纯缓存直读', 'D. 广播读'],
+          correctOption: 'A',
+          explanation: 'Raft 租约读（Leader Lease）在满足时间戳漂移边界内可无需额外网络往返实现线性一致。',
+          keyPoints: ['线性一致性', '租约机制'],
+          sourceExcerpt: '一致性模型章节重点阐述了租约读与日志复制的协同机制。',
+        },
+        {
+          id: 'q-design',
+          title: '高可用容灾架构设计',
+          prompt: '请设计跨双机房的零数据丢失部署方案。',
+          type: 'essay_design',
+          designRequirements: ['RPO=0 保证', '跨机房延迟 < 10ms', '故障自动倒换'],
+          keyPoints: ['双活架构', '同步复制', '健康探测仲裁'],
+          sourceExcerpt: '在金融核心系统中，同城双活与仲裁节点是保障业务连续性的基石。',
+        },
+      ],
+      submissions: {
+        'q-choice': {
+          questionId: 'q-choice',
+          userAnswer: 'A. Raft 租约读',
+          score: 100,
+          grade: 'A',
+          feedback: '完全正确！抓住了 Leader Lease 的核心优势。',
+          hitKeyPoints: ['线性一致性', '租约机制'],
+          missedKeyPoints: [],
+          gradedAt: '2026-09-10T10:05:00.000Z',
+        },
+        'q-design': {
+          questionId: 'q-design',
+          userAnswer: '采用 Raft 三副本（主机房 2 副本 + 备机房 1 副本 + 仲裁节点），同步日志落盘，达成 RPO=0。',
+          score: 84,
+          grade: 'B',
+          feedback: '架构方案完整可行，双机房倒换仲裁逻辑清晰。',
+          hitKeyPoints: ['双活架构', '同步复制'],
+          missedKeyPoints: ['跨机房网络延迟边界'],
+          gradedAt: '2026-09-10T10:08:00.000Z',
+        },
+      },
+    }
+
+    expect(isOk(await appendQuizSession(sessionWithFeedback))).toBe(true)
+
+    const all = await readAllQuizSessions()
+    expect(isOk(all)).toBe(true)
+    if (!isOk(all)) return
+    const fetched = all.value.find((s) => s.id === 'session-rich-1')
+    expect(fetched).toBeDefined()
+    expect(fetched?.overallFeedback).toBe(sessionWithFeedback.overallFeedback)
+    expect(fetched?.questions).toHaveLength(2)
+
+    // 选择题选项与解析保真
+    const choiceQ = fetched?.questions.find((q) => q.id === 'q-choice')
+    expect(choiceQ?.type).toBe('choice')
+    expect(choiceQ?.options).toEqual(sessionWithFeedback.questions[0].options)
+    expect(choiceQ?.correctOption).toBe('A')
+    expect(choiceQ?.explanation).toContain('租约读')
+
+    // 设计题设计指标清单保真
+    const designQ = fetched?.questions.find((q) => q.id === 'q-design')
+    expect(designQ?.type).toBe('essay_design')
+    expect(designQ?.designRequirements).toEqual(sessionWithFeedback.questions[1].designRequirements)
+
+    // 逐题批改与采分点保真
+    expect(fetched?.submissions['q-choice'].score).toBe(100)
+    expect(fetched?.submissions['q-design'].feedback).toContain('双机房倒换')
+  })
 })
+

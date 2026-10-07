@@ -10,20 +10,20 @@
 | `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay） |
 | `PdfOcrBanner` / `PdfOcrTocEditor` | 扫描版 OCR 提示与目录校正（含偏移自动推算、AI 整理槽位） |
 | `TocAiPolishControl` | 目录 AI 整理：目录副会话 + 模型/思考档选择 + JSON 解析回填草稿 |
-| `ReaderContentShell` / `ReaderToolbarShell` / `ReaderFooterNav` | 阅读区壳、工具栏、底栏翻页 |
+| `ReaderContentShell` / `ReaderToolbarShell` / `ReaderFooterNav` | 阅读区壳、工具栏（纯粹目录/加书签导航 + 右侧卡片流/札记箱/「考考我」智考一级入口）、底栏翻页 |
 | `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲 |
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
-| `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注列表（目录层级、类型筛选、当前章展开；含导出）与点击编辑浮层 |
+| `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层 |
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
 | `SelectionToolbar` | 划选工具条（划重点、问 Agent、批注、AI 制卡预设菜单等） |
 | `SelectionBubble` | 就地划选悬浮微晶气泡（解释/摘要/制卡/对比/追问五大动作、莫兰迪柔光高亮与复制） |
 | `CardPresetMenu` | AI 制卡预设菜单内容（6 方向点选 + 更多要求次级入口，工具条与气泡共用） |
 | `DeepAnswerMenu` | 一键深度问答菜单内容（三方向点即直答 + composer 追问入口保留） |
 | `DeepAnswerDialog` | 一键深度问答对话框（同会话直答选段、不进右侧时间线，可存为卡片批注） |
-| `MarginaliaBar` | 右侧知识卡片轨（分类药丸筛选、全部/单项折叠、AI 智能制卡、时序图联动） |
-| `KnowledgeCardItem` | 知识卡片单项（概念/引用/方法/图谱/思考五类微晶卡片、单行与多功能态切换、AI 润色） |
+| `MarginaliaBar` | 右侧知识卡片轨（分类药丸筛选、全部/单项折叠、AI 智能制卡、智考与闪卡控制台、时序图联动） |
+| `KnowledgeCardItem` | 知识卡片单项（批注/概念/引用/方法/图谱/思考微晶卡片、单行与多功能态切换、考考我/闪卡抽认/AI润色） |
 | `LibraryDrawer` | 馆藏书卷与在线规范侧拉抽屉（本地书库、在线规范快速切换、检索） |
-| `NotesDrawer` | 全书札记中心与闪卡抽屉（全书卡片聚合、关键词筛选、导出与一键闪卡复习） |
+| `NotesDrawer` | 全书札记中心与知识卡片箱（富文本 Markdown/Mermaid 拓扑渲染、资产盘点看板、彩色分类胶囊、宽屏自适应、一键 AI 智考出卷与闪卡复习） |
 | `BracketConnector` | 细线分支抱合括号引线（正文锚点与知识卡片间的发丝级微光连线） |
 | `AnnotationNoteDialog` | 批注输入；可选 AI 意图/结果 chip 与草稿确认 |
 | `BodyWatermarkPreviewDialog` | 正文水印清洗预览 + 二次确认应用（只读计数/样例 + 签名展示，确认态展示统计/签名，确认后调应用通道，成功展示备份路径/结果；确认前不写库；另有自定义水印文本仅预览区，无应用入口） |

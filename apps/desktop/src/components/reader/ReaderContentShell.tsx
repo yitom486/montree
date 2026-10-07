@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ReadingMarkPanel } from '@/components/reader/ReadingMarkPanel'
 import { ReaderUnitOutline } from '@/components/reader/ReaderUnitOutline'
@@ -141,7 +141,7 @@ export function ReaderContentShell({
     (filePath ? filePath.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') : undefined) ||
     '当前书籍'
 
-  const handleReviewFlashcards = async (scope: ReadingNotesScope) => {
+  const handleReviewFlashcards = async (scope: ReadingNotesScope, targetMarkId?: string) => {
     const toc = marksToc ?? []
     const currentChapter = findCurrentChapterRef(toc, marksCurrentChapterKey)
     const resolveChapter =
@@ -195,8 +195,17 @@ export function ReaderContentShell({
     }
 
     // 待复习排序（UI批）：due id 顺序 ∩ 派生卡；不在 due 中的新卡缀尾（不静默丢失）；
-    // IPC 失败回落派生顺序（今日行为）。
-    setReviewCards(sortCardsByDueOrder(exportResult.cards, await fetchDueOrder()))
+    // 若指定了目标卡片，将其调至首位
+    let sorted = sortCardsByDueOrder(exportResult.cards, await fetchDueOrder())
+    if (targetMarkId) {
+      const idx = sorted.findIndex((c) => c.id === targetMarkId)
+      if (idx > 0) {
+        const [targetCard] = sorted.splice(idx, 1)
+        sorted = [targetCard, ...sorted]
+      }
+    }
+
+    setReviewCards(sorted)
     setReviewOpen(true)
   }
 
@@ -238,6 +247,20 @@ export function ReaderContentShell({
   }
 
   const handleOpenQuiz = async (mark?: ReadingMark, scope?: 'mark' | 'chapter' | 'book') => {
+    if (scope === 'book') {
+      const targetMarks = marks.filter((m) => passageExcerpt(m).trim().length > 0)
+      const combinedExcerpt = targetMarks.slice(0, 15).map((m) => passageExcerpt(m).trim()).join('\n\n')
+      if (!combinedExcerpt) {
+        toast.info('全书中暂无重点划线，请在阅读中先行划线或添加卡片')
+        return
+      }
+      setQuizPassage(combinedExcerpt)
+      setQuizChapterTitle('全书跨章重点综合大考')
+      setQuizMarkId(undefined)
+      setQuizOpen(true)
+      return
+    }
+
     if (scope === 'chapter') {
       let chapterLabel = '当前章节'
       // 本章 scope 走 chapter_key 索引（[3]）；失败回落内存过滤（今日行为）
@@ -309,6 +332,25 @@ export function ReaderContentShell({
     setQuizMarkId(targetMark.id)
     setQuizOpen(true)
   }
+
+  const isGlobalQuizOpen = useReaderHudUiStore((s) => s.isQuizOpen)
+  const quizRequest = useReaderHudUiStore((s) => s.quizRequest)
+  const closeGlobalQuiz = useReaderHudUiStore((s) => s.closeQuiz)
+
+  useEffect(() => {
+    if (isGlobalQuizOpen) {
+      if (quizRequest?.passage) {
+        setQuizPassage(quizRequest.passage)
+        setQuizChapterTitle(quizRequest.chapterTitle)
+        setQuizMarkId(quizRequest.markId)
+        setQuizOpen(true)
+      } else {
+        const targetMark = quizRequest?.markId ? marks.find((m) => m.id === quizRequest.markId) : undefined
+        void handleOpenQuiz(targetMark, quizRequest?.scope ?? 'chapter')
+      }
+      closeGlobalQuiz()
+    }
+  }, [isGlobalQuizOpen, quizRequest, marks])
 
   const handleRetryQuestion = (passage: string, chapterTitle?: string, markId?: string) => {
     setQuizPassage(passage)
@@ -426,6 +468,10 @@ export function ReaderContentShell({
           onToggleAllCollapse={handleToggleAllCollapse}
           onCloseRail={() => preserveScrollAnchor(() => setIsCardRailOpen(false))}
           onGenerateAiCard={() => openPanelAndFocusComposer()}
+          onOpenQuiz={handleOpenQuiz}
+          onOpenQuizHistory={() => setQuizHistoryOpen(true)}
+          onReviewFlashcards={handleReviewFlashcards}
+          onExportAnkiCards={onExportAnkiCards}
           className="h-full"
         />
       ) : null}

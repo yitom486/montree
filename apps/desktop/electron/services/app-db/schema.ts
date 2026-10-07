@@ -64,6 +64,56 @@ const MIGRATIONS: Record<number, string> = {
 );`,
 }
 
+function getTableColumns(db: DatabaseSync, tableName: string): Set<string> {
+  try {
+    const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>
+    return new Set(rows.map((r) => r.name))
+  } catch {
+    return new Set()
+  }
+}
+
+/** 幂等补齐测验多题型扩展与 AI 整体建议列（安全兼容老库与测试降级） */
+export function ensureQuizCompatibilityColumns(db: DatabaseSync): void {
+  const sessionCols = getTableColumns(db, 'quiz_sessions')
+  if (sessionCols.has('id') && !sessionCols.has('overall_feedback')) {
+    try {
+      db.exec('ALTER TABLE quiz_sessions ADD COLUMN overall_feedback TEXT')
+    } catch {
+      // 容错防止并发时重复添加
+    }
+  }
+
+  const questionCols = getTableColumns(db, 'quiz_questions')
+  if (questionCols.has('id')) {
+    if (!questionCols.has('type')) {
+      try {
+        db.exec('ALTER TABLE quiz_questions ADD COLUMN type TEXT')
+      } catch {}
+    }
+    if (!questionCols.has('options')) {
+      try {
+        db.exec('ALTER TABLE quiz_questions ADD COLUMN options TEXT')
+      } catch {}
+    }
+    if (!questionCols.has('correct_option')) {
+      try {
+        db.exec('ALTER TABLE quiz_questions ADD COLUMN correct_option TEXT')
+      } catch {}
+    }
+    if (!questionCols.has('explanation')) {
+      try {
+        db.exec('ALTER TABLE quiz_questions ADD COLUMN explanation TEXT')
+      } catch {}
+    }
+    if (!questionCols.has('design_requirements')) {
+      try {
+        db.exec('ALTER TABLE quiz_questions ADD COLUMN design_requirements TEXT')
+      } catch {}
+    }
+  }
+}
+
 export function getMontreeDbVersion(db: DatabaseSync): number {
   const row = db.prepare('PRAGMA user_version').get() as { user_version?: unknown } | undefined
   const version = row?.user_version
@@ -88,6 +138,7 @@ export function migrateMontreeDb(db: DatabaseSync): { migrated: boolean; version
     db.exec(sql)
     db.exec(`PRAGMA user_version = ${version}`)
   }
+  ensureQuizCompatibilityColumns(db)
   const next = pending.length > 0 ? (pending[pending.length - 1] as number) : current
   return { migrated: pending.length > 0, version: next }
 }

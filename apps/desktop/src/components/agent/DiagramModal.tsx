@@ -72,7 +72,7 @@ export const DiagramModal: React.FC<DiagramModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 select-none"
       role="dialog"
       aria-modal="true"
       aria-label={diagram.title}

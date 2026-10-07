@@ -24,6 +24,8 @@ import {
   AlertCircle,
   HelpCircle,
   Trophy,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 
 export interface FlashcardReviewDialogProps {
@@ -44,6 +46,7 @@ export function FlashcardReviewDialog({
   onNavigateToMark,
   onRate,
 }: FlashcardReviewDialogProps) {
+  const [isMaximized, setIsMaximized] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [ratings, setRatings] = useState<Record<string, FlashcardReviewRating>>({})
@@ -164,17 +167,35 @@ export function FlashcardReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-card/95 backdrop-blur-xl border-border/80 shadow-2xl p-6 select-none">
+      <DialogContent
+        className={cn(
+          'bg-card/95 backdrop-blur-2xl border-border/80 shadow-2xl p-6 select-none transition-all duration-300 flex flex-col',
+          isMaximized
+            ? 'fixed inset-3 max-w-none w-auto h-[calc(100vh-1.5rem)] rounded-2xl z-50 justify-between'
+            : 'sm:max-w-2xl w-full rounded-xl',
+        )}
+      >
         {/* 顶部标题与进度栏 */}
-        <DialogHeader className="gap-1.5 pb-2">
+        <DialogHeader className="gap-1.5 pb-2 shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <Sparkles className="size-4 text-primary" />
-              闪卡复习 · 《{bookTitle}》
+              <span>闪卡工坊 · 《{bookTitle}》</span>
             </DialogTitle>
-            <span className="text-xs font-mono font-medium text-muted-foreground">
-              {currentIndex + 1} / {totalCards}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-medium text-muted-foreground">
+                {currentIndex + 1} / {totalCards}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => setIsMaximized((v) => !v)}
+                title={isMaximized ? '退出全屏' : '全屏沉浸抽认'}
+              >
+                {isMaximized ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+              </Button>
+            </div>
           </div>
           <DialogDescription className="sr-only">
             Montree 沉浸式闪卡抽认复习模式
@@ -261,7 +282,10 @@ export function FlashcardReviewDialog({
           <div className="flex flex-col space-y-4">
             {/* 3D 卡片核心容器 */}
             <div
-              className="relative w-full h-[280px] cursor-pointer [perspective:1200px]"
+              className={cn(
+                'relative w-full cursor-pointer [perspective:1200px] transition-all duration-300',
+                isMaximized ? 'h-[440px]' : 'h-[280px]',
+              )}
               onClick={() => setIsFlipped((prev) => !prev)}
             >
               <div

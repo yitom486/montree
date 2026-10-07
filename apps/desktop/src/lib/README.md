@@ -48,7 +48,7 @@
 |------|------|
 | `preview-sanitize` | 预览 HTML 消毒选项 |
 | `code-block-copy` / `code-block-chrome` | 代码块「复制」按钮 DOM 与共享工具栏 HTML |
-| `mermaid-hydrate` / `mermaid-debug` | 在容器内渲染 Mermaid |
+| `mermaid-hydrate` / `mermaid-debug` / `mermaid-repair` | 在容器内渲染 Mermaid、错误容错与源码断行自愈 |
 
 ## reader/
 

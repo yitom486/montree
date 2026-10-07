@@ -6,11 +6,21 @@ import {
   FoldVertical,
   UnfoldVertical,
   ChevronDown,
+  Sparkles,
+  Brain,
+  GraduationCap,
+  History,
+  Download,
+  BookOpen,
+  Layers,
+  RotateCcw,
 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
@@ -44,6 +54,16 @@ export interface MarginaliaBarProps {
    * 缺省时不同滚（保留手动滚动）。手动滚动 3 秒内暂停跟随，不打架。
    */
   readingFraction?: number
+  /** AI 智能出题测验回调 */
+  onOpenQuiz?: (mark?: ReadingMark, scope?: 'mark' | 'chapter' | 'book') => void
+  /** 历史卷库与成绩回调 */
+  onOpenQuizHistory?: () => void
+  /** 沉浸式 3D 闪卡复习回调 */
+  onReviewFlashcards?: (scope: 'chapter' | 'book', markId?: string) => void
+  /** 导出 Anki 记忆卡片回调 */
+  onExportAnkiCards?: (scope: 'chapter' | 'book') => void
+  /** 待复习闪卡计数徽标 */
+  dueFlashcardCount?: number
 }
 
 export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
@@ -62,6 +82,11 @@ export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
   currentChapterKey,
   chapterOrder,
   readingFraction,
+  onOpenQuiz,
+  onOpenQuizHistory,
+  onReviewFlashcards,
+  onExportAnkiCards,
+  dueFlashcardCount,
   className = '',
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | ReadingMarkCategory>('all')
@@ -345,6 +370,114 @@ export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
           </div>
         )}
 
+        {/* 智考与闪卡微晶学习控制台 */}
+        {(onOpenQuiz || onReviewFlashcards) && (
+          <div className="flex items-center gap-1.5 py-1">
+            {/* AI 智能测验 */}
+            {onOpenQuiz && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 text-primary border border-primary/30 text-[11px] font-semibold transition-all shadow-xs cursor-pointer group"
+                    title="启动 AI 考官出题测验"
+                  >
+                    <Sparkles className="size-3.5 text-primary group-hover:scale-110 transition-transform" />
+                    <span>智能测验</span>
+                    <ChevronDown className="size-3 opacity-60 ml-0.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 text-xs">
+                  <DropdownMenuLabel className="text-[10px] text-muted-foreground">
+                    AI 考官沉浸出卷
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onClick={() => onOpenQuiz(undefined, 'chapter')}
+                  >
+                    <BookOpen className="size-3.5 text-blue-500" />
+                    <span>本章重点综合卷</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onClick={() => onOpenQuiz(undefined, 'book')}
+                  >
+                    <GraduationCap className="size-3.5 text-purple-500" />
+                    <span>全书跨章重点大考</span>
+                  </DropdownMenuItem>
+                  {onOpenQuizHistory && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-xs gap-2 cursor-pointer"
+                        onClick={onOpenQuizHistory}
+                      >
+                        <History className="size-3.5 text-amber-500" />
+                        <span>历史成绩与错题</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* 3D 闪卡复习 */}
+            {onReviewFlashcards && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 hover:from-amber-500/20 hover:to-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[11px] font-semibold transition-all shadow-xs cursor-pointer group"
+                    title="进入沉浸式 3D 闪卡复习"
+                  >
+                    <Brain className="size-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span>闪卡复习</span>
+                    {typeof dueFlashcardCount === 'number' && dueFlashcardCount > 0 && (
+                      <span className="px-1 py-0.2 rounded-full text-[9px] bg-amber-500 text-white font-mono font-bold leading-none">
+                        {dueFlashcardCount}
+                      </span>
+                    )}
+                    <ChevronDown className="size-3 opacity-60 ml-0.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 text-xs">
+                  <DropdownMenuLabel className="text-[10px] text-muted-foreground">
+                    FSRS 科学记忆复习
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onClick={() => onReviewFlashcards('chapter')}
+                  >
+                    <Layers className="size-3.5 text-amber-500" />
+                    <span>本章重点闪卡</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs gap-2 cursor-pointer"
+                    onClick={() => onReviewFlashcards('book')}
+                  >
+                    <RotateCcw className="size-3.5 text-blue-500" />
+                    <span>全书重点闪卡</span>
+                  </DropdownMenuItem>
+                  {onExportAnkiCards && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-xs gap-2 cursor-pointer"
+                        onClick={() => onExportAnkiCards('book')}
+                      >
+                        <Download className="size-3.5 text-emerald-500" />
+                        <span>导出 Anki 卡包 (TSV)</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )}
+
         {/* 分类筛选药丸 */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 text-[11px]">
           <button
@@ -472,6 +605,8 @@ export const MarginaliaBar: React.FC<MarginaliaBarProps> = ({
                   onAnchorClick={() => onMarkClick(mark)}
                   onCardClick={() => onMarkClick(mark)}
                   onHover={(hovering) => onHoverAnchor?.(hovering ? mark.excerpt : undefined)}
+                  onQuiz={onOpenQuiz ? () => onOpenQuiz(mark, 'mark') : undefined}
+                  onReview={onReviewFlashcards ? () => onReviewFlashcards('book', mark.id) : undefined}
                 />
               </div>
             </div>

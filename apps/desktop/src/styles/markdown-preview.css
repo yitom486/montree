@@ -315,9 +315,28 @@
   padding: 1rem;
 }
 
-.markdown-preview .mermaid svg {
+.markdown-preview .mermaid svg,
+[data-testid="mermaid-block"] svg {
   max-width: 100%;
   height: auto;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.05));
+  transition: all 0.2s ease-in-out;
+}
+
+[data-testid="mermaid-block"] svg .node rect,
+[data-testid="mermaid-block"] svg .node polygon,
+[data-testid="mermaid-block"] svg .node circle {
+  rx: 8px !important;
+  ry: 8px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-testid="mermaid-block"] svg .node:hover rect,
+[data-testid="mermaid-block"] svg .node:hover polygon,
+[data-testid="mermaid-block"] svg .node:hover circle {
+  filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.25));
+  stroke-width: 1.8px !important;
+  cursor: pointer;
 }
 
 .markdown-preview img {

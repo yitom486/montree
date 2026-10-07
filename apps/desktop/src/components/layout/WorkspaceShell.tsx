@@ -23,6 +23,7 @@ import { NotesDrawer } from '@/components/reader/NotesDrawer'
 import { LibraryDrawer } from '@/components/reader/LibraryDrawer'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
+import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 
 import type { AppTheme } from '@/stores/editor-ui-store'
 
@@ -291,12 +292,6 @@ export function WorkspaceShell({
         </button>
       )}
 
-      <DiagramModal
-        isOpen={!!selectedDiagram}
-        onClose={() => setSelectedDiagram(null)}
-        diagram={selectedDiagram}
-      />
-
       <NotesDrawer
         isOpen={isNotesDrawerOpen}
         onClose={() => setIsNotesDrawerOpen(false)}
@@ -304,6 +299,15 @@ export function WorkspaceShell({
         bookTitle={activeFilePath ? activeFilePath.split(/[/\\]/).pop() : undefined}
         filePath={activeFilePath ?? undefined}
         onDeleteMark={(id) => void deleteMark(id)}
+        onOpenDiagram={(diagramId) => {
+          const m = marks?.find((item) => item.diagramId === diagramId || item.id === diagramId)
+          if (m) {
+            const parsed = parseDiagramFromMark(m)
+            if (parsed) {
+              setSelectedDiagram(parsed)
+            }
+          }
+        }}
       />
 
       <LibraryDrawer
@@ -316,6 +320,13 @@ export function WorkspaceShell({
         webPageUrl={webPageUrl}
         onOpenWebDoc={onOpenWebDoc}
         onOpenFile={onOpenFile}
+      />
+
+      {/* 大图全屏交互模态框：必须置于抽屉之后渲染并保持最高层叠优先级 */}
+      <DiagramModal
+        isOpen={!!selectedDiagram}
+        onClose={() => setSelectedDiagram(null)}
+        diagram={selectedDiagram}
       />
     </div>
   )

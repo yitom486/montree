@@ -37,8 +37,26 @@ markdownParser.renderer.rules.fence = (tokens, index, _options, _environment, _s
   const token = tokens[index]
   const rawLang = token.info?.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
 
-  if (rawLang === 'mermaid') {
-    return `<pre class="mermaid">${markdownParser.utils.escapeHtml(token.content)}</pre>`
+  const isMermaid =
+    rawLang === 'mermaid' ||
+    rawLang === 'flowchart' ||
+    rawLang === 'sequencediagram' ||
+    rawLang === 'mindmap' ||
+    rawLang === 'classdiagram' ||
+    rawLang === 'statediagram' ||
+    rawLang === 'erdiagram' ||
+    (rawLang === 'graph' && /^\s*(?:TD|TB|BT|RL|LR)\b/i.test(token.content)) ||
+    (!rawLang &&
+      /^\s*(?:flowchart\s+(?:TD|TB|BT|RL|LR)|graph\s+(?:TD|TB|BT|RL|LR)|sequenceDiagram|mindmap|classDiagram|erDiagram|stateDiagram)\b/i.test(
+        token.content,
+      ))
+
+  if (isMermaid) {
+    let content = token.content.trim()
+    if (!content && token.info.trim().length > rawLang.length) {
+      content = token.info.trim().slice(rawLang.length).trim()
+    }
+    return `<pre class="mermaid">${markdownParser.utils.escapeHtml(content)}</pre>`
   }
 
   const langLabel = rawLang || 'text'

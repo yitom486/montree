@@ -1,21 +1,19 @@
 import type { ReactNode } from 'react'
 import {
-  Bookmark,
   BookmarkPlus,
   Columns2,
   FileText,
+  GraduationCap,
   List,
   Maximize2,
   Minimize2,
   PanelRightClose,
   PanelRightOpen,
-  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useReaderNavTitles } from '@/stores/reader-navigation-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
-import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
 import { cn } from '@/lib/utils'
 
@@ -24,8 +22,9 @@ interface ReaderToolbarShellProps {
   tocDisabled?: boolean
   marksHidden?: boolean
   onTocToggle: () => void
-  onMarksToggle: () => void
+  onMarksToggle?: () => void
   onAddBookmark: () => void
+  onOpenQuiz?: () => void
   addBookmarkDisabled?: boolean
   cardCount?: number
   center?: ReactNode
@@ -53,6 +52,7 @@ export function ReaderToolbarShell({
   onTocToggle,
   onMarksToggle,
   onAddBookmark,
+  onOpenQuiz,
   addBookmarkDisabled = false,
   cardCount,
   center,
@@ -64,30 +64,13 @@ export function ReaderToolbarShell({
   const isCardRailOpen = useReaderHudUiStore((s) => s.isCardRailOpen)
   const toggleCardRail = useReaderHudUiStore((s) => s.toggleCardRail)
   const setIsNotesDrawerOpen = useReaderHudUiStore((s) => s.setIsNotesDrawerOpen)
+  const openQuiz = useReaderHudUiStore((s) => s.openQuiz)
   const zenMode = useReaderHudUiStore((s) => s.zenMode)
   const toggleZenMode = useReaderHudUiStore((s) => s.toggleZenMode)
 
-  const setHudDisplayMode = useAcpUiStore((s) => s.setHudDisplayMode)
-  const panelOpen = useAcpUiStore((s) => s.panelOpen)
-  const setPanelOpen = useAcpUiStore((s) => s.setPanelOpen)
-  const acpStatus = useAcpUiStore((s) => s.status)
-
-  // AI 伴读开关：已开则关闭，未开则以悬浮窗打开
-  //（侧栏/胶囊/关闭在 HUD 自身头部切换，对齐原版）
-  const handleToggleHud = () => {
-    if (panelOpen) {
-      setPanelOpen(false)
-      return
-    }
-    setPanelOpen(true)
-    setHudDisplayMode('floating')
-  }
-
-  const isAcpConnected = acpStatus === 'connected'
-
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-3 py-1.5 backdrop-blur-md select-none transition-colors">
-      {/* 左侧：导航与目录组 */}
+      {/* 左侧：纯粹的导航寻路与目录组 */}
       <div className="flex min-w-0 items-center gap-1.5">
         <ToolbarTip label="展开 / 收起目录">
           <Button
@@ -103,32 +86,18 @@ export function ReaderToolbarShell({
         </ToolbarTip>
 
         {!marksHidden ? (
-          <>
-            <ToolbarTip label="传统批注列表面板">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 rounded-lg px-2 text-xs hover:bg-muted/80"
-                disabled={!ready}
-                onClick={onMarksToggle}
-              >
-                <Bookmark className="size-3.5 text-muted-foreground" />
-                <span>批注簿</span>
-              </Button>
-            </ToolbarTip>
-            <ToolbarTip label="在当前阅读位置添加书签">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1 rounded-lg px-2 text-xs hover:bg-muted/80"
-                disabled={!ready || addBookmarkDisabled}
-                onClick={onAddBookmark}
-              >
-                <BookmarkPlus className="size-3.5 text-muted-foreground" />
-                <span className="hidden sm:inline">加书签</span>
-              </Button>
-            </ToolbarTip>
-          </>
+          <ToolbarTip label="在当前阅读位置添加书签">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 rounded-lg px-2 text-xs hover:bg-muted/80"
+              disabled={!ready || addBookmarkDisabled}
+              onClick={onAddBookmark}
+            >
+              <BookmarkPlus className="size-3.5 text-muted-foreground" />
+              <span className="hidden sm:inline">加书签</span>
+            </Button>
+          </ToolbarTip>
         ) : null}
 
         {currentTitle ? (
@@ -190,7 +159,7 @@ export function ReaderToolbarShell({
           </ToolbarTip>
 
           {/* 全书札记中心 */}
-          <ToolbarTip label="查看全书札记中心与闪卡">
+          <ToolbarTip label="查看全书札记中心与知识卡片箱">
             <Button
               variant="ghost"
               size="sm"
@@ -202,29 +171,23 @@ export function ReaderToolbarShell({
             </Button>
           </ToolbarTip>
 
-          {/* AI 伴读开关：开/关悬浮窗 */}
-          <ToolbarTip label={panelOpen ? '关闭 AI 伴读' : '打开 AI 伴读悬浮窗'}>
-            <button
-              type="button"
-              onClick={handleToggleHud}
-              className={cn(
-                'flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all duration-150 cursor-pointer select-none',
-                panelOpen
-                  ? 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
-                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
-              )}
-              aria-label="AI 伴读模态切换"
+          {/* 考考我 / AI 智考 */}
+          <ToolbarTip label="开启 AI 智能测验（结合全书重点卡片与本章内容深度出题）">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 border border-amber-500/25 bg-amber-500/5 transition-all shadow-xs"
+              onClick={() => {
+                if (onOpenQuiz) {
+                  onOpenQuiz()
+                } else {
+                  openQuiz({ scope: 'chapter' })
+                }
+              }}
             >
-              <Sparkles className="size-3.5 text-primary" />
-              <span className="hidden md:inline font-medium">AI 伴读</span>
-              {/* 伴读运行状态微型指示点 */}
-              <span
-                className={cn(
-                  'size-1.5 rounded-full',
-                  isAcpConnected ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-muted-foreground/40',
-                )}
-              />
-            </button>
+              <GraduationCap className="size-3.5 text-amber-500" />
+              <span>考考我</span>
+            </Button>
           </ToolbarTip>
 
           {/* 沉浸禅模式 */}

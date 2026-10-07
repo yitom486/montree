@@ -3,13 +3,9 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReaderToolbarShell } from './ReaderToolbarShell'
-import { useAcpUiStore } from '@/stores/acp-ui-store'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
-/**
- * 阅读器工具栏：AI 伴读按钮是开关（开则关、关则悬浮开），不是只开不关。
- */
 describe('ReaderToolbarShell', () => {
   let container: HTMLDivElement
   let root: Root
@@ -18,7 +14,6 @@ describe('ReaderToolbarShell', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    useAcpUiStore.setState({ panelOpen: false, hudDisplayMode: 'docked' })
   })
 
   afterEach(() => {
@@ -26,58 +21,49 @@ describe('ReaderToolbarShell', () => {
       root.unmount()
     })
     container.remove()
-    useAcpUiStore.setState({ panelOpen: false, hudDisplayMode: 'docked' })
   })
 
-  async function renderShell() {
+  async function renderShell(props?: Partial<React.ComponentProps<typeof ReaderToolbarShell>>) {
     await act(async () => {
       root.render(
         createElement(ReaderToolbarShell, {
           onTocToggle: vi.fn(),
           onMarksToggle: vi.fn(),
           onAddBookmark: vi.fn(),
+          ...props,
         }),
       )
     })
   }
 
-  function aiButton(): HTMLElement {
-    const el = container.querySelector('button[aria-label="AI 伴读模态切换"]') as HTMLElement | null
-    expect(el).not.toBeNull()
-    return el!
-  }
-
-  it('渲染目录/批注簿/加书签/卡片流/札记箱/AI伴读', async () => {
+  it('渲染目录/加书签/卡片流/札记箱/考考我，且已移除冗余批注簿与内部重复的AI伴读按钮', async () => {
     await renderShell()
     const text = container.textContent ?? ''
-    for (const label of ['目录', '批注簿', '加书签', '卡片流', '札记箱', 'AI 伴读']) {
+    for (const label of ['目录', '加书签', '卡片流', '札记箱', '考考我']) {
       expect(text).toContain(label)
     }
+    expect(text).not.toContain('批注簿')
+    expect(text).not.toContain('AI 伴读')
   })
 
-  it('AI 伴读按钮可开关悬浮窗', async () => {
-    await renderShell()
-    aiButton().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await act(async () => {})
-    expect(useAcpUiStore.getState().panelOpen).toBe(true)
-    expect(useAcpUiStore.getState().hudDisplayMode).toBe('floating')
+  it('考考我按钮可触发出题回调', async () => {
+    const onOpenQuiz = vi.fn()
+    await renderShell({ onOpenQuiz })
 
-    aiButton().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await act(async () => {})
-    expect(useAcpUiStore.getState().panelOpen).toBe(false)
+    const quizBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('考考我')
+    )
+    expect(quizBtn).toBeDefined()
+
+    await act(async () => {
+      quizBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onOpenQuiz).toHaveBeenCalledTimes(1)
   })
 
   it('展示卡片流数量角标', async () => {
-    await act(async () => {
-      root.render(
-        createElement(ReaderToolbarShell, {
-          onTocToggle: vi.fn(),
-          onMarksToggle: vi.fn(),
-          onAddBookmark: vi.fn(),
-          cardCount: 5,
-        }),
-      )
-    })
+    await renderShell({ cardCount: 5 })
     const text = container.textContent ?? ''
     expect(text).toContain('卡片流')
     expect(text).toContain('5')

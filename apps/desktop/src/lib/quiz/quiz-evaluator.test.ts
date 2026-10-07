@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildBatchQuestionPrompt,
   buildEvaluationPrompt,
   buildSingleQuestionPrompt,
   evaluateFallbackAnswer,
+  evaluateFallbackAnswers,
   generateFallbackQuestion,
   generateFallbackQuestions,
   parseBatchEvaluationResponse,
@@ -194,4 +196,103 @@ describe('quiz-evaluator', () => {
     expect(evaluated?.submissions['q-1'].score).toBe(90)
     expect(evaluated?.submissions['q-2'].score).toBe(86)
   })
+
+  it('builds batch prompt reflecting customized QuizConfig with question types and card focus', () => {
+    const prompt = buildBatchQuestionPrompt(
+      '卡片1：关于一致性哈希的虚拟节点分布。',
+      5,
+      '第二章 分布式存储',
+      {
+        totalCount: 5,
+        enabledTypes: ['choice', 'essay_design'],
+        focusOnCards: true,
+        includeContext: true,
+      },
+    )
+    expect(prompt).toContain('第二章 分布式存储')
+    expect(prompt).toContain('共设计 5 道考题')
+    expect(prompt).toContain('选择题(choice)')
+    expect(prompt).toContain('论述或设计题(essay_design)')
+    expect(prompt).toContain('虚拟节点分布')
+  })
+
+  it('parses diverse question types including choice and essay_design with designRequirements', () => {
+    const raw = `
+\`\`\`json
+{
+  "questions": [
+    {
+      "title": "虚拟节点作用",
+      "tag": "概念辨析",
+      "type": "choice",
+      "prompt": "一致性哈希中引入虚拟节点的最主要目的是什么？",
+      "options": [
+        "A. 解决数据倾斜问题，使负载均衡分布",
+        "B. 提高单机存储容量",
+        "C. 避免节点网络通信",
+        "D. 降低网络带宽成本"
+      ],
+      "correctOption": "A",
+      "explanation": "虚拟节点将物理节点映射为环上的多个虚拟点，从而大幅减小负载倾斜方差。",
+      "keyPoints": ["负载均衡", "解决数据倾斜"]
+    },
+    {
+      "title": "海量缓存架构设计",
+      "tag": "方案设计",
+      "type": "essay_design",
+      "prompt": "请设计一套支持千万级 QPS 的分布式缓存集群拓扑，并说明数据分片与故障容灾策略。",
+      "designRequirements": [
+        "千万级 QPS 负载分片策略",
+        "节点宕机时的数据迁移与雪崩防御",
+        "热点 Key 探测与多级缓存协同"
+      ],
+      "keyPoints": ["哈希环分片", "主备副本容灾", "本地二级缓存抗热点"]
+    }
+  ]
+}
+\`\`\`
+`
+    const parsed = parseBatchQuestionsResponse(raw)
+    expect(parsed).not.toBeNull()
+    expect(parsed).toHaveLength(2)
+
+    const choiceQ = parsed![0]
+    expect(choiceQ.type).toBe('choice')
+    expect(choiceQ.options).toHaveLength(4)
+    expect(choiceQ.correctOption).toBe('A')
+    expect(choiceQ.explanation).toContain('负载倾斜方差')
+
+    const designQ = parsed![1]
+    expect(designQ.type).toBe('essay_design')
+    expect(designQ.designRequirements).toHaveLength(3)
+    expect(designQ.designRequirements).toContain('千万级 QPS 负载分片策略')
+  })
+
+  it('evaluates objective choice questions with instant accuracy scoring', () => {
+    const questions: QuizQuestion[] = [
+      {
+        id: 'q-choice-1',
+        title: '选择题测试',
+        type: 'choice',
+        prompt: '测试问题',
+        options: ['A. 正确项', 'B. 错误项'],
+        correctOption: 'A',
+        explanation: 'A 是正确答案。',
+        keyPoints: ['要点1'],
+        sourceExcerpt: '摘录',
+      },
+    ]
+
+    // 读者选对 A
+    const correctRes = evaluateFallbackAnswers(questions, { 'q-choice-1': 'A' })
+    expect(correctRes.submissions['q-choice-1'].score).toBe(100)
+    expect(correctRes.submissions['q-choice-1'].grade).toBe('A')
+    expect(correctRes.submissions['q-choice-1'].feedback).toContain('作答正确')
+
+    // 读者选错 B
+    const wrongRes = evaluateFallbackAnswers(questions, { 'q-choice-1': 'B' })
+    expect(wrongRes.submissions['q-choice-1'].score).toBe(40)
+    expect(wrongRes.submissions['q-choice-1'].feedback).toContain('作答有误')
+  })
 })
+

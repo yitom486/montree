@@ -28,6 +28,15 @@ export interface ReaderHudUiState {
   isNotesDrawerOpen: boolean
   /** 书库与在线文档抽屉是否开启 */
   isLibraryOpen: boolean
+  /** AI 智考弹窗是否开启 */
+  isQuizOpen: boolean
+  /** 触发出题时的请求上下文 */
+  quizRequest: {
+    passage?: string
+    chapterTitle?: string
+    markId?: string
+    scope?: 'mark' | 'chapter' | 'book'
+  } | null
   /** 当前全屏放大检视的图表数据 */
   selectedDiagram: DiagramPayload | null
   /** 免打扰自动授权安全模式（低危只读工具免弹窗） */
@@ -54,6 +63,8 @@ export interface ReaderHudUiState {
   toggleCardRail: (open?: boolean) => void
   setIsNotesDrawerOpen: (open: boolean) => void
   setIsLibraryOpen: (open: boolean) => void
+  openQuiz: (req?: { passage?: string; chapterTitle?: string; markId?: string; scope?: 'mark' | 'chapter' | 'book' }) => void
+  closeQuiz: () => void
   setSelectedDiagram: (diagram: DiagramPayload | null) => void
   setApproveForMe: (approve: boolean) => void
   toggleApproveForMe: () => void
@@ -88,6 +99,8 @@ export const useReaderHudUiStore = create<ReaderHudUiState>()(
       isCardRailOpen: true,
       isNotesDrawerOpen: false,
       isLibraryOpen: false,
+      isQuizOpen: false,
+      quizRequest: null,
       selectedDiagram: null,
       approveForMe: false,
       historyOpen: false,
@@ -113,13 +126,26 @@ export const useReaderHudUiStore = create<ReaderHudUiState>()(
         set({ dockedAgentWidth: Math.round(Math.max(280, Math.min(640, width))) }),
       setIsDragging: (dragging) => set({ isDragging: dragging }),
       setHudActiveTab: (tab) => set({ hudActiveTab: tab }),
-      setIsCardRailOpen: (open) => set({ isCardRailOpen: open }),
+      setIsCardRailOpen: (open) =>
+        set((s) => ({
+          isCardRailOpen: open !== undefined ? open : !s.isCardRailOpen,
+        })),
       toggleCardRail: (open) =>
         set((s) => ({
           isCardRailOpen: open !== undefined ? open : !s.isCardRailOpen,
         })),
       setIsNotesDrawerOpen: (open) => set({ isNotesDrawerOpen: open }),
       setIsLibraryOpen: (open) => set({ isLibraryOpen: open }),
+      openQuiz: (req) =>
+        set({
+          isQuizOpen: true,
+          quizRequest: req ?? null,
+        }),
+      closeQuiz: () =>
+        set({
+          isQuizOpen: false,
+          quizRequest: null,
+        }),
       setSelectedDiagram: (diagram) => set({ selectedDiagram: diagram }),
       setApproveForMe: (approve) => set({ approveForMe: approve }),
       toggleApproveForMe: () => set((s) => ({ approveForMe: !s.approveForMe })),

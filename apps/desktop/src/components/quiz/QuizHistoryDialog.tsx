@@ -17,6 +17,7 @@ import {
   Trophy,
   Calendar,
   Layers,
+  XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useQuizSessions } from '@/hooks/quiz/useQuizSessions'
@@ -182,6 +183,19 @@ export function QuizHistoryDialog({
                     ) : null}
                   </div>
 
+                  {/* AI 整卷综合诊断与复习建议 */}
+                  {currentSession.overallFeedback && (
+                    <div className="p-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent space-y-1.5 shadow-xs">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                        <Sparkles className="size-3.5" />
+                        <span>AI 导师综合诊断与学习建议</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                        {currentSession.overallFeedback}
+                      </p>
+                    </div>
+                  )}
+
                   {/* 多题题卡切换 */}
                   {currentSession.questions.length > 1 && (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -225,13 +239,83 @@ export function QuizHistoryDialog({
                     </p>
                   </div>
 
-                  {/* 读者手写作答 */}
-                  <div className="space-y-1">
-                    <div className="text-muted-foreground font-medium">你的原始回答：</div>
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/60 text-foreground/90 leading-relaxed italic">
-                      “{submission.userAnswer}”
+                  {/* 设计题考查维度清单 */}
+                  {activeQuestion.type === 'essay_design' &&
+                    activeQuestion.designRequirements &&
+                    activeQuestion.designRequirements.length > 0 && (
+                      <div className="p-2.5 rounded-lg border border-purple-500/20 bg-purple-500/5 space-y-1 text-xs">
+                        <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                          <Layers className="size-3" />
+                          <span>架构考查指标与设计维度：</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeQuestion.designRequirements.map((req, rIdx) => (
+                            <span
+                              key={rIdx}
+                              className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 text-[10px]"
+                            >
+                              {req}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* 选择题选项回放对照 */}
+                  {activeQuestion.type === 'choice' && activeQuestion.options && (
+                    <div className="space-y-1.5">
+                      <div className="text-muted-foreground font-medium text-[11px]">选项复盘与原书解析：</div>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {activeQuestion.options.map((opt, oIdx) => {
+                          const optLetter = opt.trim().charAt(0)
+                          const userAns = submission.userAnswer || ''
+                          const isUserSelected =
+                            userAns === opt ||
+                            userAns === optLetter ||
+                            userAns.startsWith(optLetter + '.')
+                          const isCorrect =
+                            activeQuestion.correctOption?.toUpperCase() === optLetter.toUpperCase()
+
+                          return (
+                            <div
+                              key={oIdx}
+                              className={cn(
+                                'flex items-center justify-between p-2 rounded-lg border text-xs leading-relaxed',
+                                isCorrect && 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium',
+                                isUserSelected && !isCorrect && 'bg-rose-500/10 border-rose-500/40 text-rose-600 dark:text-rose-400',
+                                !isUserSelected && !isCorrect && 'bg-muted/20 border-border/40 text-muted-foreground',
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{optLetter}.</span>
+                                <span>{opt.replace(/^[A-D][.、\s]*/, '')}</span>
+                              </div>
+                              <div className="shrink-0 flex items-center gap-1 text-[11px]">
+                                {isCorrect && <span className="text-emerald-500 font-semibold flex items-center gap-0.5"><CheckCircle2 className="size-3.5" /> 正确项</span>}
+                                {isUserSelected && !isCorrect && <span className="text-rose-500 font-semibold flex items-center gap-0.5"><XCircle className="size-3.5" /> 你的回答</span>}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {activeQuestion.explanation && (
+                        <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-[11px] text-foreground/80 leading-relaxed">
+                          <span className="font-semibold text-primary">原书依据解析：</span>
+                          {activeQuestion.explanation}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* 读者手写作答 */}
+                  {activeQuestion.type !== 'choice' && (
+                    <div className="space-y-1">
+                      <div className="text-muted-foreground font-medium">你的原始回答：</div>
+                      <div className="p-3 rounded-lg bg-muted/30 border border-border/60 text-foreground/90 leading-relaxed italic">
+                        “{submission.userAnswer}”
+                      </div>
+                    </div>
+                  )}
 
                   {/* 采分点对比 */}
                   <div className="p-3 rounded-lg border border-border/60 bg-card/60 space-y-2">

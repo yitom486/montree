@@ -33,6 +33,7 @@ interface QuizSessionRow {
   question_count: number
   correct_count: number
   created_at: number
+  overall_feedback?: string | null
 }
 
 interface QuizQuestionRow {
@@ -50,6 +51,11 @@ interface QuizQuestionRow {
   max_score: number
   submissions: string | null
   created_at: number
+  type?: string | null
+  options?: string | null
+  correct_option?: string | null
+  explanation?: string | null
+  design_requirements?: string | null
 }
 
 function toMillis(createdAt: string): number {
@@ -112,8 +118,8 @@ function insertSessionRow(
   db.prepare(
     `INSERT INTO quiz_sessions (
       id, book_fingerprint, file_path, book_title, chapter_key, chapter_title,
-      total_score, grade, question_count, correct_count, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      total_score, grade, question_count, correct_count, created_at, overall_feedback
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).get(
     session.id,
     fingerprint,
@@ -126,14 +132,16 @@ function insertSessionRow(
     session.questions.length,
     correctCountForSession(session),
     createdAt,
+    session.overallFeedback ?? null,
   )
   for (const question of session.questions) {
     const submission = session.submissions?.[question.id]
     db.prepare(
       `INSERT OR IGNORE INTO quiz_questions (
         session_id, question_id, mark_id, title, prompt, source_excerpt,
-        chapter_title, tag, key_points, score, max_score, submissions, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        chapter_title, tag, key_points, score, max_score, submissions, created_at,
+        type, options, correct_option, explanation, design_requirements
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).get(
       session.id,
       question.id,
@@ -148,6 +156,11 @@ function insertSessionRow(
       QUIZ_MAX_SCORE,
       submission ? JSON.stringify(submission) : null,
       createdAt,
+      question.type ?? null,
+      question.options ? JSON.stringify(question.options) : null,
+      question.correctOption ?? null,
+      question.explanation ?? null,
+      question.designRequirements ? JSON.stringify(question.designRequirements) : null,
     )
   }
   return true
@@ -170,31 +183,49 @@ function assembleSessions(sessionRows: QuizSessionRow[], questionRows: QuizQuest
     const questions: QuizQuestion[] = []
     const submissions: Record<string, QuizAnswerSubmission> = {}
     for (const question of bySession.get(row.id) ?? []) {
-      questions.push({
+      const q: QuizQuestion = {
         id: question.question_id,
         title: question.title ?? '',
         prompt: question.prompt,
-        tag: question.tag ?? undefined,
         keyPoints: parseKeyPoints(question.key_points),
         sourceExcerpt: question.source_excerpt ?? '',
-        chapterTitle: question.chapter_title ?? undefined,
-        markId: question.mark_id ?? undefined,
-      })
+      }
+      if (question.tag) q.tag = question.tag
+      if (question.chapter_title) q.chapterTitle = question.chapter_title
+      if (question.mark_id) q.markId = question.mark_id
+      if (question.type) q.type = question.type as QuizQuestion['type']
+      if (question.options) {
+        try {
+          const opts = JSON.parse(question.options) as unknown
+          if (Array.isArray(opts)) q.options = opts as string[]
+        } catch {}
+      }
+      if (question.correct_option) q.correctOption = question.correct_option
+      if (question.explanation) q.explanation = question.explanation
+      if (question.design_requirements) {
+        try {
+          const reqs = JSON.parse(question.design_requirements) as unknown
+          if (Array.isArray(reqs)) q.designRequirements = reqs as string[]
+        } catch {}
+      }
+      questions.push(q)
       const submission = parseSubmission(question.submissions)
       if (submission) submissions[question.question_id] = submission
     }
-    return {
+    const sessionRecord: QuizSessionRecord = {
       id: row.id,
       bookTitle: row.book_title,
       filePath: row.file_path,
-      chapterKey: row.chapter_key ?? undefined,
-      chapterTitle: row.chapter_title ?? undefined,
       createdAt: new Date(row.created_at).toISOString(),
       totalScore: row.total_score,
       grade: row.grade as QuizSessionRecord['grade'],
       questions,
       submissions,
     }
+    if (row.chapter_key) sessionRecord.chapterKey = row.chapter_key
+    if (row.chapter_title) sessionRecord.chapterTitle = row.chapter_title
+    if (row.overall_feedback) sessionRecord.overallFeedback = row.overall_feedback
+    return sessionRecord
   })
 }
 
