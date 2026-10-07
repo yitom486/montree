@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import {
+  Bookmark,
   BookmarkPlus,
   Columns2,
   FileText,
@@ -86,18 +87,34 @@ export function ReaderToolbarShell({
         </ToolbarTip>
 
         {!marksHidden ? (
-          <ToolbarTip label="在当前阅读位置添加书签">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 rounded-lg px-2 text-xs hover:bg-muted/80"
-              disabled={!ready || addBookmarkDisabled}
-              onClick={onAddBookmark}
-            >
-              <BookmarkPlus className="size-3.5 text-muted-foreground" />
-              <span className="hidden sm:inline">加书签</span>
-            </Button>
-          </ToolbarTip>
+          <>
+            {onMarksToggle && (
+              <ToolbarTip label="查看批注与书签面板">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 rounded-lg px-2 text-xs hover:bg-muted/80"
+                  disabled={!ready}
+                  onClick={onMarksToggle}
+                >
+                  <Bookmark className="size-3.5 text-muted-foreground" />
+                  <span>批注簿</span>
+                </Button>
+              </ToolbarTip>
+            )}
+            <ToolbarTip label="在当前阅读位置添加书签">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 rounded-lg px-2 text-xs hover:bg-muted/80"
+                disabled={!ready || addBookmarkDisabled}
+                onClick={onAddBookmark}
+              >
+                <BookmarkPlus className="size-3.5 text-muted-foreground" />
+                <span className="hidden sm:inline">加书签</span>
+              </Button>
+            </ToolbarTip>
+          </>
         ) : null}
 
         {currentTitle ? (

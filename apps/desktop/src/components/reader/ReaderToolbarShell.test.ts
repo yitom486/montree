@@ -36,13 +36,12 @@ describe('ReaderToolbarShell', () => {
     })
   }
 
-  it('渲染目录/加书签/卡片流/札记箱/考考我，且已移除冗余批注簿与内部重复的AI伴读按钮', async () => {
+  it('渲染目录/批注簿/加书签/卡片流/札记箱/考考我，且已移除内部重复的AI伴读按钮', async () => {
     await renderShell()
     const text = container.textContent ?? ''
-    for (const label of ['目录', '加书签', '卡片流', '札记箱', '考考我']) {
+    for (const label of ['目录', '批注簿', '加书签', '卡片流', '札记箱', '考考我']) {
       expect(text).toContain(label)
     }
-    expect(text).not.toContain('批注簿')
     expect(text).not.toContain('AI 伴读')
   })
 
