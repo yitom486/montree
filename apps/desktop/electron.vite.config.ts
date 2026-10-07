@@ -33,6 +33,35 @@ function removeCrossOriginPlugin(): Plugin {
   }
 }
 
+/** 修复 foliate-js paginator 在 iframe 尚未加载完成即触发 ResizeObserver 时读取 null.documentElement 报错 */
+function foliatePaginatorGuardPlugin(): Plugin {
+  return {
+    name: 'foliate-paginator-guard',
+    transform(code, id) {
+      if (id.includes('paginator.js')) {
+        return code
+          .replace(
+            /render\(\)\s*\{([\s\S]*?)if \(!this\.#view\) return/,
+            'render() {$1if (!this.#view || !this.#view.document?.documentElement) return',
+          )
+          .replace(
+            /scrolled\(\{ gap, columnWidth \}\)\s*\{([\s\S]*?)const doc = this\.document/,
+            'scrolled({ gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement) return',
+          )
+          .replace(
+            /columnize\(\{ width, height, gap, columnWidth \}\)\s*\{([\s\S]*?)const doc = this\.document/,
+            'columnize({ width, height, gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement) return',
+          )
+          .replace(
+            /#observer = new ResizeObserver\(\(\) => this\.render\(\)\)/,
+            '#observer = new ResizeObserver(() => requestAnimationFrame(() => this.render()))',
+          )
+      }
+      return null
+    },
+  }
+}
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -83,6 +112,12 @@ export default defineConfig({
         ...workspaceAlias,
       },
     },
-    plugins: [react(), tailwindcss(), removeCrossOriginPlugin(), copyPdfjsAssetsPlugin()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      removeCrossOriginPlugin(),
+      foliatePaginatorGuardPlugin(),
+      copyPdfjsAssetsPlugin(),
+    ],
   },
 })

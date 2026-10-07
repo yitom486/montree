@@ -34,7 +34,8 @@ export interface UseFoliateHighlightsOptions {
   readerFontSize: number
   readerLineHeight: number
   selectionSnapshotRef: React.RefObject<{ text: string; cfiRange: string; rect: DOMRect } | null>
-  editingNoteMark: ReadingMark | null
+  editingNoteMark?: ReadingMark | null
+  editingNoteMarkRef?: React.RefObject<ReadingMark | null>
 }
 
 export function useFoliateHighlights({
@@ -51,6 +52,7 @@ export function useFoliateHighlights({
   readerLineHeight,
   selectionSnapshotRef,
   editingNoteMark,
+  editingNoteMarkRef,
 }: UseFoliateHighlightsOptions) {
   const markHighlightStyleSigRef = useRef<WeakMap<Document, string>>(new WeakMap())
   const pendingAnnotateKeyRef = useRef<string | null>(null)
@@ -70,7 +72,7 @@ export function useFoliateHighlights({
       const renderer = viewRef.current?.renderer as unknown as {
         getContents: () => Array<{ doc: Document; index: number }>
       } | null
-      docs = renderer?.getContents() ?? []
+      docs = (renderer?.getContents() ?? []).filter((item): item is { doc: Document; index: number } => Boolean(item?.doc))
     } catch {
       return
     }
@@ -84,6 +86,7 @@ export function useFoliateHighlights({
     const sig = Object.values(palette).join('|')
     const buckets = new Map<string, Range[]>()
     for (const { doc, index } of docs) {
+      if (!doc?.defaultView) continue
       try {
         const viewWindow = doc.defaultView as unknown as {
           CSS?: { highlights?: { set: (name: string, h: object) => void; delete: (n: string) => void } }
@@ -215,7 +218,8 @@ export function useFoliateHighlights({
   const showPendingAnnotateHighlight = useCallback(() => {
     const snapshot = selectionSnapshotRef.current
     const view = viewRef.current
-    if (!snapshot?.cfiRange || !view || editingNoteMark) return
+    const isEditing = editingNoteMarkRef ? Boolean(editingNoteMarkRef.current) : Boolean(editingNoteMark)
+    if (!snapshot?.cfiRange || !view || isEditing) return
     const existing = findMarkForSelection(marksRef.current, {
       format: kindRef.current,
       text: snapshot.text,
@@ -224,7 +228,7 @@ export function useFoliateHighlights({
     if (existing) return
     pendingAnnotateKeyRef.current = snapshot.cfiRange
     void view.addAnnotation({ value: snapshot.cfiRange }).catch(() => undefined)
-  }, [editingNoteMark, kindRef, marksRef, selectionSnapshotRef, viewRef])
+  }, [editingNoteMark, editingNoteMarkRef, kindRef, marksRef, selectionSnapshotRef, viewRef])
 
   // 5. 卡片悬停→正文高亮
   const handleHoverExcerpt = useCallback((excerpt: string | undefined) => {
@@ -233,11 +237,12 @@ export function useFoliateHighlights({
       const renderer = viewRef.current?.renderer as unknown as {
         getContents: () => Array<{ doc: Document }>
       } | null
-      docs = renderer?.getContents() ?? []
+      docs = (renderer?.getContents() ?? []).filter((item): item is { doc: Document } => Boolean(item?.doc))
     } catch {
       return
     }
     for (const { doc } of docs) {
+      if (!doc?.defaultView) continue
       try {
         const viewWindow = doc.defaultView as unknown as {
           CSS?: { highlights?: { set: (name: string, highlight: object) => void; delete: (name: string) => void } }
@@ -294,8 +299,8 @@ export function useFoliateHighlights({
       } catch {
         return
       }
-      const target = renderer?.getContents().find((item) => item.index === resolved.index)
-      if (!target) return
+      const target = renderer?.getContents().find((item) => item.index === resolved.index && Boolean(item?.doc))
+      if (!target?.doc?.defaultView) return
       let range: Range | null = null
       try {
         range = resolved.anchor(target.doc)
@@ -345,11 +350,12 @@ export function useFoliateHighlights({
         const renderer = viewRef.current?.renderer as unknown as {
           getContents: () => Array<{ doc: Document }>
         } | null
-        docs = renderer?.getContents() ?? []
+        docs = (renderer?.getContents() ?? []).filter((item): item is { doc: Document } => Boolean(item?.doc))
       } catch {
         docs = []
       }
       for (const { doc } of docs) {
+        if (!doc?.defaultView) continue
         try {
           const viewWindow = doc.defaultView as unknown as {
             CSS?: { highlights?: { delete: (name: string) => void } }
@@ -366,7 +372,7 @@ export function useFoliateHighlights({
           const renderer = viewRef.current?.renderer as unknown as {
             getContents: () => Array<{ doc: Document }>
           } | null
-          docs = renderer?.getContents() ?? []
+          docs = (renderer?.getContents() ?? []).filter((item): item is { doc: Document } => Boolean(item?.doc))
         } catch {
           docs = []
         }

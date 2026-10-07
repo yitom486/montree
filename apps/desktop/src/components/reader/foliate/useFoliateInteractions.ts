@@ -54,6 +54,8 @@ export interface UseFoliateInteractionsOptions {
   getRenderedDocs: () => Array<{ doc: Document; index: number }>
   goToChapter: (chapter: EpubChapter | null, flatIndex?: number) => void
   nav: { current: EpubChapter | null; flatIndex: number }
+  selectionSnapshotRef?: React.RefObject<{ text: string; cfiRange: string; rect: DOMRect } | null>
+  editingNoteMarkRef?: React.RefObject<ReadingMark | null>
 }
 
 export function useFoliateInteractions({
@@ -75,6 +77,8 @@ export function useFoliateInteractions({
   getRenderedDocs,
   goToChapter,
   nav,
+  selectionSnapshotRef: externalSnapshotRef,
+  editingNoteMarkRef: externalEditingNoteMarkRef,
 }: UseFoliateInteractionsOptions) {
   const [selectionSnapshot, setSelectionSnapshot] = useState<{
     text: string
@@ -89,8 +93,12 @@ export function useFoliateInteractions({
 
   const hoveredMarkIdRef = useRef<string | null>(null)
   const pointerOriginRef = useRef<{ x: number; y: number } | null>(null)
-  const selectionSnapshotRef = useRef<typeof selectionSnapshot>(null)
+  const internalSnapshotRef = useRef<typeof selectionSnapshot>(null)
+  const selectionSnapshotRef = externalSnapshotRef ?? internalSnapshotRef
   selectionSnapshotRef.current = selectionSnapshot
+  if (externalEditingNoteMarkRef) {
+    externalEditingNoteMarkRef.current = editingNoteMark
+  }
 
   const inspector = useReadingMarkInspector(marks)
   const inspectorRef = useRef(inspector)
@@ -102,7 +110,7 @@ export function useFoliateInteractions({
     clearReaderSelection()
     try {
       viewRef.current?.renderer?.getContents().forEach((item) => {
-        item.doc.defaultView?.getSelection()?.removeAllRanges()
+        item.doc?.defaultView?.getSelection()?.removeAllRanges()
       })
     } catch {
       // 视图已销毁时忽略
@@ -333,7 +341,7 @@ export function useFoliateInteractions({
           } catch {
             cfiRange = ''
           }
-          if (!cfiRange) continue
+          if (!cfiRange || !doc.defaultView) continue
           const built = buildEpubSnapshotFromRange(
             {
               window: doc.defaultView as Window,
@@ -363,6 +371,7 @@ export function useFoliateInteractions({
         pointerOriginRef.current = { x: event.clientX, y: event.clientY }
       }
       const handleDocPointerUp = (isClick: boolean): void => {
+        if (!doc.defaultView) return
         const frame = doc.defaultView?.frameElement as HTMLElement | null
         const frameRect = frame?.getBoundingClientRect()
         const view = viewRef.current
@@ -422,9 +431,11 @@ export function useFoliateInteractions({
         emitRailFocus(mark.id)
       }
       doc.addEventListener('click', onMarkClick)
-      const unbindCollapse = bindDocumentSelectionCollapse(doc, doc.defaultView as Window, () => {
-        setSelectionToolbarPos(null)
-      })
+      const unbindCollapse = doc.defaultView
+        ? bindDocumentSelectionCollapse(doc, doc.defaultView as Window, () => {
+            setSelectionToolbarPos(null)
+          })
+        : () => {}
       cleanupFns.push(() => {
         doc.removeEventListener('mousedown', onMouseDown)
         doc.removeEventListener('mouseup', onMouseUp)

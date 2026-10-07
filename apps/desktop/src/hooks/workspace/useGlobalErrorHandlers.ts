@@ -22,7 +22,13 @@ export function useGlobalErrorHandlers(filePath?: string): void {
       if (
         msg.includes('ResizeObserver') ||
         msg.includes('ResizeObserver loop completed') ||
-        msg.includes('ResizeObserver loop limit exceeded')
+        msg.includes('ResizeObserver loop limit exceeded') ||
+        ((msg.includes("reading 'documentElement'") || msg.includes("reading 'defaultView'")) &&
+          (!event.filename ||
+            event.filename.includes('paginator') ||
+            event.filename.includes('foliate') ||
+            (typeof event.error?.stack === 'string' &&
+              (event.error.stack.includes('paginator') || event.error.stack.includes('foliate')))))
       ) {
         return
       }

@@ -49,17 +49,53 @@ function spineIndexFromCfiParts(parts: unknown): number | null {
   return Number.isInteger(index) && index >= 0 ? index : null
 }
 
+function resolveSectionIndex(
+  book: FoliateBook,
+  sectionIds: string[],
+  href: string | null | undefined,
+): number | null {
+  if (!href) return null
+  const fromIds = findSectionIndex(sectionIds, href)
+  if (fromIds !== null) return fromIds
+
+  const anyBook = book as unknown as {
+    splitTOCHref?: (href: string) => [unknown, unknown]
+    resolveHref?: (href: string) => { index?: number } | Promise<{ index?: number }>
+  }
+
+  if (typeof anyBook.splitTOCHref === 'function') {
+    try {
+      const res = anyBook.splitTOCHref(href)
+      if (Array.isArray(res) && typeof res[0] === 'number' && res[0] >= 0) {
+        return res[0]
+      }
+    } catch {}
+  }
+
+  if (typeof anyBook.resolveHref === 'function') {
+    try {
+      const res = anyBook.resolveHref(href)
+      if (res && !(res instanceof Promise) && typeof res.index === 'number' && res.index >= 0) {
+        return res.index
+      }
+    } catch {}
+  }
+
+  return null
+}
+
 function mapTocItem(
   item: FoliateTocItem,
+  book: FoliateBook,
   sectionIds: string[],
   level = 0,
 ): AdapterTocItem {
   return {
     label: item.label ?? '',
     href: item.href ?? null,
-    sectionIndex: item.href ? findSectionIndex(sectionIds, item.href) : null,
+    sectionIndex: resolveSectionIndex(book, sectionIds, item.href),
     level,
-    children: (item.subitems ?? []).map((child) => mapTocItem(child, sectionIds, level + 1)),
+    children: (item.subitems ?? []).map((child) => mapTocItem(child, book, sectionIds, level + 1)),
   }
 }
 
@@ -73,11 +109,12 @@ export class FoliateBookAdapter implements IReaderBookAdapter {
   private constructor(
     private readonly book: FoliateBook,
     kind: AdapterBookKind,
-  ) {    this.kind = kind
+  ) {
+    this.kind = kind
     this.title = book.metadata?.title ?? ''
     this.language = book.metadata?.language
     const sectionIds = book.sections.map((section) => String(section.id))
-    this.toc = (book.toc ?? []).map((item) => mapTocItem(item, sectionIds))
+    this.toc = (book.toc ?? []).map((item) => mapTocItem(item, book, sectionIds))
     this.sections = book.sections.map((section, index) => ({
       index,
       id: String(section.id),
@@ -107,7 +144,7 @@ export class FoliateBookAdapter implements IReaderBookAdapter {
   }
 
   resolveHref(href: string): number | null {
-    return findSectionIndex(this.sectionIds, href)
+    return resolveSectionIndex(this.book, this.sectionIds, href)
   }
 
   async resolveLegacyEpubCfi(cfi: string): Promise<AdapterLocation | null> {

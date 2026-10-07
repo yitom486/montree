@@ -167,6 +167,25 @@ describe('FoliateBookAdapter', () => {
     }
   })
 
+  it('resolveHref 支持 MOBI/AZW3 特有 href（通过 splitTOCHref / resolveHref 解析）', async () => {
+    const adapter = await openFoliateBook(buildSmokeEpub(), 'smoke.epub')
+    try {
+      const engine = adapter.engineBook as unknown as {
+        splitTOCHref?: (href: string) => [number, string]
+      }
+      engine.splitTOCHref = (href: string) => {
+        if (href.startsWith('filepos:100')) return [0, 'filepos100']
+        if (href.startsWith('kindle:pos:fid:0001')) return [0, 'pos1']
+        return [-1, '']
+      }
+      expect(adapter.resolveHref('filepos:100')).toBe(0)
+      expect(adapter.resolveHref('kindle:pos:fid:0001:off:0000000000')).toBe(0)
+      expect(adapter.resolveHref('filepos:999')).toBeNull()
+    } finally {
+      adapter.destroy()
+    }
+  })
+
   it('CFI 按包级 spine 步进归属，越界拒绝', async () => {
     const adapter = await openFoliateBook(buildSmokeEpub(), 'smoke.epub')
     try {

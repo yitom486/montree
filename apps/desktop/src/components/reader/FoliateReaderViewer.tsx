@@ -32,9 +32,12 @@ import {
 import { isOk, type ReadingMark } from '@montree/contracts'
 import { toast } from 'sonner'
 import type { AppTheme } from '@/stores/editor-ui-store'
+import type { FoliateViewElement } from '@foliate/view.js'
+import type { FoliateBookAdapter } from '@/lib/reader/adapter/foliate-book-adapter'
+import type { EpubChapter } from '@montree/reader-core'
 import { useFoliateHighlights } from './foliate/useFoliateHighlights'
 import { useFoliateInteractions } from './foliate/useFoliateInteractions'
-import { useFoliateBookSession } from './foliate/useFoliateBookSession'
+import { useFoliateBookSession, type FoliateReaderEvents } from './foliate/useFoliateBookSession'
 
 interface FoliateReaderViewerProps {
   filePath: string
@@ -72,51 +75,17 @@ export function FoliateReaderViewer({
     : ''
   const isEpub = documentKind === 'epub'
 
-  // Forward ref hooks declarations
-  const interactionsRef = useRef<ReturnType<typeof useFoliateInteractions> | null>(null)
-  const sessionRef = useRef<ReturnType<typeof useFoliateBookSession> | null>(null)
+  // 跨模块稳定共享引用
+  const viewRef = useRef<FoliateViewElement | null>(null)
+  const adapterRef = useRef<FoliateBookAdapter | null>(null)
+  const chaptersRef = useRef<EpubChapter[]>([])
+  const chapterSectionsRef = useRef<Array<number | null>>([])
+  const lastLocationRef = useRef<{ cfi?: string; sectionIndex: number; fraction: number } | null>(null)
+  const selectionSnapshotRef = useRef<{ text: string; cfiRange: string; rect: DOMRect } | null>(null)
+  const editingNoteMarkRef = useRef<ReadingMark | null>(null)
+  const eventsRef = useRef<FoliateReaderEvents>({})
 
-  // 1. 高亮层、页边旗标、悬停联动与 TTS 标记
-  const highlights = useFoliateHighlights({
-    viewRef: { get current() { return sessionRef.current?.viewRef.current ?? null } } as React.RefObject<any>,
-    marksRef,
-    chaptersRef: { get current() { return sessionRef.current?.chaptersRef.current ?? [] } } as React.RefObject<any>,
-    chapterSectionsRef: { get current() { return sessionRef.current?.chapterSectionsRef.current ?? [] } } as React.RefObject<any>,
-    themeRef,
-    kindRef,
-    ready: Boolean(sessionRef.current?.ready),
-    marks,
-    theme,
-    readerFontSize,
-    readerLineHeight,
-    selectionSnapshotRef: { get current() { return interactionsRef.current?.selectionSnapshotRef.current ?? null } } as React.RefObject<any>,
-    editingNoteMark: interactionsRef.current?.editingNoteMark ?? null,
-  })
-
-  // 2. 选区划词、浮层与标注动作
-  const interactions = useFoliateInteractions({
-    filePath,
-    fileFingerprint,
-    kindRef,
-    viewRef: { get current() { return sessionRef.current?.viewRef.current ?? null } } as React.RefObject<any>,
-    adapterRef: { get current() { return sessionRef.current?.adapterRef.current ?? null } } as React.RefObject<any>,
-    chaptersRef: { get current() { return sessionRef.current?.chaptersRef.current ?? [] } } as React.RefObject<any>,
-    lastLocationRef: { get current() { return sessionRef.current?.lastLocationRef.current ?? null } } as React.RefObject<any>,
-    marks,
-    marksRef,
-    createMark,
-    updateMark,
-    deleteMark,
-    showPendingAnnotateHighlight: highlights.showPendingAnnotateHighlight,
-    removePendingAnnotateHighlight: highlights.removePendingAnnotateHighlight,
-    syncVisualMarks: highlights.syncVisualMarks,
-    getRenderedDocs: () => sessionRef.current?.getRenderedDocs() ?? [],
-    goToChapter: (ch, idx) => sessionRef.current?.goToChapter(ch, idx),
-    nav,
-  })
-  interactionsRef.current = interactions
-
-  // 3. 阅读生命周期与会话
+  // 1. 阅读生命周期与会话（核心底座，优先初始化）
   const session = useFoliateBookSession({
     filePath,
     documentKind,
@@ -127,6 +96,57 @@ export function FoliateReaderViewer({
     readerFontSize,
     readerLineHeight,
     marksRef,
+    viewRef,
+    adapterRef,
+    chaptersRef,
+    chapterSectionsRef,
+    lastLocationRef,
+    eventsRef,
+  })
+
+  // 2. 高亮层、页边旗标、悬停联动与 TTS 标记
+  const highlights = useFoliateHighlights({
+    viewRef,
+    marksRef,
+    chaptersRef,
+    chapterSectionsRef,
+    themeRef,
+    kindRef,
+    ready: session.ready,
+    marks,
+    theme,
+    readerFontSize,
+    readerLineHeight,
+    selectionSnapshotRef,
+    editingNoteMarkRef,
+  })
+
+  // 3. 选区划词、浮层与标注动作
+  const interactions = useFoliateInteractions({
+    filePath,
+    fileFingerprint,
+    kindRef,
+    viewRef,
+    adapterRef,
+    chaptersRef,
+    lastLocationRef,
+    marks,
+    marksRef,
+    createMark,
+    updateMark,
+    deleteMark,
+    showPendingAnnotateHighlight: highlights.showPendingAnnotateHighlight,
+    removePendingAnnotateHighlight: highlights.removePendingAnnotateHighlight,
+    syncVisualMarks: highlights.syncVisualMarks,
+    getRenderedDocs: session.getRenderedDocs,
+    goToChapter: session.goToChapter,
+    nav,
+    selectionSnapshotRef,
+    editingNoteMarkRef,
+  })
+
+  // 4. 事件委托镜像更新，彻底解耦生命周期 Effect 与上层交互
+  eventsRef.current = {
     openInspectorAtRange: interactions.openInspectorAtRange,
     bindSectionDocInteractions: interactions.bindSectionDocInteractions,
     syncVisualMarks: highlights.syncVisualMarks,
@@ -136,8 +156,7 @@ export function FoliateReaderViewer({
     handleCreateMarkAt: interactions.handleCreateMarkAt,
     createBookmark: () => interactions.addBookmarkAtCurrent(),
     createNoteFromSelection: (note) => interactions.handleSaveAnnotation(note),
-  })
-  sessionRef.current = session
+  }
 
   const { currentUnitId } = useReaderNavTitles()
   const resolveChapter = isEpub ? resolveEpubChapter : resolveMobiChapter

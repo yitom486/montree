@@ -56,6 +56,18 @@ declare global {
   }
 }
 
+export interface FoliateReaderEvents {
+  openInspectorAtRange?: (mark: ReadingMark, range: Range) => boolean
+  bindSectionDocInteractions?: (doc: Document, index: number) => () => void
+  syncVisualMarks?: () => void
+  syncMarkHighlights?: () => void
+  syncMarkFlags?: () => void
+  flashJumpRange?: (cfiKey: string) => void
+  handleCreateMarkAt?: (params: CreateMarkAtParams) => Promise<any>
+  createBookmark?: () => Promise<ReadingMark>
+  createNoteFromSelection?: (note: string) => Promise<ReadingMark>
+}
+
 export interface UseFoliateBookSessionOptions {
   filePath: string
   documentKind: 'epub' | 'mobi'
@@ -66,15 +78,21 @@ export interface UseFoliateBookSessionOptions {
   readerFontSize: number
   readerLineHeight: number
   marksRef: React.RefObject<ReadingMark[]>
-  openInspectorAtRange: (mark: ReadingMark, range: Range) => boolean
-  bindSectionDocInteractions: (doc: Document, index: number) => () => void
-  syncVisualMarks: () => void
-  syncMarkHighlights: () => void
-  syncMarkFlags: () => void
-  flashJumpRange: (cfiKey: string) => void
-  handleCreateMarkAt: (params: CreateMarkAtParams) => Promise<any>
-  createBookmark: () => Promise<ReadingMark>
-  createNoteFromSelection: (note: string) => Promise<ReadingMark>
+  openInspectorAtRange?: (mark: ReadingMark, range: Range) => boolean
+  bindSectionDocInteractions?: (doc: Document, index: number) => () => void
+  syncVisualMarks?: () => void
+  syncMarkHighlights?: () => void
+  syncMarkFlags?: () => void
+  flashJumpRange?: (cfiKey: string) => void
+  handleCreateMarkAt?: (params: CreateMarkAtParams) => Promise<any>
+  createBookmark?: () => Promise<ReadingMark>
+  createNoteFromSelection?: (note: string) => Promise<ReadingMark>
+  viewRef?: React.RefObject<FoliateViewElement | null>
+  adapterRef?: React.RefObject<FoliateBookAdapter | null>
+  chaptersRef?: React.RefObject<EpubChapter[]>
+  chapterSectionsRef?: React.RefObject<Array<number | null>>
+  lastLocationRef?: React.RefObject<{ cfi?: string; sectionIndex: number; fraction: number } | null>
+  eventsRef?: React.RefObject<FoliateReaderEvents>
 }
 
 export function useFoliateBookSession({
@@ -96,19 +114,70 @@ export function useFoliateBookSession({
   handleCreateMarkAt,
   createBookmark,
   createNoteFromSelection,
+  viewRef: externalViewRef,
+  adapterRef: externalAdapterRef,
+  chaptersRef: externalChaptersRef,
+  chapterSectionsRef: externalChapterSectionsRef,
+  lastLocationRef: externalLastLocationRef,
+  eventsRef,
 }: UseFoliateBookSessionOptions) {
-  const viewRef = useRef<FoliateViewElement | null>(null)
-  const adapterRef = useRef<FoliateBookAdapter | null>(null)
-  const chaptersRef = useRef<EpubChapter[]>([])
-  const chapterSectionsRef = useRef<Array<number | null>>([])
+  const internalViewRef = useRef<FoliateViewElement | null>(null)
+  const viewRef = externalViewRef ?? internalViewRef
+  const internalAdapterRef = useRef<FoliateBookAdapter | null>(null)
+  const adapterRef = externalAdapterRef ?? internalAdapterRef
+  const internalChaptersRef = useRef<EpubChapter[]>([])
+  const chaptersRef = externalChaptersRef ?? internalChaptersRef
+  const internalChapterSectionsRef = useRef<Array<number | null>>([])
+  const chapterSectionsRef = externalChapterSectionsRef ?? internalChapterSectionsRef
   const [chapters, setChapters] = useState<EpubChapter[]>([])
   const [ready, setReady] = useState(false)
   const [globalProgress, setGlobalProgress] = useState(0)
 
-  const lastLocationRef = useRef<{ cfi?: string; sectionIndex: number; fraction: number } | null>(null)
+  const internalLastLocationRef = useRef<{ cfi?: string; sectionIndex: number; fraction: number } | null>(null)
+  const lastLocationRef = externalLastLocationRef ?? internalLastLocationRef
   const lastVisibleRangeRef = useRef<Range | null>(null)
   const lastMarkSectionRef = useRef<number>(-1)
   const saveProgressTimerRef = useRef<number | null>(null)
+
+  const callbacksRef = useRef<FoliateReaderEvents>({})
+  callbacksRef.current = {
+    openInspectorAtRange: (mark, range) =>
+      eventsRef?.current?.openInspectorAtRange?.(mark, range) ??
+      openInspectorAtRange?.(mark, range) ??
+      false,
+    bindSectionDocInteractions: (doc, index) =>
+      eventsRef?.current?.bindSectionDocInteractions?.(doc, index) ??
+      bindSectionDocInteractions?.(doc, index) ??
+      (() => () => {}),
+    syncVisualMarks: () => {
+      eventsRef?.current?.syncVisualMarks?.()
+      syncVisualMarks?.()
+    },
+    syncMarkHighlights: () => {
+      eventsRef?.current?.syncMarkHighlights?.()
+      syncMarkHighlights?.()
+    },
+    syncMarkFlags: () => {
+      eventsRef?.current?.syncMarkFlags?.()
+      syncMarkFlags?.()
+    },
+    flashJumpRange: (cfi) => {
+      eventsRef?.current?.flashJumpRange?.(cfi)
+      flashJumpRange?.(cfi)
+    },
+    handleCreateMarkAt: (params) =>
+      eventsRef?.current?.handleCreateMarkAt?.(params) ??
+      handleCreateMarkAt?.(params) ??
+      Promise.reject(new Error('not implemented')),
+    createBookmark: () =>
+      eventsRef?.current?.createBookmark?.() ??
+      createBookmark?.() ??
+      Promise.reject(new Error('not implemented')),
+    createNoteFromSelection: (note) =>
+      eventsRef?.current?.createNoteFromSelection?.(note) ??
+      createNoteFromSelection?.(note) ??
+      Promise.reject(new Error('not implemented')),
+  }
 
   const typography = useMemo<FoliateTypography>(
     () => ({
@@ -203,9 +272,10 @@ export function useFoliateBookSession({
         })
         .catch(() => undefined)
     }
-    const flatIndex = units.findIndex((unit) =>
-      href ? isSameSpineBase(unit.href, href, normalizeLoadKey) : false,
-    )
+    const flatIndex = units.findIndex((unit, idx) => {
+      if (href && isSameSpineBase(unit.href, href, normalizeLoadKey)) return true
+      return chapterSectionsRef.current[idx] === sectionIndex
+    })
     if (flatIndex >= 0) {
       const ambiguous =
         units.filter((unit) => href && isSameSpineBase(unit.href, href, normalizeLoadKey)).length > 1
@@ -228,23 +298,35 @@ export function useFoliateBookSession({
     if (sectionIndex === null || sectionIndex < 0) {
       sectionIndex = adapterRef.current?.resolveHref(chapter.href) ?? null
     }
-    if (sectionIndex === null || sectionIndex < 0) return
-    const targetSection = sectionIndex
+    if ((sectionIndex === null || sectionIndex < 0) && !chapter.href) return
+    const targetSection = sectionIndex ?? 0
     const resolvedFlat =
       typeof flatIndex === 'number' && flatIndex >= 0
         ? flatIndex
         : chaptersRef.current.findIndex((item) => item.href === chapter.href)
-    useReaderNavigationStore.getState().syncFlatIndex(resolvedFlat)
+    if (resolvedFlat >= 0) {
+      useReaderNavigationStore.getState().syncFlatIndex(resolvedFlat)
+    }
     const { fragment } = splitChapterFragment(chapter.href)
-    const needsFullHref =
-      fragment !== null ||
+    const isSpecialHref =
       chapter.href.includes('filepos:') ||
+      chapter.href.startsWith('kindle:') ||
       kindRef.current === 'epub'
+    const needsFullHref =
+      !chapter.href.startsWith('section:') &&
+      (fragment !== null || isSpecialHref || sectionIndex === null)
+
     void (async () => {
       if (needsFullHref) {
         try {
           await view.goTo(chapter.href)
-        } catch {}
+        } catch {
+          if (sectionIndex !== null && sectionIndex >= 0) {
+            try {
+              await view.goTo(targetSection)
+            } catch {}
+          }
+        }
       } else {
         try {
           await view.goTo(targetSection)
@@ -324,7 +406,7 @@ export function useFoliateBookSession({
           ? hit.range.startContainer
           : hit.range.startContainer.parentElement
       host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      const selection = hit.doc.defaultView?.getSelection()
+      const selection = hit.doc?.defaultView?.getSelection()
       selection?.removeAllRanges()
       selection?.addRange(hit.range.cloneRange())
     } catch {
@@ -346,7 +428,7 @@ export function useFoliateBookSession({
               } catch {
                 return false
               }
-              flashJumpRange(step.cfi)
+              callbacksRef.current.flashJumpRange?.(step.cfi)
               return true
             }
             case 'mobi-chapter': {
@@ -379,7 +461,7 @@ export function useFoliateBookSession({
         }
       })
     },
-    [filePath, flashJumpRange, revealExcerptInFoliateDocs],
+    [filePath, revealExcerptInFoliateDocs],
   )
 
   useEffect(() => {
@@ -458,8 +540,8 @@ export function useFoliateBookSession({
       schedulePersistReadingProgress(sectionIndex, fraction, detail.cfi)
       if (lastMarkSectionRef.current !== sectionIndex) {
         lastMarkSectionRef.current = sectionIndex
-        syncMarkHighlights()
-        syncMarkFlags()
+        callbacksRef.current.syncMarkHighlights?.()
+        callbacksRef.current.syncMarkFlags?.()
       }
       const tocHref = detail.tocItem?.href
       if (tocHref) {
@@ -484,16 +566,16 @@ export function useFoliateBookSession({
       if (cancelled) return
       applyDocTheme(detail.doc, themeRef.current, typographyRef.current)
       docCleanups.get(detail.doc)?.()
-      const unbindInteractions = bindSectionDocInteractions(detail.doc, detail.index)
+      const unbindInteractions = callbacksRef.current.bindSectionDocInteractions?.(detail.doc, detail.index) ?? (() => {})
       const unbindRailFollow = bindRailFollow(detail.doc, detail.index)
       docCleanups.set(detail.doc, () => {
         unbindInteractions()
         unbindRailFollow()
       })
-      syncVisualMarks()
+      callbacksRef.current.syncVisualMarks?.()
       lastMarkSectionRef.current = -1
-      syncMarkHighlights()
-      syncMarkFlags()
+      callbacksRef.current.syncMarkHighlights?.()
+      callbacksRef.current.syncMarkFlags?.()
     }
 
     const onLink = (event: CustomEvent) => {
@@ -501,14 +583,20 @@ export function useFoliateBookSession({
       if (!detail.href) return
       event.preventDefault()
       const sectionIndex = adapterRef.current?.resolveHref(detail.href) ?? null
-      if (sectionIndex === null || sectionIndex < 0 || !viewRef.current) return
-      const flatIndex = chaptersRef.current.findIndex(
-        (_, flat) => chapterSectionsRef.current[flat] === sectionIndex,
-      )
-      if (flatIndex >= 0) {
-        useReaderNavigationStore.getState().syncFlatIndex(flatIndex)
+      if (!viewRef.current) return
+      if (sectionIndex !== null && sectionIndex >= 0) {
+        const flatIndex = chaptersRef.current.findIndex(
+          (_, flat) => chapterSectionsRef.current[flat] === sectionIndex,
+        )
+        if (flatIndex >= 0) {
+          useReaderNavigationStore.getState().syncFlatIndex(flatIndex)
+        }
       }
-      void viewRef.current.goTo(sectionIndex).catch(() => undefined)
+      void viewRef.current.goTo(detail.href).catch(() => {
+        if (sectionIndex !== null && sectionIndex >= 0 && viewRef.current) {
+          void viewRef.current.goTo(sectionIndex).catch(() => undefined)
+        }
+      })
     }
 
     const onExternalLink = (event: CustomEvent) => {
@@ -523,7 +611,7 @@ export function useFoliateBookSession({
       if (cancelled) return
       const mark = findMarkByOverlayerKey(marksRef.current, detail.value)
       if (!mark) return
-      openInspectorAtRange(mark, detail.range)
+      callbacksRef.current.openInspectorAtRange?.(mark, detail.range)
     }
 
     const onDrawAnnotation = (event: CustomEvent) => {
@@ -670,18 +758,13 @@ export function useFoliateBookSession({
     }
   }, [
     bindRailFollow,
-    bindSectionDocInteractions,
     containerRef,
     data,
     filePath,
-    openInspectorAtRange,
     persistReadingProgress,
     resolveGlobalProgress,
     schedulePersistReadingProgress,
     syncChapterNav,
-    syncMarkFlags,
-    syncMarkHighlights,
-    syncVisualMarks,
   ])
 
   // 3. 主题与排版动态更新
@@ -743,15 +826,15 @@ export function useFoliateBookSession({
   useEffect(() => {
     return registerReaderMarks({
       filePath,
-      createBookmark: () => createBookmark(),
-      createNoteFromSelection: (note) => createNoteFromSelection(note),
-      createMarkAt: (params) => handleCreateMarkAt(params),
+      createBookmark: () => callbacksRef.current.createBookmark?.() ?? Promise.reject(new Error('not ready')),
+      createNoteFromSelection: (note) => callbacksRef.current.createNoteFromSelection?.(note) ?? Promise.reject(new Error('not ready')),
+      createMarkAt: (params) => callbacksRef.current.handleCreateMarkAt?.(params) ?? Promise.reject(new Error('not ready')),
       navigateToFlatIndex: (index) => {
         const chapter = chaptersRef.current[index]
         if (chapter) goToChapter(chapter, index)
       },
     })
-  }, [createBookmark, createNoteFromSelection, filePath, goToChapter, handleCreateMarkAt])
+  }, [filePath, goToChapter])
 
   // 6. E2E 探针注入
   useEffect(() => {
@@ -811,13 +894,13 @@ export function useFoliateBookSession({
         } catch {
           return false
         }
-        return openInspectorAtRange(mark, range)
+        return callbacksRef.current.openInspectorAtRange?.(mark, range) ?? false
       },
     }
     return () => {
       delete window.__montreeE2eReader
     }
-  }, [filePath, getRenderedDocs, marksRef, openInspectorAtRange])
+  }, [filePath, getRenderedDocs, marksRef])
 
   // 7. 快捷键
   useEffect(() => {

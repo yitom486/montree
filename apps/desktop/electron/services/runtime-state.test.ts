@@ -14,4 +14,11 @@ describe('runtime-state', () => {
     expect(shouldLogRendererConsole(1, 'debug')).toBe(true)
     setVerboseRendererLogs(false)
   })
+
+  it('过滤良性 ResizeObserver loop 提示', () => {
+    expect(
+      shouldLogRendererConsole(3, 'ResizeObserver loop completed with undelivered notifications.'),
+    ).toBe(false)
+    expect(shouldLogRendererConsole(3, 'ResizeObserver loop limit exceeded')).toBe(false)
+  })
 })
