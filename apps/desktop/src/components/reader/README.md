@@ -6,7 +6,7 @@
 |------|------|
 | `WebDocViewer` | 在线文档阅读（iframe 阅读模式、划词批注、标记侧栏与导出、本页标题大纲；拆量子目录 `web-doc/`：`useWebDocNavigation`、`useWebDocInteractions`、`useWebDocSession`） |
 | `FoliateReaderViewer` | EPUB / MOBI / AZW3 统一阅读（foliate 后端：章节导航、划词批注、标记侧栏与导出；拆量子目录 `foliate/`：`foliate-theme`、`useFoliateHighlights`、`useFoliateInteractions`、`useFoliateBookSession`） |
-| `PdfViewer` | PDF 主 Viewer（Agent 正文走 WASM 结构化阅读顺序，失败回退 pdf.js；UI/选区坐标系不动；已入库 Agent 正文只读库，缺文抛错不回退 OCR；拆量子目录 `pdf/`：`usePdfDocumentSession`、`usePdfOcrTocManager`、`usePdfInteractions`） |
+| `PdfViewer` | PDF 主 Viewer（Agent 正文走 WASM 结构化阅读顺序，失败回退 pdf.js；UI/选区坐标系不动；已入库 Agent 正文只读库，缺文抛错不回退 OCR；拆量子目录 `pdf/`：`usePdfDocumentSession`、`usePdfRosettaIndex`、`usePdfAgentRegistry`、`usePdfOcrTocManager`、`usePdfInteractions`） |
 | `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay） |
 | `PdfOcrBanner` / `PdfOcrTocEditor` | 扫描版 OCR 提示与目录校正（含偏移自动推算、AI 整理槽位） |
 | `TocAiPolishControl` | 目录 AI 整理：目录副会话 + 模型/思考档选择 + JSON 解析回填草稿 |
