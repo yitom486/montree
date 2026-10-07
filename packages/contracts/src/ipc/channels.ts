@@ -305,6 +305,22 @@ export const IPC = {
   SYNC_APPLY_REMOTE_PROGRESS: 'sync:apply-remote-progress',
   /** invoke：渲染端把最新阅读进度快照推送到主进程持久化保存 */
   SYNC_SAVE_LOCAL_PROGRESS: 'sync:save-local-progress',
+
+  /* ================================================================
+   * 语音朗读（tts:*）：Gemini TTS 智能合成、双 Key 容灾与磁盘缓存
+   * ================================================================ */
+  /** invoke：获取 TTS 配置 */
+  TTS_GET_CONFIG: 'tts:get-config',
+  /** invoke：保存 TTS 配置 */
+  TTS_SAVE_CONFIG: 'tts:save-config',
+  /** invoke：语音合成（带本地磁盘缓存与双 Key 容灾） */
+  TTS_SYNTHESIZE: 'tts:synthesize',
+  /** invoke：测试指定 API Key 有效性 */
+  TTS_TEST_KEY: 'tts:test-key',
+  /** invoke：获取本地音频缓存统计 */
+  TTS_GET_CACHE_STATS: 'tts:get-cache-stats',
+  /** invoke：清空本地音频缓存 */
+  TTS_CLEAR_CACHE: 'tts:clear-cache',
 } as const
 
 /** `IPC` 全部通道字符串的联合类型，用于约束 handle/on/invoke 的 channel 参数 */

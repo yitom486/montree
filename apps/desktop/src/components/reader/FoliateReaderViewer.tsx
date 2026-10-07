@@ -31,6 +31,7 @@ import { findMarkForSelection, isClickNotDrag } from '@montree/reader-core'
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { useReaderNavigationStore, useReaderNavTitles, isNavIntentLocked } from '@/stores/reader-navigation-store'
+import { useTtsStore } from '@/stores/tts-store'
 import { cn } from '@/lib/utils'
 import type { AppError } from '@montree/contracts'
 import type { ReadingMark } from '@montree/contracts'
@@ -53,6 +54,7 @@ import {
   runRevealPlan,
   subscribeRevealMark,
   subscribeAnchorHighlight,
+  subscribeTtsHighlight,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
 import { searchReaderContent } from '@/lib/agent/context/search-reader-content'
@@ -168,6 +170,8 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
   const lastLocationRef = useRef<{ cfi?: string; sectionIndex: number; fraction: number } | null>(
     null,
   )
+  /** Foliate 经过精确视口计算产出的当前可见 Range（精确对齐翻页与滚动视口顶部） */
+  const lastVisibleRangeRef = useRef<Range | null>(null)
   /** 已绘制常驻标记的节序号，避免节内滚动重复重算 */
   const lastMarkSectionRef = useRef<number>(-1)
   const readerFontSize = useAppSettingsStore((state) => state.readerFontSize)
@@ -831,6 +835,94 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
     })
   }, [handleJumpToLabel, revealExcerptInFoliateDocs])
 
+  // TTS 语音朗读逐句微光临时标记跟随
+  useEffect(() => {
+    const clearTtsHighlight = () => {
+      let docs: Array<{ doc: Document }> = []
+      try {
+        const renderer = viewRef.current?.renderer as unknown as {
+          getContents: () => Array<{ doc: Document }>
+        } | null
+        docs = renderer?.getContents() ?? []
+      } catch {
+        docs = []
+      }
+      for (const { doc } of docs) {
+        try {
+          const viewWindow = doc.defaultView as unknown as {
+            CSS?: { highlights?: { delete: (name: string) => void } }
+          } | null
+          viewWindow?.CSS?.highlights?.delete('montree-tts-active')
+        } catch {}
+      }
+    }
+
+    return subscribeTtsHighlight(
+      (sentence) => {
+        let docs: Array<{ doc: Document }> = []
+        try {
+          const renderer = viewRef.current?.renderer as unknown as {
+            getContents: () => Array<{ doc: Document }>
+          } | null
+          docs = renderer?.getContents() ?? []
+        } catch {
+          docs = []
+        }
+        if (!docs.length) return
+
+        // 清理已有标记
+        clearTtsHighlight()
+
+        // 匹配逻辑：优先原句 -> 提取核心前 15 汉字/字符
+        const cleanCore = sentence
+          .replace(/[，。！？；：“”‘’（）《》、\s,.!?;:'"()[\]]/g, '')
+          .slice(0, 15)
+        let hit = locateExcerptInDocuments(docs, sentence)
+        if (!hit && cleanCore.length >= 4) {
+          hit = locateExcerptInDocuments(docs, cleanCore)
+        }
+        if (!hit) {
+          hit = locateExcerptInDocuments(docs, sentence.slice(0, 20))
+        }
+
+        if (hit) {
+          try {
+            const host =
+              hit.range.startContainer instanceof Element
+                ? hit.range.startContainer
+                : hit.range.startContainer.parentElement
+            host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+            const viewWindow = hit.doc.defaultView as unknown as {
+              CSS?: { highlights?: { set: (name: string, h: object) => void; delete: (name: string) => void } }
+              Highlight?: new (...ranges: AbstractRange[]) => object
+            } | null
+            const registry = viewWindow?.CSS?.highlights
+            const HighlightCtor = viewWindow?.Highlight
+            if (registry && HighlightCtor) {
+              if (!hit.doc.querySelector('style[data-montree-tts-highlight]')) {
+                const style = hit.doc.createElement('style')
+                style.setAttribute('data-montree-tts-highlight', '')
+                style.textContent = `
+                  ::highlight(montree-tts-active) {
+                    background-color: rgba(245, 158, 11, 0.35) !important;
+                    color: inherit !important;
+                    border-radius: 4px;
+                  }
+                `
+                ;(hit.doc.head ?? hit.doc.documentElement)?.appendChild(style)
+              }
+              registry.set('montree-tts-active', new HighlightCtor(hit.range))
+            }
+          } catch {}
+        }
+      },
+      () => {
+        clearTtsHighlight()
+      },
+    )
+  }, [])
+
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
       const key = overlayerKeyForMark(mark)
@@ -1263,6 +1355,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
     setSelectionToolbarPos(null)
     selectionSnapshotRef.current = null
     lastLocationRef.current = null
+    lastVisibleRangeRef.current = null
     chaptersRef.current = []
     chapterSectionsRef.current = []
     viewRef.current = null
@@ -1272,7 +1365,7 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
     let view: FoliateViewElement | null = null
     const docCleanups = new Map<Document, () => void>()
 
-    // view 级 relocate 明细：{ fraction（全书）, section: { current }, cfi, tocItem }，
+    // view 级 relocate 明细：{ fraction（全书）, section: { current }, cfi, tocItem, range }，
     // 与 paginator 级 { index } 形状不同，此处只认 view 级。
     const onRelocate = (event: CustomEvent) => {
       const detail = event.detail as {
@@ -1280,8 +1373,12 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
         fraction?: number
         cfi?: string
         tocItem?: { label?: string; href?: string } | null
+        range?: Range
       }
       if (cancelled) return
+      if (detail.range) {
+        lastVisibleRangeRef.current = detail.range
+      }
       const sectionIndex = detail.section?.current ?? 0
       const fraction = detail.fraction ?? 0
       lastLocationRef.current = {
@@ -1570,8 +1667,18 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
           .join('\n\n')
       },
       getViewportText: () => {
+        const range = lastVisibleRangeRef.current
+        if (range) {
+          try {
+            const rangeText = range.toString()?.trim()
+            if (rangeText && rangeText.length > 5) {
+              return rangeText
+            }
+          } catch {}
+        }
         return getRenderedDocs()
           .map((item) => extractViewportText(item.doc))
+          .filter(Boolean)
           .join('\n\n')
       },
       iterateUnits: async function* () {
@@ -1846,6 +1953,12 @@ export function FoliateReaderViewer({ filePath, documentKind, theme, workspaceRo
           hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
           keyEventDocs={getRenderedDocs().map((item) => item.doc)}
           onAnnotate={selectionActions.handleAnnotate}
+          onReadAloud={() => {
+            if (selectionSnapshot?.text) {
+              void useTtsStore.getState().playFromSnippet(selectionSnapshot.text)
+              selectionActions.handleDismiss()
+            }
+          }}
           onHighlight={selectionActions.handleHighlight}
           onAddToChat={selectionActions.handleAddToChat}
           onAskAgent={selectionActions.handleAskAgent}

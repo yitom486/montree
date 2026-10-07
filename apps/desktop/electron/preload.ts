@@ -301,6 +301,13 @@ const electronAPI: ElectronAPI = {
   },
   saveLocalProgress: (progressJson: string) =>
     ipcRenderer.invoke(IPC.SYNC_SAVE_LOCAL_PROGRESS, progressJson),
+  /* ===== 语音朗读（TTS / Gemini TTS） ===== */
+  getTtsConfig: () => ipcRenderer.invoke(IPC.TTS_GET_CONFIG),
+  saveTtsConfig: (config) => ipcRenderer.invoke(IPC.TTS_SAVE_CONFIG, config),
+  synthesizeTts: (payload) => ipcRenderer.invoke(IPC.TTS_SYNTHESIZE, payload),
+  testTtsKey: (payload) => ipcRenderer.invoke(IPC.TTS_TEST_KEY, payload),
+  getTtsCacheStats: () => ipcRenderer.invoke(IPC.TTS_GET_CACHE_STATS),
+  clearTtsCache: () => ipcRenderer.invoke(IPC.TTS_CLEAR_CACHE),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

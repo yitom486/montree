@@ -67,4 +67,16 @@ describe('ReaderToolbarShell', () => {
     expect(text).toContain('卡片流')
     expect(text).toContain('5')
   })
+
+  it('支持禁用听书按钮并设置禁用状态', async () => {
+    await renderShell({
+      readAloudDisabled: true,
+      readAloudDisabledReason: '当前文档为图片扫描件，暂不支持语音朗读',
+    })
+    const ttsBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('听书')
+    )
+    expect(ttsBtn).toBeDefined()
+    expect(ttsBtn?.hasAttribute('disabled')).toBe(true)
+  })
 })

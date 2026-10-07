@@ -57,6 +57,13 @@
 | `runtime-state.ts` | 进程内开关（如 verbose 渲染日志） |
 | `error-log-service.ts` | 渲染端上报错误写入日志文件 |
 
+## 语音朗读（TTS）
+
+| 目录 | 功能 |
+|------|------|
+| `tts/` | `tts/tts-service.ts`：集成 `gemini-tts-studio`（Google Gemini、微软 Azure Speech、Local OpenAI 兼容 TTS 与系统兜底）、主备双 API Key 智能容灾与 1 分钟 429 冷却调度、音频本地磁盘持久化缓存（首次保存，后续直接读取） |
+
 ## ACP
 
 见 [`acp/`](./acp/)。
+

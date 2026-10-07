@@ -18,6 +18,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `reading-mark-panel-store.ts` | 标记侧栏筛选（重点/批注/书签，persist） |
 | `acp-ui-store.ts` | Agent 线程、消息、连接状态、权限与配置偏好；线程会话 id 按运行时分桶（`agentSessionIds`） |
 | `annotation-agent-store.ts` | 批注 AI 助手：按书线程、独立 agentSessionIds（按运行时分桶）、pendingDraft |
+| `tts-store.ts` | 语音朗读听书：Google Gemini / 微软 Azure Speech / Local OpenAI / 系统兜底、双 Key 容灾、逐句高亮、右上角自由拖拽悬浮球/折叠状态、视口顶部起读与章节进度记忆 |
 | `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store） |
 | `acp/` | ACP 智能体交互与次世代伴读 HUD 专职子状态（见 `acp/README.md`） |
 

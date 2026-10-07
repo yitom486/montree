@@ -4,6 +4,7 @@ import {
   Check,
   ClipboardPaste,
   Copy,
+  Headphones,
   Loader2,
   MessageSquarePlus,
   Quote,
@@ -30,6 +31,8 @@ export interface SelectionToolbarProps {
   /** iframe 阅读器（Foliate/WebDoc）额外监听其 contentDocument，PDF 不传 */
   keyEventDocs?: Document[]
   onAnnotate: () => void
+  /** 从当前选区开始语音朗读 */
+  onReadAloud?: () => void
   /** 打开 Agent 面板并带着当前选区去提问 */
   onAskAgent?: () => void
   /**
@@ -59,6 +62,7 @@ export function SelectionToolbar({
   hasSelectionForCopy = false,
   keyEventDocs,
   onAnnotate,
+  onReadAloud,
   onAskAgent,
   onAskDeepAnswer,
   deepAnswerPending = false,
@@ -167,6 +171,19 @@ export function SelectionToolbar({
         <MessageSquarePlus className="size-3.5 text-muted-foreground" />
         <span>批注</span>
       </Button>
+
+      {onReadAloud ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 rounded-lg px-2 text-xs text-primary hover:bg-primary/10 transition-colors"
+          title="从当前划选的句子开始语音朗读"
+          onClick={onReadAloud}
+        >
+          <Headphones className="size-3.5 text-primary" />
+          <span>朗读</span>
+        </Button>
+      ) : null}
 
       {onGenerateCardPreset ? (
         <div className="relative">

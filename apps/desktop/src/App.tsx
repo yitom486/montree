@@ -15,6 +15,7 @@ import { WebDocWorkspaceMain, type WebDocWorkspaceMainHandle } from '@/component
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell'
 import { Toaster } from '@/components/ui/sonner'
 import { UpdatePromptHost } from '@/components/shared/UpdatePromptHost'
+import { FloatingTtsPlayer } from '@/components/reader/FloatingTtsPlayer'
 import { toast } from 'sonner'
 import { useAutoSave } from '@/hooks/editor/useAutoSave'
 import { useDraftPersistence, clearDraftForFile } from '@/hooks/editor/useDraftPersistence'
@@ -571,6 +572,8 @@ function App() {
         onDiscard={() => void discardUnsavedChanges()}
         onCancel={cancelUnsavedPrompt}
       />
+
+      <FloatingTtsPlayer onOpenSettings={() => setSettingsOpen(true)} />
     </>
   )
 }

@@ -61,6 +61,15 @@ import type { SyncConfig } from '@montree/contracts'
 import { syncManager } from '../services/sync/sync-manager'
 import { readSyncConfig, writeSyncConfig } from '../services/sync/sync-config-service'
 import { writeLocalProgress } from '../services/sync/reading-progress-sync'
+import type { TtsConfig, TtsSynthesizePayload, TtsTestKeyPayload } from '@montree/contracts'
+import {
+  readTtsConfig,
+  writeTtsConfig,
+  synthesizeTts,
+  testTtsKey,
+  getTtsCacheStats,
+  clearTtsCache,
+} from '../services/tts/tts-service'
 import {
   exportHtmlDocument,
   exportPdfDocument,
@@ -920,4 +929,18 @@ export function registerIpcHandlers(): void {
       return ok(undefined)
     }
   })
+
+  // --- 语音朗读 (TTS / Gemini TTS) ---
+  ipcMain.handle(IPC.TTS_GET_CONFIG, async () => readTtsConfig())
+  ipcMain.handle(IPC.TTS_SAVE_CONFIG, async (_event, config: TtsConfig) =>
+    writeTtsConfig(config),
+  )
+  ipcMain.handle(IPC.TTS_SYNTHESIZE, async (_event, payload: TtsSynthesizePayload) =>
+    synthesizeTts(payload),
+  )
+  ipcMain.handle(IPC.TTS_TEST_KEY, async (_event, payload: TtsTestKeyPayload) =>
+    testTtsKey(payload),
+  )
+  ipcMain.handle(IPC.TTS_GET_CACHE_STATS, async () => getTtsCacheStats())
+  ipcMain.handle(IPC.TTS_CLEAR_CACHE, async () => clearTtsCache())
 }

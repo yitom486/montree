@@ -19,6 +19,7 @@
 | `ocr-api.ts` | OCR 组件状态、单页识别、目录识别与目录页范围探测（只建议范围） |
 | `rosetta-api.ts` | 罗盘索引：扫描书一键导入、进度订阅、书信息、统一读查询、纯本地目录重建、正文水印只读预览、备份并应用正文水印（二次确认后调用，空计划 noop）、已入库内容只读取证 |
 | `pdf-inspect-api.ts` | pdf-inspector 主进程分类与整档 Markdown |
+| `tts-api.ts` | 语音朗读：Gemini TTS 合成、双 Key 智能容灾、磁盘缓存管理 |
 | `query-keys.ts` | TanStack Query key 工厂 |
 
 新增能力顺序（见 AGENTS.md）：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。

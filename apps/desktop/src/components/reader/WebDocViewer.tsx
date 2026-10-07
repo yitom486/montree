@@ -45,6 +45,7 @@ import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-a
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { registerSelectionProvider, commitReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
+import { useTtsStore } from '@/stores/tts-store'
 import { DEFAULT_HIGHLIGHT_COLOR } from '@montree/reader-core'
 import { findMarkForSelection, isClickNotDrag } from '@montree/reader-core'
 import { buildWebDocReaderDocument } from '@/lib/reader/web-doc/web-doc-html'
@@ -1140,6 +1141,8 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         ready={ready}
         tocDisabled={units.length === 0}
         cardCount={marks.length}
+        readAloudDisabled={true}
+        readAloudDisabledReason="网页版语音朗读优化中，暂未开放"
         onTocToggle={toggleToc}
         onMarksToggle={toggleMarks}
         onAddBookmark={() => void addPageBookmark()}
@@ -1231,6 +1234,12 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : []
           }
           onAnnotate={selectionActions.handleAnnotate}
+          onReadAloud={() => {
+            if (selectionSnapshot?.text) {
+              void useTtsStore.getState().playFromSnippet(selectionSnapshot.text)
+              selectionActions.handleDismiss()
+            }
+          }}
           onHighlight={selectionActions.handleHighlight}
           onAddToChat={selectionActions.handleAddToChat}
           onAskAgent={selectionActions.handleAskAgent}

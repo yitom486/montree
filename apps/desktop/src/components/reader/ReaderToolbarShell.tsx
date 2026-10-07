@@ -5,6 +5,7 @@ import {
   Columns2,
   FileText,
   GraduationCap,
+  Headphones,
   List,
   Maximize2,
   Minimize2,
@@ -15,6 +16,9 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useReaderNavTitles } from '@/stores/reader-navigation-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
+import { useTtsStore } from '@/stores/tts-store'
+import { getReaderContentProvider } from '@/lib/agent/context/reader-content-registry'
+import { toast } from 'sonner'
 import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +26,8 @@ interface ReaderToolbarShellProps {
   ready?: boolean
   tocDisabled?: boolean
   marksHidden?: boolean
+  readAloudDisabled?: boolean
+  readAloudDisabledReason?: string
   onTocToggle: () => void
   onMarksToggle?: () => void
   onAddBookmark: () => void
@@ -50,6 +56,8 @@ export function ReaderToolbarShell({
   ready = true,
   tocDisabled = false,
   marksHidden = false,
+  readAloudDisabled = false,
+  readAloudDisabledReason,
   onTocToggle,
   onMarksToggle,
   onAddBookmark,
@@ -68,6 +76,47 @@ export function ReaderToolbarShell({
   const openQuiz = useReaderHudUiStore((s) => s.openQuiz)
   const zenMode = useReaderHudUiStore((s) => s.zenMode)
   const toggleZenMode = useReaderHudUiStore((s) => s.toggleZenMode)
+
+  const isSpeaking = useTtsStore((s) => s.isSpeaking)
+  const isPlayerVisible = useTtsStore((s) => s.isPlayerVisible)
+
+  const handleToggleReadAloud = async () => {
+    if (readAloudDisabled) {
+      toast.info(readAloudDisabledReason || '当前文档暂不支持语音朗读')
+      return
+    }
+    if (isPlayerVisible && isSpeaking) {
+      useTtsStore.getState().togglePlayPause()
+      return
+    }
+    const provider = getReaderContentProvider()
+    if (!provider) {
+      toast.warning('当前暂无可用阅读正文')
+      return
+    }
+    try {
+      const rawText = await provider.getCurrentText()
+      if (!rawText || !rawText.trim()) {
+        toast.warning('当前章节或版面未提取到可朗读正文')
+        return
+      }
+
+      let viewportSnippet = ''
+      try {
+        if (provider.getViewportText) {
+          viewportSnippet = await provider.getViewportText()
+        }
+      } catch (e) {
+        console.warn('[TTS] 视口顶部文本提取失败，回退默认起始句:', e)
+      }
+
+      void useTtsStore.getState().playText(currentTitle || '当前章节', rawText, {
+        viewportSnippet,
+      })
+    } catch (err: any) {
+      toast.error(`获取正文失败: ${err?.message || '未知错误'}`)
+    }
+  }
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-3 py-1.5 backdrop-blur-md select-none transition-colors">
@@ -185,6 +234,35 @@ export function ReaderToolbarShell({
             >
               <FileText className="size-3.5" />
               <span className="hidden sm:inline">札记箱</span>
+            </Button>
+          </ToolbarTip>
+
+          {/* 听书朗读本章 */}
+          <ToolbarTip
+            label={
+              readAloudDisabled
+                ? readAloudDisabledReason || '当前文档暂不支持语音朗读'
+                : isSpeaking
+                  ? '暂停 / 继续朗读本章'
+                  : '听书朗读本章（Gemini 智能 TTS / 双 Key 容灾 / 句子高亮）'
+            }
+          >
+            <Button
+              variant={isSpeaking ? 'secondary' : 'ghost'}
+              size="sm"
+              disabled={!ready || readAloudDisabled}
+              className={cn(
+                'h-7 gap-1.5 rounded-lg px-2 text-xs transition-all duration-150',
+                readAloudDisabled
+                  ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+                  : isSpeaking
+                    ? 'border border-primary/25 bg-primary/10 text-primary font-medium cursor-pointer'
+                    : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer',
+              )}
+              onClick={() => void handleToggleReadAloud()}
+            >
+              <Headphones className={cn('size-3.5', isSpeaking && 'animate-pulse text-primary')} />
+              <span>{isSpeaking ? '朗读中' : '听书'}</span>
             </Button>
           </ToolbarTip>
 

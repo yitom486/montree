@@ -104,6 +104,14 @@ import type {
   SyncExecuteResult,
 } from '../types/sync'
 import type {
+  TtsConfig,
+  TtsSynthesizePayload,
+  TtsSynthesizeResult,
+  TtsCacheStats,
+  TtsTestKeyPayload,
+  TtsTestKeyResult,
+} from '../types/tts'
+import type {
   RosettaActiveImport,
   RosettaBodyWatermarkApplyPayload,
   RosettaBodyWatermarkApplyResult,
@@ -452,4 +460,19 @@ export interface ElectronAPI {
   onApplyRemoteProgress: (callback: (progressJson: string) => void) => () => void
   /** 保存渲染端阅读进度快照到本地主进程文件 */
   saveLocalProgress: (progressJson: string) => Promise<Result<void, AppError>>
+  /* ===== 语音朗读（TTS / Gemini TTS） ===== */
+  /** 获取 TTS 配置 */
+  getTtsConfig: () => Promise<Result<TtsConfig, AppError>>
+  /** 保存 TTS 配置 */
+  saveTtsConfig: (config: TtsConfig) => Promise<Result<void, AppError>>
+  /** 语音合成（带本地磁盘缓存与双 Key 容灾） */
+  synthesizeTts: (
+    payload: TtsSynthesizePayload,
+  ) => Promise<Result<TtsSynthesizeResult, AppError>>
+  /** 测试指定 API Key 有效性 */
+  testTtsKey: (payload: TtsTestKeyPayload) => Promise<Result<TtsTestKeyResult, AppError>>
+  /** 获取本地音频缓存统计 */
+  getTtsCacheStats: () => Promise<Result<TtsCacheStats, AppError>>
+  /** 清空本地音频缓存 */
+  clearTtsCache: () => Promise<Result<void, AppError>>
 }

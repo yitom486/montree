@@ -223,3 +223,41 @@ export function subscribeAnchorHighlight(handler: (excerpt: string) => void): ()
   window.addEventListener(ANCHOR_HIGHLIGHT_EVENT, onHighlight)
   return () => window.removeEventListener(ANCHOR_HIGHLIGHT_EVENT, onHighlight)
 }
+
+/**
+ * 跨面板 TTS 语音朗读临时高亮通道：
+ * 播放器切句时 emit 正在朗读的句子，各 Viewer 订阅后在正文中做临时高亮与居中滚动。
+ * 暂停、切章或关闭播放器时 emit 清除事件，临时高亮立即撤除，不污染任何真实标注。
+ */
+export const TTS_HIGHLIGHT_EVENT = 'montree:tts-highlight'
+export const TTS_CLEAR_HIGHLIGHT_EVENT = 'montree:tts-clear-highlight'
+
+export function emitTtsHighlight(sentence: string): void {
+  if (typeof window === 'undefined' || !sentence) return
+  window.dispatchEvent(new CustomEvent<string>(TTS_HIGHLIGHT_EVENT, { detail: sentence }))
+}
+
+export function emitTtsClearHighlight(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(TTS_CLEAR_HIGHLIGHT_EVENT))
+}
+
+export function subscribeTtsHighlight(
+  onHighlight: (sentence: string) => void,
+  onClear?: () => void,
+): () => void {
+  if (typeof window === 'undefined') return () => undefined
+  const handleHighlight = (e: Event) => {
+    const text = (e as CustomEvent<string>).detail
+    if (typeof text === 'string' && text.trim()) onHighlight(text.trim())
+  }
+  const handleClear = () => {
+    onClear?.()
+  }
+  window.addEventListener(TTS_HIGHLIGHT_EVENT, handleHighlight)
+  window.addEventListener(TTS_CLEAR_HIGHLIGHT_EVENT, handleClear)
+  return () => {
+    window.removeEventListener(TTS_HIGHLIGHT_EVENT, handleHighlight)
+    window.removeEventListener(TTS_CLEAR_HIGHLIGHT_EVENT, handleClear)
+  }
+}

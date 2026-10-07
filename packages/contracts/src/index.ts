@@ -11,6 +11,7 @@ export * from "./types/ocr";
 export * from "./types/rosetta";
 export * from "./types/web-doc";
 export * from "./types/sync";
+export * from "./types/tts";
 export * from "./types/quiz";
 export * from "./types/flashcard";
 export * from "./types/ai-session";

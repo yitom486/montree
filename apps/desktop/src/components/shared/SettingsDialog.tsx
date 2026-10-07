@@ -37,6 +37,7 @@ import { appApi } from '@/api/app-api'
 import { clearAllPdfOcrCache } from '@/api/ocr-api'
 import { useOcrComponent } from '@/hooks/reader/useOcrComponent'
 import { SyncSettingsSection } from './SyncSettingsSection'
+import { TtsSettingsSection } from './TtsSettingsSection'
 import { toast } from 'sonner'
 
 interface SettingsDialogProps {
@@ -377,6 +378,10 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
           <Separator className="my-2" />
 
           <SyncSettingsSection />
+
+          <Separator className="my-2" />
+
+          <TtsSettingsSection />
 
           <Separator className="my-2" />
 

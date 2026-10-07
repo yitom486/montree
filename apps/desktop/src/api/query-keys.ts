@@ -20,4 +20,7 @@ export const queryKeys = {
   rosettaBookInfo: (fingerprint: string) => ['rosetta-book-info', fingerprint] as const,
   /** OCR 组件（语言包/引擎）状态（onOcrComponentStatus 推送经 setQueryData 写回） */
   ocrComponent: ['ocr', 'component-status'] as const,
+  /** TTS 语音配置与缓存统计 */
+  ttsConfig: ['tts', 'config'] as const,
+  ttsCacheStats: ['tts', 'cache-stats'] as const,
 }

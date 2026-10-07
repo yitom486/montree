@@ -60,6 +60,7 @@ import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { registerSelectionProvider, commitReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { DEFAULT_HIGHLIGHT_COLOR } from '@montree/reader-core'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
+import { useTtsStore } from '@/stores/tts-store'
 import { loadPdfOutlineInfo, formatPdfOutlineNotice, type PdfOutlineSource } from '@montree/reader-core'
 import { detectPdfDocumentProfile } from '@/lib/reader/pdf/pdf-scan-detector'
 import {
@@ -142,6 +143,7 @@ import {
   scrollElementTextIntoView,
   subscribeRevealMark,
   subscribeAnchorHighlight,
+  subscribeTtsHighlight,
   type RevealAdapter,
 } from '@/lib/reader/marks/mark-linkage'
 import {
@@ -1870,6 +1872,49 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     })
   }, [jumpToPage])
 
+  // TTS 语音朗读逐句临时标记跟随
+  useEffect(() => {
+    const clearTtsHighlight = () => {
+      try {
+        const viewWindow = window as any
+        viewWindow?.CSS?.highlights?.delete('montree-tts-active')
+      } catch {}
+    }
+
+    return subscribeTtsHighlight(
+      (sentence) => {
+        clearTtsHighlight()
+        const currentEl = pageAnchorRefs.current.get(pageNumRef.current)
+        if (!currentEl) return
+
+        const cleanCore = sentence
+          .replace(/[，。！？；：“”‘’（）《》、\s,.!?;:'"()[\]]/g, '')
+          .slice(0, 15)
+        let range = scrollElementTextIntoView(currentEl, sentence)
+        if (!range && cleanCore.length >= 4) {
+          range = scrollElementTextIntoView(currentEl, cleanCore)
+        }
+        if (!range) {
+          range = scrollElementTextIntoView(currentEl, sentence.slice(0, 20))
+        }
+
+        if (range) {
+          try {
+            const viewWindow = window as any
+            const registry = viewWindow?.CSS?.highlights
+            const HighlightCtor = viewWindow?.Highlight
+            if (registry && HighlightCtor) {
+              registry.set('montree-tts-active', new HighlightCtor(range))
+            }
+          } catch {}
+        }
+      },
+      () => {
+        clearTtsHighlight()
+      },
+    )
+  }, [])
+
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
       await deleteMark(mark.id)
@@ -2280,6 +2325,8 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         ready={ready}
         tocDisabled={!hasChapterToc}
         cardCount={marks.length}
+        readAloudDisabled={isScannedPdf}
+        readAloudDisabledReason="当前文档为图片扫描件，暂不支持语音朗读"
         onTocToggle={() => {          setMarksOpen(false)
           setTocOpen((value) => !value)
         }}
@@ -2489,6 +2536,12 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           onCopy={selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
           onAnnotate={selectionActions.handleAnnotate}
+          onReadAloud={() => {
+            if (selectionSnapshot?.text) {
+              void useTtsStore.getState().playFromSnippet(selectionSnapshot.text)
+              selectionActions.handleDismiss()
+            }
+          }}
           onHighlight={selectionActions.handleHighlight}
           onAddToChat={selectionActions.handleAddToChat}
           onAskAgent={selectionActions.handleAskAgent}

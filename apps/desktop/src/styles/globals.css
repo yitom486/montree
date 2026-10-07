@@ -392,3 +392,22 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 140, 130, 0.42);
 }
+
+/* TTS 智能朗读正文句子高亮微光样式 */
+.montree-tts-highlight {
+  background-color: rgba(234, 179, 8, 0.22) !important;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.35);
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dark .montree-tts-highlight {
+  background-color: rgba(234, 179, 8, 0.28) !important;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.45);
+}
+
+/* 原生 CSS Custom Highlight API：TTS 逐句临时微光标记（琥珀金柔光，不污染 DOM） */
+::highlight(montree-tts-active) {
+  background-color: rgba(234, 179, 8, 0.32) !important;
+  color: inherit !important;
+}

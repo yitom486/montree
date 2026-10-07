@@ -33,6 +33,8 @@ files:
   - node_modules/@yitom/acp-client/**/*
   - node_modules/@agentclientprotocol/sdk/**/*
   - node_modules/zod/**/*
+  - node_modules/@google/genai/**/*
+  - node_modules/gemini-tts-studio/**/*
   - '!node_modules/{@codemirror,codemirror,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
 electronLanguages:
   - zh-CN
