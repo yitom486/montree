@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.5] - 2026-10-07
+
 - ### 阅读器与知识卡片箱
   - **Mermaid 架构图谱渲染与连线自愈**：修复笔记 Markdown 规范化正则拆断代码块连线语法（`-->`）导致解析失败的问题，建立代码围栏隔离保护机制并增加连线跨行断裂自愈容错；全面注入现代化卡片配色系统、平滑贝塞尔曲线与圆润交互微动效。
   - **全书札记箱防溢出与操作栏自适应**：修复长书名与操作按钮组挤压导致关闭按钮 `X` 溢出视口的问题，抽屉顶栏实现自适应弹性截断，保证关闭与快捷操作区 100% 可见。
@@ -345,7 +349,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.4...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/yitom486/montree/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yitom486/montree/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/yitom486/montree/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/yitom486/montree/compare/v0.4.1...v0.4.2
