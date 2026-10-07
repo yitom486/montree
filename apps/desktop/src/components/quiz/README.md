@@ -4,5 +4,5 @@ AI 伴读考官出题、作答判卷与成绩回放组件。
 
 | 组件 | 功能 |
 |------|------|
-| `AiQuizDialog` | 独立 AI 智考工坊（多题型个性化定制、选择/简答/设计多模态渲染、AI 判卷评分与整卷诊断建议落库） |
+| `AiQuizDialog` | 独立 AI 智考工坊（多题型个性化定制、选择/简答/设计多模态渲染、AI 判卷评分与整卷诊断建议落库；拆分子模块：`useQuizSessionState`、`QuizConfigPanel`、`QuizAnsweringView`、`QuizResultReview`） |
 | `QuizHistoryDialog` | 测验历史与成绩单完整回放（历次测验时间轴、AI 整卷诊断建议回放、多题型选项与错题深度复盘） |
