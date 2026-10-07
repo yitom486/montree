@@ -47,7 +47,7 @@ export interface UsePdfOcrTocManagerOptions {
   outlineSource: PdfOutlineSource | 'ocr'
   isScannedPdf: boolean
   isMixedPdf: boolean
-  rosettaImportRunning: boolean
+  rosettaImportRunning?: boolean | React.RefObject<boolean>
   tocLifecycleRef: React.RefObject<TocDocLifecycle | null>
   readPageText: (pageNumber: number, options?: { allowAutoOcr?: boolean }) => Promise<string>
   resetPageOcr: () => void
@@ -68,7 +68,7 @@ export function usePdfOcrTocManager({
   outlineSource,
   isScannedPdf,
   isMixedPdf,
-  rosettaImportRunning,
+  rosettaImportRunning = false,
   tocLifecycleRef,
   readPageText,
   resetPageOcr,
@@ -116,9 +116,34 @@ export function usePdfOcrTocManager({
     setTocPageOffset(tocPageTo)
   }, [outlineSource, tocPageTo])
 
+  // 切换文档时自动重置局部 UI 状态
+  useEffect(() => {
+    setOcrBannerDismissed(false)
+    setBookmarkSlimDismissed(false)
+    setOcrTocEditorOpen(false)
+    setOcrTocEditMode(false)
+    setOcrTocEntries([])
+  }, [filePath, fileFingerprint])
+
+  const restoreFromCache = useCallback(
+    (cache: { tocPageRange: [number, number]; pageOffset: number; entries: OcrTocEntry[] }) => {
+      setTocPageFrom(cache.tocPageRange[0])
+      setTocPageTo(cache.tocPageRange[1])
+      setTocPageOffset(cache.pageOffset)
+      setOcrTocEntries(cache.entries)
+    },
+    [],
+  )
+
+  const checkImportRunning = useCallback(() => {
+    return typeof rosettaImportRunning === 'object' && rosettaImportRunning !== null
+      ? Boolean(rosettaImportRunning.current)
+      : Boolean(rosettaImportRunning)
+  }, [rosettaImportRunning])
+
   const handleRecognizeToc = useCallback(async () => {
     if (!fileFingerprint) return
-    if (rosettaImportRunning) {
+    if (checkImportRunning()) {
       toast.error('全书识别进行中，目录识别请等待完成或取消后再试')
       return
     }
@@ -160,7 +185,7 @@ export function usePdfOcrTocManager({
       if (isLiveTocOp(lease, session)) setOcrRecognizing(false)
       endTocOp(lease)
     }
-  }, [beginTocOp, endTocOp, fileFingerprint, filePath, isLiveTocOp, numPages, ocrTocEditMode, pdfOcrScale, rosettaImportRunning, setOcrTocNotice, setOutlineSource, setOutlineUnits, setTocOpen, tocLifecycleRef, tocPageFrom, tocPageOffset, tocPageTo])
+  }, [beginTocOp, checkImportRunning, endTocOp, fileFingerprint, filePath, isLiveTocOp, numPages, ocrTocEditMode, pdfOcrScale, setOcrTocNotice, setOutlineSource, setOutlineUnits, setTocOpen, tocLifecycleRef, tocPageFrom, tocPageOffset, tocPageTo])
 
   const handleSaveOcrToc = useCallback(
     async (entries: OcrTocEntry[]) => {
@@ -202,7 +227,7 @@ export function usePdfOcrTocManager({
 
   const handleDetectTocPages = useCallback(async () => {
     if (!fileFingerprint) return
-    if (rosettaImportRunning) {
+    if (checkImportRunning()) {
       toast.error('全书识别进行中，目录识别请等待完成或取消后再试')
       return
     }
@@ -248,7 +273,7 @@ export function usePdfOcrTocManager({
       if (isLiveTocOp(lease, session)) setTocDetecting(false)
       endTocOp(lease)
     }
-  }, [beginTocOp, endTocOp, fileFingerprint, filePath, isLiveTocOp, numPages, ocrTocEditMode, rosettaImportRunning, tocLifecycleRef, tocPageFrom, tocPageTo])
+  }, [beginTocOp, checkImportRunning, endTocOp, fileFingerprint, filePath, isLiveTocOp, numPages, ocrTocEditMode, tocLifecycleRef, tocPageFrom, tocPageTo])
 
   const handleSelectDetectCandidate = useCallback(
     (index: number) => {
@@ -461,5 +486,6 @@ export function usePdfOcrTocManager({
     handleSuggestOffset,
     handleOpenOcrTocEditor,
     handleClearOcrCache,
+    restoreFromCache,
   }
 }

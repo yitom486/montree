@@ -29,8 +29,6 @@ import { reportAppError } from '@/lib/workspace/report-error'
 import { isLiveLoadSession, TocDocLifecycle } from '@/lib/reader/pdf-ocr/ocr-toc-op'
 import type { OcrTocEntry } from '@montree/contracts'
 import type { usePdfPageOcr } from '@/hooks/reader/usePdfPageOcr'
-import { usePdfRosettaIndex } from '@/components/reader/pdf/usePdfRosettaIndex'
-import { usePdfAgentRegistry } from '@/components/reader/pdf/usePdfAgentRegistry'
 
 export interface UsePdfDocumentSessionOptions {
   filePath: string
@@ -40,20 +38,9 @@ export interface UsePdfDocumentSessionOptions {
   pageAnchorRefs: React.RefObject<Map<number, HTMLDivElement>>
   tocLifecycleRef: React.RefObject<TocDocLifecycle | null>
   pdfPageOcr: ReturnType<typeof usePdfPageOcr>
-  setOcrBannerDismissed: (val: boolean) => void
-  setBookmarkSlimDismissed: (val: boolean) => void
-  setOcrTocEditorOpen: (val: boolean) => void
-  setOcrTocEditMode: (val: boolean) => void
-  setOcrTocEntries: (entries: OcrTocEntry[]) => void
-  setOcrTocNotice: (notice: OcrTocNotice | null) => void
-  setTocPageFrom: (page: number) => void
-  setTocPageTo: (page: number) => void
-  setTocPageOffset: (offset: number) => void
-  setTocOpen: (open: boolean | ((prev: boolean) => boolean)) => void
-  ocrTocEntries: OcrTocEntry[]
-  tocPageOffset: number
-  handleOpenOcrTocEditor: () => void
-  handleClearOcrCache: () => Promise<void>
+  setOcrTocNotice?: (notice: OcrTocNotice | null) => void
+  onRestoreOcrTocCache?: (cache: { tocPageRange: [number, number]; pageOffset: number; entries: OcrTocEntry[] }) => void
+  isImportRunningRef?: React.RefObject<boolean>
 }
 
 export function usePdfDocumentSession({
@@ -64,35 +51,34 @@ export function usePdfDocumentSession({
   pageAnchorRefs,
   tocLifecycleRef,
   pdfPageOcr,
-  setOcrBannerDismissed,
-  setBookmarkSlimDismissed,
-  setOcrTocEditorOpen,
-  setOcrTocEditMode,
-  setOcrTocEntries,
   setOcrTocNotice,
-  setTocPageFrom,
-  setTocPageTo,
-  setTocPageOffset,
-  setTocOpen,
-  ocrTocEntries,
-  tocPageOffset,
-  handleOpenOcrTocEditor,
-  handleClearOcrCache,
+  onRestoreOcrTocCache,
+  isImportRunningRef,
 }: UsePdfDocumentSessionOptions) {
   const {
     ocrPageCaches,
     ocrPageCachesRef,
     ocrPageRecognizing,
-    currentPageOcrReady,
-    currentPageOcrBusy,
-    ocrRecognizedCount,
     runPageOcr,
     readPageText,
     handleRecognizePage,
-    hasPendingPageOcr,
     hydratePageCaches,
     resetPageOcr,
+    hasPendingPageOcr,
   } = pdfPageOcr
+
+  const callbacksRef = useRef({
+    setOcrTocNotice,
+    onRestoreOcrTocCache,
+    hydratePageCaches,
+    resetPageOcr,
+  })
+  callbacksRef.current = {
+    setOcrTocNotice,
+    onRestoreOcrTocCache,
+    hydratePageCaches,
+    resetPageOcr,
+  }
 
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null)
   const loadingTaskRef = useRef<PDFDocumentLoadingTask | null>(null)
@@ -162,8 +148,7 @@ export function usePdfDocumentSession({
     setOutlineNotice(undefined)
     setIsScannedPdf(false)
     setIsMixedPdf(false)
-    setBookmarkSlimDismissed(false)
-  }, [filePath, fileFingerprint, setBookmarkSlimDismissed, tocLifecycleRef])
+  }, [filePath, fileFingerprint, tocLifecycleRef])
 
   // Missing word layer tracking
   const missingWordLayerRef = useRef<Set<number>>(new Set())
@@ -286,43 +271,6 @@ export function usePdfDocumentSession({
     fitWidth()
   }, [fitWidth, filePath, numPages])
 
-  // Rosetta Index & Menu
-  const rosetta = usePdfRosettaIndex({
-    filePath,
-    fileFingerprint,
-    numPages,
-    pageNum,
-    outlineUnits,
-    ocrTocEntries,
-    tocPageOffset,
-    isScannedPdf,
-    isMixedPdf,
-    outlineSource,
-    ready,
-    fitWidth,
-    setScale,
-    handleRecognizePage,
-    handleOpenOcrTocEditor,
-    handleClearOcrCache,
-    currentPageOcrBusy,
-    currentPageOcrReady,
-    ocrRecognizedCount,
-  })
-
-  // Agent Content & Registry
-  usePdfAgentRegistry({
-    filePath,
-    fileFingerprint,
-    numPages,
-    pageNumRef,
-    pdfDocRef,
-    isScannedPdf,
-    isMixedPdf,
-    data,
-    rosettaImport: rosetta.rosettaImport,
-    readPageText,
-  })
-
   // Auto-OCR missing page
   const tryAutoOcrMissingPage = useCallback(() => {
     const current = pageNumRef.current
@@ -335,14 +283,14 @@ export function usePdfDocumentSession({
         reportedMissing: missingWordLayerRef.current.has(current),
         isCurrentPage: true,
         hasCache: false,
-        importRunning: rosetta.rosettaImport.state === 'running',
+        importRunning: Boolean(isImportRunningRef?.current),
       })
     ) {
       return
     }
     if (hasPendingPageOcr(current)) return
     void runPageOcr(current).catch(() => {})
-  }, [hasPendingPageOcr, ocrPageCachesRef, rosetta.rosettaImport.state, runPageOcr])
+  }, [hasPendingPageOcr, isImportRunningRef, ocrPageCachesRef, runPageOcr])
 
   const handleWordLayerMissing = useCallback(
     (missingPage: number) => {
@@ -354,7 +302,7 @@ export function usePdfDocumentSession({
 
   useEffect(() => {
     tryAutoOcrMissingPage()
-  }, [pageNum, isScannedPdf, isMixedPdf, rosetta.rosettaImport.state, tryAutoOcrMissingPage])
+  }, [pageNum, isScannedPdf, isMixedPdf, tryAutoOcrMissingPage])
 
   // PDF Document Loading & Hydration
   useEffect(() => {
@@ -368,10 +316,8 @@ export function usePdfDocumentSession({
     setPdfDoc(null)
     setPageNum(1)
     setNumPages(0)
-    setOcrBannerDismissed(false)
-    resetPageOcr()
+    callbacksRef.current.resetPageOcr()
     missingWordLayerRef.current.clear()
-    setTocOpen(false)
     pageAnchorRefs.current.clear()
 
     const loadSession = tocLifecycleRef.current?.currentSession() ?? 0
@@ -438,17 +384,14 @@ export function usePdfDocumentSession({
             })
             const notice = noticeForRestoredCache(assessment)
             if (assessment.status === 'invalid') {
-              setOcrTocNotice(notice)
+              callbacksRef.current.setOcrTocNotice?.(notice)
             } else {
               const cache = cacheResult.value
               nextUnits = assessment.repairedUnits ?? cache.units
               nextSource = 'ocr'
-              setTocPageFrom(cache.tocPageRange[0])
-              setTocPageTo(cache.tocPageRange[1])
-              setTocPageOffset(cache.pageOffset)
-              setOcrTocEntries(cache.entries)
               nextNotice = undefined
-              setOcrTocNotice(notice)
+              callbacksRef.current.onRestoreOcrTocCache?.(cache)
+              callbacksRef.current.setOcrTocNotice?.(notice)
             }
           }
         }
@@ -471,7 +414,7 @@ export function usePdfDocumentSession({
             },
           })
           if (!isLiveLoad()) return
-          hydratePageCaches(hydrated)
+          callbacksRef.current.hydratePageCaches(hydrated)
         }
       } catch (cause) {
         if (!isLiveLoad()) return
@@ -495,7 +438,7 @@ export function usePdfDocumentSession({
       loadingTaskRef.current = null
       setPdfDoc(null)
     }
-  }, [data, fileFingerprint, filePath, hydratePageCaches, pageAnchorRefs, resetPageOcr, setOcrBannerDismissed, setOcrTocEntries, setOcrTocNotice, setTocOpen, setTocPageFrom, setTocPageOffset, setTocPageTo, tocLifecycleRef])
+  }, [data, fileFingerprint, filePath])
 
   // Progress save debounce
   useEffect(() => {
@@ -613,7 +556,7 @@ export function usePdfDocumentSession({
       !fileFingerprint ||
       !ready ||
       numPages < 1 ||
-      rosetta.rosettaImport.state === 'running'
+      Boolean(isImportRunningRef?.current)
     ) {
       return
     }
@@ -645,33 +588,7 @@ export function usePdfDocumentSession({
     return () => {
       cancelled = true
     }
-  }, [fileFingerprint, hasChapterToc, hasPendingPageOcr, isScannedPdf, numPages, ocrPageCachesRef, ocrPageRecognizing, outlineUnits, pageNum, pdfOcrBackgroundPrefetch, ready, rosetta.rosettaImport.state, runPageOcr])
-
-  // Hydrate pages as Rosetta completes blocks
-  useEffect(() => {
-    if (!fileFingerprint || rosetta.rosettaImport.state !== 'running' || rosetta.rosettaImport.donePages <= 0) {
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      const fresh = await loadPersistedOcrPageCaches(fileFingerprint, {
-        listPages: async () => {
-          const pagesResult = await listPdfOcrPages({ fileFingerprint })
-          if (!pagesResult.ok) return []
-          return pagesResult.value.filter((page) => !ocrPageCachesRef.current[page]?.words.length)
-        },
-        getPage: async (pageNumber) => {
-          const pageResult = await getPdfOcrPage({ fileFingerprint, page: pageNumber })
-          return pageResult.ok ? pageResult.value : null
-        },
-      })
-      if (!cancelled) hydratePageCaches(fresh)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [fileFingerprint, hydratePageCaches, ocrPageCachesRef, rosetta.rosettaImport.donePages, rosetta.rosettaImport.state])
-
+  }, [fileFingerprint, hasChapterToc, hasPendingPageOcr, isImportRunningRef, isScannedPdf, numPages, ocrPageCachesRef, ocrPageRecognizing, outlineUnits, pageNum, pdfOcrBackgroundPrefetch, ready, runPageOcr])
   return {
     pdfDoc,
     pdfDocRef,
@@ -696,12 +613,6 @@ export function usePdfDocumentSession({
     hasChapterToc,
     currentPdfChapter,
     marksToc,
-    rosettaImport: rosetta.rosettaImport,
-    bodyWatermarkPreviewOpen: rosetta.bodyWatermarkPreviewOpen,
-    setBodyWatermarkPreviewOpen: rosetta.setBodyWatermarkPreviewOpen,
-    indexBadge: rosetta.indexBadge,
-    moreMenuItems: rosetta.moreMenuItems,
-    rosettaExtraAction: rosetta.rosettaExtraAction,
     fitWidth,
     scrollToPage,
     jumpToPage,

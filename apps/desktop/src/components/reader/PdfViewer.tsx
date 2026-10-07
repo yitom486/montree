@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, ScanText, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
@@ -38,7 +38,11 @@ import '@/styles/pdf-viewer.css'
 
 import { usePdfDocumentSession } from '@/components/reader/pdf/usePdfDocumentSession'
 import { usePdfOcrTocManager } from '@/components/reader/pdf/usePdfOcrTocManager'
+import { usePdfRosettaIndex } from '@/components/reader/pdf/usePdfRosettaIndex'
+import { usePdfAgentRegistry } from '@/components/reader/pdf/usePdfAgentRegistry'
 import { usePdfInteractions } from '@/components/reader/pdf/usePdfInteractions'
+import { loadPersistedOcrPageCaches } from '@/lib/reader/pdf-ocr/pdf-ocr-page-hydrate'
+import { listPdfOcrPages, getPdfOcrPage } from '@/api/ocr-api'
 
 interface PdfViewerProps {
   filePath: string
@@ -91,11 +95,8 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     }, []),
   })
 
-  // 跨模块调用解耦引用
-  const handleOpenOcrTocEditorRef = useRef<() => void>(() => {})
-  const handleClearOcrCacheRef = useRef<() => Promise<void>>(async () => {})
-  const ocrTocEntriesRef = useRef<any[]>([])
-  const tocPageOffsetRef = useRef<number>(12)
+  const isImportRunningRef = useRef(false)
+  const ocrTocManagerRef = useRef<ReturnType<typeof usePdfOcrTocManager> | null>(null)
 
   // 2. PDF 文档渲染会话
   const session = usePdfDocumentSession({
@@ -106,20 +107,9 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     pageAnchorRefs,
     tocLifecycleRef,
     pdfPageOcr,
-    setOcrBannerDismissed: (val) => ocrTocManager.setOcrBannerDismissed(val),
-    setBookmarkSlimDismissed: (val) => ocrTocManager.setBookmarkSlimDismissed(val),
-    setOcrTocEditorOpen: (val) => ocrTocManager.setOcrTocEditorOpen(val),
-    setOcrTocEditMode: (val) => ocrTocManager.setOcrTocEditMode(val),
-    setOcrTocEntries: (entries) => ocrTocManager.setOcrTocEntries(entries),
     setOcrTocNotice,
-    setTocPageFrom: (page) => ocrTocManager.setTocPageFrom(page),
-    setTocPageTo: (page) => ocrTocManager.setTocPageTo(page),
-    setTocPageOffset: (offset) => ocrTocManager.setTocPageOffset(offset),
-    setTocOpen,
-    ocrTocEntries: ocrTocEntriesRef.current,
-    tocPageOffset: tocPageOffsetRef.current,
-    handleOpenOcrTocEditor: () => handleOpenOcrTocEditorRef.current(),
-    handleClearOcrCache: () => handleClearOcrCacheRef.current(),
+    onRestoreOcrTocCache: (cache) => ocrTocManagerRef.current?.restoreFromCache(cache),
+    isImportRunningRef,
   })
 
   pdfDocHolderRef.current = session.pdfDoc
@@ -134,7 +124,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     outlineSource: session.outlineSource,
     isScannedPdf: session.isScannedPdf,
     isMixedPdf: session.isMixedPdf,
-    rosettaImportRunning: session.rosettaImport.state === 'running',
+    rosettaImportRunning: isImportRunningRef,
     tocLifecycleRef,
     readPageText: pdfPageOcr.readPageText,
     resetPageOcr: pdfPageOcr.resetPageOcr,
@@ -145,11 +135,82 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     ocrTocNotice,
     setOcrTocNotice,
   })
+  ocrTocManagerRef.current = ocrTocManager
 
-  handleOpenOcrTocEditorRef.current = ocrTocManager.handleOpenOcrTocEditor
-  handleClearOcrCacheRef.current = ocrTocManager.handleClearOcrCache
-  ocrTocEntriesRef.current = ocrTocManager.ocrTocEntries
-  tocPageOffsetRef.current = ocrTocManager.tocPageOffset
+  // 4. 罗盘索引与更多工具
+  const rosetta = usePdfRosettaIndex({
+    filePath,
+    fileFingerprint,
+    numPages: session.numPages,
+    pageNum: session.pageNum,
+    outlineUnits: session.outlineUnits,
+    ocrTocEntries: ocrTocManager.ocrTocEntries,
+    tocPageOffset: ocrTocManager.tocPageOffset,
+    isScannedPdf: session.isScannedPdf,
+    isMixedPdf: session.isMixedPdf,
+    outlineSource: session.outlineSource,
+    ready: session.ready,
+    fitWidth: session.fitWidth,
+    setScale: session.setScale,
+    handleRecognizePage: pdfPageOcr.handleRecognizePage,
+    handleOpenOcrTocEditor: ocrTocManager.handleOpenOcrTocEditor,
+    handleClearOcrCache: ocrTocManager.handleClearOcrCache,
+    currentPageOcrBusy: pdfPageOcr.currentPageOcrBusy,
+    currentPageOcrReady: pdfPageOcr.currentPageOcrReady,
+    ocrRecognizedCount: pdfPageOcr.ocrRecognizedCount,
+  })
+  isImportRunningRef.current = rosetta.rosettaImport.state === 'running'
+
+  // 5. 罗盘导入进度中补水 OCR 页面缓存
+  useEffect(() => {
+    if (
+      !fileFingerprint ||
+      rosetta.rosettaImport.state !== 'running' ||
+      rosetta.rosettaImport.donePages <= 0
+    ) {
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const fresh = await loadPersistedOcrPageCaches(fileFingerprint, {
+        listPages: async () => {
+          const pagesResult = await listPdfOcrPages({ fileFingerprint })
+          if (!pagesResult.ok) return []
+          return pagesResult.value.filter(
+            (page) => !pdfPageOcr.ocrPageCachesRef.current[page]?.words.length,
+          )
+        },
+        getPage: async (pageNumber) => {
+          const pageResult = await getPdfOcrPage({ fileFingerprint, page: pageNumber })
+          return pageResult.ok ? pageResult.value : null
+        },
+      })
+      if (!cancelled) pdfPageOcr.hydratePageCaches(fresh)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    fileFingerprint,
+    pdfPageOcr.hydratePageCaches,
+    pdfPageOcr.ocrPageCachesRef,
+    rosetta.rosettaImport.donePages,
+    rosetta.rosettaImport.state,
+  ])
+
+  // 6. Agent 侧栏上下文与结构化阅读注册
+  usePdfAgentRegistry({
+    filePath,
+    fileFingerprint,
+    numPages: session.numPages,
+    pageNumRef: session.pageNumRef,
+    pdfDocRef: session.pdfDocRef,
+    isScannedPdf: session.isScannedPdf,
+    isMixedPdf: session.isMixedPdf,
+    data,
+    rosettaImport: rosetta.rosettaImport,
+    readPageText: pdfPageOcr.readPageText,
+  })
 
   // 4. 阅读标注与批注
   const { marks, createMark, updateMark, deleteMark } = useReadingMarks(filePath)
@@ -269,7 +330,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
             size="sm"
             variant="ghost"
             className="h-6 text-xs"
-            disabled={ocrTocManager.ocrTocBusy || session.rosettaImport.state === 'running'}
+            disabled={ocrTocManager.ocrTocBusy || rosetta.rosettaImport.state === 'running'}
             onClick={() => void ocrTocManager.handleRecognizeToc()}
           >
             重新识别
@@ -298,7 +359,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
             size="sm"
             variant="ghost"
             className="h-6 text-xs"
-            disabled={ocrTocManager.ocrTocBusy || session.rosettaImport.state === 'running'}
+            disabled={ocrTocManager.ocrTocBusy || rosetta.rosettaImport.state === 'running'}
             onClick={() => ocrTocManager.setOcrTocEditorOpen(true)}
           >
             识别印刷目录
@@ -346,15 +407,15 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         }
         trailing={
           <>
-            {session.rosettaExtraAction}
+            {rosetta.rosettaExtraAction}
             {fileFingerprint ? (
               <PdfBookSearch
                 fingerprint={fileFingerprint}
-                indexed={Boolean(session.rosettaImport.info)}
+                indexed={Boolean(rosetta.rosettaImport.info)}
                 onJumpToPage={(page) => session.jumpToPage(page)}
               />
             ) : null}
-            <PdfToolbarMoreMenu items={session.moreMenuItems} />
+            <PdfToolbarMoreMenu items={rosetta.moreMenuItems} />
             {isLoading ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             ) : session.isScannedPdf ? (
@@ -597,9 +658,9 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         }}
       />
       <BodyWatermarkPreviewDialog
-        open={session.bodyWatermarkPreviewOpen}
+        open={rosetta.bodyWatermarkPreviewOpen}
         fingerprint={fileFingerprint}
-        onOpenChange={session.setBodyWatermarkPreviewOpen}
+        onOpenChange={rosetta.setBodyWatermarkPreviewOpen}
       />
     </div>
   )
