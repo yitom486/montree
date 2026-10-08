@@ -13,6 +13,7 @@ import type {
   TtsCacheStats,
   TtsConfig,
   TtsRemoteModelItem,
+  TtsSpeechBoundary,
   TtsSynthesizePayload,
   TtsSynthesizeResult,
   TtsTestKeyPayload,
@@ -42,6 +43,7 @@ export const DEFAULT_TTS_CONFIG: TtsConfig = {
   filterFootnotesAndCitations: true,
   filterLinksAndTechnicalMarkup: true,
   enableBatch: false,
+  highlightInReader: true,
 }
 
 let quotaStateLoaded: Promise<void> | undefined
@@ -494,22 +496,30 @@ export async function synthesizeTts(
       const cacheKey = buildCacheKey({ text, voiceName: `${azureRegion}:${azureVoice}`, modelId: 'azure', rate })
       const cacheDir = getCacheDirPath()
       const cacheFilePath = join(cacheDir, `${cacheKey}.wav`)
+      const timelineFilePath = join(cacheDir, `${cacheKey}.timeline.json`)
 
       if (config.saveAudioCache) {
         try {
           const cachedBuf = await readFile(cacheFilePath)
           if (cachedBuf.byteLength > 0) {
+            let cachedBoundaries: TtsSpeechBoundary[] | undefined
+            try {
+              const timelineStr = await readFile(timelineFilePath, 'utf-8')
+              cachedBoundaries = JSON.parse(timelineStr)
+            } catch {}
             return ok({
               audioBase64: cachedBuf.toString('base64'),
               mimeType: 'audio/wav',
               fromCache: true,
               keyUsed: 'primary',
+              ...(cachedBoundaries ? { boundaries: cachedBoundaries } : {}),
             })
           }
         } catch {}
       }
 
       let audioBuf: Buffer | undefined
+      let boundaries: TtsSpeechBoundary[] | undefined
       if (text.length <= 6000) {
         const res = await azureProvider.synthesize(
           {
@@ -521,10 +531,16 @@ export async function synthesizeTts(
           azureKey,
         )
         audioBuf = res.audioBuffer
+        if (res.boundaries && res.boundaries.length > 0) {
+          boundaries = res.boundaries
+        }
       } else {
         // 针对超长章节（>6000字）自动按段安全切分并拼接，彻底规避 Azure 单次 10,000 字符限制
         const parts = splitGeminiText(text, 5000).filter((p) => p.trim())
         const pcmChunks: Buffer[] = []
+        const combinedBoundaries: TtsSpeechBoundary[] = []
+        let currentOffsetMs = 0
+        let currentTextOffset = 0
         for (const part of parts) {
           const res = await azureProvider.synthesize(
             {
@@ -536,16 +552,36 @@ export async function synthesizeTts(
             azureKey,
           )
           if (res.audioBuffer && res.audioBuffer.length > 44) {
-            pcmChunks.push(res.audioBuffer.subarray(44))
+            const rawPcm = res.audioBuffer.subarray(44)
+            pcmChunks.push(rawPcm)
+            if (res.boundaries && res.boundaries.length > 0) {
+              for (const b of res.boundaries) {
+                combinedBoundaries.push({
+                  ...b,
+                  audioOffsetMs: b.audioOffsetMs + currentOffsetMs,
+                  textOffset: (b.textOffset ?? 0) + currentTextOffset,
+                })
+              }
+            }
+            // 24000Hz 16-bit mono = 48,000 bytes/sec = 48 bytes/ms
+            const partDurationMs = Math.round(rawPcm.byteLength / 48)
+            currentOffsetMs += partDurationMs
+            currentTextOffset += part.length
           }
         }
         audioBuf = pcmChunksToWavBuffer(pcmChunks, 24000)
+        if (combinedBoundaries.length > 0) {
+          boundaries = combinedBoundaries
+        }
       }
 
       if (config.saveAudioCache && audioBuf && audioBuf.byteLength > 0) {
         try {
           await mkdir(cacheDir, { recursive: true })
           await writeFile(cacheFilePath, audioBuf)
+          if (boundaries && boundaries.length > 0) {
+            await writeFile(timelineFilePath, JSON.stringify(boundaries), 'utf-8')
+          }
         } catch {}
       }
 
@@ -554,6 +590,7 @@ export async function synthesizeTts(
         mimeType: 'audio/wav',
         fromCache: false,
         keyUsed: 'primary',
+        ...(boundaries ? { boundaries } : {}),
       })
     }
 
@@ -815,6 +852,7 @@ export async function synthesizeTtsStream(
           mimeType: singleRes.value.mimeType,
           fromCache: singleRes.value.fromCache,
           keyUsed: singleRes.value.keyUsed,
+          boundaries: singleRes.value.boundaries,
         })
       }
       return ok({ started: true, fromCache: Boolean(singleRes.value.fromCache), cachedResult: singleRes.value })
@@ -1011,9 +1049,9 @@ export async function getTtsCacheStats(): Promise<Result<TtsCacheStats, AppError
     try {
       const files = await readdir(cacheDir)
       for (const file of files) {
-        if (file.endsWith('.wav')) {
+        if (file.endsWith('.wav') || file.endsWith('.timeline.json')) {
           const info = await stat(join(cacheDir, file))
-          count++
+          if (file.endsWith('.wav')) count++
           totalBytes += info.size
         }
       }
@@ -1035,7 +1073,7 @@ export async function clearTtsCache(): Promise<Result<void, AppError>> {
     try {
       const files = await readdir(cacheDir)
       for (const file of files) {
-        if (file.endsWith('.wav')) {
+        if (file.endsWith('.wav') || file.endsWith('.timeline.json')) {
           await unlink(join(cacheDir, file)).catch(() => {})
         }
       }

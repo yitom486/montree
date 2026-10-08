@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
 import { isOk } from '@montree/contracts'
+import { subscribeTtsHighlight } from '@/lib/reader/marks/mark-linkage'
 import { toast } from 'sonner'
 import { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
 import { useReaderSelectionActions } from '@/hooks/reader/useReaderSelectionActions'
@@ -23,6 +24,7 @@ import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
 import { buildMobiSnapshotFromRange } from '@montree/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { useTtsStore } from '@/stores/tts-store'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
 import type { AppTheme } from '@/stores/editor-ui-store'
 
@@ -273,6 +275,172 @@ export function useWebDocInteractions({
     },
     [deleteMark],
   )
+
+  const lastTtsRangeRef = useRef<Range | null>(null)
+  const isUserInteractingRef = useRef(false)
+  const userInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const centerWebDocRange = useCallback((range: Range) => {
+    try {
+      const host =
+        range.startContainer instanceof Element
+          ? range.startContainer
+          : range.startContainer.parentElement
+      host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    const markUserInteraction = () => {
+      isUserInteractingRef.current = true
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+      }
+      userInteractionTimerRef.current = setTimeout(() => {
+        let hasActiveSelection = false
+        try {
+          const iframeDoc = iframeRef.current?.contentDocument
+          const sel = iframeDoc?.getSelection() ?? window.getSelection()
+          if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            hasActiveSelection = true
+          }
+        } catch {}
+
+        if (hasActiveSelection) {
+          markUserInteraction()
+          return
+        }
+
+        isUserInteractingRef.current = false
+        // 用户停止操作满 3 秒：若仍有正在朗读的高亮且处于播放状态，平滑居中跳回高亮处
+        if (lastTtsRangeRef.current) {
+          const { isSpeaking, isPaused } = useTtsStore.getState()
+          if (isSpeaking && !isPaused) {
+            centerWebDocRange(lastTtsRangeRef.current)
+          }
+        }
+      }, 3000)
+    }
+
+    const onWheel = () => {
+      markUserInteraction()
+    }
+
+    const onSelectionChange = (e: Event) => {
+      try {
+        const targetDoc = (e.target as Document) ?? (e.currentTarget as Document) ?? document
+        const sel = targetDoc.getSelection() ?? window.getSelection()
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          markUserInteraction()
+        }
+      } catch {}
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: true, capture: true })
+    document.addEventListener('selectionchange', onSelectionChange, { passive: true })
+
+    const iframeDoc = iframeRef.current?.contentDocument
+    if (iframeDoc) {
+      iframeDoc.addEventListener('wheel', onWheel, { passive: true, capture: true })
+      iframeDoc.addEventListener('selectionchange', onSelectionChange, { passive: true })
+    }
+
+    return () => {
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+        userInteractionTimerRef.current = null
+      }
+      window.removeEventListener('wheel', onWheel, { capture: true })
+      document.removeEventListener('selectionchange', onSelectionChange)
+      if (iframeDoc) {
+        iframeDoc.removeEventListener('wheel', onWheel, { capture: true })
+        iframeDoc.removeEventListener('selectionchange', onSelectionChange)
+      }
+    }
+  }, [centerWebDocRange, iframeRef])
+
+  useEffect(() => {
+    return subscribeTtsHighlight(
+      (sentence, forceScroll) => {
+        const doc = iframeRef.current?.contentDocument
+        const body = doc?.body
+        if (!doc || !body) return
+
+        try {
+          const viewWindow = doc.defaultView as any
+          viewWindow?.CSS?.highlights?.delete('montree-tts-active')
+        } catch {}
+
+        const cleanCore = sentence
+          .replace(/[，。！？；：“”‘’（）《》、\s,.!?;:'"()[\]]/g, '')
+          .slice(0, 15)
+        let range = findTextRangeInRoot(body, sentence)
+        if (!range && cleanCore.length >= 4) {
+          range = findTextRangeInRoot(body, cleanCore)
+        }
+        if (!range) {
+          range = findTextRangeInRoot(body, sentence.slice(0, 20))
+        }
+
+        if (range) {
+          lastTtsRangeRef.current = range
+          try {
+            const host =
+              range.startContainer instanceof Element
+                ? range.startContainer
+                : range.startContainer.parentElement
+            const rect = host?.getBoundingClientRect?.()
+            const viewH = doc.defaultView?.innerHeight || 800
+            const inViewport = rect && rect.top >= 48 && rect.bottom <= viewH - 48
+
+            const viewWindow = doc.defaultView as any
+            const registry = viewWindow?.CSS?.highlights
+            const HighlightCtor = viewWindow?.Highlight
+            if (registry && HighlightCtor) {
+              if (!doc.querySelector('style[data-montree-tts-highlight]')) {
+                const style = doc.createElement('style')
+                style.setAttribute('data-montree-tts-highlight', '')
+                style.textContent = `
+                  ::highlight(montree-tts-active) {
+                    background-color: rgba(245, 158, 11, 0.42) !important;
+                    color: inherit !important;
+                    border-radius: 4px;
+                  }
+                `
+                ;(doc.head ?? doc.documentElement)?.appendChild(style)
+              }
+              registry.set('montree-tts-active', new HighlightCtor(range))
+            }
+
+            if (forceScroll) {
+              isUserInteractingRef.current = false
+              if (userInteractionTimerRef.current) {
+                clearTimeout(userInteractionTimerRef.current)
+                userInteractionTimerRef.current = null
+              }
+              centerWebDocRange(range)
+            } else if (!isUserInteractingRef.current && !inViewport) {
+              centerWebDocRange(range)
+            }
+          } catch {}
+        }
+      },
+      () => {
+        lastTtsRangeRef.current = null
+        if (userInteractionTimerRef.current) {
+          clearTimeout(userInteractionTimerRef.current)
+          userInteractionTimerRef.current = null
+        }
+        isUserInteractingRef.current = false
+        const doc = iframeRef.current?.contentDocument
+        if (!doc) return
+        try {
+          const viewWindow = doc.defaultView as any
+          viewWindow?.CSS?.highlights?.delete('montree-tts-active')
+        } catch {}
+      },
+    )
+  }, [centerWebDocRange, iframeRef])
 
   return {
     selectionSnapshot,

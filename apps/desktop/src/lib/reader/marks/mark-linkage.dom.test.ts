@@ -48,6 +48,14 @@ describe('locateExcerptInDocuments', () => {
     const doc = docWithParagraphs('内容')
     expect(locateExcerptInDocuments([{ doc }], '   ')).toBeNull()
   })
+
+  it('中英文标点混杂或清洗微小差异时仍可精准定位', () => {
+    const doc = docWithParagraphs('那时,我在中国的山东大学和第一历史档案馆待了一年。')
+    // 朗读句子清洗后为全角中文逗号，DOM 中为半角西文逗号
+    const hit = locateExcerptInDocuments([{ doc }], '那时，我在中国的山东大学和第一历史档案馆待了一年。')
+    expect(hit).not.toBeNull()
+    expect(hit?.doc).toBe(doc)
+  })
 })
 
 describe('scrollElementTextIntoView', () => {

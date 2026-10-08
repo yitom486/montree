@@ -88,6 +88,7 @@ export function TtsSettingsSection() {
     filterFootnotesAndCitations,
     filterLinksAndTechnicalMarkup,
     enableBatch,
+    highlightInReader,
     setProvider,
     setPrimaryApiKey,
     setSecondaryApiKey,
@@ -105,6 +106,7 @@ export function TtsSettingsSection() {
     setFilterFootnotesAndCitations,
     setFilterLinksAndTechnicalMarkup,
     setEnableBatch,
+    setHighlightInReader,
   } = useTtsStore(
     useShallow((s) => ({
       provider: s.provider,
@@ -124,6 +126,7 @@ export function TtsSettingsSection() {
       filterFootnotesAndCitations: s.filterFootnotesAndCitations,
       filterLinksAndTechnicalMarkup: s.filterLinksAndTechnicalMarkup,
       enableBatch: s.enableBatch,
+      highlightInReader: s.highlightInReader,
       setProvider: s.setProvider,
       setPrimaryApiKey: s.setPrimaryApiKey,
       setSecondaryApiKey: s.setSecondaryApiKey,
@@ -141,6 +144,7 @@ export function TtsSettingsSection() {
       setFilterFootnotesAndCitations: s.setFilterFootnotesAndCitations,
       setFilterLinksAndTechnicalMarkup: s.setFilterLinksAndTechnicalMarkup,
       setEnableBatch: s.setEnableBatch,
+      setHighlightInReader: s.setHighlightInReader,
     })),
   )
 
@@ -1027,6 +1031,30 @@ export function TtsSettingsSection() {
                 type="checkbox"
                 checked={filterLinksAndTechnicalMarkup}
                 onChange={(e) => setFilterLinksAndTechnicalMarkup(e.target.checked)}
+                className="size-4 mt-0.5 accent-amber-500 rounded cursor-pointer shrink-0"
+              />
+            </div>
+
+            {/* 正文跟读高亮与居中滚动 */}
+            <div className="flex items-start justify-between gap-4 pt-3 border-t border-border/40">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-medium text-foreground">正文句子跟读高亮与平滑跟随</p>
+                  <span className="text-[10px] rounded px-1.5 py-0.5 bg-blue-500/10 text-blue-500 font-medium">
+                    微软 Azure & 已存音频生效
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  朗读时在书籍正文中高亮正在发音的句子，并平滑居中滚动屏幕视野，适合跟读与对照。
+                  <span className="text-muted-foreground/80 block mt-0.5">
+                    （注：微软 Azure 以及所有本地已缓存保存的整章音频均完全生效；仅 Gemini 在线流式接收时暂不开启，避免长难句跳动）
+                  </span>
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={highlightInReader}
+                onChange={(e) => setHighlightInReader(e.target.checked)}
                 className="size-4 mt-0.5 accent-amber-500 rounded cursor-pointer shrink-0"
               />
             </div>

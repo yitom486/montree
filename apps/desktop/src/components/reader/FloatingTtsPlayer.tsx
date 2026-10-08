@@ -3,7 +3,9 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   GripHorizontal,
   Headphones,
+  Highlighter,
   Loader2,
+  LocateFixed,
   Minimize2,
   Pause,
   Play,
@@ -52,6 +54,9 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     provider,
     rate,
     setRate,
+    highlightInReader,
+    setHighlightInReader,
+    locateCurrentSentenceInReader,
     togglePlayPause,
     seekTime,
     closePlayer,
@@ -79,6 +84,9 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
       provider: s.provider,
       rate: s.rate,
       setRate: s.setRate,
+      highlightInReader: s.highlightInReader,
+      setHighlightInReader: s.setHighlightInReader,
+      locateCurrentSentenceInReader: s.locateCurrentSentenceInReader,
       togglePlayPause: s.togglePlayPause,
       seekTime: s.seekTime,
       closePlayer: s.closePlayer,
@@ -464,8 +472,15 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
                 <Headphones className="size-3" />
               </div>
 
-              <div className="flex items-center gap-2 min-w-0">
-                <h4 className="truncate text-xs font-semibold text-foreground max-w-[160px]">
+              <div
+                className="flex items-center gap-2 min-w-0 cursor-pointer group"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  locateCurrentSentenceInReader()
+                }}
+                title="点击在页面中定位到当前朗读句子"
+              >
+                <h4 className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors max-w-[160px]">
                   {currentTitle || '语音朗读'}
                 </h4>
                 <div className="flex items-center text-[10px] text-muted-foreground">
@@ -507,6 +522,49 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
             </div>
 
             <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={locateCurrentSentenceInReader}
+                title="在页面中跳转并定位到当前朗读句子"
+              >
+                <LocateFixed className="size-3.5" />
+              </Button>
+
+              {(() => {
+                const canHighlight = provider === 'azure' || isFromCache
+                return (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'size-6 transition-colors',
+                      canHighlight
+                        ? highlightInReader
+                          ? 'text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer'
+                          : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                        : 'text-muted-foreground/30 cursor-not-allowed',
+                    )}
+                    disabled={!canHighlight}
+                    onClick={() => {
+                      if (canHighlight) {
+                        setHighlightInReader(!highlightInReader)
+                      }
+                    }}
+                    title={
+                      canHighlight
+                        ? highlightInReader
+                          ? '正文跟读高亮：已开启（点击关闭）'
+                          : '正文跟读高亮：已关闭（点击开启）'
+                        : 'Gemini 在线流式合成中暂不开启高亮（自动保持纯净阅读；整章落盘缓存后自动支持）'
+                    }
+                  >
+                    <Highlighter className="size-3.5" />
+                  </Button>
+                )
+              })()}
+
               {onOpenSettings && (
                 <Button
                   variant="ghost"

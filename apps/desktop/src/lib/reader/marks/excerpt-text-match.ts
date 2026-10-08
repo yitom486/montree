@@ -270,15 +270,52 @@ export function findTextRangeExact(
   const collapsedTrimmed = collapsed.trim()
   const trimStart = collapsed.length - collapsed.replace(/^\s+/, '').length
   const needleInCollapsed = collapsedTrimmed.indexOf(collapsedNeedle)
-  if (needleInCollapsed === -1) return null
+  if (needleInCollapsed !== -1) {
+    const startCollapsed = trimStart + needleInCollapsed
+    const endCollapsed = startCollapsed + collapsedNeedle.length - 1
+    if (startCollapsed >= 0 && endCollapsed < collapsedMap.length) {
+      const rawStart = collapsedMap[startCollapsed]!
+      const rawEndExclusive = collapsedMap[endCollapsed]! + 1
+      const mapped = mapRange(rawStart, rawEndExclusive)
+      if (mapped) return mapped
+    }
+  }
 
-  const startCollapsed = trimStart + needleInCollapsed
-  const endCollapsed = startCollapsed + collapsedNeedle.length - 1
-  if (startCollapsed < 0 || endCollapsed >= collapsedMap.length) return null
+  // 3. 语义字符级韧性对齐（免疫中英标点互换、引号形态、角标消除、零宽字符与轻微排版差异）
+  const cleanCharIndices: number[] = []
+  let cleanCombined = ''
+  for (let i = 0; i < combined.length; i++) {
+    const ch = combined[i]!
+    if (/[\p{L}\p{N}]/u.test(ch)) {
+      cleanCharIndices.push(i)
+      cleanCombined += ch.toLowerCase()
+    }
+  }
 
-  const rawStart = collapsedMap[startCollapsed]!
-  const rawEndExclusive = collapsedMap[endCollapsed]! + 1
-  return mapRange(rawStart, rawEndExclusive)
+  const cleanNeedle = searchText.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase()
+  if (cleanNeedle && cleanNeedle.length >= 2) {
+    const needleIdx = cleanCombined.indexOf(cleanNeedle)
+    if (needleIdx !== -1) {
+      const rawStart = cleanCharIndices[needleIdx]!
+      const rawEndExclusive = cleanCharIndices[needleIdx + cleanNeedle.length - 1]! + 1
+      const res = mapRange(rawStart, rawEndExclusive)
+      if (res) return res
+    }
+    // 若长句两端标点或轻微断句有出入，取前 12~16 个语义字符核心前缀对齐
+    if (cleanNeedle.length >= 8) {
+      const prefix = cleanNeedle.slice(0, Math.min(16, cleanNeedle.length))
+      const pIdx = cleanCombined.indexOf(prefix)
+      if (pIdx !== -1) {
+        const matchLen = Math.min(cleanNeedle.length, cleanCombined.length - pIdx)
+        const rawStart = cleanCharIndices[pIdx]!
+        const rawEndExclusive = cleanCharIndices[pIdx + matchLen - 1]! + 1
+        const res = mapRange(rawStart, rawEndExclusive)
+        if (res) return res
+      }
+    }
+  }
+
+  return null
 }
 
 export function findTextRangeInRoot(root: HTMLElement, searchText: string): Range | null {

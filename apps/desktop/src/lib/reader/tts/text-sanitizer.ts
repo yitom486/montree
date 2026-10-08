@@ -11,8 +11,8 @@ export interface SentenceItem {
   isParagraphEnd?: boolean
   /** 句末检测到的真实物理停顿时长（秒） */
   detectedPauseSec?: number
-  /** 声学对齐标记类型：物理停顿锚定 | 比例插值 */
-  alignmentType?: 'acoustic-vad' | 'proportional'
+  /** 声学对齐标记类型：物理停顿锚定 | 比例插值 | 微软官方时间轴 */
+  alignmentType?: 'acoustic-vad' | 'proportional' | 'azure-boundary'
 }
 
 export interface SanitizedTextResult {

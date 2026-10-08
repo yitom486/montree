@@ -1,5 +1,6 @@
 import type { SentenceItem } from './text-sanitizer'
 import { base64ToBytes } from './pcm-player'
+import type { TtsSpeechBoundary } from '@montree/contracts'
 
 /**
  * 音频-文本静态时间标记（AudioTextCueMarker）
@@ -22,8 +23,8 @@ export interface AudioTextCueMarker {
   duration: number
   /** 句末检测到的声学真实物理停顿时长（秒，连读为 0） */
   detectedPauseSec: number
-  /** 标记类型：声学物理停顿锚定 | 客观字符比例插值 */
-  alignmentType: 'acoustic-vad' | 'proportional'
+  /** 标记类型：声学物理停顿锚定 | 客观字符比例插值 | 微软官方时间轴 */
+  alignmentType: 'acoustic-vad' | 'proportional' | 'azure-boundary'
 }
 
 /**
@@ -477,3 +478,60 @@ export async function alignSentencesWithAudio(
     return fallbackWithProportional()
   }
 }
+
+/**
+ * 使用官方语音引擎返回的精确实时时间轴边界（如微软 Azure Speech SDK 的 SentenceBoundary 事件）
+ * 直接将阅读器句子与官方边界 1:1 对齐，达到毫秒级 100% 绝对同步
+ */
+export function alignSentencesWithBoundaries(
+  sentences: SentenceItem[],
+  boundaries: TtsSpeechBoundary[],
+  totalDurationSeconds: number,
+): SentenceItem[] {
+  if (sentences.length === 0) return []
+  if (!boundaries || boundaries.length === 0) {
+    const staticMarkers = buildStaticCueMarkers(sentences, totalDurationSeconds)
+    return sentences.map((s, idx) => ({
+      ...s,
+      startTime: staticMarkers[idx]?.startTime ?? 0,
+      endTime: staticMarkers[idx]?.endTime ?? totalDurationSeconds,
+      detectedPauseSec: staticMarkers[idx]?.detectedPauseSec ?? 0,
+      alignmentType: 'proportional',
+    }))
+  }
+
+  // 筛选出整句边界（若有 SentenceBoundary 优先使用，否则全量使用）
+  const sentenceBoundaries = boundaries.filter((b) => b.boundaryType === 'SentenceBoundary')
+  const activeBoundaries = sentenceBoundaries.length > 0 ? sentenceBoundaries : boundaries
+
+  let prevEndTime = 0
+  return sentences.map((s, idx) => {
+    let b = activeBoundaries[idx]
+    if (!b && activeBoundaries.length > 0) {
+      b = activeBoundaries[activeBoundaries.length - 1]
+    }
+
+    if (b) {
+      const start = Math.max(prevEndTime, b.audioOffsetMs / 1000)
+      const dur = b.durationMs > 0 ? b.durationMs / 1000 : 0.5
+      const end = Math.min(totalDurationSeconds, Math.max(start + 0.1, start + dur))
+      prevEndTime = end
+      return {
+        ...s,
+        startTime: start,
+        endTime: end,
+        detectedPauseSec: 0,
+        alignmentType: 'azure-boundary' as const,
+      }
+    }
+
+    return {
+      ...s,
+      startTime: prevEndTime,
+      endTime: totalDurationSeconds,
+      detectedPauseSec: 0,
+      alignmentType: 'azure-boundary' as const,
+    }
+  })
+}
+

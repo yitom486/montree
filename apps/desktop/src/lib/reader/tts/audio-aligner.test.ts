@@ -3,6 +3,7 @@ import type { SentenceItem } from './text-sanitizer'
 import {
   alignSentencesWithAudio,
   alignSentencesWithAudioSamples,
+  alignSentencesWithBoundaries,
   buildStaticCueMarkers,
   computeRmsEnergyContour,
   detectAcousticSilenceIntervals,
@@ -201,5 +202,50 @@ describe('audio-aligner 纯声学物理停顿对齐', () => {
     expect(aligned[1].endTime).toBeLessThanOrEqual(7.4)
     expect(aligned[2].endTime).toBe(totalDuration)
   })
+
+  it('alignSentencesWithBoundaries 能高精度对应微软 Azure 官方 SentenceBoundary 事件', () => {
+    const boundaries = [
+      {
+        text: '在中国古代历史上，',
+        audioOffsetMs: 150,
+        durationMs: 1800,
+        boundaryType: 'SentenceBoundary',
+      },
+      {
+        text: '春秋战国是一个百家争鸣的辉煌时代。',
+        audioOffsetMs: 2200,
+        durationMs: 2700,
+        boundaryType: 'SentenceBoundary',
+      },
+      {
+        text: '各派学者著作立说，留下了深远影响。',
+        audioOffsetMs: 5100,
+        durationMs: 2900,
+        boundaryType: 'SentenceBoundary',
+      },
+    ]
+
+    const aligned = alignSentencesWithBoundaries(sampleSentences, boundaries, 8.5)
+    expect(aligned.length).toBe(3)
+    expect(aligned[0].startTime).toBe(0.15)
+    expect(aligned[0].endTime).toBe(1.95)
+    expect(aligned[0].alignmentType).toBe('azure-boundary')
+
+    expect(aligned[1].startTime).toBe(2.2)
+    expect(aligned[1].endTime).toBe(4.9)
+    expect(aligned[1].alignmentType).toBe('azure-boundary')
+
+    expect(aligned[2].startTime).toBe(5.1)
+    expect(aligned[2].endTime).toBe(8.0)
+    expect(aligned[2].alignmentType).toBe('azure-boundary')
+  })
+
+  it('alignSentencesWithBoundaries 在空边界时平滑降级为比例对齐', () => {
+    const aligned = alignSentencesWithBoundaries(sampleSentences, [], 6.0)
+    expect(aligned.length).toBe(3)
+    expect(aligned[0].alignmentType).toBe('proportional')
+    expect(aligned[2].endTime).toBe(6.0)
+  })
 })
+
 

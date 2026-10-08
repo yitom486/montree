@@ -13,12 +13,17 @@ import {
 } from '@/lib/reader/tts/text-sanitizer'
 import {
   alignSentencesWithAudio,
+  alignSentencesWithBoundaries,
   buildStaticCueMarkers,
   findActiveMarkerIndex,
 } from '@/lib/reader/tts/audio-aligner'
 import { PcmStreamPlayer, base64ToBytes, parsePcmRate } from '@/lib/reader/tts/pcm-player'
+import { emitTtsHighlight, emitTtsClearHighlight } from '@/lib/reader/marks/mark-linkage'
 
 export interface TtsStoreState extends TtsConfig {
+  highlightInReader: boolean
+  setHighlightInReader: (highlightInReader: boolean) => void
+
   // 运行时播放状态
   isSpeaking: boolean
   isPaused: boolean
@@ -88,6 +93,8 @@ export interface TtsStoreState extends TtsConfig {
   prevSentence: () => void
   stop: () => void
   closePlayer: () => void
+  /** 让阅读器页面立即平滑跳转/翻页并聚焦到当前正在朗读的高亮句子处 */
+  locateCurrentSentenceInReader: () => void
 }
 
 let activeAudio: HTMLAudioElement | null = null
@@ -163,6 +170,7 @@ function stopAllPlayback(): void {
     window.speechSynthesis.cancel()
     currentUtterance = null
   }
+  emitTtsClearHighlight()
 }
 
 function prefetchNextChapter(): void {
@@ -244,6 +252,7 @@ export const useTtsStore = create<TtsStoreState>()(
       filterFootnotesAndCitations: true,
       filterLinksAndTechnicalMarkup: true,
       enableBatch: false,
+      highlightInReader: true,
 
       // 运行时状态
       isSpeaking: false,
@@ -271,6 +280,18 @@ export const useTtsStore = create<TtsStoreState>()(
 
       setIsPlayerCollapsed: (isPlayerCollapsed) => set({ isPlayerCollapsed }),
       setPlayerPosition: (playerPosition) => set({ playerPosition }),
+      setHighlightInReader: (highlightInReader) => {
+        set({ highlightInReader })
+        const isSupported = get().provider === 'azure' || get().isFromCache
+        if (!highlightInReader || !isSupported) {
+          emitTtsClearHighlight()
+        } else if (get().isSpeaking && !get().isPaused && isSupported) {
+          const sList = get().sentences
+          const activeText = sList[get().currentSentenceIndex]?.text
+          if (activeText) emitTtsHighlight(activeText)
+        }
+        void ttsApi.saveConfig({ ...get(), highlightInReader })
+      },
       saveChapterProgress: (title, index) => {
         if (!title) return
         const progress = { ...get().chapterProgress, [title]: index }
@@ -279,6 +300,9 @@ export const useTtsStore = create<TtsStoreState>()(
 
       setProvider: (provider) => {
         set({ provider })
+        if (provider !== 'azure' && !get().isFromCache) {
+          emitTtsClearHighlight()
+        }
         void ttsApi.saveConfig({ ...get(), provider })
       },
       setPrimaryApiKey: (primaryApiKey) => {
@@ -612,25 +636,29 @@ export const useTtsStore = create<TtsStoreState>()(
                   hasSetupTimeline = true
 
                   let alignedEffective = sentences
-                  try {
-                    alignedEffective = await alignSentencesWithAudio(
-                      sentences,
-                      audioBytes,
-                      dur,
-                    )
-                  } catch (alignErr) {
-                    console.warn('[TTS] 声波对齐失败，降级静态比例标记:', alignErr)
-                    const staticMarkers = buildStaticCueMarkers(sentences, dur)
-                    alignedEffective = sentences.map((s, idx) => {
-                      const m = staticMarkers[idx]
-                      return {
-                        ...s,
-                        startTime: m.startTime,
-                        endTime: m.endTime,
-                        detectedPauseSec: m.detectedPauseSec,
-                        alignmentType: m.alignmentType,
-                      }
-                    })
+                  if (end.boundaries && end.boundaries.length > 0) {
+                    alignedEffective = alignSentencesWithBoundaries(sentences, end.boundaries, dur)
+                  } else {
+                    try {
+                      alignedEffective = await alignSentencesWithAudio(
+                        sentences,
+                        audioBytes,
+                        dur,
+                      )
+                    } catch (alignErr) {
+                      console.warn('[TTS] 声波对齐失败，降级静态比例标记:', alignErr)
+                      const staticMarkers = buildStaticCueMarkers(sentences, dur)
+                      alignedEffective = sentences.map((s, idx) => {
+                        const m = staticMarkers[idx]
+                        return {
+                          ...s,
+                          startTime: m.startTime,
+                          endTime: m.endTime,
+                          detectedPauseSec: m.detectedPauseSec,
+                          alignmentType: m.alignmentType,
+                        }
+                      })
+                    }
                   }
 
                   if (!isCurrentPlayback() || activeAudio !== audio) return
@@ -651,10 +679,16 @@ export const useTtsStore = create<TtsStoreState>()(
                       streamProgressTimer = null
                     }
                     audio.currentTime = Math.min(resumeSeconds, Math.max(0, dur - 0.05))
+                    const initialIdx = Math.max(0, findActiveMarkerIndex(alignedEffective, audio.currentTime))
                     set({
                       currentTime: audio.currentTime,
-                      currentSentenceIndex: 0,
+                      currentSentenceIndex: initialIdx,
                     })
+                    const isSupported = get().provider === 'azure' || get().isFromCache
+                    if (get().highlightInReader && isSupported) {
+                      const activeText = alignedEffective[initialIdx]?.text
+                      if (activeText) emitTtsHighlight(activeText)
+                    }
                     if (get().isPaused) return
                     audio.play().catch((err) => {
                       if (!isCurrentPlayback()) return
@@ -679,8 +713,24 @@ export const useTtsStore = create<TtsStoreState>()(
                 const updateAudioProgress = () => {
                   if (!isCurrentPlayback() || activePcmPlayer || activeAudio !== audio) return
                   const cur = activeAudio.currentTime
+                  const state = get()
+                  const sList = state.sentences
+                  let newSentenceIndex = state.currentSentenceIndex
+                  if (sList.length > 0) {
+                    const foundIdx = findActiveMarkerIndex(sList, cur)
+                    if (foundIdx >= 0 && foundIdx !== newSentenceIndex) {
+                      newSentenceIndex = foundIdx
+                      // 来源与缓存规则：微软 Azure 来源或本地已有整章缓存时启用高亮；Gemini 在线流式接收中保持纯净静默
+                      const isSupported = state.provider === 'azure' || state.isFromCache
+                      if (state.highlightInReader && isSupported) {
+                        const activeText = sList[foundIdx]?.text
+                        if (activeText) emitTtsHighlight(activeText)
+                      }
+                    }
+                  }
                   set({
                     currentTime: cur,
+                    currentSentenceIndex: newSentenceIndex,
                   })
                   if (Date.now() - lastBookmarkAt >= 2000) rememberPlaybackPosition()
                 }
@@ -688,11 +738,18 @@ export const useTtsStore = create<TtsStoreState>()(
                 audio.ontimeupdate = updateAudioProgress
                 audio.onplay = () => {
                   if (!isCurrentPlayback() || activeAudio !== audio) return
+                  const state = get()
+                  const isSupported = state.provider === 'azure' || state.isFromCache
+                  if (state.highlightInReader && isSupported) {
+                    const activeText = state.sentences[state.currentSentenceIndex]?.text
+                    if (activeText) emitTtsHighlight(activeText)
+                  }
                   if (activeAudioProgressTimer) clearInterval(activeAudioProgressTimer)
                   activeAudioProgressTimer = setInterval(updateAudioProgress, 50)
                 }
                 audio.onpause = () => {
                   if (!isCurrentPlayback() || activeAudio !== audio) return
+                  emitTtsClearHighlight()
                   if (activeAudioProgressTimer) {
                     clearInterval(activeAudioProgressTimer)
                     activeAudioProgressTimer = null
@@ -701,6 +758,7 @@ export const useTtsStore = create<TtsStoreState>()(
 
                 audio.onended = () => {
                   if (!isCurrentPlayback() || activeAudio !== audio) return
+                  emitTtsClearHighlight()
                   if (activeAudioProgressTimer) {
                     clearInterval(activeAudioProgressTimer)
                     activeAudioProgressTimer = null
@@ -1043,6 +1101,18 @@ export const useTtsStore = create<TtsStoreState>()(
           currentTime: 0,
         })
       },
+
+      locateCurrentSentenceInReader: () => {
+        const state = get()
+        if (!state.highlightInReader) {
+          set({ highlightInReader: true })
+          void ttsApi.saveConfig({ ...state, highlightInReader: true })
+        }
+        const activeText = state.sentences[state.currentSentenceIndex]?.text
+        if (activeText) {
+          emitTtsHighlight(activeText, true)
+        }
+      },
     }),
     {
       name: 'montree_tts_preferences',
@@ -1068,6 +1138,7 @@ export const useTtsStore = create<TtsStoreState>()(
         isPlayerCollapsed: state.isPlayerCollapsed,
         chapterProgress: state.chapterProgress,
         playbackPositions: state.playbackPositions,
+        highlightInReader: state.highlightInReader,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -1091,6 +1162,7 @@ export const useTtsStore = create<TtsStoreState>()(
             saveAudioCache: state.saveAudioCache,
             filterFootnotesAndCitations: state.filterFootnotesAndCitations,
             filterLinksAndTechnicalMarkup: state.filterLinksAndTechnicalMarkup,
+            highlightInReader: state.highlightInReader,
           })
         }
       },

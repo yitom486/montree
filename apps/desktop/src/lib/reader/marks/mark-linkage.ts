@@ -233,24 +233,35 @@ export function subscribeAnchorHighlight(handler: (excerpt: string) => void): ()
 export const TTS_HIGHLIGHT_EVENT = 'montree:tts-highlight'
 export const TTS_CLEAR_HIGHLIGHT_EVENT = 'montree:tts-clear-highlight'
 
-export function emitTtsHighlight(sentence: string): void {
-  if (typeof window === 'undefined' || !sentence) return
-  window.dispatchEvent(new CustomEvent<string>(TTS_HIGHLIGHT_EVENT, { detail: sentence }))
+export interface TtsHighlightDetail {
+  sentence: string
+  forceScroll?: boolean
+}
+
+export function emitTtsHighlight(sentence: string, forceScroll = false): void {
+  if (typeof window === 'undefined' || !sentence || typeof window.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return
+  window.dispatchEvent(new CustomEvent<TtsHighlightDetail>(TTS_HIGHLIGHT_EVENT, {
+    detail: { sentence, forceScroll },
+  }))
 }
 
 export function emitTtsClearHighlight(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return
   window.dispatchEvent(new CustomEvent(TTS_CLEAR_HIGHLIGHT_EVENT))
 }
 
 export function subscribeTtsHighlight(
-  onHighlight: (sentence: string) => void,
+  onHighlight: (sentence: string, forceScroll?: boolean) => void,
   onClear?: () => void,
 ): () => void {
   if (typeof window === 'undefined') return () => undefined
   const handleHighlight = (e: Event) => {
-    const text = (e as CustomEvent<string>).detail
-    if (typeof text === 'string' && text.trim()) onHighlight(text.trim())
+    const raw = (e as CustomEvent).detail
+    if (typeof raw === 'string' && raw.trim()) {
+      onHighlight(raw.trim(), false)
+    } else if (raw && typeof raw === 'object' && typeof raw.sentence === 'string' && raw.sentence.trim()) {
+      onHighlight(raw.sentence.trim(), Boolean(raw.forceScroll))
+    }
   }
   const handleClear = () => {
     onClear?.()

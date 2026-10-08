@@ -33,6 +33,7 @@ import {
 } from '@/lib/agent/context/reader-selection-registry'
 import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-agent-composer'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { useTtsStore } from '@/stores/tts-store'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { buildPdfSnapshotFromRange } from '@montree/reader-core'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
@@ -429,6 +430,83 @@ export function usePdfInteractions({
     })
   }, [jumpToPage, pageAnchorRefs, pageNumRef])
 
+  const lastTtsRangeRef = useRef<{ range: Range; page?: number } | null>(null)
+  const isUserInteractingRef = useRef(false)
+  const userInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const centerPdfRange = useCallback(
+    (item: { range: Range; page?: number }) => {
+      try {
+        if (item.page != null && item.page !== pageNumRef.current) {
+          jumpToPage(item.page)
+        }
+        const host =
+          item.range.startContainer instanceof Element
+            ? item.range.startContainer
+            : item.range.startContainer.parentElement
+        host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } catch {}
+    },
+    [jumpToPage, pageNumRef],
+  )
+
+  useEffect(() => {
+    const markUserInteraction = () => {
+      isUserInteractingRef.current = true
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+      }
+      userInteractionTimerRef.current = setTimeout(() => {
+        let hasActiveSelection = false
+        try {
+          const sel = window.getSelection()
+          if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            hasActiveSelection = true
+          }
+        } catch {}
+
+        if (hasActiveSelection) {
+          markUserInteraction()
+          return
+        }
+
+        isUserInteractingRef.current = false
+        // 用户停止操作满 3 秒：若仍有正在朗读的高亮且处于播放状态，平滑居中跳回高亮处
+        if (lastTtsRangeRef.current) {
+          const { isSpeaking, isPaused } = useTtsStore.getState()
+          if (isSpeaking && !isPaused) {
+            centerPdfRange(lastTtsRangeRef.current)
+          }
+        }
+      }, 3000)
+    }
+
+    const onWheel = () => {
+      markUserInteraction()
+    }
+
+    const onSelectionChange = () => {
+      try {
+        const sel = window.getSelection()
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          markUserInteraction()
+        }
+      } catch {}
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: true, capture: true })
+    document.addEventListener('selectionchange', onSelectionChange, { passive: true })
+
+    return () => {
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+        userInteractionTimerRef.current = null
+      }
+      window.removeEventListener('wheel', onWheel, { capture: true })
+      document.removeEventListener('selectionchange', onSelectionChange)
+    }
+  }, [centerPdfRange])
+
   useEffect(() => {
     const clearTtsHighlight = () => {
       try {
@@ -436,27 +514,69 @@ export function usePdfInteractions({
         viewWindow?.CSS?.highlights?.delete('montree-tts-active')
       } catch {}
     }
-    // 【保留管道 / 技术储备说明】：
-    // 当前为保持读者阅读纯净，FloatingTtsPlayer 已暂停广播正文高亮事件（仅在播放卡片内展示句览）。
-    // 本 PDF 文字层高亮订阅与定位逻辑完整保留；后续若接入带精确时间戳的 TTS 服务时可无缝重新激活。
+
+    const isPdfRangeInViewport = (range: Range): boolean => {
+      try {
+        const rect = range.getBoundingClientRect()
+        const winH = window.innerHeight
+        const winW = window.innerWidth
+        if (rect.width === 0 && rect.height === 0) {
+          const parent =
+            range.startContainer instanceof Element
+              ? range.startContainer
+              : range.startContainer.parentElement
+          if (!parent) return false
+          const pRect = parent.getBoundingClientRect()
+          return pRect.top >= 48 && pRect.bottom <= winH - 48
+        }
+        return rect.top >= 48 && rect.bottom <= winH - 48 && rect.left >= 0 && rect.right <= winW
+      } catch {
+        return false
+      }
+    }
+
     return subscribeTtsHighlight(
-      (sentence) => {
+      (sentence, forceScroll) => {
         clearTtsHighlight()
         const currentEl = pageAnchorRefs.current.get(pageNumRef.current)
-        if (!currentEl) return
 
         const cleanCore = sentence
           .replace(/[，。！？；：“”‘’（）《》、\s,.!?;:'"()[\]]/g, '')
           .slice(0, 15)
-        let range = scrollElementTextIntoView(currentEl, sentence)
-        if (!range && cleanCore.length >= 4) {
-          range = scrollElementTextIntoView(currentEl, cleanCore)
+        let range: Range | null = null
+        let targetPage: number | undefined = pageNumRef.current
+
+        if (currentEl) {
+          range = findTextRangeInRoot(currentEl, sentence)
+          if (!range && cleanCore.length >= 4) {
+            range = findTextRangeInRoot(currentEl, cleanCore)
+          }
+          if (!range) {
+            range = findTextRangeInRoot(currentEl, sentence.slice(0, 20))
+          }
         }
+
+        // 若当前页未找到（如朗读已跨到后续页面），扫描其余已挂载页面
         if (!range) {
-          range = scrollElementTextIntoView(currentEl, sentence.slice(0, 20))
+          for (const [page, el] of pageAnchorRefs.current.entries()) {
+            if (page === pageNumRef.current) continue
+            let candidate = findTextRangeInRoot(el, sentence)
+            if (!candidate && cleanCore.length >= 4) {
+              candidate = findTextRangeInRoot(el, cleanCore)
+            }
+            if (!candidate) {
+              candidate = findTextRangeInRoot(el, sentence.slice(0, 20))
+            }
+            if (candidate) {
+              range = candidate
+              targetPage = page
+              break
+            }
+          }
         }
 
         if (range) {
+          lastTtsRangeRef.current = { range, page: targetPage }
           try {
             const viewWindow = window as any
             const registry = viewWindow?.CSS?.highlights
@@ -464,14 +584,32 @@ export function usePdfInteractions({
             if (registry && HighlightCtor) {
               registry.set('montree-tts-active', new HighlightCtor(range))
             }
+
+            const inViewport = isPdfRangeInViewport(range)
+            if (forceScroll) {
+              isUserInteractingRef.current = false
+              if (userInteractionTimerRef.current) {
+                clearTimeout(userInteractionTimerRef.current)
+                userInteractionTimerRef.current = null
+              }
+              centerPdfRange({ range, page: targetPage })
+            } else if (!isUserInteractingRef.current && (!inViewport || targetPage !== pageNumRef.current)) {
+              centerPdfRange({ range, page: targetPage })
+            }
           } catch {}
         }
       },
       () => {
+        lastTtsRangeRef.current = null
+        if (userInteractionTimerRef.current) {
+          clearTimeout(userInteractionTimerRef.current)
+          userInteractionTimerRef.current = null
+        }
+        isUserInteractingRef.current = false
         clearTtsHighlight()
       },
     )
-  }, [pageAnchorRefs, pageNumRef])
+  }, [centerPdfRange, pageAnchorRefs, pageNumRef])
 
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {

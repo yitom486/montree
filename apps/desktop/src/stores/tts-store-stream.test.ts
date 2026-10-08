@@ -22,7 +22,9 @@ vi.mock('@/api/tts-api', () => ({ ttsApi: {
 vi.mock('sonner', () => ({ toast: { success, error, warning: vi.fn() } }))
 vi.mock('@/lib/agent/context/reader-content-registry', () => ({ getReaderContentProvider: () => null }))
 vi.mock('@/lib/reader/tts/audio-aligner', () => ({
-  alignSentencesWithAudio: vi.fn(async (sentences) => sentences), buildStaticCueMarkers: vi.fn(),
+  alignSentencesWithAudio: vi.fn(async (sentences) => sentences),
+  buildStaticCueMarkers: vi.fn(),
+  findActiveMarkerIndex: vi.fn(() => 0),
 }))
 
 class FakeAudioContext {

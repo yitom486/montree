@@ -19,6 +19,7 @@ import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { locateExcerptInDocuments, overlayerKeyForMark } from '@/lib/reader/marks/mark-linkage'
 import { subscribeTtsHighlight } from '@/lib/reader/marks/mark-linkage'
+import { useTtsStore } from '@/stores/tts-store'
 import { EPUB_MARK_FLAGS_PER_DOC_CAP } from './foliate-theme'
 
 export interface UseFoliateHighlightsOptions {
@@ -36,6 +37,39 @@ export interface UseFoliateHighlightsOptions {
   selectionSnapshotRef: React.RefObject<{ text: string; cfiRange: string; rect: DOMRect } | null>
   editingNoteMark?: ReadingMark | null
   editingNoteMarkRef?: React.RefObject<ReadingMark | null>
+}
+
+export function isRangeInViewport(
+  range: Range,
+  doc: Document,
+  containerEl?: HTMLElement | null,
+): boolean {
+  try {
+    let rect = range.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      const parent =
+        range.startContainer instanceof Element
+          ? range.startContainer
+          : range.startContainer.parentElement
+      if (!parent) return false
+      rect = parent.getBoundingClientRect()
+    }
+    const iframe = doc.defaultView?.frameElement as HTMLElement | null
+    const iframeTop = iframe ? iframe.getBoundingClientRect().top : 0
+    const screenTop = iframeTop + rect.top
+    const screenBottom = iframeTop + rect.bottom
+
+    const viewRect = containerEl
+      ? containerEl.getBoundingClientRect()
+      : { top: 0, bottom: window.innerHeight }
+
+    const topBound = Math.max(0, viewRect.top) + 60
+    const bottomBound = Math.min(window.innerHeight, viewRect.bottom) - 60
+
+    return screenTop >= topBound && screenBottom <= bottomBound
+  } catch {
+    return false
+  }
 }
 
 export function useFoliateHighlights({
@@ -342,7 +376,125 @@ export function useFoliateHighlights({
     syncMarkFlags()
   }, [marks, ready, readerFontSize, readerLineHeight, syncVisualMarks, syncMarkHighlights, syncMarkFlags, theme])
 
-  // 8. TTS 语音朗读逐句微光临时标记跟随
+  // 8. TTS 语音朗读逐句高亮与智能居中跟随（支持用户翻看避让 & 3 秒停止操作后自动跳回居中）
+  const lastTtsHitRef = useRef<{ range: Range; doc: Document } | null>(null)
+  const isUserInteractingRef = useRef(false)
+  const userInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const centerTtsHit = useCallback((hit: { range: Range; doc: Document }) => {
+    try {
+      const renderer = viewRef.current?.renderer as any
+      if (renderer && typeof renderer.scrollToAnchor === 'function') {
+        void renderer.scrollToAnchor(hit.range, 'anchor').catch(() => {
+          const host =
+            hit.range.startContainer instanceof Element
+              ? hit.range.startContainer
+              : hit.range.startContainer.parentElement
+          host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        })
+      } else {
+        const host =
+          hit.range.startContainer instanceof Element
+            ? hit.range.startContainer
+            : hit.range.startContainer.parentElement
+        host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    } catch {}
+  }, [viewRef])
+
+  useEffect(() => {
+    const markUserInteraction = () => {
+      isUserInteractingRef.current = true
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+      }
+      userInteractionTimerRef.current = setTimeout(() => {
+        // 用户停止操作满 3 秒：检查是否仍保持正文划选
+        let hasActiveSelection = false
+        try {
+          const activeDoc = lastTtsHitRef.current?.doc ?? document
+          const sel = activeDoc.getSelection() ?? window.getSelection()
+          if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            hasActiveSelection = true
+          }
+        } catch {}
+
+        if (hasActiveSelection) {
+          markUserInteraction()
+          return
+        }
+
+        isUserInteractingRef.current = false
+        // 用户停止操作满 3 秒：若仍有正在朗读的高亮且处于播放状态，平滑居中跳回高亮处
+        if (lastTtsHitRef.current) {
+          const { isSpeaking, isPaused } = useTtsStore.getState()
+          if (isSpeaking && !isPaused) {
+            centerTtsHit(lastTtsHitRef.current)
+          }
+        }
+      }, 3000)
+    }
+
+    // 严格遵从用户准则：只有鼠标划选文本与滚轮滑动才算用户动作
+    // 点击悬浮播放器、按钮、快捷键等一律不计入用户操作
+    const onWheel = () => {
+      markUserInteraction()
+    }
+
+    const onSelectionChange = (e: Event) => {
+      try {
+        const targetDoc = (e.target as Document) ?? (e.currentTarget as Document) ?? document
+        const sel = targetDoc.getSelection() ?? window.getSelection()
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          markUserInteraction()
+        }
+      } catch {}
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: true, capture: true })
+    document.addEventListener('selectionchange', onSelectionChange, { passive: true })
+
+    const boundDocs = new Set<Document>()
+    const attachDocListeners = (doc?: Document | null) => {
+      if (!doc || boundDocs.has(doc)) return
+      boundDocs.add(doc)
+      doc.addEventListener('wheel', onWheel, { passive: true, capture: true })
+      doc.addEventListener('selectionchange', onSelectionChange, { passive: true })
+    }
+
+    const view = viewRef.current
+    const onDocLoad = (e: Event) => {
+      const doc = (e as CustomEvent)?.detail?.doc as Document | undefined
+      if (doc) attachDocListeners(doc)
+    }
+    view?.addEventListener('load', onDocLoad)
+
+    try {
+      const renderer = view?.renderer as any
+      const docs = renderer?.getContents?.() ?? []
+      for (const item of docs) {
+        if (item?.doc) attachDocListeners(item.doc)
+      }
+    } catch {}
+
+    return () => {
+      if (userInteractionTimerRef.current) {
+        clearTimeout(userInteractionTimerRef.current)
+        userInteractionTimerRef.current = null
+      }
+      window.removeEventListener('wheel', onWheel, { capture: true })
+      document.removeEventListener('selectionchange', onSelectionChange)
+      view?.removeEventListener('load', onDocLoad)
+      for (const doc of boundDocs) {
+        try {
+          doc.removeEventListener('wheel', onWheel, { capture: true })
+          doc.removeEventListener('selectionchange', onSelectionChange)
+        } catch {}
+      }
+      boundDocs.clear()
+    }
+  }, [centerTtsHit, viewRef])
+
   useEffect(() => {
     const clearTtsHighlight = () => {
       let docs: Array<{ doc: Document }> = []
@@ -364,11 +516,9 @@ export function useFoliateHighlights({
         } catch {}
       }
     }
-    // 【保留管道 / 技术储备说明】：
-    // 当前为保持读者阅读纯净，FloatingTtsPlayer 已暂停广播正文高亮事件（仅在播放卡片内展示句览）。
-    // 本 Foliate 原生高亮订阅与定位逻辑完整保留；后续若接入带精确时间戳的 TTS 服务时可无缝重新激活。
+
     return subscribeTtsHighlight(
-      (sentence) => {
+      (sentence, forceScroll) => {
         let docs: Array<{ doc: Document }> = []
         try {
           const renderer = viewRef.current?.renderer as unknown as {
@@ -394,18 +544,8 @@ export function useFoliateHighlights({
         }
 
         if (hit) {
+          lastTtsHitRef.current = hit
           try {
-            const host =
-              hit.range.startContainer instanceof Element
-                ? hit.range.startContainer
-                : hit.range.startContainer.parentElement
-            const rect = host?.getBoundingClientRect?.()
-            const viewH = hit.doc.defaultView?.innerHeight || 800
-            const inViewport = rect && rect.top >= 48 && rect.bottom <= viewH - 48
-            if (!inViewport) {
-              host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            }
-
             const viewWindow = hit.doc.defaultView as unknown as {
               CSS?: { highlights?: { set: (name: string, h: object) => void; delete: (name: string) => void } }
               Highlight?: new (...ranges: AbstractRange[]) => object
@@ -418,7 +558,7 @@ export function useFoliateHighlights({
                 style.setAttribute('data-montree-tts-highlight', '')
                 style.textContent = `
                   ::highlight(montree-tts-active) {
-                    background-color: rgba(245, 158, 11, 0.35) !important;
+                    background-color: rgba(245, 158, 11, 0.42) !important;
                     color: inherit !important;
                     border-radius: 4px;
                   }
@@ -427,14 +567,32 @@ export function useFoliateHighlights({
               }
               registry.set('montree-tts-active', new HighlightCtor(hit.range))
             }
+
+            const inViewport = isRangeInViewport(hit.range, hit.doc, viewRef.current)
+            if (forceScroll) {
+              isUserInteractingRef.current = false
+              if (userInteractionTimerRef.current) {
+                clearTimeout(userInteractionTimerRef.current)
+                userInteractionTimerRef.current = null
+              }
+              centerTtsHit(hit)
+            } else if (!isUserInteractingRef.current && !inViewport) {
+              centerTtsHit(hit)
+            }
           } catch {}
         }
       },
       () => {
+        lastTtsHitRef.current = null
+        if (userInteractionTimerRef.current) {
+          clearTimeout(userInteractionTimerRef.current)
+          userInteractionTimerRef.current = null
+        }
+        isUserInteractingRef.current = false
         clearTtsHighlight()
       },
     )
-  }, [viewRef])
+  }, [centerTtsHit, viewRef])
 
   return {
     syncMarkHighlights,

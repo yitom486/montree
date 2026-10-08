@@ -32,6 +32,9 @@ export interface TtsConfig {
 
   // Gemini 异步 Batch 模式（默认关闭）
   enableBatch?: boolean
+
+  // 正文跟读高亮（仅在微软 Azure 等支持精准时间轴的引擎下生效，Gemini 保持纯净静默）
+  highlightInReader?: boolean
 }
 
 export interface TtsSynthesizePayload {
@@ -56,12 +59,22 @@ export interface TtsSynthesizePayload {
   localVoice?: string
 }
 
+export interface TtsSpeechBoundary {
+  text: string
+  audioOffsetMs: number
+  durationMs: number
+  textOffset?: number
+  wordLength?: number
+  boundaryType?: string
+}
+
 export interface TtsSynthesizeResult {
   audioBase64: string
   mimeType: string
   fromCache: boolean
   keyUsed?: 'primary' | 'secondary' | 'system'
   cooldownActivated?: boolean
+  boundaries?: TtsSpeechBoundary[]
 }
 
 export interface TtsStreamChunkPayload {
@@ -89,6 +102,7 @@ export interface TtsStreamEndPayload {
   mimeType: string
   fromCache: boolean
   keyUsed?: 'primary' | 'secondary' | 'system'
+  boundaries?: TtsSpeechBoundary[]
 }
 
 export interface TtsStreamErrorPayload {
