@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.6] - 2026-10-08
+
 - ### 语音朗读 (TTS)
   - **整章从头完整合成与自由拉动进度条**：消除视口中间切片导致只能读半章且无法前退的断层问题，始终从第 0 秒开头完整合成章节音频，时长真实对齐整章；支持在整章时间轴内任意点击/拖拽拉动进度，配备快退 15 秒（`-15s`）、快进 15 秒（`+15s`）与一键回到 0:00 重播。
   - **轻量紧凑型 Mini 播放器**：卡片高度大幅压缩至 ~110px，移除不准确且遮挡视线的正文分句预览文字与列表抽屉，专注沉浸收听。
@@ -359,7 +363,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.5...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/yitom486/montree/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/yitom486/montree/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yitom486/montree/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/yitom486/montree/compare/v0.4.2...v0.4.3
