@@ -14,6 +14,7 @@
 
 - ### 阅读器与底层依赖
   - **Foliate 阅读引擎自愈与多格式适配**：修复阅读器在 Electron 沙盒中的 `defaultView` 空指针异常、防范 `customElements` 重复注册崩溃，完善 MOBI/AZW3 目录异步跳转支持；将 `foliate-js` 子模块托管迁移至项目专属维护分支确保 CI 构建稳定可靠。
+  - **ACP 协议客户端核心升级 (0.1.2)**：同步升级 `@yitom/acp-client` 至最新版，内置跨平台 `acp-engine` sidecar 伴生进程与 headless 服务，持续保持与 8 大主流 Agent 运行时（Codex、Claude、Cursor、DeepSeek、Gemini、Copilot、OpenCode、agy）的会话、认证守门员及 MCP 协议栈无缝兼容。
 
 ---
 

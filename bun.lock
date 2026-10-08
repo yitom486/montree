@@ -23,7 +23,7 @@
         "@lezer/common": "^1.5.2",
         "@tanstack/react-query": "^5.102.8",
         "@vscode/markdown-it-katex": "^1.1.2",
-        "@yitom/acp-client": "0.1.0",
+        "@yitom/acp-client": "0.1.2",
         "codemirror": "^6.0.2",
         "dompurify": "^3.4.14",
         "electron-updater": "^6.8.9",
@@ -808,7 +808,7 @@
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.15", "", {}, "sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA=="],
 
-    "@yitom/acp-client": ["@yitom/acp-client@0.1.0", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" } }, "sha512-O4xWVKZ0Y8MYyWIKvd+RwxtEPhVq8i0o4LvUSab/Y9bvRglML4lUPeivK4XWNOH4N5ZPXQv66OfdJIEJR26Gvw=="],
+    "@yitom/acp-client": ["@yitom/acp-client@0.1.2", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" }, "bin": { "acp-engine": "dist/sidecar.cjs" } }, "sha512-1XlO3vKSSGZ3Oah07dZpPQHwRpdazvpMDZjZs2VZa7NlynVECA4NcuaVfl80x/yP6GKWHNOiS1WouCf49gLEoQ=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 
