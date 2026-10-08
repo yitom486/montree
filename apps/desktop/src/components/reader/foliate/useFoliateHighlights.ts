@@ -364,7 +364,9 @@ export function useFoliateHighlights({
         } catch {}
       }
     }
-
+    // 【保留管道 / 技术储备说明】：
+    // 当前为保持读者阅读纯净，FloatingTtsPlayer 已暂停广播正文高亮事件（仅在播放卡片内展示句览）。
+    // 本 Foliate 原生高亮订阅与定位逻辑完整保留；后续若接入带精确时间戳的 TTS 服务时可无缝重新激活。
     return subscribeTtsHighlight(
       (sentence) => {
         let docs: Array<{ doc: Document }> = []
@@ -397,7 +399,12 @@ export function useFoliateHighlights({
               hit.range.startContainer instanceof Element
                 ? hit.range.startContainer
                 : hit.range.startContainer.parentElement
-            host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            const rect = host?.getBoundingClientRect?.()
+            const viewH = hit.doc.defaultView?.innerHeight || 800
+            const inViewport = rect && rect.top >= 48 && rect.bottom <= viewH - 48
+            if (!inViewport) {
+              host?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
 
             const viewWindow = hit.doc.defaultView as unknown as {
               CSS?: { highlights?: { set: (name: string, h: object) => void; delete: (name: string) => void } }

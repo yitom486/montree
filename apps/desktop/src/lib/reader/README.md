@@ -11,7 +11,7 @@ EPUB / PDF / MOBI / 在线文档 渲染端专属逻辑，按域分子目录（20
 | `rosetta/` | 罗盘：目录归一与签名状态、块转 Agent 文本、只读取卫、目录 AI 整理（`toc-ai`） |
 | `marks/` | 阅读标记渲染/命中（PDF/MOBI/Web 复用）、划词匹配、启发式智能制卡（`heuristic-card-classifier`）、卡片元数据智能反序列化（`resolve-card-meta`）、图谱卡片解析提取（`diagram-mark-parser`）、导出 Anki/读书笔记 |
 | `web-doc/` | 在线文档：正文提取、页头剥离、URL/链接、本页大纲、公式/代码块/iframe 白名单、Agent 按页抓文 |
-| `tts/` | 语音朗读：正文智能降噪清洗器（`tts/text-sanitizer.ts`，过滤 URL/角标/脚注并保留链接正文、视口顶部可见正文智能起读定位）、分句与时间轴加权分配、Web Audio 实时流式 PCM 播放器（`tts/pcm-player.ts`） |
+| `tts/` | 语音朗读与音频对齐（详见 [tts/README.md](tts/README.md)）：正文智能降噪清洗（`tts/text-sanitizer.ts`）、端侧声波静音波谷与分句对齐算法（`tts/audio-aligner.ts`，保留用于播放器卡片内部句览与跳转）、Web Audio 实时流式 PCM 播放器（`tts/pcm-player.ts`） |
 
 根目录仅留跨格式骨架：`reader-adapter`（后端契约）、`reader-unit-tree`（目录树）、`scroll-anchor`（视口防抖锚点锁）、`reader-viewport-*`（视口测试助手）、`wait-for-dom`、`azw3-toc-anchor.test`（测 `@montree/reader-core` 的 azw3 锚定）。
 

@@ -436,7 +436,9 @@ export function usePdfInteractions({
         viewWindow?.CSS?.highlights?.delete('montree-tts-active')
       } catch {}
     }
-
+    // 【保留管道 / 技术储备说明】：
+    // 当前为保持读者阅读纯净，FloatingTtsPlayer 已暂停广播正文高亮事件（仅在播放卡片内展示句览）。
+    // 本 PDF 文字层高亮订阅与定位逻辑完整保留；后续若接入带精确时间戳的 TTS 服务时可无缝重新激活。
     return subscribeTtsHighlight(
       (sentence) => {
         clearTtsHighlight()

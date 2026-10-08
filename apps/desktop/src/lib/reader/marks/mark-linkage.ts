@@ -228,6 +228,7 @@ export function subscribeAnchorHighlight(handler: (excerpt: string) => void): ()
  * 跨面板 TTS 语音朗读临时高亮通道：
  * 播放器切句时 emit 正在朗读的句子，各 Viewer 订阅后在正文中做临时高亮与居中滚动。
  * 暂停、切章或关闭播放器时 emit 清除事件，临时高亮立即撤除，不污染任何真实标注。
+ * （注意：当前正文高亮已主动暂停广播以保持正文沉浸纯净，事件通道与 Viewer 接收逻辑完整保留作为技术储备）
  */
 export const TTS_HIGHLIGHT_EVENT = 'montree:tts-highlight'
 export const TTS_CLEAR_HIGHLIGHT_EVENT = 'montree:tts-clear-highlight'

@@ -101,18 +101,7 @@ export function ReaderToolbarShell({
         return
       }
 
-      let viewportSnippet = ''
-      try {
-        if (provider.getViewportText) {
-          viewportSnippet = await provider.getViewportText()
-        }
-      } catch (e) {
-        console.warn('[TTS] 视口顶部文本提取失败，回退默认起始句:', e)
-      }
-
-      void useTtsStore.getState().playText(currentTitle || '当前章节', rawText, {
-        viewportSnippet,
-      })
+      void useTtsStore.getState().playText(currentTitle || '当前章节', rawText)
     } catch (err: any) {
       toast.error(`获取正文失败: ${err?.message || '未知错误'}`)
     }

@@ -11,7 +11,12 @@ import {
   sanitizeReaderText,
   type SentenceItem,
 } from '@/lib/reader/tts/text-sanitizer'
-import { PcmStreamPlayer, base64ToBytes } from 'gemini-tts-studio/client'
+import {
+  alignSentencesWithAudio,
+  buildStaticCueMarkers,
+  findActiveMarkerIndex,
+} from '@/lib/reader/tts/audio-aligner'
+import { PcmStreamPlayer, base64ToBytes } from '@/lib/reader/tts/pcm-player'
 
 export interface TtsStoreState extends TtsConfig {
   // 运行时播放状态
@@ -69,6 +74,8 @@ export interface TtsStoreState extends TtsConfig {
   syncToViewport: () => Promise<void>
   togglePlayPause: () => void
   seekSentence: (index: number) => void
+  /** 在当前章节音频中自由跳转到任意指定秒数（音频拖拽进度条模式） */
+  seekTime: (targetSeconds: number) => void
   nextSentence: () => void
   prevSentence: () => void
   stop: () => void
@@ -79,13 +86,20 @@ let activeAudio: HTMLAudioElement | null = null
 let activePcmPlayer: PcmStreamPlayer | null = null
 let activeCancelStream: (() => Promise<unknown>) | null = null
 let streamProgressTimer: any = null
+let activeAudioProgressTimer: any = null
 let currentUtterance: SpeechSynthesisUtterance | null = null
 let systemSentenceIndex = 0
+let currentRawText = ''
+let currentInitialSentenceIndex = 0
 
 function stopAllPlayback(): void {
   if (streamProgressTimer) {
     clearInterval(streamProgressTimer)
     streamProgressTimer = null
+  }
+  if (activeAudioProgressTimer) {
+    clearInterval(activeAudioProgressTimer)
+    activeAudioProgressTimer = null
   }
   if (activeCancelStream) {
     void activeCancelStream()
@@ -278,7 +292,7 @@ export const useTtsStore = create<TtsStoreState>()(
         void ttsApi.saveConfig({ ...get(), filterLinksAndTechnicalMarkup })
       },
 
-      playText: async (title: string, rawText: string, options) => {
+      playText: async (title: string, rawText: string) => {
         stopAllPlayback()
 
         const { sentences, fullCleanText } = sanitizeReaderText(rawText, {
@@ -290,32 +304,21 @@ export const useTtsStore = create<TtsStoreState>()(
           return
         }
 
-        // 智能定位起始朗读句子：视口顶部优先 > 显式指定 > 历史记录 > 0
-        let initialIndex = 0
-        if (
-          options?.startSentenceIndex !== undefined &&
-          options.startSentenceIndex >= 0 &&
-          options.startSentenceIndex < sentences.length
-        ) {
-          initialIndex = options.startSentenceIndex
-        } else if (options?.viewportSnippet) {
-          initialIndex = findViewportStartingSentenceIndex(sentences, options.viewportSnippet)
-        } else if (get().chapterProgress[title] !== undefined) {
-          const saved = get().chapterProgress[title]
-          if (saved >= 0 && saved < sentences.length) {
-            initialIndex = saved
-          }
-        }
+        currentRawText = rawText
+        currentInitialSentenceIndex = 0
+
+        // 整章完整朗读：永远从本章第 0 秒开头完整合成，时长为整章全长，用户可在全章节内自由拖拽拉动进度
+        const estimatedDur = Math.max(1, fullCleanText.length / 4.3)
 
         set({
           isLoading: true,
           isPlayerVisible: true,
-          isPlayerCollapsed: true,
+          isPlayerCollapsed: false,
           currentTitle: title || '正在朗读',
-          sentences,
-          currentSentenceIndex: initialIndex,
+          sentences: sentences,
+          currentSentenceIndex: 0,
           currentTime: 0,
-          duration: 0,
+          duration: estimatedDur,
           isSpeaking: true,
           isPaused: false,
         })
@@ -335,6 +338,7 @@ export const useTtsStore = create<TtsStoreState>()(
             isFromCache: false,
             duration: sentences.length * 3, // 估算
             currentSentenceIndex: startIndex,
+            currentTime: 0,
             isSpeaking: true,
             isPaused: false,
           })
@@ -379,6 +383,9 @@ export const useTtsStore = create<TtsStoreState>()(
           const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
           let pcmPlayer: PcmStreamPlayer | null = null
 
+          // 整章完整朗读：直接将整章清洗后的纯文本发送给 API，始终从第 0 秒开头完整合成
+          const speakText = fullCleanText
+
           if (state.provider === 'gemini') {
             try {
               pcmPlayer = new PcmStreamPlayer(24000)
@@ -397,23 +404,30 @@ export const useTtsStore = create<TtsStoreState>()(
             streamProgressTimer = setInterval(() => {
               if (activePcmPlayer !== pcmPlayer || get().isPaused) return
               const played = pcmPlayer.playedSeconds
-              const curSentences = get().sentences
-              const curIdx = findCurrentSentenceIndex(curSentences, played)
-              const prevIdx = get().currentSentenceIndex
               set({
                 currentTime: played,
-                currentSentenceIndex: curIdx,
               })
-              if (curIdx !== prevIdx) {
-                get().saveChapterProgress(get().currentTitle, curIdx)
+
+              // 检查音频是否全部播放完毕
+              const currentDur = get().duration
+              if (streamCompleted && currentDur > 0 && played >= currentDur - 0.1) {
+                clearInterval(streamProgressTimer)
+                streamProgressTimer = null
+                if (activePcmPlayer) {
+                  void activePcmPlayer.close()
+                  activePcmPlayer = null
+                }
+                set({ isSpeaking: false, isPaused: false, currentTime: currentDur })
+                toast.success('本章朗读完毕')
+                prefetchNextChapter()
               }
-            }, 150)
+            }, 100)
           }
 
           const { cancel, promise } = ttsApi.synthesizeStream(
             {
               streamId,
-              text: fullCleanText,
+              text: speakText,
               provider: state.provider,
               voiceName: state.provider === 'azure' ? state.azureVoice : state.provider === 'local' ? state.localVoice : state.voiceName,
               modelId: state.provider === 'local' ? state.localModel : (state.modelId || 'gemini-3.8-flash-lite-tts'),
@@ -449,16 +463,43 @@ export const useTtsStore = create<TtsStoreState>()(
                   keyUsed: end.keyUsed ?? 'primary',
                 })
 
-                const audio = new Audio(`data:${end.mimeType};base64,${end.audioBase64}`)
+                const audioBytes = base64ToBytes(end.audioBase64)
+                const audioBlob = new Blob([audioBytes.buffer as ArrayBuffer], { type: end.mimeType || 'audio/wav' })
+                const audioUrl = URL.createObjectURL(audioBlob)
+                const audio = new Audio(audioUrl)
                 audio.playbackRate = get().rate
                 activeAudio = audio
 
-                audio.onloadedmetadata = () => {
-                  const dur = audio.duration || 0
-                  const timedSentences = allocateSentenceTimeline(get().sentences, dur)
+                let hasSetupTimeline = false
+                const setupTimeline = async (dur: number) => {
+                  if (hasSetupTimeline) return
+                  hasSetupTimeline = true
+
+                  let alignedEffective = sentences
+                  try {
+                    alignedEffective = await alignSentencesWithAudio(
+                      sentences,
+                      audioBytes,
+                      dur,
+                    )
+                  } catch (alignErr) {
+                    console.warn('[TTS] 声波对齐失败，降级静态比例标记:', alignErr)
+                    const staticMarkers = buildStaticCueMarkers(sentences, dur)
+                    alignedEffective = sentences.map((s, idx) => {
+                      const m = staticMarkers[idx]
+                      return {
+                        ...s,
+                        startTime: m.startTime,
+                        endTime: m.endTime,
+                        detectedPauseSec: m.detectedPauseSec,
+                        alignmentType: m.alignmentType,
+                      }
+                    })
+                  }
+
                   set({
                     duration: dur,
-                    sentences: timedSentences,
+                    sentences: alignedEffective,
                     isLoading: false,
                   })
 
@@ -471,14 +512,9 @@ export const useTtsStore = create<TtsStoreState>()(
                       clearInterval(streamProgressTimer)
                       streamProgressTimer = null
                     }
-                    const startItem = timedSentences[initialIndex]
-                    const startSeek = startItem?.startTime || 0
-                    if (startSeek > 0) {
-                      audio.currentTime = startSeek
-                    }
                     set({
-                      currentTime: startSeek,
-                      currentSentenceIndex: initialIndex,
+                      currentTime: 0,
+                      currentSentenceIndex: 0,
                     })
                     audio.play().catch((err) => {
                       toast.error(`播放失败: ${err?.message || '未知错误'}`)
@@ -487,22 +523,43 @@ export const useTtsStore = create<TtsStoreState>()(
                   }
                 }
 
-                audio.ontimeupdate = () => {
-                  if (activePcmPlayer) return
-                  const cur = audio.currentTime
-                  const curSentences = get().sentences
-                  const curIdx = findCurrentSentenceIndex(curSentences, cur)
-                  const prevIdx = get().currentSentenceIndex
+                audio.onloadedmetadata = () => {
+                  const dur = audio.duration || 0
+                  void setupTimeline(dur)
+                }
+
+                // 微任务兜底：部分 Data URL metadata 瞬时就绪，确保对齐绝不遗漏
+                setTimeout(() => {
+                  if (!hasSetupTimeline && audio.duration) {
+                    void setupTimeline(audio.duration)
+                  }
+                }, 60)
+
+                const updateAudioProgress = () => {
+                  if (activePcmPlayer || !activeAudio) return
+                  const cur = activeAudio.currentTime
                   set({
                     currentTime: cur,
-                    currentSentenceIndex: curIdx,
                   })
-                  if (curIdx !== prevIdx) {
-                    get().saveChapterProgress(get().currentTitle, curIdx)
+                }
+
+                audio.ontimeupdate = updateAudioProgress
+                audio.onplay = () => {
+                  if (activeAudioProgressTimer) clearInterval(activeAudioProgressTimer)
+                  activeAudioProgressTimer = setInterval(updateAudioProgress, 50)
+                }
+                audio.onpause = () => {
+                  if (activeAudioProgressTimer) {
+                    clearInterval(activeAudioProgressTimer)
+                    activeAudioProgressTimer = null
                   }
                 }
 
                 audio.onended = () => {
+                  if (activeAudioProgressTimer) {
+                    clearInterval(activeAudioProgressTimer)
+                    activeAudioProgressTimer = null
+                  }
                   set({ isSpeaking: false, isPaused: false })
                   toast.success('本章朗读完毕')
                   prefetchNextChapter()
@@ -520,7 +577,7 @@ export const useTtsStore = create<TtsStoreState>()(
                 console.warn('[TTS] 流式合成失败，准备降级系统语音:', errPayload.error)
                 stopAllPlayback()
                 toast.error(`Gemini 合成失败（${errPayload.error || '未知'}），已无缝切换系统原生语音兜底`)
-                startSystemSpeech(initialIndex)
+                startSystemSpeech(0)
               },
             },
           )
@@ -532,7 +589,7 @@ export const useTtsStore = create<TtsStoreState>()(
             console.warn('[TTS] 流式启动调用未成功，降级系统语音:', startRes.error.message)
             stopAllPlayback()
             toast.error(`Gemini 合成失败（${startRes.error.message}），已无缝切换系统原生语音兜底`)
-            startSystemSpeech(initialIndex)
+            startSystemSpeech(0)
             return
           }
 
@@ -540,7 +597,7 @@ export const useTtsStore = create<TtsStoreState>()(
         }
 
         // 2. 兜底回退：系统原生 Web Speech API
-        startSystemSpeech(initialIndex)
+        startSystemSpeech(0)
       },
 
       playFromSnippet: async (snippet: string, title?: string) => {
@@ -666,7 +723,14 @@ export const useTtsStore = create<TtsStoreState>()(
 
         get().saveChapterProgress(get().currentTitle, index)
 
-        if (activePcmPlayer && activeAudio) {
+        // 若用户点击跳转的目标句位于当前合成切片之前（index < currentInitialSentenceIndex），
+        // 自动无缝重新从目标句起读并合成
+        if (index < currentInitialSentenceIndex && currentRawText) {
+          void get().playText(get().currentTitle, currentRawText, { startSentenceIndex: index })
+          return
+        }
+
+        if (activePcmPlayer) {
           void activePcmPlayer.close()
           activePcmPlayer = null
           if (streamProgressTimer) {
@@ -679,12 +743,17 @@ export const useTtsStore = create<TtsStoreState>()(
           const target = sentences[index]
           if (target && target.startTime !== undefined) {
             activeAudio.currentTime = target.startTime
-            set({ currentSentenceIndex: index, currentTime: target.startTime })
-            if (get().isPaused) {
-              activeAudio.play().catch(() => {})
-              set({ isPaused: false, isSpeaking: true })
-            }
+            set({ currentSentenceIndex: index, currentTime: target.startTime, isSpeaking: true, isPaused: false })
+            activeAudio.play().catch((err) => {
+              console.warn('[TTS] 跳转播放失败:', err)
+            })
           }
+          return
+        }
+
+        // 若完整音频尚未就绪（流式还在首包阶段），直接从目标句重新合成
+        if (currentRawText) {
+          void get().playText(get().currentTitle, currentRawText, { startSentenceIndex: index })
           return
         }
 
@@ -711,6 +780,36 @@ export const useTtsStore = create<TtsStoreState>()(
         } else {
           set({ currentSentenceIndex: index })
         }
+      },
+
+      seekTime: (targetSeconds: number) => {
+        const { duration, sentences } = get()
+        const maxDur = duration > 0 ? duration : (activeAudio?.duration || 0)
+        const clamped = Math.max(0, Math.min(maxDur, targetSeconds))
+
+        if (activePcmPlayer) {
+          void activePcmPlayer.close()
+          activePcmPlayer = null
+          if (streamProgressTimer) {
+            clearInterval(streamProgressTimer)
+            streamProgressTimer = null
+          }
+        }
+
+        if (activeAudio) {
+          activeAudio.currentTime = clamped
+          set({
+            currentTime: clamped,
+            isSpeaking: true,
+            isPaused: false,
+          })
+          activeAudio.play().catch((err) => {
+            console.warn('[TTS] 跳转时间播放失败:', err)
+          })
+          return
+        }
+
+        set({ currentTime: clamped })
       },
 
       nextSentence: () => {

@@ -7,6 +7,12 @@ export interface SentenceItem {
   weight: number
   startTime: number
   endTime: number
+  cleanText?: string
+  isParagraphEnd?: boolean
+  /** 句末检测到的真实物理停顿时长（秒） */
+  detectedPauseSec?: number
+  /** 声学对齐标记类型：物理停顿锚定 | 比例插值 */
+  alignmentType?: 'acoustic-vad' | 'proportional'
 }
 
 export interface SanitizedTextResult {
@@ -216,12 +222,14 @@ export function allocateSentenceTimeline(
 ): SentenceItem[] {
   if (sentences.length === 0 || totalDurationSeconds <= 0) return sentences
 
-  const totalWeight = sentences.reduce((sum, s) => sum + s.weight, 0)
-  if (totalWeight <= 0) return sentences
+  // 客观字符规模比例插值：不人为硬编码任何固定停顿常数，由真实字符比例确定基准区间
+  const charCounts = sentences.map((s) => Math.max(1, (s.cleanText ?? s.text ?? '').length))
+  const totalChars = charCounts.reduce((sum, c) => sum + c, 0)
+  if (totalChars <= 0) return sentences
 
   let currentTime = 0
   return sentences.map((s, idx) => {
-    const fraction = s.weight / totalWeight
+    const fraction = charCounts[idx] / totalChars
     const duration = fraction * totalDurationSeconds
     const startTime = currentTime
     const endTime = idx === sentences.length - 1 ? totalDurationSeconds : currentTime + duration
@@ -236,7 +244,8 @@ export function allocateSentenceTimeline(
 }
 
 /**
- * 根据当前播放时间（秒）定位正在朗读的句子
+ * 根据当前播放时间（秒）定位正在朗读的句子：
+ * 具备声学时间轴容差吸附与流式未对齐阶段的平滑语速推算，避免突兀跳至末尾。
  */
 export function findCurrentSentenceIndex(
   sentences: SentenceItem[],
@@ -245,9 +254,37 @@ export function findCurrentSentenceIndex(
   if (sentences.length === 0) return -1
   if (currentTimeSeconds <= 0) return 0
 
+  // 1. 判断是否已具备有效的时间轴区间
+  const hasValidTimeline = sentences.some((s) => s.endTime !== undefined && s.endTime > (s.startTime ?? 0))
+
+  if (hasValidTimeline) {
+    if (currentTimeSeconds <= (sentences[0].startTime ?? 0)) return 0
+    const last = sentences[sentences.length - 1]
+    if (currentTimeSeconds >= (last.endTime ?? 0)) return sentences.length - 1
+
+    for (let i = 0; i < sentences.length; i++) {
+      const s = sentences[i]
+      const start = s.startTime ?? 0
+      const end = s.endTime ?? start
+      if (currentTimeSeconds >= start && currentTimeSeconds <= end) {
+        return i
+      }
+      if (currentTimeSeconds < start) {
+        return Math.max(0, i - 1)
+      }
+    }
+    return sentences.length - 1
+  }
+
+  // 2. 流式接收或对齐未完成阶段：基于大模型真实平均语速（~4.5 字/秒 + 真实短停顿）平滑推算当前句
+  let accumulatedSeconds = 0
   for (let i = 0; i < sentences.length; i++) {
     const s = sentences[i]
-    if (currentTimeSeconds >= s.startTime && currentTimeSeconds <= s.endTime) {
+    const textLen = (s.cleanText ?? s.text ?? '').length
+    const pauseSec = s.isParagraphEnd ? 0.35 : /[。！？!?]$/.test((s.text ?? '').trim()) ? 0.25 : 0.1
+    const estSec = Math.max(0.2, textLen / 4.5 + pauseSec)
+    accumulatedSeconds += estSec
+    if (currentTimeSeconds <= accumulatedSeconds) {
       return i
     }
   }

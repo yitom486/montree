@@ -70,14 +70,20 @@ export function pcmChunksToWavBlob(chunks: Uint8Array[], sampleRate = 24000): Bl
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
+interface ScheduledPcmChunk {
+  startAt: number
+  endAt: number
+  duration: number
+}
+
 /**
- * 流式 PCM 播放器：首包即播，后续分片无缝续播（Web Audio 调度）
+ * 流式 PCM 播放器：首包即播，后续分片无缝续播（基于 Web Audio 高精度分片调度）
+ * 彻底消除网络延迟导致 startTime 早于发声、进而导致 playedSeconds 封顶卡死的时钟 Bug。
  */
 export class PcmStreamPlayer {
   private ctx: AudioContext | null = null
   private nextTime = 0
-  private startTime = 0
-  private totalDuration = 0
+  private scheduledChunks: ScheduledPcmChunk[] = []
   private closed = false
 
   constructor(private readonly sampleRate: number = 24000) {}
@@ -98,43 +104,68 @@ export class PcmStreamPlayer {
   async resume(): Promise<void> {
     if (this.closed) return
     const ctx = this.ensureContext()
-    if (ctx.state === 'suspended') await ctx.resume()
-    if (this.nextTime === 0) {
-      this.nextTime = ctx.currentTime + 0.05
-      this.startTime = this.nextTime
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
     }
+  }
+
+  async pause(): Promise<void> {
+    if (this.closed) return
+    const ctx = this.ensureContext()
+    if (ctx.state === 'running') {
+      await ctx.suspend()
+    }
+  }
+
+  get isPaused(): boolean {
+    return this.ctx?.state === 'suspended'
   }
 
   pushChunk(bytes: Uint8Array): void {
     if (this.closed || !bytes || bytes.length === 0) return
     const ctx = this.ensureContext()
-    if (this.nextTime === 0) {
-      this.nextTime = ctx.currentTime + 0.05
-      this.startTime = this.nextTime
-    }
+
     const frames = Math.floor(bytes.length / 2)
     if (frames === 0) return
+
     const buffer = ctx.createBuffer(1, frames, this.sampleRate)
     const channel = buffer.getChannelData(0)
     const view = new DataView(bytes.buffer, bytes.byteOffset, frames * 2)
     for (let i = 0; i < frames; i++) {
       channel[i] = view.getInt16(i * 2, true) / 32768
     }
+
     const source = ctx.createBufferSource()
     source.buffer = buffer
     source.connect(ctx.destination)
+
+    // 若当前时间已落后于声卡当前时钟（网络断流或首包到达），重新从当前时钟平滑起步
     const startAt = Math.max(this.nextTime, ctx.currentTime)
-    if (this.startTime === 0) this.startTime = startAt
+    const duration = buffer.duration
+    const endAt = startAt + duration
+
     source.start(startAt)
-    this.nextTime = startAt + buffer.duration
-    this.totalDuration += buffer.duration
+    this.scheduledChunks.push({ startAt, endAt, duration })
+    this.nextTime = endAt
   }
 
+  /**
+   * 真实已播放秒数：
+   * 遍历所有已调度分片在当前 AudioContext 时钟下的实际发声区间，
+   * 无论遇到网络延迟、首包排队还是断流静音，均分秒不差严格对应声卡真实发音进度。
+   */
   get playedSeconds(): number {
-    if (!this.ctx || this.startTime === 0) return 0
-    const elapsed = this.ctx.currentTime - this.startTime
-    if (elapsed <= 0) return 0
-    return Math.min(elapsed, this.totalDuration)
+    if (!this.ctx || this.scheduledChunks.length === 0) return 0
+    const now = this.ctx.currentTime
+    let played = 0
+    for (const chunk of this.scheduledChunks) {
+      if (now >= chunk.endAt) {
+        played += chunk.duration
+      } else if (now > chunk.startAt) {
+        played += now - chunk.startAt
+      }
+    }
+    return played
   }
 
   async close(): Promise<void> {
@@ -142,8 +173,7 @@ export class PcmStreamPlayer {
     const ctx = this.ctx
     this.ctx = null
     this.nextTime = 0
-    this.startTime = 0
-    this.totalDuration = 0
+    this.scheduledChunks = []
     if (ctx) {
       try {
         await ctx.close()

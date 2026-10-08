@@ -3,29 +3,29 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   GripHorizontal,
   Headphones,
-  ListMusic,
   Loader2,
-  LocateFixed,
   Minimize2,
   Pause,
   Play,
   RotateCcw,
+  RotateCw,
   Settings,
-  SkipBack,
-  SkipForward,
   Sparkles,
-  Volume2,
   X,
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTtsStore } from '@/stores/tts-store'
-import { emitTtsHighlight, emitTtsClearHighlight } from '@/lib/reader/marks/mark-linkage'
+import { emitTtsClearHighlight } from '@/lib/reader/marks/mark-linkage'
 import { cn } from '@/lib/utils'
 
 interface FloatingTtsPlayerProps {
   onOpenSettings?: () => void
 }
+
+const BALL_SIZE = 48
+const PANEL_WIDTH = 380
+const DOCK_GAP = 8
 
 export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {}) {
   const {
@@ -38,8 +38,6 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     isPaused,
     isLoading,
     currentTitle,
-    sentences,
-    currentSentenceIndex,
     currentTime,
     duration,
     isFromCache,
@@ -47,10 +45,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     rate,
     setRate,
     togglePlayPause,
-    seekSentence,
-    nextSentence,
-    prevSentence,
-    syncToViewport,
+    seekTime,
     closePlayer,
   } = useTtsStore(
     useShallow((s) => ({
@@ -63,8 +58,6 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
       isPaused: s.isPaused,
       isLoading: s.isLoading,
       currentTitle: s.currentTitle,
-      sentences: s.sentences,
-      currentSentenceIndex: s.currentSentenceIndex,
       currentTime: s.currentTime,
       duration: s.duration,
       isFromCache: s.isFromCache,
@@ -72,108 +65,134 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
       rate: s.rate,
       setRate: s.setRate,
       togglePlayPause: s.togglePlayPause,
-      seekSentence: s.seekSentence,
-      nextSentence: s.nextSentence,
-      prevSentence: s.prevSentence,
-      syncToViewport: s.syncToViewport,
+      seekTime: s.seekTime,
       closePlayer: s.closePlayer,
     })),
   )
 
-  const [expandedSentenceList, setExpandedSentenceList] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const currentSentenceRef = useRef<HTMLDivElement | null>(null)
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  })
+
+  // 展开停靠方位（打开时锁定，拖动过程中不动态翻转，防止跳变）
+  const [dockSide, setDockSide] = useState<'left' | 'right'>('left')
+  const [dockVertical, setDockVertical] = useState<'up' | 'down'>('down')
+
+  // 音频进度条拖拽/拉取状态
+  const [isScrubbing, setIsScrubbing] = useState(false)
+  const [scrubTime, setScrubTime] = useState(0)
+  const [hoverTime, setHoverTime] = useState<number | null>(null)
+  const [hoverX, setHoverX] = useState<number>(0)
+  const trackRef = useRef<HTMLDivElement | null>(null)
   const isDraggingRef = useRef(false)
 
-  // 同步持久化坐标：每次启动或更新时自动读取
+  // 窗口大小监听
+  useEffect(() => {
+    const onResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // 同步持久化坐标
   useEffect(() => {
     if (playerPosition) {
       setDragPos(playerPosition)
     }
   }, [playerPosition])
 
-  // 监听句子切换高亮正文
+  // 保证正文完全干净，绝不添加干扰标记
   useEffect(() => {
-    if (!isPlayerVisible || sentences.length === 0) {
-      emitTtsClearHighlight()
-      return
-    }
-    const current = sentences[currentSentenceIndex]
-    if (!current?.text) return
-
-    // 1. 列表内部滚到当前句
-    if (expandedSentenceList && currentSentenceRef.current) {
-      currentSentenceRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }
-
-    // 2. 广播临时高亮事件给专业阅读器（Foliate / PDF / WebDoc）
-    emitTtsHighlight(current.text)
-
-    // 3. 通用 DOM 兜底（Markdown 等视图）
-    const snippet = current.text.slice(0, 15).trim()
-    if (!snippet) return
-
-    const highlightInDoc = (doc: Document) => {
-      doc.querySelectorAll('.montree-tts-highlight').forEach((el) => {
-        el.classList.remove('montree-tts-highlight')
-      })
-
-      const treeWalker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
-      let node: Node | null
-      while ((node = treeWalker.nextNode())) {
-        if (node.textContent && node.textContent.includes(snippet)) {
-          const parent = node.parentElement
-          if (parent && !parent.classList.contains('montree-tts-highlight')) {
-            parent.classList.add('montree-tts-highlight')
-            parent.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            break
-          }
-        }
-      }
-    }
-
-    try {
-      highlightInDoc(document)
-    } catch {}
-  }, [currentSentenceIndex, isPlayerVisible, sentences, expandedSentenceList])
-
-  // 卸载时清除正文标记
-  useEffect(() => {
+    emitTtsClearHighlight()
     return () => {
       emitTtsClearHighlight()
     }
   }, [])
 
-  // 原生级 Pointer 拖拽处理：整球响应、边界防飞、松手记忆最新位置
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // 展开卡片模式下仅顶部控制手柄允许拖动，按钮点击不启动拖动
-    if (!isPlayerCollapsed) {
-      const target = e.target as HTMLElement
-      if (target.closest('button') || target.closest('input')) {
-        return
+  // 格式化时间为 mm:ss
+  const formatTime = (secs: number) => {
+    if (isNaN(secs) || secs < 0) return '0:00'
+    const m = Math.floor(secs / 60)
+    const s = Math.floor(secs % 60)
+    return `${m}:${s < 10 ? '0' : ''}${s}`
+  }
+
+  // 默认位置：右上角
+  const defaultPos = {
+    x: Math.max(8, windowSize.width - BALL_SIZE - 28),
+    y: 76,
+  }
+  const currentPos = dragPos || defaultPos
+
+  // 展开/收起切换
+  const handleToggleExpandCollapse = () => {
+    if (isPlayerCollapsed) {
+      const shouldDockLeft =
+        currentPos.x > windowSize.width - PANEL_WIDTH - 20 || currentPos.x > windowSize.width / 2
+      const shouldDockUp =
+        currentPos.y > windowSize.height - 200 || currentPos.y > windowSize.height / 2
+      setDockSide(shouldDockLeft ? 'left' : 'right')
+      setDockVertical(shouldDockUp ? 'up' : 'down')
+      setIsPlayerCollapsed(false)
+    } else {
+      setIsPlayerCollapsed(true)
+    }
+  }
+
+  // 计算安全拖拽边界范围（紧凑型卡片高度仅约 120px）
+  const computeBounds = (isCollapsed: boolean, side: 'left' | 'right', vert: 'up' | 'down') => {
+    let minX = 12
+    let maxX = Math.max(12, windowSize.width - BALL_SIZE - 12)
+    let minY = 38
+    let maxY = Math.max(38, windowSize.height - BALL_SIZE - 12)
+
+    if (!isCollapsed) {
+      if (side === 'left') {
+        minX = Math.max(12, PANEL_WIDTH + DOCK_GAP + 12)
+        maxX = Math.max(minX, windowSize.width - BALL_SIZE - 12)
+      } else {
+        minX = 12
+        maxX = Math.max(12, windowSize.width - BALL_SIZE - DOCK_GAP - PANEL_WIDTH - 12)
+      }
+
+      if (vert === 'up') {
+        minY = Math.max(38, 140)
+        maxY = Math.max(minY, windowSize.height - BALL_SIZE - 12)
+      } else {
+        minY = 38
+        maxY = Math.max(38, windowSize.height - BALL_SIZE - 140)
       }
     }
 
-    const currentElem = containerRef.current
-    if (!currentElem) return
+    return { minX, maxX, minY, maxY }
+  }
+
+  // 统一平滑拖拽处理
+  const handleDragPointerDown = (e: React.PointerEvent<HTMLDivElement>, isFromBall: boolean) => {
+    const target = e.target as HTMLElement
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('[role="slider"]') ||
+      target.closest('.interactive-control')
+    ) {
+      return
+    }
 
     e.preventDefault()
     e.stopPropagation()
 
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {}
-
     const startX = e.clientX
     const startY = e.clientY
-
-    const currentRect = currentElem.getBoundingClientRect()
-    const initialLeft = currentRect.left
-    const initialTop = currentRect.top
-
+    const initialX = currentPos.x
+    const initialY = currentPos.y
     let hasMoved = false
+
+    const bounds = computeBounds(isPlayerCollapsed, dockSide, dockVertical)
 
     const onPointerMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
@@ -182,40 +201,29 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
         hasMoved = true
         isDraggingRef.current = true
       }
-
       if (!hasMoved) return
 
-      const width = currentElem.offsetWidth || (isPlayerCollapsed ? 48 : 420)
-      const height = currentElem.offsetHeight || (isPlayerCollapsed ? 48 : 180)
-
-      const maxLeft = Math.max(8, window.innerWidth - width - 8)
-      const maxTop = Math.max(40, window.innerHeight - height - 8)
-
-      const nextX = Math.max(8, Math.min(maxLeft, initialLeft + dx))
-      const nextY = Math.max(40, Math.min(maxTop, initialTop + dy))
+      const nextX = Math.max(bounds.minX, Math.min(bounds.maxX, initialX + dx))
+      const nextY = Math.max(bounds.minY, Math.min(bounds.maxY, initialY + dy))
 
       setDragPos({ x: nextX, y: nextY })
     }
 
     const onPointerUp = (ev: PointerEvent) => {
-      try {
-        e.currentTarget.releasePointerCapture(ev.pointerId)
-      } catch {}
-
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
 
       if (hasMoved) {
-        // 保存并持久化最新位置
-        setDragPos((cur) => {
-          if (cur) {
-            setPlayerPosition(cur)
-          }
-          return cur
-        })
-      } else if (isPlayerCollapsed) {
-        // 位移极小，判定为点击，展开控制卡片
-        setIsPlayerCollapsed(false)
+        const dx = ev.clientX - startX
+        const dy = ev.clientY - startY
+        const finalX = Math.max(bounds.minX, Math.min(bounds.maxX, initialX + dx))
+        const finalY = Math.max(bounds.minY, Math.min(bounds.maxY, initialY + dy))
+        const finalPos = { x: finalX, y: finalY }
+
+        setDragPos(finalPos)
+        setPlayerPosition(finalPos)
+      } else if (isFromBall) {
+        handleToggleExpandCollapse()
       }
 
       setTimeout(() => {
@@ -227,51 +235,85 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     window.addEventListener('pointerup', onPointerUp)
   }
 
-  if (!isPlayerVisible) return null
-
-  const currentSentence = sentences[currentSentenceIndex]
-  const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
-
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60)
-    const s = Math.floor(secs % 60)
-    return `${m}:${s < 10 ? '0' : ''}${s}`
+  // 进度条拉取 / 点击 Seek
+  const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0 || isLoading) return
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
+    setIsScrubbing(true)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const target = ratio * duration
+    setScrubTime(target)
   }
 
-  // 坐标计算：优先使用拖拽或持久化的位置，默认停靠在右上角（top: 76px, right: 28px）
-  const positionStyle: React.CSSProperties = dragPos
-    ? {
-        position: 'fixed',
-        left: `${dragPos.x}px`,
-        top: `${dragPos.y}px`,
-        bottom: 'auto',
-        right: 'auto',
-      }
-    : {
-        position: 'fixed',
-        top: '76px',
-        right: '28px',
-        bottom: 'auto',
-        left: 'auto',
-      }
+  const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0 || !trackRef.current) return
+    const rect = trackRef.current.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    setHoverTime(ratio * duration)
+    setHoverX(Math.max(0, Math.min(rect.width, e.clientX - rect.left)))
 
-  // ==================== 1. 悬浮球模式 (Circular Floating Orb) ====================
-  if (isPlayerCollapsed) {
-    return (
+    if (isScrubbing) {
+      setScrubTime(ratio * duration)
+    }
+  }
+
+  const handleScrubPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+    setIsScrubbing(false)
+    seekTime(scrubTime)
+  }
+
+  const handleScrubPointerLeave = () => {
+    if (!isScrubbing) {
+      setHoverTime(null)
+    }
+  }
+
+  if (!isPlayerVisible) return null
+
+  const effectiveTime = isScrubbing ? scrubTime : currentTime
+  const progressPercent = duration > 0 ? Math.min(100, (effectiveTime / duration) * 100) : 0
+
+  return (
+    // 根定位容器：统一管理 (currentPos.x, currentPos.y)，小球与面板共享唯一锚点
+    <div
+      role="region"
+      aria-label="语音朗读播放器"
+      style={{
+        position: 'fixed',
+        left: `${currentPos.x}px`,
+        top: `${currentPos.y}px`,
+        zIndex: 50,
+      }}
+      className="select-none"
+    >
+      {/* ==================== 1. 主体悬浮球（固定锚点，永不位移） ==================== */}
       <div
-        ref={containerRef}
-        role="region"
+        role="button"
+        tabIndex={0}
         aria-label="语音朗读悬浮小球"
-        style={positionStyle}
-        onPointerDown={handlePointerDown}
+        onPointerDown={(e) => handleDragPointerDown(e, true)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="z-50 flex items-center select-none cursor-grab active:cursor-grabbing touch-none"
+        className="relative flex items-center cursor-grab active:cursor-grabbing touch-none"
       >
-        {/* 悬停微型胶囊指示条（从圆球左侧平滑滑出，带播放/暂停微型按钮与书名） */}
-        {isHovered && (
+        {/* 收起态悬停胶囊（显示书名与当前时间） */}
+        {isPlayerCollapsed && isHovered && (
           <div
-            className="mr-2 flex items-center gap-2 rounded-full border border-primary/30 bg-background/95 px-3 py-1 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-right-2"
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 flex items-center gap-2 rounded-full border border-primary/30 bg-background/95 px-3 py-1 shadow-xl backdrop-blur-md animate-in fade-in duration-150 whitespace-nowrap',
+              currentPos.x > windowSize.width / 2
+                ? 'right-[54px] slide-in-from-right-2'
+                : 'left-[54px] slide-in-from-left-2',
+            )}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <button
@@ -285,40 +327,30 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
             >
               {isSpeaking ? <Pause className="size-3" /> : <Play className="size-3 ml-0.5" />}
             </button>
-            <button
-              type="button"
-              className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                void syncToViewport()
-              }}
-              title="对齐到当前屏幕"
-            >
-              <LocateFixed className="size-3" />
-            </button>
             <span className="truncate text-[11px] font-semibold text-foreground max-w-[120px]">
               {currentTitle || '听书中'}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">
-              ({sentences.length > 0 ? `${currentSentenceIndex + 1}/${sentences.length}` : '…'})
+              {formatTime(effectiveTime)} / {formatTime(duration)}
             </span>
           </div>
         )}
 
-        {/* 核心圆形小球（48x48 像素，带 SVG 环形进度圈与 Magic UI 呼吸光效） */}
+        {/* 核心圆形小球（48x48，SVG 环形进度圈，点击开合，长按拖动） */}
         <div
           className={cn(
-            'relative flex size-12 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background/90 shadow-2xl backdrop-blur-xl transition-transform duration-200 hover:scale-105 active:scale-95',
-            isSpeaking && 'ring-2 ring-primary/20',
+            'relative flex size-12 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background/90 shadow-2xl backdrop-blur-xl transition-all duration-200 hover:scale-105 active:scale-95',
+            !isPlayerCollapsed && 'ring-2 ring-primary border-primary bg-primary/10 shadow-primary/20',
+            isSpeaking && !isPlayerCollapsed && 'ring-2 ring-primary/40',
           )}
-          title="点击展开控制面板，按住可任意拖动位置"
+          title={isPlayerCollapsed ? '点击展开播放控制面板，按住可任意拖动位置' : '点击收起面板，按住可任意拖动位置'}
         >
-          {/* Magic UI 风格：播放时外圈声波脉冲光晕 */}
+          {/* 播放中声波脉冲光晕 */}
           {isSpeaking && !isPaused && (
             <span className="absolute -inset-1 rounded-full bg-primary/25 animate-ping opacity-60 pointer-events-none -z-10" />
           )}
 
-          {/* SVG 环形进度条（沿着圆球边缘环绕，周长 132） */}
+          {/* SVG 环形进度条（周长 132） */}
           <svg className="absolute inset-0 size-full -rotate-90 pointer-events-none" viewBox="0 0 48 48">
             <circle
               cx="24"
@@ -341,12 +373,11 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
             />
           </svg>
 
-          {/* 球心状态：加载态 / 动态音波条 / 静态耳机图标（全部 pointer-events-none，拖拽绝不拦截） */}
+          {/* 球心状态：加载 / 动态音柱 / 耳机图标 */}
           <div className="pointer-events-none flex items-center justify-center">
             {isLoading ? (
               <Loader2 className="size-4 animate-spin text-primary" />
             ) : isSpeaking && !isPaused ? (
-              /* 3 根跳动的律动音频微柱 */
               <div className="flex items-center justify-center gap-0.5 h-3.5">
                 <span className="w-0.5 rounded-full bg-primary animate-pulse h-2" />
                 <span className="w-0.5 rounded-full bg-primary animate-pulse h-3.5 delay-75" />
@@ -358,288 +389,258 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
           </div>
         </div>
       </div>
-    )
-  }
 
-  // ==================== 2. 展开控制面板卡片 (Expanded Card) ====================
-  return (
-    <div
-      ref={containerRef}
-      role="region"
-      aria-label="语音朗读播放器"
-      style={positionStyle}
-      className="z-50 flex w-[430px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-2xl backdrop-blur-xl transition-all animate-in fade-in zoom-in-95 duration-200"
-    >
-      {/* 顶部标题与拖拽栏 */}
-      <div
-        onPointerDown={handlePointerDown}
-        className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3.5 py-2 select-none cursor-grab active:cursor-grabbing touch-none"
-        title="按住手柄自由拖拽移动播放器"
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {/* 拖动手柄 */}
-          <GripHorizontal className="size-4 shrink-0 text-muted-foreground/60 hover:text-muted-foreground transition-colors" />
-
+      {/* ==================== 2. 极简卡片式音频播放器（无冗余文字，专注沉浸收听） ==================== */}
+      {!isPlayerCollapsed && (
+        <div
+          role="region"
+          aria-label="语音朗读播放控制面板"
+          style={{
+            position: 'absolute',
+            ...(dockSide === 'left' ? { right: `${BALL_SIZE + DOCK_GAP}px` } : { left: `${BALL_SIZE + DOCK_GAP}px` }),
+            ...(dockVertical === 'up' ? { bottom: '0px' } : { top: '0px' }),
+            width: `${PANEL_WIDTH}px`,
+          }}
+          className={cn(
+            'flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-2xl backdrop-blur-xl transition-all duration-200 animate-in fade-in zoom-in-95',
+            dockSide === 'left' ? 'origin-right' : 'origin-left',
+          )}
+        >
+          {/* 顶栏：拖拽手柄、标题与功能按钮 */}
           <div
-            className={cn(
-              'flex size-6 shrink-0 items-center justify-center rounded-full transition-colors',
-              isSpeaking
-                ? 'bg-primary/20 text-primary animate-pulse'
-                : 'bg-muted text-muted-foreground',
-            )}
+            onPointerDown={(e) => handleDragPointerDown(e, false)}
+            className="flex items-center justify-between border-b border-border/50 bg-muted/40 px-3 py-2 select-none cursor-grab active:cursor-grabbing touch-none"
+            title="按住手柄自由拖拽移动播放器"
           >
-            <Headphones className="size-3.5" />
-          </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <GripHorizontal className="size-4 shrink-0 text-muted-foreground/60 hover:text-muted-foreground transition-colors" />
 
-          <div className="min-w-0">
-            <h4 className="truncate text-xs font-semibold text-foreground max-w-[170px]">
-              {currentTitle || '语音朗读'}
-            </h4>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              {isLoading ? (
-                <span className="flex items-center gap-1 text-primary">
-                  <Loader2 className="size-2.5 animate-spin" />
-                  合成中…
-                </span>
-              ) : isFromCache ? (
-                <span className="flex items-center gap-0.5 text-emerald-500 font-medium">
-                  <Zap className="size-2.5 fill-emerald-500" />
-                  本地磁盘秒开缓存
-                </span>
-              ) : keyUsed === 'secondary' ? (
-                <span className="flex items-center gap-0.5 text-amber-500 font-medium">
-                  <Sparkles className="size-2.5" />
-                  备用 Key 接管容灾
-                </span>
-              ) : keyUsed === 'primary' ? (
-                <span className="flex items-center gap-0.5 text-primary font-medium">
-                  <Sparkles className="size-2.5" />
-                  智能云端 TTS
-                </span>
-              ) : (
-                <span>系统原生离线语音</span>
+              <div
+                className={cn(
+                  'flex size-5 shrink-0 items-center justify-center rounded-full transition-colors',
+                  isSpeaking
+                    ? 'bg-primary/20 text-primary animate-pulse'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                <Headphones className="size-3" />
+              </div>
+
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="truncate text-xs font-semibold text-foreground max-w-[160px]">
+                  {currentTitle || '语音朗读'}
+                </h4>
+                <div className="flex items-center text-[10px] text-muted-foreground">
+                  {isLoading ? (
+                    <span className="flex items-center gap-1 text-primary font-medium">
+                      <Loader2 className="size-2.5 animate-spin" />
+                      合成中…
+                    </span>
+                  ) : isFromCache ? (
+                    <span className="flex items-center gap-0.5 text-emerald-500 font-medium">
+                      <Zap className="size-2.5 fill-emerald-500" />
+                      本地秒开缓存
+                    </span>
+                  ) : keyUsed === 'secondary' ? (
+                    <span className="flex items-center gap-0.5 text-amber-500 font-medium">
+                      <Sparkles className="size-2.5" />
+                      备用 Key
+                    </span>
+                  ) : keyUsed === 'primary' ? (
+                    <span className="flex items-center gap-0.5 text-primary font-medium">
+                      <Sparkles className="size-2.5" />
+                      智能云端 TTS
+                    </span>
+                  ) : (
+                    <span>原生语音</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
+              {onOpenSettings && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={onOpenSettings}
+                  title="语音设置"
+                >
+                  <Settings className="size-3.5" />
+                </Button>
               )}
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={handleToggleExpandCollapse}
+                title="收起为悬浮球"
+              >
+                <Minimize2 className="size-3.5" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 text-muted-foreground hover:text-destructive cursor-pointer"
+                onClick={closePlayer}
+                title="关闭朗读"
+              >
+                <X className="size-3.5" />
+              </Button>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
-          {onOpenSettings && (
+          {/* 中间区：平滑拉取进度条与时间指示（无不准的文字遮挡） */}
+          <div className="px-3.5 pt-2 pb-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mb-1">
+              <span className="font-semibold text-foreground/90">
+                {formatTime(effectiveTime)}
+              </span>
+              <span>
+                {formatTime(duration)}
+              </span>
+            </div>
+
+            {/* 可自由点击、拉取的音频进度条 */}
+            <div className="relative pt-1 pb-1 interactive-control">
+              <div
+                ref={trackRef}
+                role="slider"
+                tabIndex={0}
+                aria-label="音频播放进度"
+                aria-valuemin={0}
+                aria-valuemax={duration}
+                aria-valuenow={effectiveTime}
+                onPointerDown={handleScrubPointerDown}
+                onPointerMove={handleScrubPointerMove}
+                onPointerUp={handleScrubPointerUp}
+                onPointerLeave={handleScrubPointerLeave}
+                onKeyDown={(e) => {
+                  if (duration <= 0) return
+                  if (e.key === 'ArrowLeft') {
+                    e.preventDefault()
+                    seekTime(Math.max(0, currentTime - 5))
+                  } else if (e.key === 'ArrowRight') {
+                    e.preventDefault()
+                    seekTime(Math.min(duration, currentTime + 5))
+                  }
+                }}
+                className={cn(
+                  'group relative h-2 w-full rounded-full bg-muted/80 cursor-pointer touch-none select-none transition-all duration-150',
+                  (isScrubbing || hoverTime !== null) && 'h-2.5',
+                )}
+                title="点击或拖拽快速跳转音频进度"
+              >
+                {/* 悬停时间气泡 */}
+                {hoverTime !== null && (
+                  <div
+                    className="absolute -top-7 -translate-x-1/2 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-mono font-semibold text-background shadow-lg pointer-events-none transition-transform z-10"
+                    style={{ left: `${hoverX}px` }}
+                  >
+                    {formatTime(hoverTime)}
+                  </div>
+                )}
+
+                {/* 已播进度条 */}
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-75 relative"
+                  style={{ width: `${progressPercent}%` }}
+                >
+                  {/* 可拖动手柄圆点 */}
+                  <div
+                    className={cn(
+                      'absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3.5 rounded-full border-2 border-background bg-primary shadow-md transition-transform',
+                      isScrubbing ? 'scale-125 ring-2 ring-primary/40' : 'group-hover:scale-110',
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 底栏：语速档位 + 快退15秒 / 播放暂停 / 快进15秒 + 从头重播 */}
+          <div className="flex items-center justify-between border-t border-border/40 bg-background/80 px-3.5 py-2 interactive-control">
+            {/* 语速调节 */}
+            <div className="flex items-center gap-1">
+              {[0.8, 1.0, 1.25, 1.5].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRate(r)}
+                  className={cn(
+                    'rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer',
+                    rate === r
+                      ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  {r}x
+                </button>
+              ))}
+            </div>
+
+            {/* 核心播放三键 */}
+            <div className="flex items-center gap-2">
+              {/* 快退 15 秒 */}
+              <button
+                type="button"
+                disabled={isLoading || duration <= 0}
+                onClick={() => seekTime(Math.max(0, currentTime - 15))}
+                className="flex items-center gap-0.5 px-1.5 py-1 rounded text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40"
+                title="快退 15 秒"
+              >
+                <RotateCcw className="size-3" />
+                <span>15s</span>
+              </button>
+
+              {/* 核心播放/暂停键 */}
+              <Button
+                variant="default"
+                size="icon"
+                disabled={isLoading}
+                onClick={togglePlayPause}
+                className="size-8 rounded-full shadow-md cursor-pointer"
+                title={isSpeaking ? '暂停' : '播放'}
+              >
+                {isLoading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : isSpeaking ? (
+                  <Pause className="size-3.5" />
+                ) : (
+                  <Play className="size-3.5 ml-0.5" />
+                )}
+              </Button>
+
+              {/* 快进 15 秒 */}
+              <button
+                type="button"
+                disabled={isLoading || duration <= 0}
+                onClick={() => seekTime(Math.min(duration, currentTime + 15))}
+                className="flex items-center gap-0.5 px-1.5 py-1 rounded text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40"
+                title="快进 15 秒"
+              >
+                <span>15s</span>
+                <RotateCw className="size-3" />
+              </button>
+            </div>
+
+            {/* 从头重播（回到本章 0:00） */}
             <Button
               variant="ghost"
               size="icon"
+              disabled={isLoading || duration <= 0}
+              onClick={() => seekTime(0)}
               className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={onOpenSettings}
-              title="语音设置（Google / 微软 Azure / 本地 OpenAI / 容灾）"
+              title="回到本章开头从头播放"
             >
-              <Settings className="size-3.5" />
+              <RotateCcw className="size-3" />
             </Button>
-          )}
-
-          {/* 一键同步对齐当前屏幕可见文本 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-            onClick={() => void syncToViewport()}
-            title="将朗读进度立即对齐到当前屏幕可见正文（跟随当前页面）"
-          >
-            <LocateFixed className="size-3.5" />
-          </Button>
-
-          {/* 全句列表抽屉切换 */}
-          <Button
-            variant={expandedSentenceList ? 'secondary' : 'ghost'}
-            size="icon"
-            className={cn(
-              'size-6 cursor-pointer transition-colors',
-              expandedSentenceList
-                ? 'bg-primary/15 text-primary hover:bg-primary/20'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-            onClick={() => setExpandedSentenceList(!expandedSentenceList)}
-            title={expandedSentenceList ? '收起句子列表' : '自由选择需要读取的位置（全句列表）'}
-          >
-            <ListMusic className="size-3.5" />
-          </Button>
-
-          {/* 收起为圆形悬浮球 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={() => setIsPlayerCollapsed(true)}
-            title="收起为圆形小球（不遮挡正文）"
-          >
-            <Minimize2 className="size-3.5" />
-          </Button>
-
-          {/* 关闭朗读 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-destructive cursor-pointer"
-            onClick={closePlayer}
-            title="关闭朗读"
-          >
-            <X className="size-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {/* 当前句子高亮视窗 */}
-      <div className="relative border-b border-border/50 bg-gradient-to-b from-transparent to-muted/20 px-4 py-3">
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="font-medium text-foreground/80">
-              当前句 ({sentences.length > 0 ? currentSentenceIndex + 1 : 0} / {sentences.length})
-            </span>
-            <span className="text-muted-foreground/60">•</span>
-            <span>从当前页面顶部自适应起读</span>
           </div>
-          <span className="font-mono text-[10px]">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-        </div>
-
-        <p className="min-h-12 text-sm font-medium leading-relaxed text-foreground select-text transition-all duration-200">
-          {isLoading ? (
-            <span className="text-muted-foreground italic flex items-center gap-2">
-              <Loader2 className="size-3.5 animate-spin" />
-              正在通过智能音频引擎合成章节语音…
-            </span>
-          ) : currentSentence ? (
-            <span className="rounded bg-primary/10 px-1 py-0.5 text-primary font-semibold decoration-primary/30">
-              {currentSentence.text}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">暂无正文</span>
-          )}
-        </p>
-
-        {/* 细进度条 */}
-        <div className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full bg-primary transition-all duration-150"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* 自由选择需要读取的位置：展开的全句列表抽屉 */}
-      {expandedSentenceList && (
-        <div className="max-h-56 overflow-y-auto border-b border-border/50 p-2 text-xs divide-y divide-border/30 bg-muted/15">
-          <div className="px-2 py-1 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>点击任意句子直接跳转朗读：</span>
-            <button
-              type="button"
-              className="text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-              onClick={() => void syncToViewport()}
-              title="根据当前阅读屏幕位置定位"
-            >
-              <LocateFixed className="size-3" />
-              定位到当前屏幕
-            </button>
-          </div>
-          {sentences.map((s, idx) => (
-            <div
-              key={s.id}
-              ref={idx === currentSentenceIndex ? currentSentenceRef : null}
-              onClick={() => seekSentence(idx)}
-              className={cn(
-                'flex items-start gap-2 p-1.5 rounded-lg cursor-pointer transition-colors',
-                idx === currentSentenceIndex
-                  ? 'bg-primary/15 text-primary font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-              )}
-            >
-              <span className="shrink-0 text-[10px] opacity-70 w-6 text-right mt-0.5 font-mono">
-                {idx + 1}.
-              </span>
-              <span className="flex-1 leading-snug line-clamp-2">{s.text}</span>
-              {idx === currentSentenceIndex && (
-                <Volume2 className="size-3.5 shrink-0 text-primary animate-pulse mt-0.5" />
-              )}
-            </div>
-          ))}
         </div>
       )}
-
-      {/* 底部播放控制操作台 */}
-      <div className="flex items-center justify-between bg-background px-4 py-2.5">
-        {/* 语速调节快捷按钮 */}
-        <div className="flex items-center gap-1">
-          {[0.8, 1.0, 1.25, 1.5].map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRate(r)}
-              className={cn(
-                'rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer',
-                rate === r
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              {r}x
-            </button>
-          ))}
-        </div>
-
-        {/* 核心三键（上一句、播放/暂停、下一句） */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={currentSentenceIndex <= 0 || isLoading}
-            onClick={prevSentence}
-            className="size-8 rounded-full cursor-pointer hover:bg-muted"
-            title="上一句"
-          >
-            <SkipBack className="size-4" />
-          </Button>
-
-          <Button
-            variant="default"
-            size="icon"
-            disabled={isLoading || sentences.length === 0}
-            onClick={togglePlayPause}
-            className="size-9 rounded-full shadow-md cursor-pointer"
-            title={isSpeaking ? '暂停' : '播放'}
-          >
-            {isLoading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : isSpeaking ? (
-              <Pause className="size-4" />
-            ) : (
-              <Play className="size-4 ml-0.5" />
-            )}
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={currentSentenceIndex >= sentences.length - 1 || isLoading}
-            onClick={nextSentence}
-            className="size-8 rounded-full cursor-pointer hover:bg-muted"
-            title="下一句"
-          >
-            <SkipForward className="size-4" />
-          </Button>
-        </div>
-
-        {/* 重播本句 */}
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isLoading || sentences.length === 0}
-          onClick={() => seekSentence(currentSentenceIndex)}
-          className="size-7 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
-          title="重播当前句"
-        >
-          <RotateCcw className="size-3.5" />
-        </Button>
-      </div>
     </div>
   )
 }

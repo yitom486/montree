@@ -12,7 +12,7 @@
 | `TocAiPolishControl` | 目录 AI 整理：目录副会话 + 模型/思考档选择 + JSON 解析回填草稿 |
 | `ReaderContentShell` / `ReaderToolbarShell` / `ReaderFooterNav` | 阅读区壳、工具栏（纯粹目录/加书签导航 + 右侧卡片流/札记箱/「考考我」智考一级入口）、底栏翻页 |
 | `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲 |
-| `FloatingTtsPlayer` | 自由拖拽微晶悬浮球与展开控制面板（默认停靠书本右上角、可自由拖拽记忆坐标、微晶悬浮球与卡片双态平滑切换、视口顶部正文智能起读与一键对齐当前屏幕、全章句子抽屉点选跳转、实时分句滚动高亮、正文 DOM 跟随与语速调节） |
+| `FloatingTtsPlayer` | 自由拖拽微晶悬浮球与轻量展开控制面板（主体小球稳固锚定、紧凑卡片智能停靠侧翼展开收起、本章第0秒从头完整合成与自由拉动进度条、快退快进15秒与从头重播、无冗余文字干扰、纯净沉浸听书） |
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
 | `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层 |
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
