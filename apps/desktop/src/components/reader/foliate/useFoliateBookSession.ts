@@ -5,7 +5,7 @@ import {
   openFoliateBook,
   type FoliateBookAdapter,
 } from '@/lib/reader/adapter/foliate-book-adapter'
-import { findMarkByOverlayerKey } from '@/lib/reader/marks/mark-linkage'
+import { findMarkByOverlayerKey, overlayerKeyForMark } from '@/lib/reader/marks/mark-linkage'
 import {
   isSameSpineBase,
   normalizeLoadKey,
@@ -34,7 +34,6 @@ import { reportAppError } from '@/lib/workspace/report-error'
 import { isNavIntentLocked, useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { appApi } from '@/api/app-api'
-import { parse as parseFoliateCfi, toRange as foliateCfiToRange } from '@foliate/epubcfi.js'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import type { ReadingMark, AppError } from '@montree/contracts'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
@@ -878,24 +877,20 @@ export function useFoliateBookSession({
       },
       clickMark: async (markId: string): Promise<boolean> => {
         const mark = marksRef.current.find((m) => m.id === markId)
-        if (!mark) return false
-        const cfi = mark.anchor?.format === 'epub' ? mark.anchor.cfi : undefined
-        if (!cfi) return false
+        const key = mark ? overlayerKeyForMark(mark) : null
         const view = viewRef.current
-        if (!view) return false
-        let parsed: { spinePos?: number } | null = null
+        if (!mark || !key || !view) return false
+        let resolved: { index: number; anchor: (doc: Document) => Range }
         try {
-          parsed = parseFoliateCfi(cfi) as any
+          resolved = view.resolveCFI(key)
         } catch {
           return false
         }
-        const spineIndex = parsed?.spinePos
-        if (spineIndex === undefined) return false
-        const targetDoc = getRenderedDocs().find((d) => d.index === spineIndex)?.doc
-        if (!targetDoc) return false
+        const target = getRenderedDocs().find((item) => item.index === resolved.index)
+        if (!target) return false
         let range: Range
         try {
-          range = foliateCfiToRange(targetDoc, cfi)
+          range = resolved.anchor(target.doc)
         } catch {
           return false
         }
