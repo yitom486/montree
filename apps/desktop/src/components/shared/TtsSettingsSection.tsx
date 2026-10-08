@@ -245,8 +245,7 @@ export function TtsSettingsSection() {
       !modelId ||
       modelId === 'gemini-2.5-flash' ||
       modelId === 'gemini-1.5-pro' ||
-      modelId === 'gemini-1.5-flash' ||
-      modelId === 'gemini-2.0-flash'
+      modelId === 'gemini-1.5-flash'
     ) {
       setModelId('gemini-3.8-flash-lite-tts')
     }

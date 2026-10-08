@@ -41,16 +41,20 @@ function foliatePaginatorGuardPlugin(): Plugin {
       if (id.includes('paginator.js')) {
         return code
           .replace(
+            /const setStylesImportant = \(el, styles\) => \{/,
+            'const setStylesImportant = (el, styles) => {\n        if (!el?.style) return',
+          )
+          .replace(
             /render\(\)\s*\{([\s\S]*?)if \(!this\.#view\) return/,
             'render() {$1if (!this.#view || !this.#view.document?.documentElement) return',
           )
           .replace(
             /scrolled\(\{ gap, columnWidth \}\)\s*\{([\s\S]*?)const doc = this\.document/,
-            'scrolled({ gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement) return',
+            'scrolled({ gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement || !doc?.body) return',
           )
           .replace(
             /columnize\(\{ width, height, gap, columnWidth \}\)\s*\{([\s\S]*?)const doc = this\.document/,
-            'columnize({ width, height, gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement) return',
+            'columnize({ width, height, gap, columnWidth }) {$1const doc = this.document\n        if (!doc?.documentElement || !doc?.body) return',
           )
           .replace(
             /#observer = new ResizeObserver\(\(\) => this\.render\(\)\)/,

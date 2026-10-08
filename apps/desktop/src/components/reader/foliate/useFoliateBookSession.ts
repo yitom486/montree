@@ -782,10 +782,24 @@ export function useFoliateBookSession({
   useEffect(() => {
     return registerReaderContent({
       filePath,
-      getCurrentText: () => {
-        return getRenderedDocs()
+      getCurrentText: async () => {
+        const domText = getRenderedDocs()
           .map((item) => extractDocumentText(item.doc))
           .join('\n\n')
+        if (domText.trim().length > 100) return domText
+        try {
+          const currentFlat = useReaderNavigationStore.getState().nav.flatIndex
+          if (currentFlat >= 0) {
+            const sectionIndex = chapterSectionsRef.current[currentFlat]
+            if (sectionIndex !== null && sectionIndex !== undefined && sectionIndex >= 0) {
+              const fullText = await adapterRef.current?.loadSectionText(sectionIndex)
+              if (fullText && fullText.trim().length > domText.trim().length) {
+                return fullText
+              }
+            }
+          }
+        } catch {}
+        return domText
       },
       getViewportText: () => {
         const range = lastVisibleRangeRef.current

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useReaderNavTitles } from '@/stores/reader-navigation-store'
+import { useReaderNavTitles, useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useTtsStore } from '@/stores/tts-store'
 import { getReaderContentProvider } from '@/lib/agent/context/reader-content-registry'
@@ -95,7 +95,16 @@ export function ReaderToolbarShell({
       return
     }
     try {
-      const rawText = await provider.getCurrentText()
+      let rawText = await provider.getCurrentText()
+      const currentFlat = useReaderNavigationStore.getState().nav.flatIndex
+      if ((!rawText || rawText.trim().length < 100) && provider.getUnitByIndex && currentFlat >= 0) {
+        try {
+          const unit = await provider.getUnitByIndex(currentFlat)
+          if (unit?.text && unit.text.trim().length > (rawText?.trim().length || 0)) {
+            rawText = unit.text
+          }
+        } catch {}
+      }
       if (!rawText || !rawText.trim()) {
         toast.warning('当前章节或版面未提取到可朗读正文')
         return
