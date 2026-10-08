@@ -115,6 +115,7 @@ import type {
   TtsBatchCreatePayload,
   TtsBatchJobStatus,
   TtsStreamChunkPayload,
+  TtsStreamProgressPayload,
   TtsStreamEndPayload,
   TtsStreamErrorPayload,
 } from '../types/tts'
@@ -476,7 +477,7 @@ export interface ElectronAPI {
   synthesizeTts: (
     payload: TtsSynthesizePayload,
   ) => Promise<Result<TtsSynthesizeResult, AppError>>
-  /** 启动流式语音合成（首包即播 + 边播边拼装） */
+  /** 启动分段语音合成，验证完成的音频段边播边拼装 */
   synthesizeTtsStream: (
     payload: TtsSynthesizePayload & { streamId: string },
   ) => Promise<Result<{ started: boolean; fromCache?: boolean; cachedResult?: TtsSynthesizeResult }, AppError>>
@@ -484,6 +485,7 @@ export interface ElectronAPI {
   cancelTtsStream: (streamId: string) => Promise<Result<void, AppError>>
   /** 订阅 TTS 流式音频分片 */
   onTtsStreamChunk: (callback: (payload: TtsStreamChunkPayload) => void) => () => void
+  onTtsStreamProgress: (callback: (payload: TtsStreamProgressPayload) => void) => () => void
   /** 订阅 TTS 流式合成完成 */
   onTtsStreamEnd: (callback: (payload: TtsStreamEndPayload) => void) => () => void
   /** 订阅 TTS 流式合成出错 */

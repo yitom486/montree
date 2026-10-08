@@ -94,7 +94,10 @@ export function sanitizeReaderText(
   }
 
   if (filterMarkup) {
-    // 14. 去除其他 HTML 标签
+    // 14. 处理 HTML 块级与换行标签，转换为真实自然段落分隔
+    text = text.replace(/<\/(p|div|section|article|h[1-6]|li)>/gi, '\n\n')
+    text = text.replace(/<(br|hr)\s*\/?>/gi, '\n')
+    // 去除其他 HTML 标签
     text = text.replace(/<[^>]+>/g, '')
 
     // 15. 去除 Markdown 格式标记
@@ -133,33 +136,58 @@ export function sanitizeReaderText(
     return { fullCleanText: '', sentences: [] }
   }
 
-  // 18. 分句切分：根据标点符号（。！？!?；;\n）拆分为句子列表
-  const rawSegments = splitIntoSentences(text)
+  // 18. 按自然段落切分，并在段落内精准分句，保持段落自然韵律与完整性
+  const rawParagraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
   const sentences: SentenceItem[] = []
+  const cleanParagraphs: string[] = []
 
   let idx = 0
-  for (const seg of rawSegments) {
-    const trimmed = seg.trim()
-    if (!trimmed) continue
-    const charCount = trimmed.length
-    // 计算停顿加权：中英文基本字数 + 标点停顿权重
-    const pauseBonus = /[。！？!?]/.test(trimmed) ? 2 : /[；;，,]/.test(trimmed) ? 1 : 0.5
-    const weight = Math.max(1, charCount + pauseBonus * 2)
+  for (const para of rawParagraphs) {
+    const paraSegments = splitIntoSentences(para)
+    const paraCleanSentences: string[] = []
+    for (let sIdx = 0; sIdx < paraSegments.length; sIdx++) {
+      const seg = paraSegments[sIdx]
+      const trimmed = seg.trim()
+      if (!trimmed) continue
+      const charCount = trimmed.length
+      // 计算停顿加权：中英文基本字数 + 标点停顿权重
+      const pauseBonus = /[。！？!?]/.test(trimmed) ? 2 : /[；;，,]/.test(trimmed) ? 1 : 0.5
+      const weight = Math.max(1, charCount + pauseBonus * 2)
+      const isParagraphEnd = sIdx === paraSegments.length - 1
 
-    sentences.push({
-      id: `tts-s-${idx}`,
-      index: idx,
-      text: trimmed,
-      rawSentence: seg,
-      charCount,
-      weight,
-      startTime: 0,
-      endTime: 0,
-    })
-    idx++
+      sentences.push({
+        id: `tts-s-${idx}`,
+        index: idx,
+        text: trimmed,
+        rawSentence: seg,
+        charCount,
+        weight,
+        startTime: 0,
+        endTime: 0,
+        isParagraphEnd,
+      })
+      paraCleanSentences.push(trimmed)
+      idx++
+    }
+
+    if (paraCleanSentences.length > 0) {
+      // 段落内自然连接：中文/全角标点直接无缝相接，西文/英文单词间保留一个空格
+      let joinedPara = ''
+      for (let i = 0; i < paraCleanSentences.length; i++) {
+        const cur = paraCleanSentences[i]
+        if (i === 0) {
+          joinedPara = cur
+        } else {
+          const prev = paraCleanSentences[i - 1]
+          const needsSpace = /[a-zA-Z0-9,.!?:;]$/.test(prev) && /^[a-zA-Z0-9]/.test(cur)
+          joinedPara += (needsSpace ? ' ' : '') + cur
+        }
+      }
+      cleanParagraphs.push(joinedPara)
+    }
   }
 
-  const fullCleanText = sentences.map((s) => s.text).join('\n')
+  const fullCleanText = cleanParagraphs.join('\n\n')
   return { fullCleanText, sentences }
 }
 

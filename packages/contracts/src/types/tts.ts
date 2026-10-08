@@ -29,6 +29,9 @@ export interface TtsConfig {
   // 文本清洗与听书降噪偏好
   filterFootnotesAndCitations?: boolean
   filterLinksAndTechnicalMarkup?: boolean
+
+  // Gemini 异步 Batch 模式（默认关闭）
+  enableBatch?: boolean
 }
 
 export interface TtsSynthesizePayload {
@@ -39,6 +42,8 @@ export interface TtsSynthesizePayload {
   rate?: number
   unitLabel?: string
   forceKeyType?: 'primary' | 'secondary'
+  priority?: 'foreground' | 'background'
+  enableBatch?: boolean
 
   // 可选厂商特定参数与密钥实时覆盖
   primaryApiKey?: string
@@ -66,6 +71,17 @@ export interface TtsStreamChunkPayload {
   mimeType: string
 }
 
+export interface TtsStreamProgressPayload {
+  streamId: string
+  stage: 'queued' | 'receiving' | 'segment-complete' | 'complete'
+  segmentIndex: number
+  totalSegments: number
+  completedSegments: number
+  cachedSegments: number
+  bufferedSeconds: number
+  waitMs?: number
+}
+
 export interface TtsStreamEndPayload {
   streamId: string
   totalChunks: number
@@ -79,6 +95,7 @@ export interface TtsStreamErrorPayload {
   streamId: string
   error: string
   canFallbackToSystem?: boolean
+  retryAt?: number
 }
 
 export interface TtsCacheStats {
@@ -107,6 +124,8 @@ export interface TtsVoiceInfo {
   name: string
   gender: 'male' | 'female' | 'neutral'
   description: string
+  isRecommended?: boolean
+  language?: string
 }
 
 export interface TtsRemoteModelItem {

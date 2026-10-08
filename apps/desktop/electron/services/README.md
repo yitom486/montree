@@ -61,7 +61,7 @@
 
 | 目录 | 功能 |
 |------|------|
-| `tts/` | `tts/tts-service.ts`：集成 `gemini-tts-studio`（Google Gemini、微软 Azure Speech、Local OpenAI 兼容 TTS 与系统兜底）、主备双 API Key 智能容灾与 1 分钟 429 冷却调度、音频本地磁盘持久化缓存（首次保存，后续直接读取） |
+| `tts/` | `tts/tts-service.ts`：集成 `gemini-tts-studio`（模型/音色查询、Azure Speech 与 Local OpenAI TTS）、双 Key 容灾、磁盘缓存；Gemini 长文本段落优先分段（保留自然段落完整性，超长段按句切分，最多 800 字符），逐段验证、缓存和播放，失败段按 Key 独立重试与敏感词/云端异常（OTHER）安全跳过自愈，支持可选的异步 Batch 批量任务模式；主 Key 遇到任意 429（含日额度）或异常优先切换不同的备用 Key 继续当前缺失段，主备均受限或没有可用备用时才报错；完整段落缓存跨退出复用，半段不保存。发送排队/接收/分段完成进度事件。`tts/gemini-stream.ts`：通过 Google SDK 接收全部分片并检查 `finishReason`、超时与 WAV 完整性/异常短音频；日志标记任务、段号、尝试次数、模型版本、响应编号、接收量及错误/取消结果，接收中日志每秒最多一次，不记录正文和密钥。`tts/gemini-queue.ts`：应用内统一串行队列，连续 60 秒最多 3 次合成请求（含重试、主备 Key 和密钥测试），播放优先于后台预取，排队可取消。`tts/gemini-quota.ts`：解析日额度与短期限流、保留云端 RetryInfo，按 Key 指纹与模型分别记录冷却，避免主 Key 的 429 阻塞备用；日额度恢复时间保存到用户数据目录的 tts-quota.json，只存哈希与时间。Batch API 使用其独立配额。回归测试见 `tts/tts-service.test.ts`、`tts/gemini-stream.test.ts`、`tts/gemini-queue.test.ts` 与 `tts/gemini-quota.test.ts`。 |
 
 ## ACP
 

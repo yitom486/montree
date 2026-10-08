@@ -321,6 +321,8 @@ export const IPC = {
   TTS_CANCEL_STREAM: 'tts:cancel-stream',
   /** main→renderer：TTS 流式音频分片推送 */
   TTS_STREAM_CHUNK: 'tts:stream-chunk',
+  /** main→renderer：排队、分段接收与完成进度 */
+  TTS_STREAM_PROGRESS: 'tts:stream-progress',
   /** main→renderer：TTS 流式合成完成推送（携带完整音频） */
   TTS_STREAM_END: 'tts:stream-end',
   /** main→renderer：TTS 流式合成出错推送 */

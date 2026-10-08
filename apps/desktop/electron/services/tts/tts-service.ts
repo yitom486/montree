@@ -1,8 +1,11 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { azureProvider, geminiProvider, localProvider, prettyApiError } from 'gemini-tts-studio/server'
+import { synthesizeGeminiStream, validateGeminiWav } from './gemini-stream'
+import { splitGeminiText, type GeminiRequestPriority } from './gemini-queue'
+import { geminiQuota, GeminiQuotaError } from './gemini-quota'
 import { IPC, err, ok, toAppError, type AppError, type Result } from '@montree/contracts'
 import type {
   TtsBatchCreatePayload,
@@ -15,6 +18,7 @@ import type {
   TtsTestKeyPayload,
   TtsTestKeyResult,
   TtsVoiceInfo,
+  TtsStreamProgressPayload,
 } from '@montree/contracts'
 
 export const DEFAULT_TTS_CONFIG: TtsConfig = {
@@ -37,9 +41,22 @@ export const DEFAULT_TTS_CONFIG: TtsConfig = {
   saveAudioCache: true,
   filterFootnotesAndCitations: true,
   filterLinksAndTechnicalMarkup: true,
+  enableBatch: false,
 }
 
-let primaryCooldownUntil = 0
+let quotaStateLoaded: Promise<void> | undefined
+
+function loadGeminiQuotaState(): Promise<void> {
+  return quotaStateLoaded ??= readFile(join(app.getPath('userData'), 'tts-quota.json'), 'utf-8')
+    .then((saved) => { geminiQuota.restore(JSON.parse(saved)) }).catch(() => {})
+}
+
+async function saveGeminiQuotaState(): Promise<void> {
+  try {
+    await mkdir(app.getPath('userData'), { recursive: true })
+    await writeFile(join(app.getPath('userData'), 'tts-quota.json'), JSON.stringify(geminiQuota.snapshot()), 'utf-8')
+  } catch (cause) { console.warn('[TTS] 保存额度恢复时间失败:', cause) }
+}
 
 function getConfigFilePath(): string {
   return join(app.getPath('userData'), 'tts-config.json')
@@ -111,6 +128,7 @@ export async function writeTtsConfig(config: TtsConfig): Promise<Result<void, Ap
 
 export function isRateLimitOrQuotaError(error: unknown): boolean {
   if (!error) return false
+  if (error instanceof GeminiQuotaError) return true
   const msg = error instanceof Error ? error.message : String(error)
   const status = String((error as { status?: unknown })?.status ?? '')
   const code = String((error as { code?: unknown })?.code ?? '')
@@ -136,112 +154,304 @@ function buildCacheKey(payload: {
   return createHash('sha256').update(raw).digest('hex')
 }
 
+async function tryGeminiBatchPrefetch(
+  apiKey: string,
+  segments: string[],
+  voiceName: string,
+  model: string,
+  rate: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!geminiProvider.createBatchJob || !geminiProvider.getBatchJob) return
+  const uncached: Array<{ segment: string; index: number; cacheFile: string }> = []
+  for (const [index, segment] of segments.entries()) {
+    const cacheFile = join(getCacheDirPath(), `${buildCacheKey({ text: segment, voiceName, modelId: model, rate })}.segment.wav`)
+    try {
+      await stat(cacheFile)
+    } catch {
+      uncached.push({ segment, index, cacheFile })
+    }
+  }
+
+  if (uncached.length === 0) return
+
+  console.info('[TTS] 正在尝试通过 Gemini Batch 提交批量预取任务...', { uncachedCount: uncached.length, model })
+  try {
+    const created = await geminiProvider.createBatchJob(apiKey, {
+      model,
+      voiceName,
+      displayName: `montree-tts-${Date.now()}`,
+      speechMetadata: '',
+      languageCode: '',
+      items: uncached.map((item) => ({
+        key: String(item.index),
+        text: item.segment,
+        voiceName,
+        speechMetadata: '',
+        languageCode: '',
+      })),
+    })
+
+    if (!created?.name) return
+    console.info('[TTS] Gemini Batch 任务已创建，正在等待完成...', { name: created.name, state: created.state })
+
+    // 轮询检查最多 10 秒（5次 x 2秒），避免过度阻塞播放起播
+    for (let i = 0; i < 5; i++) {
+      signal?.throwIfAborted()
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      signal?.throwIfAborted()
+      const job = await geminiProvider.getBatchJob(apiKey, created.name)
+      if (job.state === 'SUCCEEDED' || job.state === 'JOB_STATE_SUCCEEDED') {
+        console.info('[TTS] Gemini Batch 任务执行成功，正在写入本地分段缓存...', { name: created.name })
+        if (job.results && Array.isArray(job.results)) {
+          await mkdir(getCacheDirPath(), { recursive: true })
+          for (const res of job.results) {
+            if (res.ok && res.audioBase64) {
+              const matched = uncached.find((it) => String(it.index) === String(res.key))
+              if (matched) {
+                const wavBuf = Buffer.from(res.audioBase64, 'base64')
+                try {
+                  validateGeminiWav(matched.segment, wavBuf)
+                  await writeFile(matched.cacheFile, wavBuf)
+                } catch {}
+              }
+            }
+          }
+        }
+        return
+      }
+      if (job.state === 'FAILED' || job.state === 'JOB_STATE_FAILED' || job.state === 'CANCELLED') {
+        console.warn('[TTS] Gemini Batch 任务未成功结束:', job.state)
+        return
+      }
+    }
+    console.info('[TTS] Gemini Batch 任务云端排队中，自动无缝回退至实时流式分段播放')
+  } catch (cause) {
+    console.warn('[TTS] Gemini Batch 批量流程异常，平滑回退至实时流式:', cause)
+  }
+}
+
+async function synthesizeSegmentBySubSentences(
+  segment: string,
+  voiceName: string,
+  model: string,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<{ pcm: Buffer; rate: number } | null> {
+  const sentences = segment.match(/[^。！？；!?;]+[。！？；!?;\n]?/g) || [segment]
+  const cleanSentences = sentences.map((s) => s.trim()).filter(Boolean)
+  if (cleanSentences.length <= 1) return null
+
+  const pcmList: Buffer[] = []
+  let detectedRate = 24000
+
+  for (const s of cleanSentences) {
+    signal?.throwIfAborted()
+    const chunks: Buffer[] = []
+    let rate: number | undefined
+    try {
+      await synthesizeGeminiStream(
+        { text: s, voiceName, model },
+        apiKey,
+        ({ audioBase64, mimeType }) => {
+          rate = parsePcmRate(mimeType)
+          detectedRate = rate
+          chunks.push(Buffer.from(audioBase64, 'base64'))
+        },
+        { signal },
+      )
+      if (chunks.length > 0) {
+        pcmList.push(Buffer.concat(chunks))
+      }
+    } catch {
+      pcmList.push(Buffer.alloc(Math.round(detectedRate * 2 * 0.3), 0))
+    }
+  }
+
+  if (pcmList.length === 0) return null
+  return { pcm: Buffer.concat(pcmList), rate: detectedRate }
+}
+
 async function invokeGeminiTTS(params: {
   apiKey: string
   text: string
   voiceName: string
   modelId: string
-}): Promise<{ audioBase64: string; mimeType: string }> {
-  const { apiKey, text, voiceName } = params
-  if (!apiKey.trim()) {
-    throw new Error('未配置 Gemini API Key')
+  secondaryApiKey?: string
+  keyUsed?: 'primary' | 'secondary'
+  saveAudioCache?: boolean
+  enableBatch?: boolean
+  rate?: number
+  signal?: AbortSignal
+  priority?: GeminiRequestPriority
+  onChunk?: (chunk: { audioBase64: string; mimeType: string }) => void
+  jobId?: string
+  onProgress?: (progress: Omit<TtsStreamProgressPayload, 'streamId'>) => void
+}): Promise<{ audioBase64: string; mimeType: string; keyUsed: 'primary' | 'secondary'; cooldownActivated: boolean }> {
+  await loadGeminiQuotaState()
+  let apiKey = params.apiKey.trim()
+  if (!apiKey) throw new Error('未配置 Gemini API Key')
+  let model = resolveTtsModelId(params.modelId)
+  let keyUsed = params.keyUsed ?? 'primary'
+  let cooldownActivated = false
+  let primaryQuotaError: GeminiQuotaError | undefined
+  const text = params.text.trim()
+  const voiceName = params.voiceName.trim() || 'Aoede'
+  const allPcm: Buffer[] = []
+  let sampleRate: number | undefined
+  const segments = splitGeminiText(text).filter((segment) => segment.trim())
+  const jobId = params.jobId ?? randomUUID()
+  let completedSegments = 0
+  let cachedSegments = 0
+  let validatedSeconds = 0
+  console.info('[TTS] 章节接收开始', { jobId, totalSegments: segments.length, textLength: text.length, cacheEnabled: Boolean(params.saveAudioCache) })
+  const report = (stage: TtsStreamProgressPayload['stage'], segmentIndex: number, bufferedSeconds = validatedSeconds, waitMs?: number) => {
+    params.onProgress?.({ stage, segmentIndex, totalSegments: segments.length, completedSegments, cachedSegments, bufferedSeconds, waitMs })
   }
-
-  const cleanText = text.trim()
-  const cleanVoice = voiceName.trim() || 'Aoede'
-  const primaryModel = resolveTtsModelId(params.modelId)
-
-  const trySynthesize = async (model: string) => {
-    const chunks: string[] = []
-    let detectedMime = 'audio/L16;codec=pcm;rate=24000'
-    try {
-      if (geminiProvider.synthesizeStream) {
-        const res = await geminiProvider.synthesizeStream(
-          {
-            text: cleanText,
-            voiceName: cleanVoice,
-            model,
-          },
-          apiKey.trim(),
-          ({ audioBase64, mimeType }: { audioBase64: string; mimeType: string }) => {
-            if (audioBase64) chunks.push(audioBase64)
-            if (mimeType) detectedMime = mimeType
-          },
-        )
-        if (res?.mimeType) detectedMime = res.mimeType
-      } else {
-        throw new Error('当前 geminiProvider 未提供 synthesizeStream')
-      }
-    } catch {
-      const single = await geminiProvider.synthesize(
-        {
-          text: cleanText,
-          voiceName: cleanVoice,
-          model,
-        },
-        apiKey.trim(),
-      )
-      return {
-        audioBase64: single.audioBuffer ? single.audioBuffer.toString('base64') : '',
-        mimeType: single.mimeType || 'audio/wav',
-      }
-    }
-
-    if (chunks.length === 0) {
-      throw new Error('Gemini TTS 未返回任何音频数据')
-    }
-
-    // 将收集到的 base64 PCM 分片拼装为标准 24kHz 单声道 WAV 格式
-    const bytesList = chunks.map((b) => Buffer.from(b, 'base64'))
-    const totalPcmBytes = bytesList.reduce((acc, cur) => acc + cur.length, 0)
-    const wavBuffer = Buffer.alloc(44 + totalPcmBytes)
-    wavBuffer.write('RIFF', 0)
-    wavBuffer.writeUInt32LE(36 + totalPcmBytes, 4)
-    wavBuffer.write('WAVE', 8)
-    wavBuffer.write('fmt ', 12)
-    wavBuffer.writeUInt32LE(16, 16)
-    wavBuffer.writeUInt16LE(1, 20)
-    wavBuffer.writeUInt16LE(1, 22)
-    wavBuffer.writeUInt32LE(24000, 24)
-    wavBuffer.writeUInt32LE(48000, 28)
-    wavBuffer.writeUInt16LE(2, 32)
-    wavBuffer.writeUInt16LE(16, 34)
-    wavBuffer.write('data', 36)
-    wavBuffer.writeUInt32LE(totalPcmBytes, 40)
-
-    let offset = 44
-    for (const b of bytesList) {
-      b.copy(wavBuffer, offset)
-      offset += b.length
-    }
-
-    return {
-      audioBase64: wavBuffer.toString('base64'),
-      mimeType: 'audio/wav',
-    }
+  report('queued', 1)
+  if (params.enableBatch && params.saveAudioCache && segments.length > 1) {
+    await tryGeminiBatchPrefetch(apiKey, segments, voiceName, model, params.rate ?? 1, params.signal)
   }
-
-  try {
-    return await trySynthesize(primaryModel)
-  } catch (err: any) {
-    const errMsg = String(err?.message || err)
-    if (errMsg.includes('This model only supports text output') || errMsg.includes('supports text output')) {
-      const fallbackModel = primaryModel !== 'gemini-3.8-flash-lite-tts' ? 'gemini-3.8-flash-lite-tts' : 'gemini-3.8-flash-tts'
+  for (const [index, segment] of segments.entries()) {
+    const segmentIndex = index + 1
+    const segmentLog = { jobId, segmentIndex, totalSegments: segments.length, textHash: createHash('sha256').update(segment).digest('hex').slice(0, 12) }
+    params.signal?.throwIfAborted()
+    let segmentPcm: Buffer | undefined
+    let segmentRate = 24000
+    const cacheFile = join(getCacheDirPath(), `${buildCacheKey({ text: segment, voiceName, modelId: model, rate: params.rate ?? 1 })}.segment.wav`)
+    if (params.saveAudioCache) {
       try {
-        return await trySynthesize(fallbackModel)
-      } catch (fallbackErr) {
-        throw new Error(formatFriendlyErrorMessage(fallbackErr))
-      }
+        const cached = await readFile(cacheFile)
+        validateGeminiWav(segment, cached)
+        // Segment caches are exclusively written below with this canonical 44-byte header.
+        if (cached.readUInt32LE(16) === 16 && cached.toString('ascii', 36, 40) === 'data' && cached.readUInt32LE(40) === cached.length - 44) {
+          segmentPcm = cached.subarray(44)
+          segmentRate = cached.readUInt32LE(24)
+          cachedSegments++
+          console.info('[TTS] 复用已完成分段', segmentLog)
+        }
+      } catch {}
     }
-    if (primaryModel === 'gemini-3.8-flash-tts' && isRateLimitOrQuotaError(err)) {
-      try {
-        return await trySynthesize('gemini-3.8-flash-lite-tts')
-      } catch (liteErr) {
-        throw new Error(formatFriendlyErrorMessage(liteErr))
+    if (!segmentPcm) {
+      let retriedTransientError = false
+      let changedModel = false
+      for (let attempt = 0; attempt < 4; attempt++) {
+        params.signal?.throwIfAborted()
+        const chunks: Buffer[] = []
+        let detectedRate: number | undefined
+        try {
+          await synthesizeGeminiStream(
+            { text: segment, voiceName, model }, apiKey,
+            ({ audioBase64, mimeType }) => {
+              const nextRate = parsePcmRate(mimeType)
+              if (detectedRate !== undefined && detectedRate !== nextRate) throw new Error('云端语音分片采样率发生变化，请重试')
+              detectedRate = nextRate
+              chunks.push(Buffer.from(audioBase64, 'base64'))
+            },
+            {
+              signal: params.signal, priority: params.priority,
+              logContext: { jobId, segmentIndex, totalSegments: segments.length, attempt: attempt + 1 },
+              onQueueState: (state) => {
+                console.info('[TTS] 请求调度', { ...segmentLog, attempt: attempt + 1, ...state })
+                if (state.phase !== 'cancelled') report(state.phase === 'queued' ? 'queued' : 'receiving', segmentIndex, validatedSeconds, state.waitMs)
+              },
+              onProgress: ({ audioBytes, mimeType }) => report('receiving', segmentIndex, validatedSeconds + audioBytes / (parsePcmRate(mimeType) * 2)),
+            },
+          )
+          segmentRate = detectedRate ?? 24000
+          const wav = pcmChunksToWavBuffer(chunks, segmentRate)
+          validateGeminiWav(segment, wav)
+          params.signal?.throwIfAborted()
+          segmentPcm = wav.subarray(44)
+          if (params.saveAudioCache) {
+            try {
+              const actualCacheFile = join(getCacheDirPath(), `${buildCacheKey({ text: segment, voiceName, modelId: model, rate: params.rate ?? 1 })}.segment.wav`)
+              await mkdir(getCacheDirPath(), { recursive: true })
+              await writeFile(actualCacheFile, wav)
+            } catch (cause) { console.warn('[TTS] 写入分段缓存失败:', cause) }
+          }
+          break
+        } catch (cause) {
+          params.signal?.throwIfAborted()
+          if (cause instanceof GeminiQuotaError && cause.kind === 'daily') await saveGeminiQuotaState()
+          const message = cause instanceof Error ? cause.message : String(cause)
+          console.warn('[TTS] 分段尝试失败', { ...segmentLog, attempt: attempt + 1, keyUsed, error: message.replaceAll(apiKey, '[REDACTED]') })
+          const secondaryKey = params.secondaryApiKey?.trim()
+          if (keyUsed === 'primary' && secondaryKey && secondaryKey !== apiKey && isRateLimitOrQuotaError(cause)) {
+            primaryQuotaError = cause instanceof GeminiQuotaError ? cause : undefined
+            cooldownActivated = true
+            keyUsed = 'secondary'
+            apiKey = secondaryKey
+            retriedTransientError = false
+            console.info('[TTS] 主 Key 额度受限，切换备用 Key 继续当前段', { ...segmentLog, attempt: attempt + 1, retryAt: primaryQuotaError?.retryAt })
+          } else if (cause instanceof GeminiQuotaError) {
+            const retryAt = primaryQuotaError ? Math.min(primaryQuotaError.retryAt, cause.retryAt) : cause.retryAt
+            const unavailable = new GeminiQuotaError(retryAt, cause.kind)
+            unavailable.message = `第 ${segmentIndex}/${segments.length} 段接收失败：${primaryQuotaError ? '主备 API Key 均受额度限制' : keyUsed === 'secondary' ? '备用 API Key 受额度限制' : cause.message}；已缓存音频仍可播放，请待额度恢复后继续接收`
+            throw unavailable
+          } else if (!changedModel && message.includes('supports text output')) {
+            model = model === 'gemini-3.8-flash-lite-tts' ? 'gemini-3.8-flash-tts' : 'gemini-3.8-flash-lite-tts'
+            changedModel = true
+          } else if (!retriedTransientError && /（OTHER）|缺少结束标志|严重不匹配|接收超时|fetch failed|ECONNRESET|\b50[234]\b/i.test(message)) {
+            retriedTransientError = true
+            continue
+          } else if (/（OTHER）|缺少结束标志/i.test(message)) {
+            // 敏感词/黑盒风控/云端异常截断终极自愈保护（经瞬态重试后依然失败，确认具有持续性）：
+            // 1. 若主 Key 遇到截断且有备用 Key，先尝试备用 Key 接力
+            if (keyUsed === 'primary' && secondaryKey && secondaryKey !== apiKey) {
+              keyUsed = 'secondary'
+              apiKey = secondaryKey
+              retriedTransientError = false
+              console.info('[TTS] 主 Key 遇到云端异常截断，切换备用 Key 继续当前段', { ...segmentLog, attempt: attempt + 1 })
+              continue
+            }
+
+            // 2. 尝试将大段拆分为独立短句逐句合成（能够有效避开大段文本敏感词密集度风控拦截）
+            console.info('[TTS] 分段遭遇云端截断（OTHER），启动短句级降噪自愈合成', segmentLog)
+            try {
+              const subRes = await synthesizeSegmentBySubSentences(segment, voiceName, model, apiKey, params.signal)
+              if (subRes && subRes.pcm.length > 0) {
+                segmentRate = subRes.rate
+                segmentPcm = subRes.pcm
+                console.info('[TTS] 短句级自愈合成成功，完整恢复该段朗读', segmentLog)
+                break
+              }
+            } catch (subErr) {
+              console.warn('[TTS] 短句降级重试失败:', subErr)
+            }
+
+            // 3. 若整段依然无法通过，且前序段落已合成，生成 0.5 秒静音平滑跳过，保证整章其余内容顺畅播放
+            if (completedSegments > 0) {
+              console.warn('[TTS] 分段内容疑似受云端限制或异常中断（OTHER），已自动安全跳过该段，继续接收后续段落', segmentLog)
+              segmentRate = detectedRate ?? 24000
+              segmentPcm = Buffer.alloc(Math.round(segmentRate * 2 * 0.5), 0)
+              break
+            } else {
+              throw new Error(`第 ${segmentIndex}/${segments.length} 段接收失败：${formatFriendlyErrorMessage(cause)}`, { cause })
+            }
+          } else {
+            throw new Error(`第 ${segmentIndex}/${segments.length} 段接收失败：${formatFriendlyErrorMessage(cause)}`, { cause })
+          }
+        }
       }
+      if (!segmentPcm) throw new Error('云端语音分段重试失败，请重试')
     }
-    throw new Error(formatFriendlyErrorMessage(err))
+    params.signal?.throwIfAborted()
+    if (sampleRate !== undefined && sampleRate !== segmentRate) throw new Error('云端语音段落采样率发生变化，请重试')
+    sampleRate = segmentRate
+    allPcm.push(segmentPcm)
+    completedSegments++
+    validatedSeconds += segmentPcm.length / (segmentRate * 2)
+    console.info('[TTS] 分段已接收完成', { ...segmentLog, completedSegments, cachedSegments, audioSeconds: validatedSeconds })
+    report('segment-complete', segmentIndex)
+    // Failed attempts are never played, so retrying the current segment cannot duplicate speech.
+    params.onChunk?.({ audioBase64: segmentPcm.toString('base64'), mimeType: `audio/L16;codec=pcm;rate=${segmentRate}` })
   }
+  const wav = pcmChunksToWavBuffer(allPcm, sampleRate ?? 24000)
+  validateGeminiWav(text, wav)
+  console.info('[TTS] 整章已接收完成', { jobId, completedSegments, totalSegments: segments.length, cachedSegments, audioSeconds: validatedSeconds })
+  report('complete', segments.length)
+  return { audioBase64: wav.toString('base64'), mimeType: 'audio/wav', keyUsed, cooldownActivated }
 }
 
 export async function synthesizeTts(
@@ -299,17 +509,39 @@ export async function synthesizeTts(
         } catch {}
       }
 
-      const res = await azureProvider.synthesize(
-        {
-          text,
-          voiceName: azureVoice,
-          region: azureRegion,
-          speed: rate,
-        },
-        azureKey,
-      )
+      let audioBuf: Buffer | undefined
+      if (text.length <= 6000) {
+        const res = await azureProvider.synthesize(
+          {
+            text,
+            voiceName: azureVoice,
+            region: azureRegion,
+            speed: rate,
+          },
+          azureKey,
+        )
+        audioBuf = res.audioBuffer
+      } else {
+        // 针对超长章节（>6000字）自动按段安全切分并拼接，彻底规避 Azure 单次 10,000 字符限制
+        const parts = splitGeminiText(text, 5000).filter((p) => p.trim())
+        const pcmChunks: Buffer[] = []
+        for (const part of parts) {
+          const res = await azureProvider.synthesize(
+            {
+              text: part,
+              voiceName: azureVoice,
+              region: azureRegion,
+              speed: rate,
+            },
+            azureKey,
+          )
+          if (res.audioBuffer && res.audioBuffer.length > 44) {
+            pcmChunks.push(res.audioBuffer.subarray(44))
+          }
+        }
+        audioBuf = pcmChunksToWavBuffer(pcmChunks, 24000)
+      }
 
-      const audioBuf = res.audioBuffer
       if (config.saveAudioCache && audioBuf && audioBuf.byteLength > 0) {
         try {
           await mkdir(cacheDir, { recursive: true })
@@ -319,7 +551,7 @@ export async function synthesizeTts(
 
       return ok({
         audioBase64: audioBuf ? audioBuf.toString('base64') : '',
-        mimeType: res.mimeType || 'audio/wav',
+        mimeType: 'audio/wav',
         fromCache: false,
         keyUsed: 'primary',
       })
@@ -364,6 +596,7 @@ export async function synthesizeTts(
       try {
         const cachedBuf = await readFile(cacheFilePath)
         if (cachedBuf.byteLength > 0) {
+          validateGeminiWav(text, cachedBuf)
           return ok({
             audioBase64: cachedBuf.toString('base64'),
             mimeType: 'audio/wav',
@@ -384,7 +617,6 @@ export async function synthesizeTts(
       })
     }
 
-    const inCooldown = primaryCooldownUntil > Date.now()
     let chosenKey: string
     let keyUsed: 'primary' | 'secondary' = 'primary'
 
@@ -394,9 +626,6 @@ export async function synthesizeTts(
     } else if (payload.forceKeyType === 'primary' && primaryKey) {
       chosenKey = primaryKey
       keyUsed = 'primary'
-    } else if (inCooldown && secondaryKey) {
-      chosenKey = secondaryKey
-      keyUsed = 'secondary'
     } else if (primaryKey) {
       chosenKey = primaryKey
       keyUsed = 'primary'
@@ -405,38 +634,19 @@ export async function synthesizeTts(
       keyUsed = 'secondary'
     }
 
-    let audioData: { audioBase64: string; mimeType: string }
-    let cooldownActivated = false
-
-    try {
-      audioData = await invokeGeminiTTS({
-        apiKey: chosenKey,
-        text,
-        voiceName,
-        modelId,
-      })
-      if (!inCooldown && keyUsed === 'primary') {
-        primaryCooldownUntil = 0
-      }
-    } catch (firstErr) {
-      if (keyUsed === 'primary' && secondaryKey && isRateLimitOrQuotaError(firstErr)) {
-        primaryCooldownUntil = Date.now() + 60_000
-        cooldownActivated = true
-        keyUsed = 'secondary'
-        try {
-          audioData = await invokeGeminiTTS({
-            apiKey: secondaryKey,
-            text,
-            voiceName,
-            modelId,
-          })
-        } catch (secondErr) {
-          return err(toAppError(secondErr, '主备 API Key 均请求失败'))
-        }
-      } else {
-        return err(toAppError(firstErr, 'Gemini 语音合成失败'))
-      }
-    }
+    const audioData = await invokeGeminiTTS({
+      apiKey: chosenKey,
+      secondaryApiKey: secondaryKey,
+      keyUsed,
+      text,
+      voiceName,
+      modelId,
+      rate,
+      saveAudioCache: config.saveAudioCache,
+      enableBatch: Boolean(payload.enableBatch ?? config.enableBatch),
+      priority: payload.priority,
+    })
+    keyUsed = audioData.keyUsed
 
     // 3. 首次拉取落盘持久化
     if (config.saveAudioCache && audioData.audioBase64) {
@@ -454,7 +664,7 @@ export async function synthesizeTts(
       mimeType: audioData.mimeType,
       fromCache: false,
       keyUsed,
-      cooldownActivated,
+      cooldownActivated: audioData.cooldownActivated,
     })
   } catch (cause) {
     const friendlyMsg = formatFriendlyErrorMessage(cause)
@@ -498,12 +708,18 @@ function pcmChunksToWavBuffer(chunks: Buffer[], sampleRate = 24000): Buffer {
 }
 
 const activeStreams = new Map<string, AbortController>()
+const cancelledBeforeStart = new Set<string>()
 
 export async function cancelTtsStream(streamId: string): Promise<Result<void, AppError>> {
   const ctrl = activeStreams.get(streamId)
   if (ctrl) {
+    console.info('[TTS] 请求取消接收', { jobId: streamId })
     ctrl.abort(new Error('用户取消了流式朗读'))
     activeStreams.delete(streamId)
+  } else {
+    // IPC cancellation can arrive while the startup handler is still reading config/cache.
+    cancelledBeforeStart.add(streamId)
+    if (cancelledBeforeStart.size > 128) cancelledBeforeStart.delete(cancelledBeforeStart.values().next().value!)
   }
   return ok(undefined)
 }
@@ -527,9 +743,11 @@ export async function synthesizeTtsStream(
     }
     const rate = payload.rate ?? config.rate ?? 1.0
 
+    const azureRegion = payload.azureRegion?.trim() || config.azureRegion?.trim() || 'eastasia'
+    const azureVoice = payload.voiceName?.trim() || config.azureVoice?.trim() || 'zh-CN-XiaoxiaoNeural'
     const voiceName =
       activeProvider === 'azure'
-        ? payload.voiceName?.trim() || config.azureVoice?.trim() || 'zh-CN-XiaoxiaoNeural'
+        ? `${azureRegion}:${azureVoice}`
         : activeProvider === 'local'
           ? payload.localVoice?.trim() || config.localVoice?.trim() || 'zh-female'
           : payload.voiceName?.trim() || config.voiceName || 'Aoede'
@@ -549,6 +767,8 @@ export async function synthesizeTtsStream(
       try {
         const cachedBuf = await readFile(cacheFilePath)
         if (cachedBuf.byteLength > 0) {
+          if (activeProvider === 'gemini') validateGeminiWav(text, cachedBuf)
+          console.info('[TTS] 整章缓存已就绪', { jobId: streamId, audioBytes: cachedBuf.length })
           const cachedBase64 = cachedBuf.toString('base64')
           if (!sender.isDestroyed()) {
             sender.send(IPC.TTS_STREAM_END, {
@@ -597,10 +817,11 @@ export async function synthesizeTtsStream(
           keyUsed: singleRes.value.keyUsed,
         })
       }
-      return ok({ started: true, fromCache: false, cachedResult: singleRes.value })
+      return ok({ started: true, fromCache: Boolean(singleRes.value.fromCache), cachedResult: singleRes.value })
     }
 
     // 3. Gemini 实时流式合成
+    if (cancelledBeforeStart.delete(streamId)) return err({ code: 'CANCELLED', message: '用户取消了朗读' })
     const abortCtrl = new AbortController()
     activeStreams.set(streamId, abortCtrl)
 
@@ -615,7 +836,6 @@ export async function synthesizeTtsStream(
       })
     }
 
-    const inCooldown = primaryCooldownUntil > Date.now()
     let chosenKey = primaryKey
     let keyUsed: 'primary' | 'secondary' = 'primary'
     if (payload.forceKeyType === 'secondary' && secondaryKey) {
@@ -624,9 +844,6 @@ export async function synthesizeTtsStream(
     } else if (payload.forceKeyType === 'primary' && primaryKey) {
       chosenKey = primaryKey
       keyUsed = 'primary'
-    } else if (inCooldown && secondaryKey) {
-      chosenKey = secondaryKey
-      keyUsed = 'secondary'
     } else if (primaryKey) {
       chosenKey = primaryKey
       keyUsed = 'primary'
@@ -637,102 +854,67 @@ export async function synthesizeTtsStream(
 
     // 异步执行消费循环，避免阻塞主进程 IPC handle 返回
     void (async () => {
-      const streamPcmBuffers: Buffer[] = []
-      let detectedMime = 'audio/L16;codec=pcm;rate=24000'
       let chunkIndex = 0
-
-      const executeStreamWithKeyAndModel = async (k: string, m: string) => {
-        if (!geminiProvider.synthesizeStream) {
-          throw new Error('geminiProvider.synthesizeStream 不可用')
-        }
-        return await geminiProvider.synthesizeStream(
-          {
-            text,
-            voiceName,
-            model: m,
-          },
-          k.trim(),
-          ({ audioBase64, mimeType }: { audioBase64: string; mimeType: string }) => {
-            if (abortCtrl.signal.aborted || sender.isDestroyed()) return
-            if (audioBase64) {
-              const buf = Buffer.from(audioBase64, 'base64')
-              streamPcmBuffers.push(buf)
-              sender.send(IPC.TTS_STREAM_CHUNK, {
-                streamId,
-                chunkIndex: chunkIndex++,
-                audioBase64,
-                mimeType: mimeType || detectedMime,
-              })
-            }
-            if (mimeType) detectedMime = mimeType
-          },
-          { signal: abortCtrl.signal },
-        )
-      }
-
+      const abortOnDestroyed = () => abortCtrl.abort(new Error('朗读窗口已关闭'))
+      sender.once('destroyed', abortOnDestroyed)
       try {
-        try {
-          await executeStreamWithKeyAndModel(chosenKey, modelId)
-        } catch (firstErr: any) {
-          if (abortCtrl.signal.aborted) return
-
-          // 若配置为 gemini-3.8-flash-tts 且被免费层限额（429 / 10次/天超额），无缝尝试 flash-lite-tts
-          if (modelId === 'gemini-3.8-flash-tts' && isRateLimitOrQuotaError(firstErr)) {
-            console.warn('[TTS] gemini-3.8-flash-tts 达到免费额度配额限制，自动切换至 gemini-3.8-flash-lite-tts')
-            await executeStreamWithKeyAndModel(chosenKey, 'gemini-3.8-flash-lite-tts')
-          } else if (keyUsed === 'primary' && secondaryKey && isRateLimitOrQuotaError(firstErr)) {
-            primaryCooldownUntil = Date.now() + 60_000
-            keyUsed = 'secondary'
-            try {
-              await executeStreamWithKeyAndModel(secondaryKey, modelId)
-            } catch (secErr: any) {
-              if (modelId === 'gemini-3.8-flash-tts' && isRateLimitOrQuotaError(secErr)) {
-                await executeStreamWithKeyAndModel(secondaryKey, 'gemini-3.8-flash-lite-tts')
-              } else {
-                throw secErr
-              }
-            }
-          } else {
-            throw firstErr
-          }
-        }
-
+        if (sender.isDestroyed()) abortOnDestroyed()
+        const audioData = await invokeGeminiTTS({
+          apiKey: chosenKey,
+          secondaryApiKey: secondaryKey,
+          keyUsed,
+          text,
+          voiceName,
+          modelId,
+          rate,
+          saveAudioCache: config.saveAudioCache,
+          enableBatch: Boolean(payload.enableBatch ?? config.enableBatch),
+          signal: abortCtrl.signal,
+          jobId: streamId,
+          onProgress: (progress) => {
+            if (!abortCtrl.signal.aborted && !sender.isDestroyed()) sender.send(IPC.TTS_STREAM_PROGRESS, { streamId, ...progress })
+          },
+          priority: payload.priority,
+          onChunk: ({ audioBase64, mimeType }) => {
+            abortCtrl.signal.throwIfAborted()
+            if (sender.isDestroyed()) { abortOnDestroyed(); abortCtrl.signal.throwIfAborted() }
+            sender.send(IPC.TTS_STREAM_CHUNK, { streamId, chunkIndex: chunkIndex++, audioBase64, mimeType })
+          },
+        })
         if (abortCtrl.signal.aborted || sender.isDestroyed()) return
-
-        if (streamPcmBuffers.length === 0) {
-          throw new Error('Gemini 流式合成未收到任何有效音频分片')
-        }
-
-        const sampleRate = parsePcmRate(detectedMime) || 24000
-        const finalWavBuffer = pcmChunksToWavBuffer(streamPcmBuffers, sampleRate)
-        const finalBase64 = finalWavBuffer.toString('base64')
 
         if (config.saveAudioCache) {
           try {
             await mkdir(cacheDir, { recursive: true })
-            await writeFile(cacheFilePath, finalWavBuffer)
+            await writeFile(cacheFilePath, Buffer.from(audioData.audioBase64, 'base64'))
           } catch (cacheErr) {
             console.warn('[TTS] 写入本地音频缓存失败:', cacheErr)
           }
         }
 
+        if (abortCtrl.signal.aborted || sender.isDestroyed()) return
         sender.send(IPC.TTS_STREAM_END, {
           streamId,
           totalChunks: chunkIndex,
-          audioBase64: finalBase64,
+          audioBase64: audioData.audioBase64,
           mimeType: 'audio/wav',
           fromCache: false,
-          keyUsed,
+          keyUsed: audioData.keyUsed,
         })
       } catch (err: any) {
-        if (abortCtrl.signal.aborted || sender.isDestroyed()) return
-        console.warn('[TTS] 流式合成失败:', err)
+        if (abortCtrl.signal.aborted || sender.isDestroyed()) {
+          console.info('[TTS] 章节接收已中断', { jobId: streamId, completedSegments: chunkIndex, reason: 'cancelled' })
+          return
+        }
+        console.warn('[TTS] 章节接收失败', { jobId: streamId, completedSegments: chunkIndex, error: formatFriendlyErrorMessage(err) })
         sender.send(IPC.TTS_STREAM_ERROR, {
           streamId,
           error: formatFriendlyErrorMessage(err),
           canFallbackToSystem: true,
+          retryAt: err instanceof GeminiQuotaError ? err.retryAt : undefined,
         })
       } finally {
+        sender.removeListener('destroyed', abortOnDestroyed)
         activeStreams.delete(streamId)
       }
     })()
@@ -900,6 +1082,15 @@ export async function listTtsModels(
   }
 }
 
+export const GEMINI_CORE_VOICES: TtsVoiceInfo[] = [
+  { id: 'Aoede', name: 'Aoede', description: '优雅知性 · 女声 (听书精选 · 推荐)', gender: 'female', isRecommended: true },
+  { id: 'Puck', name: 'Puck', description: '阳光活力 · 男声 (听书精选 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Charon', name: 'Charon', description: '低沉稳重 · 男声 (沉浸书感 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Kore', name: 'Kore', description: '温柔治愈 · 女声 (轻柔舒缓 · 推荐)', gender: 'female', isRecommended: true },
+  { id: 'Fenrir', name: 'Fenrir', description: '雄浑有力 · 男声 (气势磅礴 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Leda', name: 'Leda', description: '清澈明朗 · 女声 (通透悦耳 · 推荐)', gender: 'female', isRecommended: true },
+]
+
 export async function listTtsVoices(
   provider = 'gemini',
   apiKey?: string,
@@ -916,10 +1107,41 @@ export async function listTtsVoices(
       }
     }
 
-    let list: any[] = []
     if (provider === 'gemini') {
-      list = await geminiProvider.listVoices(key)
-    } else if (provider === 'azure') {
+      let rawList: any[] = []
+      try {
+        rawList = await geminiProvider.listVoices(key)
+      } catch {
+        rawList = []
+      }
+
+      // 提取核心推荐音色
+      const coreIds = new Set(GEMINI_CORE_VOICES.map((v) => v.id.toLowerCase()))
+      const mappedCore: TtsVoiceInfo[] = [...GEMINI_CORE_VOICES]
+
+      // 过滤云端音色：剔除特定语种人设（如 ar-001-* 阿拉伯语特定政务/客服人设），保留星宿等通用高品质音色
+      const extraList: TtsVoiceInfo[] = []
+      for (const v of rawList || []) {
+        const id = (v.id || '').trim()
+        const idLower = id.toLowerCase()
+        if (!idLower || coreIds.has(idLower)) continue
+        // 过滤非通用语言人设（例如 ar-001 等阿拉伯语客服人设音色）
+        if (/^(ar|he|ur|fa)-/i.test(id)) continue
+
+        extraList.push({
+          id,
+          name: v.name || id,
+          gender: v.gender || 'neutral',
+          description: v.description || v.tone || 'Google 预置音色',
+          isRecommended: false,
+        })
+      }
+
+      return ok([...mappedCore, ...extraList])
+    }
+
+    let list: any[] = []
+    if (provider === 'azure') {
       list = await azureProvider.listVoices(key, region || 'eastasia')
     } else if (provider === 'local') {
       list = await localProvider.listVoices(key)
@@ -930,6 +1152,7 @@ export async function listTtsVoices(
       name: v.name || v.id,
       gender: v.gender || 'neutral',
       description: v.description || v.tone || '',
+      isRecommended: ['zh-CN-XiaoxiaoNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunjianNeural', 'zh-CN-XiaoyiNeural'].includes(v.id),
     }))
 
     return ok(mapped)

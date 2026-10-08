@@ -70,20 +70,32 @@ export function pcmChunksToWavBlob(chunks: Uint8Array[], sampleRate = 24000): Bl
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
+interface RecordedPcmChunk {
+  bytes: Uint8Array
+  sampleRate: number
+  offsetSec: number
+  duration: number
+}
+
 interface ScheduledPcmChunk {
+  source?: any
   startAt: number
   endAt: number
   duration: number
+  timelineOffset: number
 }
 
 /**
  * 流式 PCM 播放器：首包即播，后续分片无缝续播（基于 Web Audio 高精度分片调度）
- * 彻底消除网络延迟导致 startTime 早于发声、进而导致 playedSeconds 封顶卡死的时钟 Bug。
+ * 支持在流式接收过程中任意快退、快进、重播以及在已就绪音频进度内自由 Seek。
  */
 export class PcmStreamPlayer {
   private ctx: AudioContext | null = null
   private nextTime = 0
   private scheduledChunks: ScheduledPcmChunk[] = []
+  private recordedChunks: RecordedPcmChunk[] = []
+  private totalRecordedSeconds = 0
+  private seekOffset = 0
   private closed = false
 
   constructor(private readonly sampleRate: number = 24000) {}
@@ -121,14 +133,30 @@ export class PcmStreamPlayer {
     return this.ctx?.state === 'suspended'
   }
 
-  pushChunk(bytes: Uint8Array): void {
-    if (this.closed || !bytes || bytes.length === 0) return
-    const ctx = this.ensureContext()
+  get receivedSeconds(): number {
+    return this.totalRecordedSeconds
+  }
 
+  /** Buffer exhaustion can mean waiting for the network; only the caller knows whether input ended. */
+  get isDrained(): boolean {
+    if (this.scheduledChunks.length === 0) {
+      return this.recordedChunks.length > 0
+    }
+    return Boolean(this.ctx && this.ctx.currentTime >= this.nextTime)
+  }
+
+  private scheduleSlice(
+    bytes: Uint8Array,
+    sampleRate: number,
+    timelineOffset: number,
+    duration: number,
+  ): void {
+    if (this.closed || bytes.length === 0 || duration <= 0) return
+    const ctx = this.ensureContext()
     const frames = Math.floor(bytes.length / 2)
     if (frames === 0) return
 
-    const buffer = ctx.createBuffer(1, frames, this.sampleRate)
+    const buffer = ctx.createBuffer(1, frames, sampleRate)
     const channel = buffer.getChannelData(0)
     const view = new DataView(bytes.buffer, bytes.byteOffset, frames * 2)
     for (let i = 0; i < frames; i++) {
@@ -139,41 +167,119 @@ export class PcmStreamPlayer {
     source.buffer = buffer
     source.connect(ctx.destination)
 
-    // 若当前时间已落后于声卡当前时钟（网络断流或首包到达），重新从当前时钟平滑起步
     const startAt = Math.max(this.nextTime, ctx.currentTime)
-    const duration = buffer.duration
     const endAt = startAt + duration
 
-    source.start(startAt)
-    this.scheduledChunks.push({ startAt, endAt, duration })
+    try {
+      source.start(startAt)
+    } catch {}
+
+    this.scheduledChunks.push({
+      source,
+      startAt,
+      endAt,
+      duration,
+      timelineOffset,
+    })
     this.nextTime = endAt
+  }
+
+  pushChunk(bytes: Uint8Array, sampleRate = this.sampleRate): void {
+    if (this.closed || !bytes || bytes.length === 0) return
+    const frames = Math.floor(bytes.length / 2)
+    if (frames === 0) return
+    const duration = frames / sampleRate
+    const offsetSec = this.totalRecordedSeconds
+
+    this.recordedChunks.push({
+      bytes,
+      sampleRate,
+      offsetSec,
+      duration,
+    })
+    this.totalRecordedSeconds += duration
+
+    this.scheduleSlice(bytes, sampleRate, offsetSec, duration)
+  }
+
+  /**
+   * 跳转播放位置（秒）：在已接收的 PCM 缓存区内任意 Seek，停止当前调度并从目标时间无缝重调
+   */
+  seek(targetSec: number): void {
+    if (this.closed) return
+    const ctx = this.ensureContext()
+
+    const clamped = Math.max(0, Math.min(this.totalRecordedSeconds, targetSec))
+    this.seekOffset = clamped
+
+    for (const chunk of this.scheduledChunks) {
+      try {
+        chunk.source?.stop?.()
+        chunk.source?.disconnect?.()
+      } catch {}
+    }
+    this.scheduledChunks = []
+    this.nextTime = ctx.currentTime
+
+    if (clamped >= this.totalRecordedSeconds) {
+      return
+    }
+
+    for (const chunk of this.recordedChunks) {
+      const chunkEnd = chunk.offsetSec + chunk.duration
+      if (chunkEnd <= clamped) {
+        continue
+      }
+
+      if (chunk.offsetSec < clamped) {
+        const skipSec = clamped - chunk.offsetSec
+        const skipFrames = Math.floor(skipSec * chunk.sampleRate)
+        const byteOffset = skipFrames * 2
+        const sliceBytes = chunk.bytes.subarray(byteOffset)
+        const sliceDuration = chunk.duration - skipFrames / chunk.sampleRate
+        if (sliceBytes.length > 0 && sliceDuration > 0) {
+          this.scheduleSlice(sliceBytes, chunk.sampleRate, clamped, sliceDuration)
+        }
+      } else {
+        this.scheduleSlice(chunk.bytes, chunk.sampleRate, chunk.offsetSec, chunk.duration)
+      }
+    }
   }
 
   /**
    * 真实已播放秒数：
-   * 遍历所有已调度分片在当前 AudioContext 时钟下的实际发声区间，
-   * 无论遇到网络延迟、首包排队还是断流静音，均分秒不差严格对应声卡真实发音进度。
+   * 严格对应当前 AudioContext 时钟下正在发声或已发声的 PCM 时间轴位置。
    */
   get playedSeconds(): number {
-    if (!this.ctx || this.scheduledChunks.length === 0) return 0
+    if (!this.ctx || this.scheduledChunks.length === 0) return this.seekOffset
     const now = this.ctx.currentTime
-    let played = 0
-    for (const chunk of this.scheduledChunks) {
-      if (now >= chunk.endAt) {
-        played += chunk.duration
-      } else if (now > chunk.startAt) {
-        played += now - chunk.startAt
+    for (let i = this.scheduledChunks.length - 1; i >= 0; i--) {
+      const chunk = this.scheduledChunks[i]
+      if (now >= chunk.startAt) {
+        if (now < chunk.endAt) {
+          return chunk.timelineOffset + (now - chunk.startAt)
+        }
+        return chunk.timelineOffset + chunk.duration
       }
     }
-    return played
+    return this.scheduledChunks[0].timelineOffset
   }
 
   async close(): Promise<void> {
     this.closed = true
+    for (const chunk of this.scheduledChunks) {
+      try {
+        chunk.source?.stop?.()
+        chunk.source?.disconnect?.()
+      } catch {}
+    }
+    this.scheduledChunks = []
+    this.recordedChunks = []
+    this.totalRecordedSeconds = 0
+    this.seekOffset = 0
     const ctx = this.ctx
     this.ctx = null
     this.nextTime = 0
-    this.scheduledChunks = []
     if (ctx) {
       try {
         await ctx.close()

@@ -92,4 +92,19 @@ describe('text-sanitizer', () => {
     // 空视口退回第 0 句
     expect(findViewportStartingSentenceIndex(sentences, '')).toBe(0)
   })
+
+  it('应当保留 HTML 自然段落结构且不在段内句子间强插换行符', () => {
+    const rawHtml = `<p>第一段第一句。第一段第二句！</p><p>第二段只有一句。</p>`
+    const { fullCleanText, sentences } = sanitizeReaderText(rawHtml)
+
+    // 段落间由双换行分隔
+    expect(fullCleanText).toBe('第一段第一句。第一段第二句！\n\n第二段只有一句。')
+    // 句子独立性仍然保持完整用于精准高亮
+    expect(sentences).toHaveLength(3)
+    expect(sentences[0].text).toBe('第一段第一句。')
+    expect(sentences[1].text).toBe('第一段第二句！')
+    expect(sentences[2].text).toBe('第二段只有一句。')
+    expect(sentences[1].isParagraphEnd).toBe(true)
+    expect(sentences[2].isParagraphEnd).toBe(true)
+  })
 })

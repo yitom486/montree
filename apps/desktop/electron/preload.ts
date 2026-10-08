@@ -307,6 +307,11 @@ const electronAPI: ElectronAPI = {
   synthesizeTts: (payload) => ipcRenderer.invoke(IPC.TTS_SYNTHESIZE, payload),
   synthesizeTtsStream: (payload) => ipcRenderer.invoke(IPC.TTS_SYNTHESIZE_STREAM, payload),
   cancelTtsStream: (streamId) => ipcRenderer.invoke(IPC.TTS_CANCEL_STREAM, streamId),
+  onTtsStreamProgress: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => callback(payload)
+    ipcRenderer.on(IPC.TTS_STREAM_PROGRESS, handler)
+    return () => ipcRenderer.removeListener(IPC.TTS_STREAM_PROGRESS, handler)
+  },
   onTtsStreamChunk: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => {
       callback(payload)

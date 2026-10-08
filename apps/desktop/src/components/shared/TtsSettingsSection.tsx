@@ -42,12 +42,12 @@ const FALLBACK_GEMINI_MODELS = [
 ]
 
 const FALLBACK_GEMINI_VOICES: TtsVoiceInfo[] = [
-  { id: 'Aoede', name: 'Aoede', description: '优雅知性 · 女声 (推荐)', gender: 'female' },
-  { id: 'Puck', name: 'Puck', description: '阳光活力 · 男声 (推荐)', gender: 'male' },
-  { id: 'Charon', name: 'Charon', description: '低沉沉稳 · 男声', gender: 'male' },
-  { id: 'Kore', name: 'Kore', description: '温柔治愈 · 女声', gender: 'female' },
-  { id: 'Fenrir', name: 'Fenrir', description: '雄浑有力 · 男声', gender: 'male' },
-  { id: 'Leda', name: 'Leda', description: '清澈明朗 · 女声', gender: 'female' },
+  { id: 'Aoede', name: 'Aoede', description: '优雅知性 · 女声 (听书精选 · 推荐)', gender: 'female', isRecommended: true },
+  { id: 'Puck', name: 'Puck', description: '阳光活力 · 男声 (听书精选 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Charon', name: 'Charon', description: '低沉沉稳 · 男声 (沉浸书感 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Kore', name: 'Kore', description: '温柔治愈 · 女声 (轻柔舒缓 · 推荐)', gender: 'female', isRecommended: true },
+  { id: 'Fenrir', name: 'Fenrir', description: '雄浑有力 · 男声 (气势磅礴 · 推荐)', gender: 'male', isRecommended: true },
+  { id: 'Leda', name: 'Leda', description: '清澈明朗 · 女声 (通透悦耳 · 推荐)', gender: 'female', isRecommended: true },
 ]
 
 const AZURE_REGIONS = [
@@ -87,6 +87,7 @@ export function TtsSettingsSection() {
     saveAudioCache,
     filterFootnotesAndCitations,
     filterLinksAndTechnicalMarkup,
+    enableBatch,
     setProvider,
     setPrimaryApiKey,
     setSecondaryApiKey,
@@ -103,6 +104,7 @@ export function TtsSettingsSection() {
     setSaveAudioCache,
     setFilterFootnotesAndCitations,
     setFilterLinksAndTechnicalMarkup,
+    setEnableBatch,
   } = useTtsStore(
     useShallow((s) => ({
       provider: s.provider,
@@ -121,6 +123,7 @@ export function TtsSettingsSection() {
       saveAudioCache: s.saveAudioCache,
       filterFootnotesAndCitations: s.filterFootnotesAndCitations,
       filterLinksAndTechnicalMarkup: s.filterLinksAndTechnicalMarkup,
+      enableBatch: s.enableBatch,
       setProvider: s.setProvider,
       setPrimaryApiKey: s.setPrimaryApiKey,
       setSecondaryApiKey: s.setSecondaryApiKey,
@@ -137,6 +140,7 @@ export function TtsSettingsSection() {
       setSaveAudioCache: s.setSaveAudioCache,
       setFilterFootnotesAndCitations: s.setFilterFootnotesAndCitations,
       setFilterLinksAndTechnicalMarkup: s.setFilterLinksAndTechnicalMarkup,
+      setEnableBatch: s.setEnableBatch,
     })),
   )
 
@@ -152,6 +156,7 @@ export function TtsSettingsSection() {
   const [remoteVoices, setRemoteVoices] = useState<TtsVoiceInfo[]>([])
   const [loadingModels, setLoadingModels] = useState(false)
   const [loadingVoices, setLoadingVoices] = useState(false)
+  const [voiceFilterTab, setVoiceFilterTab] = useState<'recommended' | 'all'>('recommended')
 
   // 试听状态
   const [previewText, setPreviewText] = useState('您好，欢迎使用 Montree 智能伴读。今天也一起静心阅读吧。')
@@ -431,9 +436,13 @@ export function TtsSettingsSection() {
       })
     : FALLBACK_GEMINI_MODELS
 
-  const displayVoices = remoteVoices.length > 0
-    ? remoteVoices
-    : FALLBACK_GEMINI_VOICES
+  const allVoices = remoteVoices.length > 0 ? remoteVoices : FALLBACK_GEMINI_VOICES
+  const recommendedVoices = allVoices.filter(
+    (v) => v.isRecommended || FALLBACK_GEMINI_VOICES.some((f) => f.id.toLowerCase() === v.id.toLowerCase()),
+  )
+  const displayVoices = voiceFilterTab === 'recommended' && recommendedVoices.length > 0
+    ? recommendedVoices
+    : allVoices
 
   return (
     <div className="space-y-6">
@@ -545,6 +554,25 @@ export function TtsSettingsSection() {
           <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/30 p-2.5 rounded-lg border border-border/40">
             支持主备双 Key 智能容灾：主用 Key 触发 Google 1 分钟频率限制 (429 / 15 RPM) 时，系统自动无缝切换至备用 Key 接管；60 秒冷却后自动恢复优先使用免费 Key。
           </p>
+
+          {/* Gemini 异步 Batch 模式开关 */}
+          <div className="flex items-start justify-between gap-4 pt-2 border-t border-border/40">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-foreground">Gemini 异步 Batch 模式 (实验性)</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 font-medium">默认关闭</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                开启后，长章节合成将优先提交给 Gemini 官方 Batch API 批量任务处理。Batch 模式享有 50% 成本折扣，且拥有独立的云端并发与配额（不消耗日常交互式配额，极大降低 429 风险）；若批量任务未就绪或当前环境不支持，系统将自动无缝回退至实时流式接口与备用 Key 容灾保障。
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={Boolean(enableBatch)}
+              onChange={(e) => setEnableBatch(e.target.checked)}
+              className="size-4 mt-0.5 accent-primary rounded cursor-pointer shrink-0"
+            />
+          </div>
         </div>
       )}
 
@@ -826,44 +854,122 @@ export function TtsSettingsSection() {
             </div>
 
             {/* 音色音质选择 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground">发音人音色选择</label>
-                  {remoteVoices.length > 0 && (
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 font-medium">
-                      云端返回 {remoteVoices.length} 个音色
-                    </span>
-                  )}
+                  <label className="text-xs font-semibold text-foreground">发音人音色选择</label>
+                  {/* 分类切换 Pills */}
+                  <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/50 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setVoiceFilterTab('recommended')}
+                      className={cn(
+                        'px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer',
+                        voiceFilterTab === 'recommended'
+                          ? 'bg-background text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      ⭐ 官方精选 ({recommendedVoices.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceFilterTab('all')}
+                      className={cn(
+                        'px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer',
+                        voiceFilterTab === 'all'
+                          ? 'bg-background text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      全部云端 ({allVoices.length})
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleSyncRemoteVoices(false)}
-                  disabled={loadingVoices}
-                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                  title="从远端接口刷新可用音色库"
-                >
-                  <RefreshCw className={cn('size-3', loadingVoices && 'animate-spin')} />
-                  {loadingVoices ? '正在同步…' : '刷新音色库'}
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {displayVoices.map((v) => (
+
+                <div className="flex items-center gap-2">
                   <button
-                    key={v.id}
                     type="button"
-                    onClick={() => setVoiceName(v.id)}
-                    className={cn(
-                      'flex flex-col text-left p-2 rounded-lg border text-xs transition-colors cursor-pointer',
-                      voiceName === v.id
-                        ? 'border-primary/50 bg-primary/10 text-primary font-medium'
-                        : 'border-border/50 hover:bg-muted/50 text-foreground',
-                    )}
+                    onClick={() => {
+                      setVoiceName('Aoede')
+                      setVoiceFilterTab('recommended')
+                      toast.success('已切换为官方推荐听书音色 (Aoede)')
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                    title="一键切回 Google 官方推荐听书女声音色 Aoede"
                   >
-                    <span className="font-semibold">{v.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{v.description || v.id}</span>
+                    恢复推荐 (Aoede)
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncRemoteVoices(false)}
+                    disabled={loadingVoices}
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    title="从远端接口刷新可用音色库"
+                  >
+                    <RefreshCw className={cn('size-3', loadingVoices && 'animate-spin')} />
+                    {loadingVoices ? '正在同步…' : '刷新音色库'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 当前选中音色不在当前列表时的贴心提醒 */}
+              {!displayVoices.some((v) => v.id === voiceName) && (
+                <div className="flex items-center justify-between text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1.5 rounded-md border border-amber-500/20">
+                  <span>
+                    当前选中的音色为 <strong>{voiceName}</strong>（不在精选推荐列表中）
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoiceName('Aoede')
+                      setVoiceFilterTab('recommended')
+                      toast.success('已切回官方精选音色 Aoede')
+                    }}
+                    className="underline hover:text-amber-700 font-medium cursor-pointer"
+                  >
+                    切回推荐 Aoede
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {displayVoices.map((v) => {
+                  const isSelected = voiceName === v.id
+                  const isRec =
+                    v.isRecommended ||
+                    FALLBACK_GEMINI_VOICES.some((f) => f.id.toLowerCase() === v.id.toLowerCase())
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setVoiceName(v.id)}
+                      className={cn(
+                        'flex flex-col text-left p-2.5 rounded-lg border text-xs transition-all cursor-pointer relative',
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-primary font-medium shadow-xs'
+                          : 'border-border/60 hover:bg-muted/50 hover:border-border text-foreground',
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-1 w-full mb-1">
+                        <span className="font-semibold text-xs truncate">{v.name}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isRec && (
+                            <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1 py-0.2 rounded font-medium border border-amber-500/25">
+                              推荐
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {v.gender === 'female' ? '女声' : v.gender === 'male' ? '男声' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground leading-snug line-clamp-2">
+                        {v.description || v.id}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>

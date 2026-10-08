@@ -18,7 +18,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `reading-mark-panel-store.ts` | 标记侧栏筛选（重点/批注/书签，persist） |
 | `acp-ui-store.ts` | Agent 线程、消息、连接状态、权限与配置偏好；线程会话 id 按运行时分桶（`agentSessionIds`） |
 | `annotation-agent-store.ts` | 批注 AI 助手：按书线程、独立 agentSessionIds（按运行时分桶）、pendingDraft |
-| `tts-store.ts` | 语音朗读听书：Google Gemini / 微软 Azure Speech / Local OpenAI / 系统兜底、双 Key 容灾、逐句高亮、右上角自由拖拽悬浮球/折叠状态、视口顶部起读与章节进度记忆 |
+| `tts-store.ts` | 语音朗读听书：Google Gemini / Azure Speech / Local OpenAI / 系统语音；接收段号、排队、缓冲等待与播放完成分别维护，云端确认结束且播放队列耗尽才完成。主备容灾由主进程处理；接收中断后缓冲音频继续播放，耗尽后保留位置并暂停，按服务端额度恢复时间保护重试。未接收完的进度条显示已验证、可播放音频进度。按正文与语音配置指纹持久保存最近 100 章的实际播放秒数（每 2 秒、暂停/关闭/退出时保存），恢复时跳过已经听过的缓存 PCM，完整播放后清除位置。悬浮播放器、章节进度记忆。回归测试见 `tts-store-stream.test.ts`。 |
 | `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store） |
 | `acp/` | ACP 智能体交互与次世代伴读 HUD 专职子状态（见 `acp/README.md`） |
 

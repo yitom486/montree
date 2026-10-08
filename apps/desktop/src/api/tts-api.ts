@@ -10,6 +10,7 @@ import type {
   TtsTestKeyResult,
   TtsVoiceInfo,
   TtsStreamChunkPayload,
+  TtsStreamProgressPayload,
   TtsStreamEndPayload,
   TtsStreamErrorPayload,
 } from '@montree/contracts'
@@ -92,6 +93,7 @@ export const ttsApi = {
     payload: TtsSynthesizePayload & { streamId: string },
     callbacks: {
       onChunk?: (chunk: TtsStreamChunkPayload) => void
+      onProgress?: (progress: TtsStreamProgressPayload) => void
       onEnd?: (end: TtsStreamEndPayload) => void
       onError?: (err: TtsStreamErrorPayload) => void
     },
@@ -115,6 +117,12 @@ export const ttsApi = {
           unsubs.pop()?.()
         } catch {}
       }
+    }
+
+    if (callbacks.onProgress && typeof api.value.onTtsStreamProgress === 'function') {
+      unsubs.push(api.value.onTtsStreamProgress((progress) => {
+        if (progress.streamId === payload.streamId) callbacks.onProgress?.(progress)
+      }))
     }
 
     if (callbacks.onChunk && typeof api.value.onTtsStreamChunk === 'function') {
@@ -167,6 +175,7 @@ export const ttsApi = {
           })
         }
         const res = await api.value.synthesizeTtsStream(payload)
+        if (!res.ok) cleanup()
         return res
       } catch (cause: any) {
         cleanup()

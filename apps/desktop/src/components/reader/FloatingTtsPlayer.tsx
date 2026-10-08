@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { useTtsStore } from '@/stores/tts-store'
 import { emitTtsClearHighlight } from '@/lib/reader/marks/mark-linkage'
 import { cn } from '@/lib/utils'
+import { getTtsPlaybackProgress } from '@/lib/reader/tts/playback-progress'
 
 interface FloatingTtsPlayerProps {
   onOpenSettings?: () => void
@@ -37,11 +38,18 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     isSpeaking,
     isPaused,
     isLoading,
+    isReceiving,
+    isBuffering,
+    receivedDuration,
+    receptionProgress,
+    receptionError,
+    receptionRetryAt,
     currentTitle,
     currentTime,
     duration,
     isFromCache,
     keyUsed,
+    provider,
     rate,
     setRate,
     togglePlayPause,
@@ -57,11 +65,18 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
       isSpeaking: s.isSpeaking,
       isPaused: s.isPaused,
       isLoading: s.isLoading,
+      isReceiving: s.isReceiving,
+      isBuffering: s.isBuffering,
+      receivedDuration: s.receivedDuration,
+      receptionProgress: s.receptionProgress,
+      receptionError: s.receptionError,
+      receptionRetryAt: s.receptionRetryAt,
       currentTitle: s.currentTitle,
       currentTime: s.currentTime,
       duration: s.duration,
       isFromCache: s.isFromCache,
       keyUsed: s.keyUsed,
+      provider: s.provider,
       rate: s.rate,
       setRate: s.setRate,
       togglePlayPause: s.togglePlayPause,
@@ -120,6 +135,22 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     const s = Math.floor(secs % 60)
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
+  const segmentStatus = receptionProgress
+    ? `${receptionProgress.completedSegments}/${receptionProgress.totalSegments} 段`
+    : ''
+  const receptionStatus = receptionError
+    ? receptionRetryAt > Date.now() ? '额度受限 · 可播放已缓存部分' : '接收中断 · 可播放已缓存部分'
+    : isReceiving
+      ? receptionProgress?.stage === 'queued'
+        ? `排队等待 · 已完成 ${segmentStatus}`
+        : receptionProgress?.stage === 'receiving'
+          ? `接收 ${receptionProgress.segmentIndex}/${receptionProgress.totalSegments} 段 · 已就绪 ${formatTime(receivedDuration)}`
+          : isBuffering
+            ? `等待后续音频 · ${segmentStatus}`
+            : `已完成 ${segmentStatus} · 已就绪 ${formatTime(receivedDuration)}`
+      : receptionProgress?.stage === 'complete' || isFromCache
+        ? `已接收完成 · ${formatTime(duration)}`
+        : formatTime(duration)
 
   // 默认位置：右上角
   const defaultPos = {
@@ -235,9 +266,18 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     window.addEventListener('pointerup', onPointerUp)
   }
 
-  // 进度条拉取 / 点击 Seek
+  const effectiveTime = isScrubbing ? scrubTime : currentTime
+  const incomplete = isReceiving || Boolean(receptionError)
+  const { duration: progressDuration, percent: progressPercent } = getTtsPlaybackProgress(
+    effectiveTime,
+    duration,
+    receivedDuration,
+    incomplete,
+  )
+
+  // 进度条拉取 / 点击 Seek（支持在流式已就绪音频内自由拖动与跳转）
   const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (duration <= 0 || isLoading) return
+    if (progressDuration <= 0 || isLoading) return
     e.preventDefault()
     e.stopPropagation()
     try {
@@ -246,19 +286,20 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
     setIsScrubbing(true)
     const rect = e.currentTarget.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const target = ratio * duration
+    const target = ratio * progressDuration
     setScrubTime(target)
   }
 
   const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (duration <= 0 || !trackRef.current) return
+    if (progressDuration <= 0 || !trackRef.current) return
     const rect = trackRef.current.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    setHoverTime(ratio * duration)
+    const target = ratio * progressDuration
+    setHoverTime(target)
     setHoverX(Math.max(0, Math.min(rect.width, e.clientX - rect.left)))
 
     if (isScrubbing) {
-      setScrubTime(ratio * duration)
+      setScrubTime(target)
     }
   }
 
@@ -268,7 +309,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
     setIsScrubbing(false)
-    seekTime(scrubTime)
+    seekTime(Math.max(0, Math.min(progressDuration, scrubTime)))
   }
 
   const handleScrubPointerLeave = () => {
@@ -278,9 +319,6 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
   }
 
   if (!isPlayerVisible) return null
-
-  const effectiveTime = isScrubbing ? scrubTime : currentTime
-  const progressPercent = duration > 0 ? Math.min(100, (effectiveTime / duration) * 100) : 0
 
   return (
     // 根定位容器：统一管理 (currentPos.x, currentPos.y)，小球与面板共享唯一锚点
@@ -331,7 +369,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
               {currentTitle || '听书中'}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">
-              {formatTime(effectiveTime)} / {formatTime(duration)}
+              {formatTime(effectiveTime)} / {isReceiving ? '生成中' : formatTime(duration)}
             </span>
           </div>
         )}
@@ -441,6 +479,16 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
                       <Zap className="size-2.5 fill-emerald-500" />
                       本地秒开缓存
                     </span>
+                  ) : provider === 'azure' ? (
+                    <span className="flex items-center gap-0.5 text-blue-500 font-medium">
+                      <Sparkles className="size-2.5 text-blue-500" />
+                      微软 Azure 语音
+                    </span>
+                  ) : provider === 'local' ? (
+                    <span className="flex items-center gap-0.5 text-emerald-500 font-medium">
+                      <Sparkles className="size-2.5 text-emerald-500" />
+                      本地模型语音
+                    </span>
                   ) : keyUsed === 'secondary' ? (
                     <span className="flex items-center gap-0.5 text-amber-500 font-medium">
                       <Sparkles className="size-2.5" />
@@ -449,7 +497,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
                   ) : keyUsed === 'primary' ? (
                     <span className="flex items-center gap-0.5 text-primary font-medium">
                       <Sparkles className="size-2.5" />
-                      智能云端 TTS
+                      Gemini 智能云端
                     </span>
                   ) : (
                     <span>原生语音</span>
@@ -498,9 +546,10 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
             <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mb-1">
               <span className="font-semibold text-foreground/90">
                 {formatTime(effectiveTime)}
+                {incomplete && progressDuration > 0 && <span className="font-normal text-muted-foreground"> / {formatTime(progressDuration)} 可播放</span>}
               </span>
-              <span>
-                {formatTime(duration)}
+              <span aria-live="polite" title={receptionError ?? undefined}>
+                {receptionStatus}
               </span>
             </div>
 
@@ -510,29 +559,30 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
                 ref={trackRef}
                 role="slider"
                 tabIndex={0}
-                aria-label="音频播放进度"
+                aria-label={incomplete ? '已就绪音频的播放进度' : '整章音频播放进度'}
                 aria-valuemin={0}
-                aria-valuemax={duration}
+                aria-valuemax={progressDuration}
                 aria-valuenow={effectiveTime}
+                aria-disabled={isLoading || progressDuration <= 0}
                 onPointerDown={handleScrubPointerDown}
                 onPointerMove={handleScrubPointerMove}
                 onPointerUp={handleScrubPointerUp}
                 onPointerLeave={handleScrubPointerLeave}
                 onKeyDown={(e) => {
-                  if (duration <= 0) return
+                  if (progressDuration <= 0 || isLoading) return
                   if (e.key === 'ArrowLeft') {
                     e.preventDefault()
                     seekTime(Math.max(0, currentTime - 5))
                   } else if (e.key === 'ArrowRight') {
                     e.preventDefault()
-                    seekTime(Math.min(duration, currentTime + 5))
+                    seekTime(Math.min(progressDuration, currentTime + 5))
                   }
                 }}
                 className={cn(
                   'group relative h-2 w-full rounded-full bg-muted/80 cursor-pointer touch-none select-none transition-all duration-150',
                   (isScrubbing || hoverTime !== null) && 'h-2.5',
                 )}
-                title="点击或拖拽快速跳转音频进度"
+                title={incomplete ? '点击或拖拽跳转当前已就绪音频进度（整章后台持续接收中）' : '点击或拖拽快速跳转音频进度'}
               >
                 {/* 悬停时间气泡 */}
                 {hoverTime !== null && (
@@ -587,7 +637,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
               {/* 快退 15 秒 */}
               <button
                 type="button"
-                disabled={isLoading || duration <= 0}
+                disabled={isLoading || progressDuration <= 0}
                 onClick={() => seekTime(Math.max(0, currentTime - 15))}
                 className="flex items-center gap-0.5 px-1.5 py-1 rounded text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40"
                 title="快退 15 秒"
@@ -617,8 +667,8 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
               {/* 快进 15 秒 */}
               <button
                 type="button"
-                disabled={isLoading || duration <= 0}
-                onClick={() => seekTime(Math.min(duration, currentTime + 15))}
+                disabled={isLoading || progressDuration <= 0}
+                onClick={() => seekTime(Math.min(progressDuration, currentTime + 15))}
                 className="flex items-center gap-0.5 px-1.5 py-1 rounded text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40"
                 title="快进 15 秒"
               >
@@ -631,7 +681,7 @@ export function FloatingTtsPlayer({ onOpenSettings }: FloatingTtsPlayerProps = {
             <Button
               variant="ghost"
               size="icon"
-              disabled={isLoading || duration <= 0}
+              disabled={isLoading || progressDuration <= 0}
               onClick={() => seekTime(0)}
               className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
               title="回到本章开头从头播放"
