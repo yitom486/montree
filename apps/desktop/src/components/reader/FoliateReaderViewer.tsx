@@ -156,6 +156,22 @@ export function FoliateReaderViewer({
     handleCreateMarkAt: interactions.handleCreateMarkAt,
     createBookmark: () => interactions.addBookmarkAtCurrent(),
     createNoteFromSelection: (note) => interactions.handleSaveAnnotation(note),
+    onE2eSelectRange: (doc, range, cfiRange) => {
+      interactions.inspector.close()
+      const text = range.toString()
+      const rect = range.getBoundingClientRect()
+      const snapshot = { text, cfiRange, rect }
+      interactions.setSelectionSnapshot(snapshot)
+      if (interactions.selectionSnapshotRef) {
+        interactions.selectionSnapshotRef.current = snapshot
+      }
+      const frame = doc.defaultView?.frameElement as HTMLElement | null
+      const frameRect = frame?.getBoundingClientRect()
+      interactions.setSelectionToolbarPos({
+        x: (frameRect?.left ?? 0) + snapshot.rect.left + snapshot.rect.width / 2,
+        y: (frameRect?.top ?? 0) + snapshot.rect.top,
+      })
+    },
   }
 
   const { currentUnitId } = useReaderNavTitles()

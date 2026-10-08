@@ -66,6 +66,7 @@ export interface FoliateReaderEvents {
   handleCreateMarkAt?: (params: CreateMarkAtParams) => Promise<any>
   createBookmark?: () => Promise<ReadingMark>
   createNoteFromSelection?: (note: string) => Promise<ReadingMark>
+  onE2eSelectRange?: (doc: Document, range: Range, cfiRange: string) => void
 }
 
 export interface UseFoliateBookSessionOptions {
@@ -177,6 +178,9 @@ export function useFoliateBookSession({
       eventsRef?.current?.createNoteFromSelection?.(note) ??
       createNoteFromSelection?.(note) ??
       Promise.reject(new Error('not implemented')),
+    onE2eSelectRange: (doc, range, cfiRange) => {
+      eventsRef?.current?.onE2eSelectRange?.(doc, range, cfiRange)
+    },
   }
 
   const typography = useMemo<FoliateTypography>(
@@ -858,6 +862,7 @@ export function useFoliateBookSession({
             if (!cfiRange) continue
             commitReaderSelection(filePath, text)
             focusAgentComposerOnReaderSelection()
+            callbacksRef.current.onE2eSelectRange?.(doc, range, cfiRange)
             return true
           }
           await new Promise((r) => setTimeout(r, 100))
