@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.7] - 2026-10-09
+
 - ### 智能目录提取与 AI 整理 (TOC AI)
   - **目录 AI 独立会话与三级级联选择**：目录 AI 整理脱离主聊天上下文，建立独立副会话通道，避免会话污染；支持运行时（Runtime）、模型（Model）与思考档（Thinking Level）三级深度联动级联切换，支持参数化动态探测。
   - **实时流式任务动态面板**：新增 `TocAiLiveDashboard` 实时动态面板，集成 4 阶段进度条、脉冲状态指示灯、流式思考过程折叠预览、实时耗时秒表与优雅取消操作。
@@ -371,7 +375,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.6...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.7...HEAD
+[0.4.7]: https://github.com/yitom486/montree/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/yitom486/montree/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/yitom486/montree/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yitom486/montree/compare/v0.4.3...v0.4.4
