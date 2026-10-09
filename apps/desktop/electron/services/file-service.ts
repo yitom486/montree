@@ -1,8 +1,16 @@
 import { dialog, BrowserWindow } from 'electron'
 import { dirname, extname, join } from 'path'
 import { mkdir, readFile, writeFile } from 'fs/promises'
-import { ALL_DOCUMENT_EXTENSIONS, DEFAULT_SAVE_FILENAME, MARKDOWN_EXTENSIONS } from '@montree/contracts'
-import { getDocumentKind } from '@montree/contracts'
+import {
+  ALL_DOCUMENT_EXTENSIONS,
+  DATA_EXTENSIONS,
+  DEFAULT_SAVE_FILENAME,
+  MARKDOWN_EXTENSIONS,
+  OFFICE_EXTENSIONS,
+  getDocumentKind,
+  isDataDocumentKind,
+  isOfficeDocumentKind,
+} from '@montree/contracts'
 import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@montree/contracts'
 import { toAppError, type AppError } from '@montree/contracts'
 import { err, ok, type Result } from '@montree/contracts'
@@ -30,13 +38,15 @@ export const MARKDOWN_DIALOG_FILTERS = [
   { name: 'All Files', extensions: ['*'] },
 ]
 
-/** 打开文件对话框：Markdown + 电子书 */
+/** 打开文件对话框：Markdown + 电子书 + 数据表格 + Office */
 export const DOCUMENT_DIALOG_FILTERS = [
   { name: '所有支持格式', extensions: [...ALL_DOCUMENT_EXTENSIONS] },
   { name: 'Markdown', extensions: [...MARKDOWN_EXTENSIONS] },
   { name: 'PDF', extensions: ['pdf'] },
   { name: 'EPUB', extensions: ['epub'] },
   { name: 'MOBI / Kindle', extensions: ['mobi', 'azw3', 'azw'] },
+  { name: '数据表格与日志', extensions: [...DATA_EXTENSIONS] },
+  { name: 'Office 文档', extensions: [...OFFICE_EXTENSIONS] },
   { name: 'All Files', extensions: ['*'] },
 ]
 
@@ -67,18 +77,18 @@ export async function openDocumentDialog(
     const filePath = filePaths[0]!
     const kind = getDocumentKind(filePath)
 
-    if (kind === 'markdown') {
+    if (kind === 'markdown' || isDataDocumentKind(kind)) {
       const content = await readFile(filePath, 'utf-8')
-      return ok({ filePath, kind: 'markdown', content })
+      return ok({ filePath, kind, content })
     }
 
-    if (kind === 'pdf' || kind === 'epub' || kind === 'mobi') {
+    if (kind === 'pdf' || kind === 'epub' || kind === 'mobi' || isOfficeDocumentKind(kind)) {
       return ok({ filePath, kind })
     }
 
     return err({
       code: 'UNSUPPORTED_FORMAT',
-      message: '不支持的文件格式，请选择 Markdown、PDF、EPUB、MOBI 或 AZW3',
+      message: '不支持的文件格式',
     })
   } catch (error) {
     return err(toAppError(error, '打开文件失败'))
@@ -91,10 +101,10 @@ export async function openFileDialog(
 ): Promise<Result<OpenFileResult, AppError>> {
   const result = await openDocumentDialog(options)
   if (!result.ok) return result
-  if (result.value.kind !== 'markdown') {
+  if (!('content' in result.value)) {
     return err({
       code: 'UNSUPPORTED_FORMAT',
-      message: '请选择 Markdown 文件',
+      message: '请选择可读取的文本或数据文件',
     })
   }
   return ok({ filePath: result.value.filePath, content: result.value.content })
@@ -143,10 +153,10 @@ export async function readFileByPath(
 ): Promise<Result<OpenFileResult, AppError>> {
   try {
     const kind = getDocumentKind(filePath)
-    if (kind !== 'markdown') {
+    if (kind !== 'markdown' && !isDataDocumentKind(kind)) {
       return err({
         code: 'UNSUPPORTED_FORMAT',
-        message: '该文件不是可编辑的 Markdown 文档',
+        message: '该文件不是可读取的 Markdown 或数据文档',
       })
     }
 
@@ -162,10 +172,10 @@ export async function readBinaryFileByPath(
 ): Promise<Result<ReadBinaryResult, AppError>> {
   try {
     const kind = getDocumentKind(filePath)
-    if (kind !== 'pdf' && kind !== 'epub' && kind !== 'mobi') {
+    if (kind !== 'pdf' && kind !== 'epub' && kind !== 'mobi' && !isOfficeDocumentKind(kind)) {
       return err({
         code: 'UNSUPPORTED_FORMAT',
-        message: '该文件不是支持的电子书格式（PDF / EPUB / MOBI / AZW3）',
+        message: '该文件不是支持的二进制文档格式（PDF / EPUB / MOBI / Office）',
       })
     }
 

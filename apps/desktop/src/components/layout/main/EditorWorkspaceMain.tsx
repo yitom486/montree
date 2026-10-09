@@ -35,9 +35,15 @@ import {
 } from '@/lib/editor/markdown-headings'
 import { useEditorUiStore, useFileUiState, type EditorViewMode } from '@/stores/editor-ui-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
-import type { FileTreeNode } from '@montree/contracts'
+import { getDocumentKind, type FileTreeNode } from '@montree/contracts'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
+import { DataSheetViewer } from '@/components/data/DataSheetViewer'
+import { JsonTreeViewer } from '@/components/data/JsonTreeViewer'
+import { LogStreamViewer } from '@/components/data/LogStreamViewer'
+import { DocxViewer } from '@/components/office/DocxViewer'
+import { SpreadsheetViewer } from '@/components/office/SpreadsheetViewer'
+import { PptxViewer } from '@/components/office/PptxViewer'
 
 export interface EditorWorkspaceMainHandle {
   selectHeading: (heading: MarkdownHeading) => void
@@ -271,6 +277,16 @@ export const EditorWorkspaceMain = forwardRef<
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
   }, [filePath, setViewMode])
 
+  const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
+  const isDataOrOfficeDoc =
+    documentKind === 'csv' ||
+    documentKind === 'tsv' ||
+    documentKind === 'json' ||
+    documentKind === 'log' ||
+    documentKind === 'docx' ||
+    documentKind === 'xlsx' ||
+    documentKind === 'pptx'
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <FileBreadcrumb
@@ -278,13 +294,13 @@ export const EditorWorkspaceMain = forwardRef<
         isDirty={isDirty}
         welcome={showWelcome}
         trailing={
-          showWelcome ? undefined : (
+          showWelcome || isDataOrOfficeDoc ? undefined : (
             <ViewModeToggle mode={viewMode} onChange={(mode) => setViewMode(filePath, mode)} />
           )
         }
       />
 
-      <main className="min-h-0 flex-1 bg-editor">
+      <main className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
         {showWelcome ? (
           <WelcomePage
             recentFiles={recentFiles}
@@ -295,6 +311,18 @@ export const EditorWorkspaceMain = forwardRef<
             onOpenRecentFile={onOpenRecentFile}
             onOpenWebDoc={onOpenWebDoc}
           />
+        ) : documentKind === 'docx' && filePath ? (
+          <DocxViewer filePath={filePath} />
+        ) : documentKind === 'xlsx' && filePath ? (
+          <SpreadsheetViewer filePath={filePath} />
+        ) : documentKind === 'pptx' && filePath ? (
+          <PptxViewer filePath={filePath} />
+        ) : documentKind === 'csv' || documentKind === 'tsv' ? (
+          <SpreadsheetViewer filePath={filePath} content={content} onChange={onContentChange} />
+        ) : documentKind === 'json' ? (
+          <JsonTreeViewer content={content} onChange={onContentChange} />
+        ) : documentKind === 'log' ? (
+          <LogStreamViewer content={content} onChange={onContentChange} />
         ) : (
           <ResizablePanelGroup
             id={`markdown-editor-content-${viewMode}`}

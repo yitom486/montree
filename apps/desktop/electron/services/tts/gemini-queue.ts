@@ -95,17 +95,36 @@ export class GeminiRequestQueue {
 
 export const geminiRequestQueue = new GeminiRequestQueue()
 
-/** Conservative character budget, preserving paragraph boundaries first and sentences second. */
-export function splitGeminiText(text: string, maxCharacters = 800): string[] {
+/**
+ * Gemini 语音文本分段切分：
+ * 默认单段上限约 3300 字，且分段时前序各段至少充实到 2500 字以上才寻找断句边界，
+ * 优先段落换行，其次句末标点，最大化吃满 Gemini 免费配额与长文本合成吞吐。
+ */
+export function splitGeminiText(
+  text: string,
+  maxCharacters = 3300,
+  minCharacters?: number,
+): string[] {
   if (!Number.isInteger(maxCharacters) || maxCharacters < 1) throw new Error('语音分段长度无效')
   const characters = Array.from(text)
   const segments: string[] = []
-  for (let start = 0; start < characters.length;) {
+
+  // 最小分段门槛：默认 2500（当 maxCharacters >= 3000 时），小预算则等比例按 1/3 处理
+  const effectiveMin =
+    minCharacters !== undefined
+      ? Math.min(minCharacters, maxCharacters)
+      : maxCharacters >= 3000
+        ? Math.min(2500, maxCharacters)
+        : Math.floor(maxCharacters / 3)
+
+  for (let start = 0; start < characters.length; ) {
     let end = Math.min(start + maxCharacters, characters.length)
     if (end < characters.length) {
       let splitAt = -1
-      // 1. 优先段落边界（\n\n 或 \n），在后 2/3 区间寻找自然段分隔
-      for (let index = end - 1; index >= start + Math.floor(maxCharacters / 3); index--) {
+      const searchFloor = start + effectiveMin
+
+      // 1. 优先在 [searchFloor, end) 区间内寻找自然段落边界（\n\n 或 \n）
+      for (let index = end - 1; index >= searchFloor; index--) {
         if (characters[index] === '\n') {
           if (index > start && characters[index - 1] === '\n') {
             splitAt = index + 1
@@ -114,9 +133,10 @@ export function splitGeminiText(text: string, maxCharacters = 800): string[] {
           if (splitAt === -1) splitAt = index + 1
         }
       }
-      // 2. 无段落分界时退化为句末标点（。！？!?），在后半区间切分
+
+      // 2. 无段落分界时在 [searchFloor, end) 区间寻找句末标点（。！？!?）及后引号
       if (splitAt === -1) {
-        for (let index = end - 1; index >= start + Math.floor(maxCharacters / 2); index--) {
+        for (let index = end - 1; index >= searchFloor; index--) {
           if (/[。！？!?]/u.test(characters[index])) {
             let next = index + 1
             while (next < characters.length && /[”’」）"']/.test(characters[next])) next++
@@ -125,15 +145,30 @@ export function splitGeminiText(text: string, maxCharacters = 800): string[] {
           }
         }
       }
-      // 3. 兜底分句标点（；;，,）
+
+      // 3. 兜底分句标点（；;，,）在 [searchFloor, end) 区间
       if (splitAt === -1) {
-        for (let index = end - 1; index >= start + Math.floor(maxCharacters / 2); index--) {
+        for (let index = end - 1; index >= searchFloor; index--) {
           if (/[；;，,]/u.test(characters[index])) {
             splitAt = index + 1
             break
           }
         }
       }
+
+      // 4. 若在 [searchFloor, end) 区间内未找到任何标点，向后半区 [start + max/2, searchFloor) 放宽回退寻找
+      if (splitAt === -1) {
+        const fallbackFloor = start + Math.floor(maxCharacters / 2)
+        for (let index = searchFloor - 1; index >= fallbackFloor; index--) {
+          if (characters[index] === '\n' || /[。！？!?；;，,]/u.test(characters[index])) {
+            let next = index + 1
+            while (next < characters.length && /[”’」）"']/.test(characters[next])) next++
+            splitAt = next
+            break
+          }
+        }
+      }
+
       if (splitAt !== -1) {
         end = splitAt
       }

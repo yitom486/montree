@@ -8,6 +8,8 @@ import { isCancelled, type AppError } from '@montree/contracts'
 import { DEFAULT_SAVE_FILENAME } from '@montree/contracts'
 import {
   getDocumentKind,
+  isDataDocumentKind,
+  isOfficeDocumentKind,
   isReaderDocumentKind,
   type ReaderDocumentKind,
 } from '@montree/contracts'
@@ -45,7 +47,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
     ? documentKind
     : undefined
   const isMarkdownDocument = documentKind === 'markdown'
-  const isDirty = isMarkdownDocument && content !== savedContent
+  const isEditableDocument = isMarkdownDocument || isDataDocumentKind(documentKind)
+  const isDirty = isEditableDocument && content !== savedContent
   const fileName = getFileName(filePath)
 
   useEffect(() => {
@@ -130,7 +133,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
         reportError(result.error)
         return
       }
-      if (result.value.kind === 'markdown') {
+      if ('content' in result.value) {
         loadFile({ filePath: result.value.filePath, content: result.value.content })
         return
       }
@@ -169,16 +172,16 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const openPathMutation = useMutation({
     mutationFn: async (path: string): Promise<Result<OpenDocumentResult, AppError>> => {
       const kind = getDocumentKind(path)
-      if (kind === 'markdown') {
+      if (kind === 'markdown' || isDataDocumentKind(kind)) {
         const result = await fileApi.readFile(path)
         if (!isOk(result)) return result
         return ok({
           filePath: result.value.filePath,
-          kind: 'markdown',
+          kind,
           content: result.value.content,
         })
       }
-      if (isReaderDocumentKind(kind)) {
+      if (isReaderDocumentKind(kind) || isOfficeDocumentKind(kind)) {
         return ok({ filePath: path, kind })
       }
       return err({
@@ -194,11 +197,14 @@ export function useFileOperations(onError?: (error: AppError) => void) {
         reportError(result.error)
         return
       }
-      if (result.value.kind === 'markdown') {
+      if ('content' in result.value) {
         loadFile({ filePath: result.value.filePath, content: result.value.content })
         return
       }
-      loadReader(result.value.filePath)
+      if (isReaderDocumentKind(result.value.kind) || isOfficeDocumentKind(result.value.kind)) {
+        loadReader(result.value.filePath)
+        return
+      }
     },
   })
 
@@ -505,6 +511,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
     documentKind,
     readerDocumentKind,
     isMarkdownDocument,
+    isEditableDocument,
     workspaceRoot: workspace?.rootPath,
     fileTree: workspace?.tree ?? ([] as FileTreeNode[]),
     unsavedPromptOpen: unsavedAction !== null,

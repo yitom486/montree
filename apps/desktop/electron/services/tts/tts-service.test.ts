@@ -134,10 +134,10 @@ describe('tts-service stream integration', () => {
     let calls = 0
     generate.mockImplementation(async () => (async function* () {
       if (++calls === 2) await waiting
-      yield audioChunk(30)
+      yield audioChunk(100)
       yield { candidates: [{ finishReason: 'STOP' }] }
     })())
-    const text = '中'.repeat(1700)
+    const text = '中'.repeat(7000)
     const webContents = sender()
     await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload(text))
     await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(2))
@@ -146,18 +146,18 @@ describe('tts-service stream integration', () => {
     release()
     await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 3 })))
     expect(generate.mock.calls.map(([request]) => request.contents).join('')).toBe(text)
-    expect(generate.mock.calls.every(([request]) => Array.from(request.contents).length <= 800)).toBe(true)
+    expect(generate.mock.calls.every(([request]) => Array.from(request.contents).length <= 3300)).toBe(true)
   })
 
   it('retries only the failed segment and never plays the failed attempt', async () => {
     let calls = 0
     generate.mockImplementation(async () => (async function* () {
       const index = ++calls
-      yield audioChunk(index === 2 ? 1 : 30)
+      yield audioChunk(index === 2 ? 1 : 100)
       yield { candidates: [{ finishReason: index === 2 ? 'OTHER' : 'STOP' }] }
     })())
     const webContents = sender()
-    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(900)))
+    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(3500)))
     await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 2 })))
     expect(generate).toHaveBeenCalledTimes(3)
     expect(generate.mock.calls[1][0].contents).toBe(generate.mock.calls[2][0].contents)
@@ -174,18 +174,18 @@ describe('tts-service stream integration', () => {
   })
 
   it('cancellation stops a chapter before requesting another segment or emitting END', async () => {
-    generate.mockImplementation(async () => (async function* () { yield audioChunk(30); yield { candidates: [{ finishReason: 'STOP' }] } })())
+    generate.mockImplementation(async () => (async function* () { yield audioChunk(100); yield { candidates: [{ finishReason: 'STOP' }] } })())
     const webContents = sender()
     webContents.send.mockImplementation((channel) => { if (channel === IPC.TTS_STREAM_CHUNK) void cancelTtsStream('test-stream') })
-    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(1600)))
+    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(3500)))
     await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledWith(IPC.TTS_STREAM_CHUNK, expect.anything()))
     expect(generate).toHaveBeenCalledOnce()
     expect(webContents.send.mock.calls.some(([channel]) => channel === IPC.TTS_STREAM_END)).toBe(false)
   })
 
   it('uses the same segmented generation path for nonstreaming synthesis and key tests', async () => {
-    generate.mockImplementation(async () => (async function* () { yield audioChunk(30); yield { candidates: [{ finishReason: 'STOP' }] } })())
-    expect((await synthesizeTts(payload('中'.repeat(900)))).ok).toBe(true)
+    generate.mockImplementation(async () => (async function* () { yield audioChunk(100); yield { candidates: [{ finishReason: 'STOP' }] } })())
+    expect((await synthesizeTts(payload('中'.repeat(3500)))).ok).toBe(true)
     expect(generate).toHaveBeenCalledTimes(2)
     expect((await testTtsKey({ key: 'test-key', text: '测试。' })).ok).toBe(true)
     expect(generate).toHaveBeenCalledTimes(3)
@@ -201,30 +201,30 @@ describe('tts-service stream integration', () => {
     let calls = 0
     generate.mockImplementation(async () => (async function* () {
       const index = ++calls
-      yield audioChunk(30)
+      yield audioChunk(100)
       yield { candidates: [{ finishReason: index === 2 ? 'SAFETY' : 'STOP' }] }
     })())
     const first = sender()
-    await synthesizeTtsStream(first as unknown as Electron.WebContents, payload('中'.repeat(900)))
+    await synthesizeTtsStream(first as unknown as Electron.WebContents, payload('中'.repeat(3500)))
     await vi.waitFor(() => expect(first.send).toHaveBeenCalledWith(IPC.TTS_STREAM_ERROR, expect.anything()))
     expect(cache.size).toBe(1)
     const second = sender()
-    await synthesizeTtsStream(second as unknown as Electron.WebContents, payload('中'.repeat(900)))
+    await synthesizeTtsStream(second as unknown as Electron.WebContents, payload('中'.repeat(3500)))
     await vi.waitFor(() => expect(second.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 2 })))
     expect(generate).toHaveBeenCalledTimes(3)
-    expect(generate.mock.calls[2][0].contents).toBe('中'.repeat(100))
+    expect(generate.mock.calls[2][0].contents).toBe('中'.repeat(200))
   })
 
   it('switches keys only for the failed segment, without replaying previous segments', async () => {
     let calls = 0
     generate.mockImplementation(async () => {
       if (++calls === 2) throw Object.assign(new Error('429 RESOURCE_EXHAUSTED'), { status: 429 })
-      return (async function* () { yield audioChunk(30); yield { candidates: [{ finishReason: 'STOP' }] } })()
+      return (async function* () { yield audioChunk(100); yield { candidates: [{ finishReason: 'STOP' }] } })()
     })
     const webContents = sender()
-    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, { ...payload('中'.repeat(900)), primaryApiKey: 'rate-service-key', secondaryApiKey: 'test-secondary' })
+    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, { ...payload('中'.repeat(3500)), primaryApiKey: 'rate-service-key', secondaryApiKey: 'test-secondary' })
     await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 2, keyUsed: 'secondary' })))
-    expect(generate.mock.calls.map(([request]) => request.contents.length)).toEqual([800, 100, 100])
+    expect(generate.mock.calls.map(([request]) => request.contents.length)).toEqual([3300, 200, 200])
     expect(clientKeys).toEqual(['rate-service-key', 'rate-service-key', 'test-secondary'])
   })
 
@@ -251,15 +251,15 @@ describe('tts-service stream integration', () => {
         code: 429, message: 'RESOURCE_EXHAUSTED',
         details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }, { retryDelay: '29184s' }],
       } })), { status: 429 })
-      return (async function* () { yield audioChunk(30); yield { candidates: [{ finishReason: 'STOP' }] } })()
+      return (async function* () { yield audioChunk(100); yield { candidates: [{ finishReason: 'STOP' }] } })()
     })
-    const request = { ...payload('中'.repeat(900)), primaryApiKey: dailyKey, secondaryApiKey: 'daily-secondary', forceKeyType: 'primary' as const }
+    const request = { ...payload('中'.repeat(3500)), primaryApiKey: dailyKey, secondaryApiKey: 'daily-secondary', forceKeyType: 'primary' as const }
     const first = sender()
     await synthesizeTtsStream(first as unknown as Electron.WebContents, request)
     await vi.waitFor(() => expect(first.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 2, keyUsed: 'secondary' })))
     expect(generate).toHaveBeenCalledTimes(3)
     expect(clientKeys).toEqual([dailyKey, dailyKey, 'daily-secondary'])
-    expect(generate.mock.calls.map(([request]) => request.contents.length)).toEqual([800, 100, 100])
+    expect(generate.mock.calls.map(([request]) => request.contents.length)).toEqual([3300, 200, 200])
     expect(first.send.mock.calls.filter(([channel]) => channel === IPC.TTS_STREAM_CHUNK)).toHaveLength(2)
     expect(writeFile.mock.calls.some(([path]) => path.endsWith('tts-quota.json'))).toBe(true)
     const second = sender()
@@ -277,9 +277,9 @@ describe('tts-service stream integration', () => {
     let count = 0
     generate.mockImplementation(async () => {
       if (++count > 1) throw new Error(JSON.stringify({ error: { code: 429, message: 'RESOURCE_EXHAUSTED', details: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }, { retryDelay: '29184s' }] } }))
-      return (async function* () { yield audioChunk(30); yield { candidates: [{ finishReason: 'STOP' }] } })()
+      return (async function* () { yield audioChunk(100); yield { candidates: [{ finishReason: 'STOP' }] } })()
     })
-    const request = { ...payload('中'.repeat(900)), primaryApiKey: primary, secondaryApiKey: secondary }
+    const request = { ...payload('中'.repeat(3500)), primaryApiKey: primary, secondaryApiKey: secondary }
     const first = sender()
     await synthesizeTtsStream(first as unknown as Electron.WebContents, request)
     await vi.waitFor(() => expect(first.send).toHaveBeenCalledWith(IPC.TTS_STREAM_ERROR, expect.objectContaining({ retryAt: expect.any(Number), error: expect.stringContaining(backup === 'different' ? '主备 API Key 均' : '当天请求额度') })))
@@ -299,7 +299,7 @@ describe('tts-service stream integration', () => {
     generate.mockImplementation(async () => (async function* () {
       callCount++
       if (callCount === 1) {
-        yield audioChunk(30)
+        yield audioChunk(100)
         yield { candidates: [{ finishReason: 'STOP' }] }
       } else {
         yield audioChunk(1)
@@ -307,7 +307,7 @@ describe('tts-service stream integration', () => {
       }
     })())
     const webContents = sender()
-    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(900)))
+    await synthesizeTtsStream(webContents as unknown as Electron.WebContents, payload('中'.repeat(3500)))
     await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledWith(IPC.TTS_STREAM_END, expect.objectContaining({ totalChunks: 2 })))
     expect(webContents.send.mock.calls.some(([channel]) => channel === IPC.TTS_STREAM_ERROR)).toBe(false)
   })

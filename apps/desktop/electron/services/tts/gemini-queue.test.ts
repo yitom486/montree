@@ -83,15 +83,23 @@ describe('Gemini shared request budget', () => {
 })
 
 describe('Gemini text segmentation', () => {
-  it.each(['中文。'.repeat(700), 'a'.repeat(1700), '🙂'.repeat(1700), '首段\n\n' + '中'.repeat(1500) + '\n尾段。'])('preserves every character within the budget', (text) => {
+  it.each(['中文。'.repeat(2000), 'a'.repeat(5000), '🙂'.repeat(5000), '首段\n\n' + '中'.repeat(4000) + '\n尾段。'])('preserves every character within the budget', (text) => {
     const segments = splitGeminiText(text)
     expect(segments.join('')).toBe(text)
-    expect(segments.every((segment) => Array.from(segment).length <= 800)).toBe(true)
+    expect(segments.every((segment) => Array.from(segment).length <= 3300)).toBe(true)
     expect(segments.every((segment) => !/[\uD800-\uDBFF]$/.test(segment))).toBe(true)
   })
-  it('prefers sentence boundaries and handles empty text', () => {
-    expect(splitGeminiText('中'.repeat(600) + '。' + '后'.repeat(300))[0]).toBe('中'.repeat(600) + '。')
+  it('prefers sentence boundaries within budget and handles empty text', () => {
+    expect(splitGeminiText('中'.repeat(2800) + '。' + '后'.repeat(1000))[0]).toBe('中'.repeat(2800) + '。')
     expect(splitGeminiText('')).toEqual([])
+  })
+  it('分段时确保第一段至少 2500 字且不超过 3300 字', () => {
+    const text = '第一段内容。'.repeat(600) + '\n\n' + '第二段内容。'.repeat(600) // ~7200 字
+    const segments = splitGeminiText(text)
+    expect(segments.length).toBeGreaterThanOrEqual(2)
+    expect(Array.from(segments[0]).length).toBeGreaterThanOrEqual(2500)
+    expect(Array.from(segments[0]).length).toBeLessThanOrEqual(3300)
+    expect(segments.join('')).toBe(text)
   })
   it('prefers paragraph boundaries over sentence boundaries when within budget', () => {
     const text = '第一段内容。还有一句话。' + '\n\n' + '第二段内容。还有一句话。'

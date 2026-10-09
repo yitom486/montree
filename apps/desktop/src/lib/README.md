@@ -13,6 +13,7 @@
 | `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@montree/contracts`） |
 | `workspace/` | 文件树、对话框路径、全局错误上报 |
 | `agent/` | ACP 会话辅助；`context/` 为 Montree 注入 Agent 的 Skill / 快照 / 选区（协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`） |
+| `data/` | CSV/TSV 表格数据集、JSON 树形模型与 LOG 日志流数据解析与 CRUD（纯逻辑模型层） |
 
 ---
 
@@ -119,7 +120,17 @@
 
 `agent/context/`（原 `agent-context/`）：静态 Skill、turn-context、阅读器内容/选区/标记 registry、MCP 快照序列化；标记提议统一走 `propose-mark`（`montree_propose_mark`）；目录 Agent 草稿走 `toc-draft`（`toc_*` 工具经快照回路写入，人点保存才进缓存）；已入库内容审计走 `inspect-indexed-content`（`montree_inspect_content` 经快照回路只读取证）；编辑器内存审计走 `inspect-editor-buffer`（当前 .md 未保存修改可见，`editor-buffer` 来源；有工作区根时再合并其他已保存 markdown，`workspace-file` 来源，相对路径）；EPUB/MOBI 章节审计走 `inspect-ebook-sections`（`ebook-section` 来源，章节标题定位，不持久入库）；已入库 PDF 章节迭代走 `rosetta-chapter-units`（chapters 失败/空/零产出直接抛错，禁止回退逐页 OCR）。
 
+## data/
+
+| 文件 | 功能 |
+|------|------|
+| `csv-dataset` | RFC 4180 兼容的 CSV/TSV 解析、行列与单元格 CRUD、排序检索与无损序列化 |
+| `json-tree-model` | 树形 JSON 节点构建、JSONPath 寻址、节点 CRUD、容错解析与无损序列化 |
+| `log-parser` | 高性能多行系统日志流解析、级别提取、堆栈行吸附、级别掩码过滤与日志条目 CRUD |
+| `dataset-integration.test` | 真实商业报表 CSV、真实应用配置 JSON 与真实服务崩溃 LOG 的解析与增删改查集成测试 |
+
 ---
 
 新模块先对号入座。预览 DOM 行为放 `preview/`，不要在 `agent/` 再复制一份。  
 各子目录另有短 README，文件表以**本文件**为准。
+

@@ -3,14 +3,19 @@ import { SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
 import {
   BookMarked,
   BookOpen,
+  Braces,
   ChevronDown,
   ChevronRight,
+  FileSpreadsheet,
   FileText,
   FileType,
   Folder,
   FolderOpen,
   Globe,
   PanelLeftClose,
+  Presentation,
+  ScrollText,
+  Table2,
 } from 'lucide-react'
 import type { FileTreeNode } from '@montree/contracts'
 import { Button } from '@/components/ui/button'
@@ -87,6 +92,19 @@ const FileIcon = memo(function FileIcon({ documentKind }: { documentKind?: FileT
       return <BookMarked className="size-3.5 shrink-0 text-amber-500/90" />
     case 'markdown':
       return <FileText className="size-3.5 shrink-0 text-emerald-500/80" />
+    case 'csv':
+    case 'tsv':
+      return <Table2 className="size-3.5 shrink-0 text-teal-500/90" />
+    case 'json':
+      return <Braces className="size-3.5 shrink-0 text-amber-500/90" />
+    case 'log':
+      return <ScrollText className="size-3.5 shrink-0 text-indigo-400/90" />
+    case 'docx':
+      return <FileText className="size-3.5 shrink-0 text-blue-500/90" />
+    case 'xlsx':
+      return <FileSpreadsheet className="size-3.5 shrink-0 text-emerald-600/90" />
+    case 'pptx':
+      return <Presentation className="size-3.5 shrink-0 text-orange-500/90" />
     default:
       return <FileText className="size-3.5 shrink-0" />
   }

@@ -1,7 +1,26 @@
-import { MARKDOWN_EXTENSION_SET, READER_EXTENSION_SET } from '../constants/extensions'
+import {
+  DATA_EXTENSION_SET,
+  MARKDOWN_EXTENSION_SET,
+  OFFICE_EXTENSION_SET,
+  READER_EXTENSION_SET,
+} from '../constants/extensions'
+
+/** 纯文本/结构化数据格式 */
+export type DataDocumentKind = 'csv' | 'tsv' | 'json' | 'log'
+
+/** Office 文档格式 */
+export type OfficeDocumentKind = 'docx' | 'xlsx' | 'pptx'
 
 /** 当前打开内容的种类；web 用 http(s) URL 当 path，不是磁盘扩展名 */
-export type DocumentKind = 'markdown' | 'pdf' | 'epub' | 'mobi' | 'web' | 'unknown'
+export type DocumentKind =
+  | 'markdown'
+  | 'pdf'
+  | 'epub'
+  | 'mobi'
+  | 'web'
+  | DataDocumentKind
+  | OfficeDocumentKind
+  | 'unknown'
 
 /** 走阅读器而不是 Markdown 编辑器的本地电子书 */
 export type ReaderDocumentKind = Extract<DocumentKind, 'pdf' | 'epub' | 'mobi'>
@@ -28,6 +47,13 @@ export function getDocumentKind(filePath: string): DocumentKind {
   if (extension === '.pdf') return 'pdf'
   if (extension === '.epub') return 'epub'
   if (extension === '.mobi' || extension === '.azw3' || extension === '.azw') return 'mobi'
+  if (extension === '.csv') return 'csv'
+  if (extension === '.tsv') return 'tsv'
+  if (extension === '.json') return 'json'
+  if (extension === '.log') return 'log'
+  if (extension === '.docx') return 'docx'
+  if (extension === '.xlsx') return 'xlsx'
+  if (extension === '.pptx') return 'pptx'
   return 'unknown'
 }
 
@@ -35,7 +61,21 @@ export function isReaderDocumentKind(kind: DocumentKind): kind is ReaderDocument
   return kind === 'pdf' || kind === 'epub' || kind === 'mobi'
 }
 
-/** 工作区侧栏是否展示该扩展名（Markdown + 阅读器格式） */
-export function isWorkspaceFileExtension(extension: string): boolean {
-  return MARKDOWN_EXTENSION_SET.has(extension) || READER_EXTENSION_SET.has(extension)
+export function isDataDocumentKind(kind: DocumentKind): kind is DataDocumentKind {
+  return kind === 'csv' || kind === 'tsv' || kind === 'json' || kind === 'log'
 }
+
+export function isOfficeDocumentKind(kind: DocumentKind): kind is OfficeDocumentKind {
+  return kind === 'docx' || kind === 'xlsx' || kind === 'pptx'
+}
+
+/** 工作区侧栏是否展示该扩展名（Markdown + 阅读器 + 数据表格 + Office 格式） */
+export function isWorkspaceFileExtension(extension: string): boolean {
+  return (
+    MARKDOWN_EXTENSION_SET.has(extension) ||
+    READER_EXTENSION_SET.has(extension) ||
+    DATA_EXTENSION_SET.has(extension) ||
+    OFFICE_EXTENSION_SET.has(extension)
+  )
+}
+
