@@ -1,5 +1,6 @@
 import {
   backfillMissingPages,
+  computeTocPageRanges,
   isBareChapterTitle,
   isWatermarkTocEntry,
 } from '@montree/ocr-core'
@@ -14,6 +15,7 @@ import type { OcrTocEntrySource } from '@montree/contracts'
 export interface TocDraftEntry {
   title: string
   printedPage: number
+  endPage?: number | null
   level: number
   /** 工具写入一律标 ai（0-based 已归一，合并裁决用） */
   source?: OcrTocEntrySource
@@ -44,7 +46,6 @@ function toPrintedPage(value: unknown): number | null {
   return n
 }
 
-
 /**
  * 工具入参 1-based（章=1，见提示词）→ 存储 0-based（章=0，与启发式同口径）。
  * 与 toc-ai JSON 路径同口径，合并裁决不再错位。
@@ -64,7 +65,14 @@ export function sanitizeTocDraftEntry(raw: unknown): TocDraftEntry | null {
   const printedPage = toPrintedPage(record.printedPage)
   if (printedPage === null) return null
   if (isWatermarkTocEntry(title)) return null
-  return { title, printedPage, level: toLevel(record.level), source: 'ai' as const }
+  const endPage = toPrintedPage(record.endPage)
+  return {
+    title,
+    printedPage,
+    endPage: endPage ?? undefined,
+    level: toLevel(record.level),
+    source: 'ai' as const,
+  }
 }
 
 /** 整单替换（toc_replace_all 主路径，幂等） */
@@ -77,7 +85,14 @@ export function writeTocDraft(
     return { count: 0, dropped: 0 }
   }
   // 宽松过一遍：留空页码给回填（与启发式同口径），无号章行直接丢弃
-  const prelim: { title: string; printedPage: number | null; level: number; source: OcrTocEntrySource }[] = []
+  const prelim: {
+    title: string
+    printedPage: number | null
+    endPage?: number | null
+    level: number
+    raw: string
+    source: OcrTocEntrySource
+  }[] = []
   let dropped = 0
   for (const item of rawEntries) {
     if (typeof item !== 'object' || item === null) {
@@ -95,18 +110,45 @@ export function writeTocDraft(
       dropped += 1
       continue
     }
-    prelim.push({ title, printedPage, level: toLevel(record.level), source: 'ai' })
+    const endPage = toPrintedPage(record.endPage)
+    prelim.push({
+      title,
+      printedPage,
+      endPage: endPage ?? undefined,
+      level: toLevel(record.level),
+      raw: title,
+      source: 'ai',
+    })
   }
+  const filled = backfillMissingPages(prelim)
   const entries: TocDraftEntry[] = []
-  for (const entry of backfillMissingPages(prelim)) {
+  for (const entry of filled) {
     if (entry.printedPage === null) {
       dropped += 1
       continue
     }
-    entries.push({ title: entry.title, printedPage: entry.printedPage, level: entry.level, source: entry.source })
+    entries.push({
+      title: entry.title,
+      printedPage: entry.printedPage,
+      endPage: (entry as { endPage?: number | null }).endPage,
+      level: entry.level,
+      source: entry.source,
+    })
   }
-  draft = { fingerprint, entries, updatedAt: Date.now(), seq: nextDraftSeq() }
-  return { count: entries.length, dropped }
+  // 自动根据后继章节推导 endPage（若未明确指定）
+  const withRanges = computeTocPageRanges(
+    entries.map((e) => ({ ...e, raw: e.title })),
+  )
+  const finalEntries: TocDraftEntry[] = withRanges.map((e) => ({
+    title: e.title,
+    printedPage: e.printedPage,
+    endPage: e.endPage,
+    level: e.level,
+    source: e.source,
+  }))
+
+  draft = { fingerprint, entries: finalEntries, updatedAt: Date.now(), seq: nextDraftSeq() }
+  return { count: finalEntries.length, dropped }
 }
 
 /** 同标题更新页码/层级，否则追加 */
@@ -199,7 +241,7 @@ export function takeTocDraftSince(
 }
 
 export interface TocDraftWaitOptions {
-  /** 总等待上限，默认 90_000（模型已证明跑 2–4 分钟，RPC 只等 2 分钟） */
+  /** 总等待上限，默认 180_000（3 分钟，为后台工具执行留足余量） */
   deadlineMs?: number
   /** 轮询间隔，默认 2_000 */
   intervalMs?: number
@@ -232,7 +274,7 @@ export async function waitForTocDraft(
   fingerprint: string,
   options?: TocDraftWaitOptions,
 ): Promise<TocDraftWaitResult> {
-  const deadlineMs = options?.deadlineMs ?? 90_000
+  const deadlineMs = options?.deadlineMs ?? 180_000
   const intervalMs = options?.intervalMs ?? 2_000
   const now = options?.now ?? Date.now
   const sleep =

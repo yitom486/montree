@@ -49,6 +49,9 @@ export interface SessionSlice {
    */
   connectRequestedAt: number
   requestConnect: () => void
+  runtimeSwitchRequestedAt: number
+  requestedRuntimeId: string | null
+  requestSwitchRuntime: (runtimeId: string) => void
 }
 
 export const createSessionSlice: StateCreator<
@@ -67,6 +70,8 @@ export const createSessionSlice: StateCreator<
   preferredConfigByRuntime: {},
   modelCatalogByRuntime: {},
   connectRequestedAt: 0,
+  runtimeSwitchRequestedAt: 0,
+  requestedRuntimeId: null,
 
   setSelectedRuntimeId: (id) =>
     set((s) => {
@@ -163,4 +168,6 @@ export const createSessionSlice: StateCreator<
       ),
     })),
   requestConnect: () => set({ connectRequestedAt: Date.now() }),
+  requestSwitchRuntime: (id: string) =>
+    set({ requestedRuntimeId: id, runtimeSwitchRequestedAt: Date.now() }),
 })

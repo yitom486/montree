@@ -37,6 +37,12 @@ export interface BodyWatermarkPlanOptions {
    * validateCustomEdgeToken 校验并提示）。
    */
   customEdgeToken?: unknown
+  /** 整块删除的水印归一化词表（外部注入或整书发现；若未传使用缺省兼容表） */
+  wholeBlockWatermarks?: readonly string[]
+  /** 首尾修剪的水印归一化词表（外部注入或整书发现；若未传使用缺省兼容表） */
+  trimWatermarks?: readonly string[]
+  /** 依附开头的特定前缀（可外部配置） */
+  attachedStartPrefix?: string
 }
 
 /**
@@ -149,18 +155,19 @@ function splitTokenSpans(content: string): TokenSpan[] {
  */
 const NARROW_ATTACHED_START_PREFIX = '早机教育'
 
-function planAttachedStart(block: BodyBlockInput): BodyWatermarkPatch | null {
+function planAttachedStart(block: BodyBlockInput, prefix: string | null): BodyWatermarkPatch | null {
+  if (!prefix) return null
   const leading = /^\s*/.exec(block.content)?.[0] ?? ''
   const rest = block.content.slice(leading.length)
-  if (!rest.startsWith(NARROW_ATTACHED_START_PREFIX)) return null
-  const after = leading + rest.slice(NARROW_ATTACHED_START_PREFIX.length)
+  if (!rest.startsWith(prefix)) return null
+  const after = leading + rest.slice(prefix.length)
   if (after === block.content || after.trim().length === 0) return null
   return {
     id: block.id,
     action: 'update',
     before: block.content,
     after,
-    reason: `attached-start:${NARROW_ATTACHED_START_PREFIX}`,
+    reason: `attached-start:${prefix}`,
     pageNumber: block.pageNumber,
   }
 }
@@ -206,12 +213,18 @@ function planCustomEdge(block: BodyBlockInput, token: string): BodyWatermarkPatc
   }
 }
 
-function planOne(block: BodyBlockInput, customToken: string | null): BodyWatermarkPatch | null {
+function planOne(
+  block: BodyBlockInput,
+  customToken: string | null,
+  activeWholeBlockSet: ReadonlySet<string>,
+  activeTrimSet: ReadonlySet<string>,
+  attachedPrefix: string | null,
+): BodyWatermarkPatch | null {
   if (block.type === 'table') return null
   if (block.content.trim().length === 0) return null
   const norm = normalizeWatermarkText(block.content)
   if (norm.length === 0) return null
-  if (wholeBlockSet.has(norm)) {
+  if (activeWholeBlockSet.has(norm)) {
     return {
       id: block.id,
       action: 'delete',
@@ -227,22 +240,25 @@ function planOne(block: BodyBlockInput, customToken: string | null): BodyWaterma
   const stripped: string[] = []
   while (start < end) {
     const key = normalizeWatermarkText(spans[start]?.text ?? '')
-    if (!trimSet.has(key)) break
+    if (!activeTrimSet.has(key)) break
     stripped.push(key)
     start += 1
   }
   while (end > start) {
     const key = normalizeWatermarkText(spans[end - 1]?.text ?? '')
-    if (!trimSet.has(key)) break
+    if (!activeTrimSet.has(key)) break
     stripped.push(key)
     end -= 1
   }
   if (stripped.length === 0) {
     // fallback 顺序：narrow 未命中才试自定义；内置优先，单块单补丁
-    return planAttachedStart(block) ?? (customToken ? planCustomEdge(block, customToken) : null)
+    return (
+      planAttachedStart(block, attachedPrefix) ??
+      (customToken ? planCustomEdge(block, customToken) : null)
+    )
   }
   if (start >= end) {
-    // 整块全由水印 token 组成（如“王道计 王道计 机教育 机教育”）：删块，不留空串
+    // 整块全由水印 token 组成：删块，不留空串
     return {
       id: block.id,
       action: 'delete',
@@ -256,8 +272,8 @@ function planOne(block: BodyBlockInput, customToken: string | null): BodyWaterma
   if (!first || !last) return null
   const after = block.content.slice(first.start, last.end)
   if (after === block.content || after.trim().length === 0) return null
-  // 修剪残留本身仍是整块水印（如“机教育 王道”→“王道”）：直接删块，不留碎片
-  if (wholeBlockSet.has(normalizeWatermarkText(after))) {
+  // 修剪残留本身仍是整块水印：直接删块，不留碎片
+  if (activeWholeBlockSet.has(normalizeWatermarkText(after))) {
     return {
       id: block.id,
       action: 'delete',
@@ -285,9 +301,21 @@ export function planBodyWatermarkPatches(
   const validated =
     options && 'customEdgeToken' in options ? validateCustomEdgeToken(options.customEdgeToken) : null
   const customToken = validated && validated.ok ? validated.token : null
+
+  const activeWholeBlockSet = options?.wholeBlockWatermarks
+    ? new Set(options.wholeBlockWatermarks.map(normalizeWatermarkText))
+    : wholeBlockSet
+  const activeTrimSet = options?.trimWatermarks
+    ? new Set(options.trimWatermarks.map(normalizeWatermarkText))
+    : trimSet
+  const attachedPrefix =
+    options?.attachedStartPrefix !== undefined
+      ? options.attachedStartPrefix
+      : NARROW_ATTACHED_START_PREFIX
+
   const patches: BodyWatermarkPatch[] = []
   for (const block of blocks) {
-    const patch = planOne(block, customToken)
+    const patch = planOne(block, customToken, activeWholeBlockSet, activeTrimSet, attachedPrefix)
     if (patch) patches.push(patch)
   }
   return patches

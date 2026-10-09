@@ -7,6 +7,13 @@ import { buildAcpPromptBlocks, type ComposerAttachment } from '@/lib/agent/acp-c
 import { extractTextFromContent } from '@/stores/acp-chat-types'
 import { ensureAcpTransport } from '@/lib/agent/acp-transport'
 
+import {
+  useSubsessionProgressStore,
+  type SubsessionProgress,
+} from '@/stores/subsession-progress-store'
+
+export type { SubsessionProgress }
+
 /**
  * 统一副会话工厂（quiz 单例 / toc 每次新建 / 制卡一书一键 共用骨架）。
  * 语义沿现有三实现，不自创：内存复用 → store/load 复用 → sessionNew 新建；
@@ -39,9 +46,12 @@ export interface SubsessionEnsureOptions extends SubsessionIdentity {
   toolScope?: 'toc' | 'full' // 传给 acpApi.sessionNew（toc 传 'toc'，其余缺省）
   rotation: SubsessionRotation
   store?: SubsessionStore
+  runtimeId?: string // 显式指定运行时的 Agent（如 TOC AI 自由选择运行时）
 }
 
 export interface SubsessionSendOptions extends SubsessionEnsureOptions {
+  /** 显式指定已有会话（如 TOC prepare 后的特定会话），避免重复新建导致孤儿会话与配置丢失 */
+  sessionId?: string
   images?: Array<{ id: string; kind: 'image'; name: string; mimeType: string; base64: string }> // toc 专用，缺省无
 }
 
@@ -63,9 +73,11 @@ interface SubsessionEntry extends SubsessionPersistedState {
   /** 本进程内新建（无需 load）；store 里捞回来的是 false，复用前先 load */
   fresh: boolean
   configOptions: AcpConfigOption[]
+  progress?: SubsessionProgress
 }
 
 const entries = new Map<string, SubsessionEntry>()
+
 
 function entryKey(purpose: string, key: string): string {
   return `${purpose}${key}`
@@ -119,6 +131,101 @@ export function subsessionOwnsSessionFor(purpose: string, sessionId: string): bo
   return false
 }
 
+function extractThoughtFromContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  let result = ''
+  for (const item of content) {
+    if (item && typeof item === 'object') {
+      const block = item as Record<string, unknown>
+      if (block.type === 'thought' && typeof block.text === 'string') {
+        result += block.text
+      } else if (typeof block.thought === 'string') {
+        result += block.thought
+      }
+    }
+  }
+  return result
+}
+
+function updateEntryProgress(
+  entry: SubsessionEntry,
+  update: Record<string, unknown>,
+): void {
+  const current: SubsessionProgress = entry.progress ?? {
+    sessionId: entry.sessionId,
+    purpose: entry.purpose,
+    stepCount: 1,
+    statusText: '处理中…',
+    updatedAt: Date.now(),
+  }
+
+  let modified = false
+  const updateKind = typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
+
+  if (updateKind === 'tool_call' || updateKind === 'tool_call_update') {
+    const title =
+      typeof update.title === 'string'
+        ? update.title
+        : typeof update.toolTitle === 'string'
+          ? update.toolTitle
+          : undefined
+    const name = typeof update.name === 'string' ? update.name : undefined
+    const toolName = title || name || '工具调用'
+    const status =
+      typeof update.status === 'string'
+        ? (update.status as 'in_progress' | 'completed' | 'failed')
+        : 'in_progress'
+
+    current.stepCount += 1
+    current.currentTool = toolName
+    current.toolStatus = status
+    if (status === 'completed') {
+      current.statusText = `工具 ${toolName} 执行完成`
+    } else if (status === 'failed') {
+      current.statusText = `工具 ${toolName} 执行失败`
+    } else {
+      current.statusText = `正在调用工具: ${toolName}`
+    }
+    modified = true
+  } else if (updateKind === 'agent_thought_chunk') {
+    const thought = extractTextFromContent(update.content) || extractThoughtFromContent(update.content)
+    if (thought) {
+      const merged = (current.latestThought ?? '') + thought
+      current.latestThought = merged.length > 300 ? '…' + merged.slice(-280) : merged
+      current.statusText = '大模型深度思考中…'
+      modified = true
+    }
+  } else if (update.step_update && typeof update.step_update === 'object') {
+    const su = update.step_update as Record<string, unknown>
+    if (typeof su.step_index === 'number') {
+      current.stepCount = Math.max(current.stepCount, su.step_index)
+      modified = true
+    }
+    if (typeof su.tool_name === 'string' && su.tool_name) {
+      current.currentTool = su.tool_name
+      current.statusText = `执行工具: ${su.tool_name}`
+      modified = true
+    }
+    if (typeof su.state === 'string') {
+      current.toolStatus = su.state === 'DONE' ? 'completed' : su.state === 'ACTIVE' ? 'in_progress' : 'failed'
+      modified = true
+    }
+  } else {
+    const text = extractTextFromContent(update.content)
+    if (text) {
+      current.statusText = '正在生成结果…'
+      modified = true
+    }
+  }
+
+  if (modified) {
+    current.updatedAt = Date.now()
+    entry.progress = current
+    useSubsessionProgressStore.getState().setProgress(entry.purpose, { ...current })
+  }
+}
+
 /**
  * 命中 entry 则累加其 replyBuffer；prompting 中的 entry 也收
  *（沿 quiz/toc 的 `|| isXxxPrompting()` 语义，见 card 的全表扫描写法）。
@@ -133,6 +240,7 @@ export function accumulateSubsessionUpdate(
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
     if (text) entry.replyBuffer += text
+    updateEntryProgress(entry, update)
   }
 }
 
@@ -149,6 +257,7 @@ export function accumulateSubsessionUpdateFor(
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
     if (text) entry.replyBuffer += text
+    updateEntryProgress(entry, update)
   }
 }
 
@@ -178,9 +287,9 @@ async function createSubsessionSession(
   const sid = created.value.sessionId
   const configOptions = created.value.configOptions ?? []
 
-  // 继承右侧用户的模型与配置偏好（照抄 quiz/card 逻辑）
+  // 继承该运行时下的模型与配置偏好
   const acpState = useAcpUiStore.getState()
-  const runtimeId = acpState.selectedRuntimeId
+  const runtimeId = opts.runtimeId || acpState.selectedRuntimeId
   const preferred = acpState.preferredConfigByRuntime[runtimeId] ?? undefined
   const patches = listPreferredConfigPatches(configOptions, preferred)
   for (const patch of patches) {
@@ -217,7 +326,7 @@ export async function ensureSubsessionSession(
   const { purpose, key, rotation } = opts
   const mapKey = entryKey(purpose, key)
 
-  const transport = await ensureAcpTransport(12000)
+  const transport = await ensureAcpTransport(12000, opts.runtimeId)
   if (transport !== 'connected') {
     console.info(`[subsession] ensure:abort purpose=${purpose} key=${keyTail(key)} reason=${transport}`)
     return { error: transport }
@@ -292,8 +401,24 @@ async function promptOnce(
       mimeType: image.mimeType,
       base64: image.base64,
     }))
-    const caps = useAcpUiStore.getState().promptCapabilities
+    const rawCaps = useAcpUiStore.getState().promptCapabilities
+    const caps = {
+      ...rawCaps,
+      ...(opts.images && opts.images.length > 0 && rawCaps.image !== false ? { image: true } : {}),
+    }
     const blocks = buildAcpPromptBlocks({ text: promptText, attachments, promptCapabilities: caps })
+    const initialProgress: SubsessionProgress = {
+      sessionId,
+      purpose: entry.purpose,
+      stepCount: 1,
+      statusText:
+        opts.images && opts.images.length > 0
+          ? `已附带 ${opts.images.length} 张目录原图，等待 AI 识别…`
+          : '已发送请求，等待 AI 响应…',
+      updatedAt: Date.now(),
+    }
+    entry.progress = initialProgress
+    useSubsessionProgressStore.getState().setProgress(entry.purpose, initialProgress)
     const result = await acpApi.prompt({ sessionId, prompt: blocks })
     if (!isOk(result)) {
       // ACP_TIMEOUT 表示服务端可能仍在跑（toc 调用方要等工具草稿），不算会话已死，不自转
@@ -316,15 +441,34 @@ export async function sendSubsessionPrompt(
   const { purpose, key } = opts
   const mapKey = entryKey(purpose, key)
 
-  const ensured = await ensureSubsessionSession(opts)
-  if ('error' in ensured) {
-    console.info(
-      `[subsession] send:abort purpose=${purpose} key=${keyTail(key)} reason=${ensured.error}`,
-    )
-    return { status: ensured.error === 'auth-required' ? 'auth-required' : 'failed', reply: '' }
+  let targetSessionId = opts.sessionId
+  if (targetSessionId) {
+    const existing = entries.get(mapKey)
+    if (!existing || existing.sessionId !== targetSessionId) {
+      entries.set(mapKey, {
+        purpose,
+        key,
+        sessionId: targetSessionId,
+        promptCount: 0,
+        lastUsedAt: Date.now(),
+        replyBuffer: '',
+        prompting: false,
+        fresh: false,
+        configOptions: [],
+      })
+    }
+  } else {
+    const ensured = await ensureSubsessionSession(opts)
+    if ('error' in ensured) {
+      console.info(
+        `[subsession] send:abort purpose=${purpose} key=${keyTail(key)} reason=${ensured.error}`,
+      )
+      return { status: ensured.error === 'auth-required' ? 'auth-required' : 'failed', reply: '' }
+    }
+    targetSessionId = ensured.sessionId
   }
 
-  const first = await promptOnce(mapKey, ensured.sessionId, opts, promptText)
+  const first = await promptOnce(mapKey, targetSessionId, opts, promptText)
   if (!('error' in first)) {
     if (opts.store) await opts.store.touch(purpose, key)
     console.info(
@@ -366,9 +510,12 @@ export async function sendSubsessionPrompt(
 /** 删内存 entry（store 行保留，下次 ensure 覆盖） */
 export function resetSubsession(purpose: string, key: string): void {
   entries.delete(entryKey(purpose, key))
+  useSubsessionProgressStore.getState().clearProgress(purpose)
 }
 
 /** 仅单测用，清空内存表 */
 export function clearSubsessionSessions(): void {
   entries.clear()
+  useSubsessionProgressStore.setState({ progressByPurpose: {} })
 }
+

@@ -16,6 +16,18 @@ import {
   shouldSendSessionBootstrap,
 } from './context/session-bootstrap'
 
+import {
+  useSubsessionProgressStore,
+  type SubsessionProgress,
+} from '@/stores/subsession-progress-store'
+
+export type { SubsessionProgress }
+
+/** 响应式读取目录副会话的实时进度（供进度看板展示） */
+export function useTocSessionProgress(): SubsessionProgress | null {
+  return useSubsessionProgressStore((s) => s.progressByPurpose[TOC_PURPOSE] ?? null)
+}
+
 /** 目录页原图（渲染端离屏渲染，供模型识图；无图片能力时自动退化纯文本） */
 export interface TocPromptImage {
   base64: string
@@ -39,18 +51,18 @@ let tocSessionId: string | null = null
 let tocPromptSeq = 0
 
 const TOC_TOOL_OVERVIEW =
-  'This is an Montree TOC task. The ACP client has already discovered the available toc_* MCP tools via MCP tools/list. Prefer toc_replace_all for a complete draft, toc_upsert_entry/toc_delete_entry for small fixes, and toc_list_draft to verify. Full parameters and limits are in the tool descriptions.'
+  'This is a ONE-SHOT Montree TOC extraction task. You MUST call toc_replace_all EXACTLY ONCE with the complete draft ({ fingerprint, entries: [{ title, printedPage, endPage, level }] }). CRITICAL: DO NOT use shell tools (run_command), DO NOT read/write files (view_file, write_to_file), and DO NOT call any other tools. DO NOT loop to verify.'
 
 const TOC_SESSION_BOOTSTRAP =
-  'You are the one-shot Montree table-of-contents assistant. Work only on the supplied book TOC task, use the available toc_* tools, and never write the final cache directly; the user confirms the draft in the UI.'
+  'You are the one-shot Montree table-of-contents assistant. Inspect the attached catalog page images visually, accurately extract the hierarchy (Unit/Part=1, Chapter/Lesson=2, Section=3, Subsection=4) and start/end page numbers. You MUST call toc_replace_all EXACTLY ONCE to save the draft, and then immediately output "DONE" with the count and STOP. DO NOT use run_command or view_file.'
 
 export function isTocPrompting(): boolean {
   return isSubsessionPrompting(TOC_PURPOSE)
 }
 
-/** 当前 Agent 是否接受图片（决定整理时附不附目录页原图） */
+/** 当前 Agent 是否接受图片（决定整理时附不附目录页原图，默认只要未显式禁用即允许） */
 export function canTocUseImages(): boolean {
-  return useAcpUiStore.getState().promptCapabilities.image === true
+  return useAcpUiStore.getState().promptCapabilities.image !== false
 }
 
 export function tocOwnsSessionId(sessionId: string): boolean {
@@ -117,6 +129,7 @@ function findRunnableOverride(
  * 返回应用后的完整 configOptions，供 UI 回显实际生效值。
  */
 export async function ensureTocSessionId(overrides?: {
+  runtimeId?: string
   model?: TocModelOverride
   thought?: TocModelOverride
 }): Promise<{ sessionId: string; configOptions: AcpConfigOption[] } | null> {
@@ -125,6 +138,7 @@ export async function ensureTocSessionId(overrides?: {
     key: TOC_PREPARE_KEY,
     rotation: { mode: 'always-new' },
     toolScope: 'toc',
+    runtimeId: overrides?.runtimeId,
   })
   if ('error' in ensured) return null
   const sid = ensured.sessionId
@@ -196,7 +210,12 @@ export async function sendTocPrompt(
     mimeType: image.mimeType,
     base64: image.base64,
   }))
-  const caps = useAcpUiStore.getState().promptCapabilities
+  const caps = {
+    ...useAcpUiStore.getState().promptCapabilities,
+    ...(attachments.length > 0 && useAcpUiStore.getState().promptCapabilities.image !== false
+      ? { image: true }
+      : {}),
+  }
   const includeBootstrap = shouldSendSessionBootstrap(preparedSid)
   const taskText = [
     includeBootstrap ? TOC_SESSION_BOOTSTRAP : null,
@@ -211,13 +230,12 @@ export async function sendTocPrompt(
     `[toc-ai] prompt:start op=${opId} session=${shortSid} fp=${fpTail} chars=${promptText.length} images=${imageCount}/${attachments.length}`,
   )
   const startedAt = Date.now()
-  // 单次 send 独占一 entry（并发串扰隔离），完成后即清；always-new 下它只为累积本次 reply 而存在
-  const opKey = `op-${opId}`
   try {
     const sent = await sendSubsessionPrompt(
       {
+        sessionId: preparedSid,
         purpose: TOC_PURPOSE,
-        key: opKey,
+        key: TOC_PREPARE_KEY,
         rotation: { mode: 'always-new' },
         toolScope: 'toc',
         images: attachments.map((attachment) => ({
@@ -261,7 +279,7 @@ export async function sendTocPrompt(
     )
     return { reply: null, outcome: 'error', elapsedMs, opId }
   } finally {
-    resetSubsession(TOC_PURPOSE, opKey)
+    resetSubsession(TOC_PURPOSE, TOC_PREPARE_KEY)
   }
 }
 

@@ -9,7 +9,8 @@
 | `PdfViewer` | PDF 主 Viewer（Agent 正文走 WASM 结构化阅读顺序，失败回退 pdf.js；UI/选区坐标系不动；已入库 Agent 正文只读库，缺文抛错不回退 OCR；拆量子目录 `pdf/`：`usePdfDocumentSession`、`usePdfRosettaIndex`、`usePdfAgentRegistry`、`usePdfOcrTocManager`、`usePdfInteractions`） |
 | `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay） |
 | `PdfOcrBanner` / `PdfOcrTocEditor` | 扫描版 OCR 提示与目录校正（含偏移自动推算、AI 整理槽位） |
-| `TocAiPolishControl` | 目录 AI 整理：目录副会话 + 模型/思考档选择 + JSON 解析回填草稿 |
+| `TocAiPolishControl` | 目录 AI 整理：独立副会话 + 运行时/模型/思考档三级级联选择 + 专属提示词与 montree-toc 工具隔离 + JSON 解析回填草稿 |
+| `TocAiLiveDashboard` | 目录 AI 整理实时动态面板：4 阶段进度条、脉冲指示灯、流式思考与工具调用终端卡片、计时器与取消控制 |
 | `ReaderContentShell` / `ReaderToolbarShell` / `ReaderFooterNav` | 阅读区壳、工具栏（纯粹目录/加书签导航 + 右侧卡片流/札记箱/「考考我」智考一级入口）、底栏翻页 |
 | `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲 |
 | `FloatingTtsPlayer` | 自由拖拽微晶悬浮球与轻量展开控制面板（主体小球稳固锚定、紧凑卡片智能停靠侧翼展开收起、本章第0秒从头完整合成与自由拉动进度条、快退快进15秒与从头重播、无冗余文字干扰、纯净沉浸听书） |

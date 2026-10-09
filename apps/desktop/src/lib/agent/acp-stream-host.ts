@@ -1,7 +1,7 @@
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
 import { acpApi } from '@/api/acp-api'
 import { STREAM_FLUSH_MS, StreamCoalescer, isCoalescableAgentChunk } from '@/lib/agent/stream-coalescer'
-import { useAcpUiStore } from '@/stores/acp-ui-store'
+import { useAcpUiStore, selectActiveThreadAgentSessionId } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore, annotationOwnsSessionId } from '@/stores/annotation-agent-store'
 import { subsessionOwnsSessionId, accumulateSubsessionUpdate, isSubsessionPrompting } from '@/lib/agent/acp-subsession'
 
@@ -113,6 +113,14 @@ export function startAcpStreamHost(): () => void {
       accumulateSubsessionUpdate(event.sessionId, event.update)
       return
     }
+    const mainStore = useAcpUiStore.getState()
+    const activeMainSid = selectActiveThreadAgentSessionId(mainStore) ?? mainStore.sessionId
+    // 严格会话隔离：若事件带有具体 sessionId，且既不是当前主会话、也不是全局广播，
+    // 则属于已退役副会话或已切走的过时会话，坚决丢弃，绝不污染主会话
+    if (event.sessionId && activeMainSid && event.sessionId !== activeMainSid) {
+      return
+    }
+
     const chunkText = isCoalescableAgentChunk(event.update)
     if (chunkText) {
       streamBuffer?.coalescer.push(chunkText)
@@ -120,7 +128,7 @@ export function startAcpStreamHost(): () => void {
       return
     }
     flushAcpStreamBuffer()
-    useAcpUiStore.getState().applySessionUpdate(event.update)
+    mainStore.applySessionUpdate(event.update)
   })
 
   const stop = () => {

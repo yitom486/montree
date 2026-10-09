@@ -377,12 +377,18 @@ export function useAcpSession(workspaceRoot?: string) {
   }, [appendSystemMessage, bumpConnectionEpoch, finishStreaming, flushBufferedChunks, setSession, setStatus])
 
   /**
-   * 切换 ACP 运行时：若当前正处于连接态，会自动断开旧运行时并立即连接新运行时。
+   * 切换 ACP 运行时：若当前正处于连接态，会自动断开旧运行时并立即连接新运行时；若处于离线态，直接连接新运行时。
    */
   const switchRuntime = useCallback(
     async (nextRuntimeId: string) => {
       const current = useAcpUiStore.getState().selectedRuntimeId
-      if (!nextRuntimeId || nextRuntimeId === current) return
+      if (!nextRuntimeId) return
+      if (nextRuntimeId === current) {
+        if (useAcpUiStore.getState().status === 'disconnected') {
+          void connect()
+        }
+        return
+      }
       useAcpUiStore.getState().setSelectedRuntimeId(nextRuntimeId)
       const statusNow = useAcpUiStore.getState().status
       if (
@@ -429,10 +435,20 @@ export function useAcpSession(workspaceRoot?: string) {
         }
 
         await finalizeConnected(result.value, `已连接至 ${resolveAcpRuntimeDisplayName(nextRuntimeId)}`)
+      } else {
+        void connect()
       }
     },
-    [appendSystemMessage, bumpConnectionEpoch, disconnect, finalizeConnected, setStatus, workspaceRoot],
+    [appendSystemMessage, bumpConnectionEpoch, connect, disconnect, finalizeConnected, setStatus, workspaceRoot],
   )
+
+  // 子会话运行时切换请求信令（目录/制卡/测验）
+  const runtimeSwitchRequestedAt = useAcpUiStore((s) => s.runtimeSwitchRequestedAt)
+  const requestedRuntimeId = useAcpUiStore((s) => s.requestedRuntimeId)
+  useEffect(() => {
+    if (!runtimeSwitchRequestedAt || !requestedRuntimeId) return
+    void switchRuntime(requestedRuntimeId)
+  }, [runtimeSwitchRequestedAt, requestedRuntimeId, switchRuntime])
 
   /**
    * 对齐 Agent 到当前本地线程：离线会自动连接；已连接则按需重连并 resume。

@@ -7,6 +7,7 @@ import type {
 } from '@agentclientprotocol/sdk'
 import { registerAcpClientHandlers, pickAllowOptionId } from './client-handlers'
 import { AcpTerminalManager } from './acp-terminal'
+import { resolveAcpPromptCapabilities } from './acp-connection'
 import type { AcpPermissionOutcome } from '@montree/contracts'
 import type { MontreeVirtualResource } from '@montree/contracts'
 
@@ -378,5 +379,52 @@ describe('SDK disconnect 代际（close 取消在途，新连接不受影响）'
       clientCapabilities: {},
     })
     expect(init.protocolVersion).toBe(1)
+  })
+})
+
+describe('resolveAcpPromptCapabilities 多模态能力裁决', () => {
+  const dummyRuntime = {
+    id: 'opencode',
+    name: 'OpenCode Agent',
+    command: 'opencode',
+    args: ['acp'],
+    description: 'OpenCode ACP agent',
+    requiredEnvKeys: [],
+  }
+
+  it('服务端显式声明 image: false 时尊重服务端指令', () => {
+    const caps = { promptCapabilities: { image: false } }
+    const initResult = { protocolVersion: 1 }
+    const result = resolveAcpPromptCapabilities(caps, initResult as any, dummyRuntime)
+    expect(result.image).toBe(false)
+  })
+
+  it('服务端显式声明 image: true 时保持开启', () => {
+    const caps = { promptCapabilities: { image: true } }
+    const initResult = { protocolVersion: 1 }
+    const result = resolveAcpPromptCapabilities(caps, initResult as any, dummyRuntime)
+    expect(result.image).toBe(true)
+  })
+
+  it('服务端未显式声明时（空对象或未声明），默认开启多模态图片能力（不依赖硬编码 runtime.id）', () => {
+    const caps = { promptCapabilities: {} }
+    const initResult = { protocolVersion: 1 }
+    const result = resolveAcpPromptCapabilities(caps, initResult as any, dummyRuntime)
+    expect(result.image).toBe(true)
+  })
+
+  it('自动检测 agentInfo 或 models 中的多模态大模型证据并保持开启', () => {
+    const caps = {}
+    const initResult = {
+      protocolVersion: 1,
+      agentInfo: { name: 'claude-agent', version: '1.0.0' },
+      models: ['claude-3-7-sonnet', 'gpt-4o'],
+    }
+    const result = resolveAcpPromptCapabilities(caps, initResult as any, {
+      ...dummyRuntime,
+      id: 'custom-bridge',
+      name: 'Custom Bridge',
+    })
+    expect(result.image).toBe(true)
   })
 })

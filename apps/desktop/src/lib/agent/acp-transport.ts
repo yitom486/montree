@@ -17,11 +17,18 @@ export type AcpTransportState = 'connected' | 'auth-required' | 'unavailable'
 const SETTLE_DISCONNECTED_POLLS = 10
 const POLL_MS = 100
 
-export async function ensureAcpTransport(timeoutMs = 8000): Promise<AcpTransportState> {
+export async function ensureAcpTransport(
+  timeoutMs = 8000,
+  targetRuntimeId?: string,
+): Promise<AcpTransportState> {
   const store = useAcpUiStore.getState()
-  if (store.status === 'connected') return 'connected'
-  if (store.status === 'awaiting_auth') return 'auth-required'
-  if (store.status !== 'connecting') {
+  if (targetRuntimeId && targetRuntimeId !== store.selectedRuntimeId) {
+    store.requestSwitchRuntime(targetRuntimeId)
+  } else if (store.status === 'connected') {
+    return 'connected'
+  } else if (store.status === 'awaiting_auth') {
+    return 'auth-required'
+  } else if (store.status !== 'connecting') {
     store.requestConnect()
   }
   let quietDisconnected = 0
@@ -29,6 +36,11 @@ export async function ensureAcpTransport(timeoutMs = 8000): Promise<AcpTransport
   for (;;) {
     await new Promise((r) => setTimeout(r, POLL_MS))
     const status = useAcpUiStore.getState().status
+    const currentRuntime = useAcpUiStore.getState().selectedRuntimeId
+    if (targetRuntimeId && currentRuntime !== targetRuntimeId) {
+      if (Date.now() >= deadline) return 'unavailable'
+      continue
+    }
     if (status === 'connected') return 'connected'
     if (status === 'awaiting_auth') return 'auth-required'
     if (status === 'error') return 'unavailable'

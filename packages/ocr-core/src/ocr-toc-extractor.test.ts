@@ -58,14 +58,20 @@ describe('ocr-toc-extractor', () => {
   })
 
   it('水印碎片不成目录条目', () => {
-    expect(isWatermarkTocEntry('87929797王道计')).toBe(true)
-    expect(isWatermarkTocEntry('王道计 育')).toBe(true)
-    expect(isWatermarkTocEntry('早机教育')).toBe(true)
+    // 6 位以上纯数字群号/碎片
+    expect(isWatermarkTocEntry('87929797资料')).toBe(true)
+    // 通用引流/营销特征
+    expect(isWatermarkTocEntry('https://example.com')).toBe(true)
+    expect(isWatermarkTocEntry('扫码获取视频')).toBe(true)
+    expect(isWatermarkTocEntry('交流群')).toBe(true)
+    // 外部注入的已知水印集合
+    expect(isWatermarkTocEntry('自定义水印碎片', ['自定义水印'])).toBe(true)
+    // 真实章节不误伤
     expect(isWatermarkTocEntry('1.2.6 计算机系统的工作原理')).toBe(false)
     expect(isWatermarkTocEntry('第1章 计算机系统概述')).toBe(false)
-    expect(isWatermarkTocEntry('王道训练营')).toBe(false)
+    expect(isWatermarkTocEntry('精选训练营教程')).toBe(false)
 
-    const entries = extractOcrTocFromText('87929797王道计 149\n3.1.2主存储器的组成 31\n')
+    const entries = extractOcrTocFromText('87929797群号 149\n3.1.2主存储器的组成 31\n')
     expect(entries.map((e) => e.title)).toEqual(['3.1.2主存储器的组成'])
   })
 
@@ -79,6 +85,11 @@ describe('ocr-toc-extractor', () => {
 
   it('三段号是小节 level2（防侧栏扁平与同级回填）', () => {
     expect(inferLevel('第1章 概述')).toBe(0)
+    expect(inferLevel('入门单元')).toBe(0)
+    expect(inferLevel('第1单元 小李赴日')).toBe(0)
+    expect(inferLevel('I. 日语的发音')).toBe(1)
+    expect(inferLevel('II. 日语的文字与书写方法')).toBe(1)
+    expect(inferLevel('第1课 李さんは中国...')).toBe(1)
     expect(inferLevel('2.1 数制')).toBe(1)
     expect(inferLevel('2.1.1 进制')).toBe(2)
     expect(inferLevel('3.5.4 替换算法')).toBe(2)
@@ -118,6 +129,14 @@ describe('ocr-toc-extractor', () => {
     ])
     expect(splitStuckSections('|2.1.2 定点数的编码表示·|…22|')).toEqual([
       '|2.1.2 定点数的编码表示·|…22|',
+    ])
+    expect(splitStuckSections('第3单元小李在箱根113第9课四川料理')).toEqual([
+      '第3单元小李在箱根113',
+      '第9课四川料理',
+    ])
+    expect(splitStuckSections('I.日语的发音2II.日语的文字与书写方法')).toEqual([
+      'I.日语的发音2',
+      'II.日语的文字与书写方法',
     ])
     expect(splitStuckSections('2.3.1 IEEE 754 标准的浮点数')).toEqual([
       '2.3.1 IEEE 754 标准的浮点数',

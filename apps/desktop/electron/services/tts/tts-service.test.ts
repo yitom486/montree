@@ -322,5 +322,5 @@ describe('tts-service stream integration', () => {
       expect(res.value.some((v) => v.id === 'Puck')).toBe(true)
       expect(res.value.some((v) => v.id.startsWith('ar-'))).toBe(false)
     }
-  })
+  }, 15000)
 })

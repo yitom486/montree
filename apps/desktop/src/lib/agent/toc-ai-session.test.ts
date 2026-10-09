@@ -108,4 +108,29 @@ describe('cancelTocPrompt 止血', () => {
     await cancelTocPrompt(sid)
     expect(mockedCancel).toHaveBeenCalledWith({ sessionId: sid })
   })
+
+  it('ensureTocSessionId 支持指定 runtimeId', async () => {
+    useAcpUiStore.setState({ status: 'connected', selectedRuntimeId: 'opencode' })
+    mockedSessionNew.mockResolvedValue(
+      ok({
+        sessionId: 'sid-opencode-01',
+        configOptions: [
+          {
+            configId: 'model',
+            name: '模型',
+            type: 'select',
+            currentValue: 'claude-3-7-sonnet',
+            options: [
+              { value: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet' },
+              { value: 'gpt-4o', name: 'GPT-4o' },
+            ],
+          },
+        ],
+      }),
+    )
+    const session = await ensureTocSessionId({ runtimeId: 'opencode' })
+    expect(session).not.toBeNull()
+    expect(session?.sessionId).toBe('sid-opencode-01')
+    expect(session?.configOptions[0]?.configId).toBe('model')
+  })
 })

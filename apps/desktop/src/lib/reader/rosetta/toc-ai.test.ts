@@ -33,8 +33,8 @@ describe('toc-ai', () => {
     ])}\n\`\`\``
     const result = parseTocAiEntries(reply)
     expect(result.entries).toEqual([
-      { title: '第一章 绪论', printedPage: 1, level: 0, source: 'ai' },
-      { title: '1.1 背景', printedPage: 5, level: 1, source: 'ai' },
+      { title: '第一章 绪论', printedPage: 1, endPage: 4, level: 0, source: 'ai' },
+      { title: '1.1 背景', printedPage: 5, endPage: undefined, level: 1, source: 'ai' },
     ])
     expect(result.dropped).toBe(2)
     expect(result.warnings.some((w) => w.includes('丢弃 2 条'))).toBe(true)
@@ -194,4 +194,40 @@ describe('mergeTocAiDraft', () => {
     expect(result.entries[0]?.printedPage).toBe(2)
     expect(result.conflicts).toHaveLength(1)
   })
+
+  it('自动计算起止页区间：下一条起始页 - 1，末尾留空', () => {
+    const baseline: OcrTocEntry[] = [
+      { title: '第21课 わたしは すき焼きを 食べた ことがあります', printedPage: 280, level: 1 },
+      { title: '第22课 森さんは 毎晩 テレビを 見る', printedPage: 292, level: 1 },
+      { title: '第23课 休みの 日、散歩したり 買い物に 行ったり します', printedPage: 306, level: 1 },
+      { title: '单元末模拟试题', printedPage: 320, level: 0 },
+    ]
+    const result = mergeTocAiDraft(baseline, [], OPTS)
+    expect(result.entries[0]?.endPage).toBe(291) // 292 - 1
+    expect(result.entries[1]?.endPage).toBe(305) // 306 - 1
+    expect(result.entries[2]?.endPage).toBe(319) // 320 - 1
+    expect(result.entries[3]?.endPage).toBeUndefined() // 最后一项留空
+  })
+
+  it('AI 生成有效条目时，过滤区间内的未消费低证据 OCR 粘连残渣', () => {
+    const baseline: OcrTocEntry[] = [
+      { title: 'I. 日语的发音', printedPage: 2, level: 1, source: 'paired' },
+      { title: 'II. 日语的文字与书写方法', printedPage: 7, level: 1, source: 'paired' },
+      { title: 'I.日语的发音2II.日语的文字与书写方法', printedPage: 15, level: 1, source: 'read' },
+      { title: 'III. 常用寒暄用语', printedPage: 20, level: 1, source: 'paired' },
+    ]
+    const ai: OcrTocEntry[] = [
+      { title: 'I. 日语的发音', printedPage: 2, level: 1, source: 'ai' },
+      { title: 'II. 日语的文字与书写方法', printedPage: 7, level: 1, source: 'ai' },
+      { title: 'III. 常用寒暄用语', printedPage: 20, level: 1, source: 'ai' },
+    ]
+    const result = mergeTocAiDraft(baseline, ai, OPTS)
+    expect(result.entries.map((e) => e.title)).toEqual([
+      'I. 日语的发音',
+      'II. 日语的文字与书写方法',
+      'III. 常用寒暄用语',
+    ])
+    expect(result.dropped.some((d) => d.includes('过滤未被 AI 采纳的基线存疑行'))).toBe(true)
+  })
 })
+

@@ -1,6 +1,7 @@
 import type { OcrTocEntry, OcrTocEntrySource } from '@montree/contracts'
 import {
   cleanupOcrTocTitle,
+  computeTocPageRanges,
   inferLevel,
   isWatermarkTocEntry,
   normalizeOcrChinese,
@@ -9,7 +10,8 @@ import {
 import { sectionOfHeading } from '@montree/ocr-core'
 
 /**
- * 目录 AI 整理：把目录页 OCR 原文发给大模型做结构化抽取，
+ * 目录 AI 整理：把目录页原图与 OCR 原文发给大模型做多模态/视觉结构化抽取，
+ * 保持真实章节层级（Unit/Lesson/Section），并根据“下一部分起始页 - 1”推算结束页。
  * 结果进 PdfOcrTocEditor 当草稿由用户确认。页码对齐是确定性加法
  * （印刷页 + 偏移），不让模型猜，只让它做解析。
  * 有目录工具时模型直接写草稿（takeTocDraft 取走），无工具时回退 JSON 解析。
@@ -20,6 +22,7 @@ export const TOC_AI_MAX_TEXT_CHARS = 30_000
 export interface TocAiDraftEntry {
   title: string
   printedPage: number
+  endPage?: number | null
   level: number
 }
 
@@ -51,54 +54,72 @@ function baselineTrustLabel(source: OcrTocEntrySource | undefined): string {
 }
 
 export function buildTocAiPrompt(
-  ocrText: string,
+  ocrText: string | null | undefined,
   fingerprint: string,
   options?: TocAiPromptOptions,
 ): string {
+  const cleanOcr = (ocrText ?? '').trim()
   const text =
-    ocrText.length > TOC_AI_MAX_TEXT_CHARS
-      ? ocrText.slice(0, TOC_AI_MAX_TEXT_CHARS)
-      : ocrText
+    cleanOcr.length > TOC_AI_MAX_TEXT_CHARS
+      ? cleanOcr.slice(0, TOC_AI_MAX_TEXT_CHARS)
+      : cleanOcr
   const withImages = options?.withImages === true
   const imageLine =
     withImages && options?.imagePages && options.imagePages.length > 0
-      ? `附图为目录页原图（共 ${options.imagePages.length} 页：第 ${options.imagePages.join('、')} 页，按页码顺序），`
-      : '附图为目录页原图（按页码顺序），'
-  return [
+      ? `附图为目录页原图（共 ${options.imagePages.length} 页：第 ${options.imagePages.join('、')} 页，按页码顺序）。`
+      : withImages
+        ? '附图为目录页原图（按页码顺序）。'
+        : ''
+
+  const lines = [
     withImages
-      ? `你是图书目录结构化助手。${imageLine}以附图为准提取章节条目，OCR 文本只供辅助定位。`
-      : '你是图书目录结构化助手。从下面的目录页 OCR 文本中提取章节条目。',
-    '优先使用已提供的 toc_* MCP 工具；完整参数与限制以 tools/list 返回的工具描述为准。' +
-      '完整目录优先 toc_replace_all，小修补使用 toc_upsert_entry / toc_delete_entry，写完可用 toc_list_draft 自查。',
-    `本书指纹 fingerprint 为：${fingerprint}。`,
-    '工具全部成功后只回复一行 DONE 加条数，不要输出其它文字。',
-    '工具不可用时才输出 JSON 数组：每个元素为 {"title": "章节标题", "printedPage": 印刷页码数字, "level": 层级数字}。',
-    '规则：',
-    '1. 走工具时以工具返回为准、不输出 JSON；走 JSON 回退时只输出一个 JSON 数组，不要其它文字，不要用代码块包裹之外的解释。',
-    '2. 每个元素为 {"title": "章节标题", "printedPage": 印刷页码数字, "level": 层级数字}。',
-    '3. level：章/部为 1，节为 2，小节为 3，以此类推；无法判断时填 1。',
-    '4. printedPage 取标题同一行或紧邻的页码；标题跨行时把多行拼成一个标题。',
+      ? `你是专业图书目录结构化专家。${imageLine}请直接仔细阅读附图中的目录页原图，精确识别章节条目并结构化输出。`
+      : '你是专业图书目录结构化专家。请从下面的目录页文本中提取章节条目并结构化输出。',
+    '【工具与执行要求 - 严格单次执行】：',
+    '1. 严禁调用 run_command、view_file、write_to_file 等任何终端/文件命令！所有需要的目录原图与文本已在本次消息中直接提供。',
+    '2. 必须直接提取目录结构，并【仅调用一次】toc_replace_all 工具一次性写入完整草稿。',
+    '3. 严禁反复循环调用工具，无需使用脚本二次验证。toc_replace_all 成功后，必须【立刻结束本轮回复】，输出一行 "DONE: X 条" 即可，不要输出任何多余解释。',
+    `4. 本书指纹 fingerprint 为：${fingerprint}。`,
+    '5. 工具不可用时才输出纯 JSON 数组：每个元素为 {"title": "章节标题", "printedPage": 印刷页码数字, "endPage": 结束页码数字或null, "level": 层级数字}。',
+    '规则要求：',
+    '1. 【层级保持真实树形】：根据字号大小、字体粗细与缩进深度准确判定 level：',
+    '   - level 1（1级 单元）：单元/篇/部/Unit/Part（如「入门单元」「第1单元」「Unit 1」）；',
+    '   - level 2（2级 课/章）：章/课/罗马数字序号/Lesson/Chapter（如「I. 日语的发音」「II. 日语的文字与书写方法」「第1课 李さんは中国...」）；',
+    '   - level 3（3级 节）：节/Section（如「第1节」「1.1」）；',
+    '   - level 4（4级 小节）：小节/专栏/1.1.1。',
+    '   无法判断时，顶级单元填 1，次级课/章填 2。',
     withImages
-      ? '5. 看图读数：页码取标题同一行右侧的数字（点线只是引导线）；跨行、跨栏借用一律不许；图上看不清的宁可跳过，也绝不编造。OCR 文本里缺页码的行，图上能看清就补，看不清就跳过。'
-      : '5. 文本已预处理：每行要么是“标题 页码”成对出现，要么是无页码标题——页码只取同行数字，绝不跨行借用、无中生有。',
-    '5. 找不到对应页码的标题宁可跳过，也绝不编造页码；同一页码连续出现超过 10 次必有错误，须停下来重新核对。',
-    '6. 忽略页眉页脚、广告、"目录"字样本身、省略号点线、登录提示等非目录噪音。',
-    '6. 标题保留原文（含标点），只做去首尾空白；不要改写、不要续写缺失章节。',
-    ...(options?.baseline && options.baseline.length > 0
-      ? [
-          '机器基线表如下（`标题 | 印刷页 | 层级 | 证据`；层级 0=章/部，1=节，2=小节）：',
-          ...options.baseline
-            .slice(0, 300)
-            .map(
-              (entry) =>
-                `- ${entry.title} | ${entry.printedPage} | ${entry.level} | ${baselineTrustLabel(entry.source)}`,
-            ),
-          '核对要求：逐行看图核对页码，错的在返回表里直接给对的页；基线缺的行（图上有、表上无）要补上；返回的一定是修正后的完整表，不要只给差异。',
-        ]
-      : []),
-    withImages ? '目录页 OCR 文本如下（仅供辅助定位）：' : '目录页 OCR 文本如下：',
-    text,
-  ].join('\n')
+      ? '2. 【看图读数】：人眼顺着标题右侧的点线/虚线引导符水平向右对齐印刷页码 printedPage，严禁跨行、跨栏借用页码或虚构数字；图上看不清宁可跳过，绝不编造。'
+      : '2. 【同行数字】：页码只取同行数字，绝不跨行借用、无中生有。找不到对应页码的标题宁可跳过，绝不编造。',
+    '3. 【起止页区间推导】：printedPage 为章节起始印刷页；若存在下一章节，当前章节的 endPage 为 下一章节起始页 - 1；若为末尾章节无后继，endPage 留空为 null。',
+    '4. 【背景杂音与去水印】：自动忽略半透明斜向水印、联系方式、QQ群、网址、二维码、页眉页脚、版权印次等非目录噪音。',
+    '5. 【标题原文忠实】：保留章节标题原文（含外语假名与标点），仅去除首尾多余空白，不要擅自改写或续写缺失章节。',
+    '6. 【格式洁净】：走工具调用时不要输出重复 JSON；走 JSON 回退时只输出单个 JSON 数组，严禁包含任何前缀闲聊或解释。',
+  ]
+
+  if (options?.baseline && options.baseline.length > 0) {
+    lines.push(
+      '机器基线参考如下（`标题 | 印刷页 | 层级 | 证据`；层级 0=章/部，1=节，2=小节）：',
+      ...options.baseline
+        .slice(0, 300)
+        .map(
+          (entry) =>
+            `- ${entry.title} | ${entry.printedPage} | ${entry.level} | ${baselineTrustLabel(entry.source)}`,
+        ),
+      '核对要求：逐行看图核对页码与层级，错的在返回表里直接给对的页；基线缺的行（图上有、表上无）要补上；返回的一定是修正后的完整表，不要只给差异。',
+    )
+  }
+
+  if (text) {
+    lines.push(
+      withImages
+        ? '以下为辅助参考 OCR 文本（若与图片视觉内容有出入，严格以附图为准）：'
+        : '目录页文本内容如下：',
+      text,
+    )
+  }
+
+  return lines.join('\n')
 }
 
 /** 从模型回复中抠 JSON 数组（容忍 ```json 围栏与前后杂话） */
@@ -180,13 +201,21 @@ export function parseTocAiEntries(replyText: string): TocAiParseResult {
     if (samePageRun === 13) {
       warnings.push(`从「${runStartTitle}」起连续 ${samePageRun} 条同为 ${printedPage} 页，疑似编造页码，请核对目录页范围`)
     }
+    const endPage = toPrintedPage(record.endPage)
     prevPage = printedPage
-    entries.push({ title, printedPage, level: toLevel(record.level), source: 'ai' })
+    entries.push({
+      title,
+      printedPage,
+      endPage: endPage ?? undefined,
+      level: toLevel(record.level),
+      source: 'ai',
+    })
   }
+  const withRanges = computeTocPageRanges(entries)
   if (dropped > 0) {
     warnings.push(`丢弃 ${dropped} 条空标题/非法页码`)
   }
-  return { entries, dropped, warnings }
+  return { entries: withRanges, dropped, warnings }
 }
 
 /**
@@ -302,7 +331,7 @@ export function mergeTocAiDraft(
       dropped.push(`丢弃 AI 空标题（页 ${aiEntry.printedPage}）`)
       continue
     }
-    if (!/[\u4e00-\u9fff]/.test(title) && !sectionOfHeading(title)) {
+    if (!/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7afa-zA-Z]/.test(title) && !sectionOfHeading(title)) {
       dropped.push(`丢弃 AI 非目录条目「${title}」`)
       continue
     }
@@ -318,7 +347,7 @@ export function mergeTocAiDraft(
     const base = takeBaseMatch(title)
     const level = sectionOfHeading(title) ? inferLevel(title) : aiEntry.level
     if (!base) {
-      if (pushUnique({ title, printedPage: aiEntry.printedPage, level, source: 'ai' })) {
+      if (pushUnique({ title, printedPage: aiEntry.printedPage, endPage: aiEntry.endPage, level, source: 'ai' })) {
         aiAdded += 1
       }
       continue
@@ -330,15 +359,26 @@ export function mergeTocAiDraft(
       }
       continue
     }
-    pushUnique({ title, printedPage: aiEntry.printedPage, level, source: 'ai' })
+    pushUnique({ title, printedPage: aiEntry.printedPage, endPage: aiEntry.endPage, level, source: 'ai' })
   }
 
   baseline.forEach((base, index) => {
-    if (!consumed.has(index)) pushUnique({ ...base })
+    if (!consumed.has(index)) {
+      if (ai.length > 0 && evidenceTier(base.source) < evidenceTier('ai')) {
+        const minAiPage = Math.min(...ai.map((e) => e.printedPage))
+        const maxAiPage = Math.max(...ai.map((e) => e.endPage ?? e.printedPage))
+        if (base.printedPage >= minAiPage && base.printedPage <= maxAiPage) {
+          dropped.push(`过滤未被 AI 采纳的基线存疑行「${base.title}」（页 ${base.printedPage}）`)
+          return
+        }
+      }
+      pushUnique({ ...base })
+    }
   })
 
   const kept = sortTocEntriesForDisplay(merged, (entry) => {
     dropped.push(`「${entry.title}」页码 ${entry.printedPage} 倒退，疑似错配已丢弃`)
   })
-  return { entries: kept, conflicts, aiAdded, dropped }
+  const withRanges = computeTocPageRanges(kept)
+  return { entries: withRanges, conflicts, aiAdded, dropped }
 }

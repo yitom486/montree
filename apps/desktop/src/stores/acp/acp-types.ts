@@ -89,6 +89,13 @@ export interface AcpUiStore {
    */
   connectRequestedAt: number
   requestConnect: () => void
+  /**
+   * 子会话（目录/制卡/测验）的运行时切换信令：0=无请求（不持久化）。
+   * `useAcpSession` 监听并驱动 switchRuntime。
+   */
+  runtimeSwitchRequestedAt: number
+  requestedRuntimeId: string | null
+  requestSwitchRuntime: (runtimeId: string) => void
   setPanelOpen: (open: boolean) => void
   togglePanel: () => void
   /** 面板已打开时聚焦输入框；不会强行打开面板（阅读器划选等场景） */

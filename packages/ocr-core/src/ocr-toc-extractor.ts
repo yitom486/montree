@@ -1,5 +1,5 @@
 /**
- * 从 OCR 纯文本提取教材目录（王道 / 考研类常见格式）。
+ * 从 OCR 纯文本提取教材目录。
  * 有范围参数时先经 directory-reassemble 重组（竖线拆分/数字汤配对/范围门）；
  * 注意与那边互引：双方只在函数体内使用对方绑定，无顶层求值循环。
  */
@@ -14,23 +14,27 @@ import type { OcrTocEntrySource } from '@montree/contracts'
 export interface OcrTocEntry {
   title: string
   printedPage: number
+  /** 结束印刷页码。若有下一部分则为下一部分起始页 - 1，无后继则留空 */
+  endPage?: number | null
   level: number
   raw: string
   /** 证据等级（合并裁决用，见 shared/types/ocr） */
   source?: OcrTocEntrySource
 }
 
+/** 通用出版元数据与网络引流噪音（不包含任何具体品牌名称） */
 const NOISE_PATTERNS = [
-  /官方\s*开源/i,
-  /bilibili/i,
-  /王道\s*计算机/i,
-  /配套\s*视频/i,
-  /兑换/i,
+  /https?:\/\//i,
+  /\b[a-z0-9\-]+\.(?:com|cn|net|org|edu|gov|vip|cc|io)\b/i,
+  /qq\s*群?[:：\s]*\d+/i,
+  /微信\s*公众号?/i,
+  /扫码|二维码/i,
   /水印/i,
-  /ISBN/i,
-  /CIP/i,
+  /版权所有|翻印必究|侵权必究/i,
+  /ISBN\b/i,
+  /CIP\b/i,
   /邮编/i,
-  /印张/i,
+  /印张|字数|版次|印次|定价/i,
 ]
 
 export function normalizeOcrChinese(text: string): string {
@@ -45,17 +49,48 @@ export function isNoiseLine(line: string): boolean {
   return NOISE_PATTERNS.some((p) => p.test(compact) || p.test(line))
 }
 
-/**
- * 水印碎片混进目录（如 87929797王道计）：标题仅由数字与水印字表构成。
- * 真实章节必含其他汉字/编号（1.2.6/第1章），不會全落在这个字表里。
- */
-const WATERMARK_ENTRY_CHARS = /^[\d王道计育教机算坛论早卓\s.·\-_]*$/
+/** 通用网络营销/引流/水印标识 */
+export const GENERIC_WATERMARK_PATTERNS: readonly RegExp[] = [
+  /https?:\/\//i,
+  /\b[a-z0-9\-]+\.(?:com|cn|net|org|edu|gov|vip|cc|io)\b/i,
+  /qq\s*群?[:：\s]*\d+/i,
+  /微信\s*公众号?/i,
+  /扫码|二维码/i,
+  /水印|盗版|交流群/i,
+]
 
-export function isWatermarkTocEntry(title: string): boolean {
+/**
+ * 水印碎片与营销干扰过滤（纯通用逻辑，严禁硬编码任何具体商业名称）：
+ * 1. 外部注入/动态发现的已知水印集合（优先完全匹配）；
+ * 2. 命中网址、域名、QQ群、微信、扫码等通用引流/水印模式；
+ * 3. 含有 6 位以上连续数字碎片（如常见交流群号），且缺少合法章节编号前缀。
+ */
+export function isWatermarkTocEntry(
+  title: string,
+  knownWatermarks?: readonly string[],
+): boolean {
   const compact = normalizeOcrChinese(title)
-  if (compact.length < 2 || compact.length > 16) return false
-  if (!compact.includes('王道') && !compact.includes('教育')) return false
-  return WATERMARK_ENTRY_CHARS.test(compact)
+  if (compact.length < 2 || compact.length > 30) return false
+
+  // 1. 外部注入/整书发现的已知水印集合
+  if (knownWatermarks && knownWatermarks.length > 0) {
+    const lower = compact.toLowerCase()
+    if (knownWatermarks.some((w) => w && lower.includes(w.toLowerCase()))) {
+      return true
+    }
+  }
+
+  // 2. 通用引流/营销特征
+  if (GENERIC_WATERMARK_PATTERNS.some((p) => p.test(compact))) {
+    return true
+  }
+
+  // 3. 6 位以上连续数字碎片（如常见交流群号），且非章节前缀
+  if (/\d{6,}/.test(compact) && !/^第?\d+章/.test(compact) && !/^\d+\.\d+/.test(compact)) {
+    return true
+  }
+
+  return false
 }
 
 /**
@@ -84,16 +119,35 @@ export function cleanupOcrTocTitle(title: string): string {
 }
 
 export function inferLevel(title: string): number {
-  if (/^第[0-9一二三四五六七八九十百千]+章/.test(title)) return 0
-  if (/^第[0-9一二三四五六七八九十百千]+节/.test(title)) return 1
+  const trimmed = title.trim()
+  // 顶级：单元 / 篇 / 编 / 部 / Unit / Part / 章（无单元时的顶级）
+  if (
+    /^(?:第[0-9一二三四五六七八九十百千]+[单元篇编部]|入门单元|单元\s*\d+|Unit\b|UNIT\b|Part\b|PART\b)/i.test(
+      trimmed,
+    )
+  ) {
+    return 0
+  }
+  if (/^第[0-9一二三四五六七八九十百千]+章/.test(trimmed)) return 0
+
+  // 次级：课 / Lesson / 罗马数字序号 (I., II., Ⅰ, Ⅱ)
+  if (
+    /^(?:第[0-9一二三四五六七八九十百千]+课|Lesson\b|LESSON\b|[IVXLCDM]+[\.、\s]|[Ⅰ-Ⅻ][\.、\s]?)/i.test(
+      trimmed,
+    )
+  ) {
+    return 1
+  }
+
+  if (/^第[0-9一二三四五六七八九十百千]+节/.test(trimmed)) return 1
   // 三段号（2.1.1）是小节 level2，四段号 level3；须先于两段号判定，
   // 否则 2.1.1 会被误判为 level1 导致侧栏扁平与回填涂抹（同级继承）。
-  const deep = title.match(/^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/)
+  const deep = trimmed.match(/^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/)
   if (deep) {
     if (deep[4] !== undefined) return 3
     return 2
   }
-  const section = title.match(/^(\d+)\.(\d+)/)
+  const section = trimmed.match(/^(\d+)\.(\d+)/)
   if (section) {
     const [, major, minor] = section
     if (minor === '0' || minor === '00') return 0
@@ -113,14 +167,17 @@ export const TOC_LINE = /^(.+?)(?:[.·…．。\-—–_\s]{1,8})?(\d{1,4})\s*$/
  */
 const PAGELESS_HEADING = /^(?:\d+\.)+\d*\s*.{1,30}$/
 
-export function parsePagelessHeading(line: string): string | null {
+export function parsePagelessHeading(
+  line: string,
+  knownWatermarks?: readonly string[],
+): string | null {
   // 与 TOC_LINE 分支同口径：先归一化去空格，侧栏标题与旧条目一致无空格
   const compact = normalizeOcrChinese(line)
   if (compact.length < 2 || compact.length > 40 || /[。？！]/.test(compact)) return null
   if (isNoiseLine(line)) return null
   const title = cleanupOcrTocTitle(compact)
   if (title.length < 2) return null
-  if (isWatermarkTocEntry(title)) return null
+  if (isWatermarkTocEntry(title, knownWatermarks)) return null
   if (!PAGELESS_HEADING.test(title)) return null
   if (!/[\u4e00-\u9fff]/.test(title) && !/^第\d+章/.test(title) && !/^\d+\.\d+/.test(title)) {
     return null
@@ -135,6 +192,8 @@ export interface ExtractOcrTocOptions {
   pageOffset?: number
   /** 几何配对表（章节号 → 印刷页，见 toc-geometry），直透重组 */
   geometryPages?: ReadonlyMap<string, number>
+  /** 已知水印集合（几何发现或外部配置注入，防硬编码） */
+  knownWatermarks?: readonly string[]
   /** 重组统计回传（调用方拼识别摘要用；legacy 无参数路径不调用） */
   onDiagnostics?: (stats: DirectoryReassembleStats) => void
 }
@@ -196,7 +255,7 @@ export function extractOcrTocFromText(text: string, options?: ExtractOcrTocOptio
         continue
       }
       if (/^\d[\d.\-]*$/.test(title)) continue
-      if (isWatermarkTocEntry(title)) continue
+      if (isWatermarkTocEntry(title, options?.knownWatermarks)) continue
       if (isDigitSoupTitle(title)) continue
       if (/^7-121/.test(title)) continue
       // 钉死表命中（同章节同页）→ pipe/geo 证据，否则为汤配或直读；
@@ -210,7 +269,7 @@ export function extractOcrTocFromText(text: string, options?: ExtractOcrTocOptio
     }
 
     // 无页码父项：暂记空页码，第二遍从后继条目继承（父与长子同起一页）
-    const pageless = parsePagelessHeading(line)
+    const pageless = parsePagelessHeading(line, options?.knownWatermarks)
     if (pageless) {
       rawEntries.push({ title: pageless, printedPage: null, level: inferLevel(pageless), raw: line })
     }
@@ -290,31 +349,46 @@ export function defaultPdfPageOffset(tocPageRange: [number, number]): number {
  * pipe 行不在此列（表格结构优先，由重组侧处理）。
  */
 const STUCK_SECTION = /(^|[^\d.])(?=\d+\.\d+(?:\.\d+)*)/g
+const STUCK_CHAPTER_WITH_PAGE = /(?<=\d{1,4})\s*(?=(?:第[0-9一二三四五六七八九十百千]+[课章单元]|Lesson\b|Chapter\b|[IVXLCDM]+[\.、\s]|[Ⅰ-Ⅻ]))/i
 
 export function splitStuckSections(line: string): string[] {
   if (line.includes('|')) return [line]
-  const starts: number[] = []
-  for (const m of line.matchAll(STUCK_SECTION)) {
-    starts.push((m.index ?? 0) + (m[1] ?? '').length)
+  const preChunks = line.split(STUCK_CHAPTER_WITH_PAGE).map((c) => c.trim()).filter(Boolean)
+  const chunksToProcess = preChunks.length > 1 ? preChunks : [line]
+  const results: string[] = []
+
+  for (const chunk of chunksToProcess) {
+    const starts: number[] = []
+    for (const m of chunk.matchAll(STUCK_SECTION)) {
+      starts.push((m.index ?? 0) + (m[1] ?? '').length)
+    }
+    if (starts.length <= 1) {
+      results.push(chunk)
+      continue
+    }
+    const parts: string[] = []
+    for (let i = 0; i < starts.length; i += 1) {
+      const part = chunk.slice(starts[i] as number, starts[i + 1] as number | undefined).trim()
+      if (part) parts.push(part)
+    }
+    if (parts.length <= 1) {
+      results.push(chunk)
+      continue
+    }
+    // 行尾页码归第一段：黏连的是连续两行，第一行（上一节尾）的点线页码
+    // 贴在整行末尾（如 `4.3.5…4.4…181` 中 181 是 4.3.5 的——4.4.1 已 191，
+    // 4.4 不可能早 10 页）。后段留空走回填/几何，不硬分。
+    const first = parts[0] as string
+    const last = parts[parts.length - 1] as string
+    const tail = /^(.*\S)\s+(\d{1,4})\s*$/.exec(last)
+    if (tail && tail[1] && tail[2] && !/\d\s*$/.test(first) && /[\u4e00-\u9fff]/.test(tail[1])) {
+      parts[0] = `${first} ${tail[2]}`
+      parts[parts.length - 1] = (tail[1] as string).trim()
+    }
+    results.push(...parts)
   }
-  if (starts.length <= 1) return [line]
-  const parts: string[] = []
-  for (let i = 0; i < starts.length; i += 1) {
-    const part = line.slice(starts[i] as number, starts[i + 1] as number | undefined).trim()
-    if (part) parts.push(part)
-  }
-  if (parts.length <= 1) return [line]
-  // 行尾页码归第一段：黏连的是连续两行，第一行（上一节尾）的点线页码
-  // 贴在整行末尾（如 `4.3.5…4.4…181` 中 181 是 4.3.5 的——4.4.1 已 191，
-  // 4.4 不可能早 10 页）。后段留空走回填/几何，不硬分。
-  const first = parts[0] as string
-  const last = parts[parts.length - 1] as string
-  const tail = /^(.*\S)\s+(\d{1,4})\s*$/.exec(last)
-  if (tail && tail[1] && tail[2] && !/\d\s*$/.test(first) && /[\u4e00-\u9fff]/.test(tail[1])) {
-    parts[0] = `${first} ${tail[2]}`
-    parts[parts.length - 1] = (tail[1] as string).trim()
-  }
-  return parts
+
+  return results
 }
 
 /** 回填输入：页码可空（调用方负责先滤掉无号章行，见 isBareChapterTitle） */
@@ -395,3 +469,29 @@ export function ocrTocToReaderUnits(
     level: e.level,
   }))
 }
+
+/**
+ * 根据起始页计算每个目录条目的结束页区间：
+ * 1. 若存在下一条有效起始页，则当前条目结束页 = 下一条目起始页 - 1。
+ * 2. 若后面没有下一部分（最后一项），则结束页留空（undefined）。
+ */
+export function computeTocPageRanges<T extends { printedPage: number; endPage?: number | null }>(
+  entries: T[],
+): T[] {
+  return entries.map((entry, index) => {
+    let nextStart: number | null = null
+    for (let i = index + 1; i < entries.length; i += 1) {
+      const candidate = entries[i]?.printedPage
+      if (candidate != null && Number.isFinite(candidate) && candidate > 0) {
+        nextStart = candidate
+        break
+      }
+    }
+    if (nextStart === null) {
+      return { ...entry, endPage: undefined }
+    }
+    const computedEnd = Math.max(entry.printedPage, nextStart - 1)
+    return { ...entry, endPage: computedEnd }
+  })
+}
+

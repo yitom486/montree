@@ -110,4 +110,21 @@ describe('acp-stream-host（应用级单例订阅）', () => {
     expect(resetB).toHaveBeenCalledTimes(1)
     stop()
   })
+
+  it('非当前主会话的 sessionId 更新坚决丢弃，绝不污染主会话时间线', async () => {
+    const stop = startAcpStreamHost()
+    useAcpUiStore.getState().setSession('sid-main', [])
+
+    const before = activeAgentText()
+    for (const listener of listeners.update) {
+      listener({
+        sessionId: 'sid-orphan-subsession',
+        update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '污染文本' }] },
+      })
+    }
+    await settleFlush()
+    expect(activeAgentText()).toBe(before)
+    stop()
+  })
 })
+

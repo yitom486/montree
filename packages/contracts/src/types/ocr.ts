@@ -41,6 +41,8 @@ export type OcrTocEntrySource =
 export interface OcrTocEntry {
   title: string
   printedPage: number
+  /** 结束印刷页码。若存在后继章节则为下一部分起始页 - 1，无后继（末尾）则为空 */
+  endPage?: number | null
   level: number
   source?: OcrTocEntrySource
 }

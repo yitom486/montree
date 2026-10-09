@@ -48,8 +48,8 @@ describe('toc-draft', () => {
     ])
     expect(result).toEqual({ count: 2, dropped: 1 })
     expect(readTocDraft()?.entries).toEqual([
-      { title: '3.1 主存储器', printedPage: 45, level: 0, source: 'ai' },
-      { title: '3.1.1 概述', printedPage: 45, level: 1, source: 'ai' },
+      { title: '3.1 主存储器', printedPage: 45, endPage: 45, level: 0, source: 'ai' },
+      { title: '3.1.1 概述', printedPage: 45, endPage: undefined, level: 1, source: 'ai' },
     ])
   })
 

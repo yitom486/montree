@@ -200,10 +200,16 @@ export async function promptAcp(payload: {
         sessionId: payload.sessionId,
         prompt,
       },
+      600_000, // prompt 涉及多步工具调用或视觉大模型解析，超时放宽至 600s（10分钟），避免大部头教材密集目录解析时前端过早判超时
     )
     const stopReason = typeof result.stopReason === 'string' ? result.stopReason : 'end_turn'
     return ok({ stopReason })
   } catch (error) {
+    try {
+      void a.value.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
+    } catch {
+      // 忽略竞态
+    }
     return err(toProtocolError(error, '发送 prompt 失败'))
   } finally {
     acpState.activePromptSessionId = prevActiveSessionId

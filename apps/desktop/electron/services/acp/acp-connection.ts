@@ -7,8 +7,7 @@ import type { AppError } from '@montree/contracts'
 import { err, ok, type Result } from '@montree/contracts'
 import type {
   AcpConnectResult,
-} from '@montree/contracts'
-import type {
+  AcpPromptCapabilities,
   AcpRuntimeInfo,
 } from '@montree/contracts'
 import {
@@ -50,6 +49,59 @@ import {
   safeProbeAuth,
   toProtocolError,
 } from './acp-bridges'
+
+/**
+ * 解析并裁决 Agent 的提示词能力（图片等多模态输入）：
+ * 1. 服务端显式声明优先：若服务端显式指定了 boolean（true 或 false），严格遵从服务端指令；
+ * 2. 自动检测证据与默认开启：
+ *    - 若服务端未显式禁用（未返回 false），统一默认开启图片多模态能力 (image: true)；
+ *    - 自动探查 agentInfo / models / 元数据中的多模态与大模型证据并记录诊断；
+ *    - 彻底移除对特定运行时 ID 的硬编码绑定，兼容所有多模态大模型运行时。
+ */
+export function resolveAcpPromptCapabilities(
+  caps: Record<string, unknown>,
+  initResult: InitializeResponse,
+  runtime: AcpRuntimeInfo,
+): AcpPromptCapabilities {
+  const baseCaps = parsePromptCapabilities(caps)
+  const rawPromptCaps = (
+    caps.promptCapabilities && typeof caps.promptCapabilities === 'object'
+      ? (caps.promptCapabilities as Record<string, unknown>)
+      : null
+  )
+
+  // 1. 服务端显式声明优先：若明确声明了 true 或 false，以显式配置为准
+  if (typeof rawPromptCaps?.image === 'boolean') {
+    return {
+      ...baseCaps,
+      image: rawPromptCaps.image,
+    }
+  }
+
+  // 2. 自动检测多模态/大模型证据（来自 agentInfo、models、_meta 等）
+  const agentInfo = initResult.agentInfo ?? undefined
+  const agentName = typeof agentInfo?.name === 'string' ? agentInfo.name : ''
+  const agentDesc =
+    typeof (agentInfo as Record<string, unknown> | null | undefined)?.description === 'string'
+      ? ((agentInfo as Record<string, unknown>).description as string)
+      : ''
+  const models = Array.isArray((initResult as Record<string, unknown>).models)
+    ? ((initResult as Record<string, unknown>).models as unknown[]).map(String)
+    : []
+  const evidencePool = [agentName, agentDesc, runtime.name, runtime.id, ...models].join(' ').toLowerCase()
+  const multimodalEvidence =
+    /vision|multimodal|vl\b|image|claude|gpt|gemini|qwen|deepseek|o1|o3|o4|llava/i.test(evidencePool)
+
+  // 3. 服务端未显式禁用时，默认开启多模态图片能力（用户在桌面端对接的均为主流多模态模型）
+  console.info(
+    `[acp] 多模态图片能力裁决: runtime=${runtime.id}, image=true (服务端未显式禁用, 证据检测=${multimodalEvidence ? '命中' : '默认启用'})`,
+  )
+
+  return {
+    ...baseCaps,
+    image: true,
+  }
+}
 
 /**
  * 多运行时模板解析（防御性）：
@@ -444,7 +496,8 @@ export async function connectAcp(payload: {
     const caps = (initResult.agentCapabilities ?? {}) as unknown as Record<string, unknown>
     acpState.loadSessionSupported = parseLoadSessionSupported(caps)
     acpState.resumeSessionSupported = parseResumeSessionSupported(caps)
-    acpState.cachedPromptCapabilities = parsePromptCapabilities(caps)
+    // 多模态图片能力裁决：服务端显式声明优先；未显式禁用时默认开启并自动检测大模型/多模态证据
+    acpState.cachedPromptCapabilities = resolveAcpPromptCapabilities(caps, initResult, runtime)
 
     // codex 不会主动走 fs/read_text_file，只有 MCP 工具能让它拉到我们的内存数据
     if (parseMcpHttpSupported(caps)) {
