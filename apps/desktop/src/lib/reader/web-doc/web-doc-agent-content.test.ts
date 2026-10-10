@@ -62,4 +62,21 @@ describe('web-doc-agent-content', () => {
     expect(unit.text).toContain('Install guide')
     expect(isOk({ ok: true, value: unit })).toBe(true)
   })
+
+  it('抓取外部章节失败时平滑降级为友好引导提示', async () => {
+    vi.mocked(webDocApi.fetchPage).mockResolvedValue({
+      ok: false,
+      error: { code: 'NETWORK_ERROR', message: '403 Forbidden' },
+    })
+
+    const unit = await readWebDocUnitByIndex(
+      [{ label: 'Advanced Routing', href: 'https://nextjs.org/docs/app/building-your-application/routing', level: 0 }],
+      0,
+    )
+    expect(unit.label).toBe('Advanced Routing')
+    expect(unit.text).toContain('【在线文档外部章节提示】')
+    expect(unit.text).toContain('https://nextjs.org/docs/app/building-your-application/routing')
+    expect(unit.text).toContain('Web Fetch 或 Web Search')
+  })
 })
+

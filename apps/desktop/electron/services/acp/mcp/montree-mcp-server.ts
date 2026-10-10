@@ -183,7 +183,8 @@ export function adaptMontreeTools(
           ? '使用 montree_read 读取正文，另见 montree_get_selection。'
           : '读取当前打开文档的内容（支持视口文本、全章/特定章节、目录或关键词检索）。' +
             '单次返回上限默认 20,000 字（视口默认 20,000 字，章节默认 35,000 字）。' +
-            '若文本过长发生截断，可通过指定 offset 参数（如 offset=20000）继续无缝读取后续内容。',
+            '若文本过长发生截断，可通过指定 offset 参数（如 offset=20000）继续无缝读取后续内容。' +
+            '注意：在线文档（Web-Doc）常驻当前打开页，跨页外部章节若提取受限，建议使用 Web Search/Fetch 读取对应 URL。',
         inputSchema: {
           ...toolDef.inputSchema,
           properties: {

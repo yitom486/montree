@@ -86,6 +86,12 @@ export async function readChapterByRef(args: ReadChapterArgs): Promise<ReadChapt
   }
 
   if (!unit?.text.trim()) {
+    const unitHref = (units[index] as { href?: string } | undefined)?.href
+    if (unitHref && /^https?:\/\//i.test(unitHref)) {
+      throw new Error(
+        `未能读取「${label}」（index=${index}）的正文：该章节为未在阅读器中加载的在线网页（${unitHref}）。建议直接使用 Web Fetch 或 Web Search 访问该链接。`,
+      )
+    }
     throw new Error(`未能读取「${label}」（index=${index}）的正文`)
   }
 

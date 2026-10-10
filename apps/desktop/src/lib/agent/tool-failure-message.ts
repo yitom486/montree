@@ -73,6 +73,11 @@ const RULES: Rule[] = [
     body: '启动或访问本机组件失败。请确认 Agent 相关依赖已安装，然后重新连接后再试。',
   },
   {
+    test: (raw) => /未在阅读器中加载的在线网页|在线文档外部章节|Web Fetch 或 Web Search/i.test(raw),
+    headline: '在线章节建议联网读取',
+    body: '目标章节为未在阅读区打开的外部网页。助手已获取对应链接，可直接使用联网检索或网页抓取工具读取该内容。',
+  },
+  {
     test: (raw, title) => /montree_read|mcp\.montree\.montree_read/i.test(title) || /montree_read/.test(raw),
     headline: '未能读取阅读内容',
     body: '这次没能从当前阅读内容取到数据。请确认文档已打开且页面已加载完成，然后再问一次。',

@@ -36,4 +36,14 @@ describe('explainToolFailure', () => {
     expect(r.headline).toContain('罗盘索引')
     expect(r.body).toMatch(/建立罗盘索引|识别本页/)
   })
+
+  it('在线文档外部章节未加载 → 引导使用联网检索', () => {
+    const r = explainToolFailure(
+      '未能读取「Advanced Routing」（index=2）的正文：该章节为未在阅读器中加载的在线网页（https://nextjs.org/...）。建议直接使用 Web Fetch 或 Web Search 访问该链接。',
+      'mcp.montree.montree_read',
+    )
+    expect(r.headline).toContain('联网读取')
+    expect(r.body).toContain('联网检索')
+  })
 })
+
