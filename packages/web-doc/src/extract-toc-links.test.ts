@@ -196,4 +196,52 @@ describe('extractGenericWebDocToc', () => {
     expect(entries[1]?.label).toContain('风雨同舟')
     expect(entries.every((e) => e.level === 0)).toBe(true)
   })
+
+  it('多 nav 场景下精准选取全站侧边栏并排除本页大纲（如 OpenCode 风格）', () => {
+    const html = `<!DOCTYPE html><html><body>
+      <nav aria-label="Documentation sections"><a href="/docs/">Docs</a><a href="/api/">API</a></nav>
+      <nav class="docs-sidebar" aria-label="Documentation">
+        <section>
+          <ul>
+            <li><a href="/v2/docs/">Intro</a></li>
+            <li><a href="/v2/docs/config/">Config</a></li>
+            <li><a href="/v2/docs/migrate/">Migrate</a></li>
+          </ul>
+        </section>
+        <section>
+          <h2>Configure</h2>
+          <ul>
+            <li><a href="/v2/docs/agents/">Agents</a></li>
+            <li><a href="/v2/docs/models/">Models</a></li>
+          </ul>
+        </section>
+      </nav>
+      <main>
+        <h1>Config</h1>
+        <nav class="docs-toc" aria-label="On this page">
+          <h2>On this page</h2>
+          <ul>
+            <li><a href="#format">Format</a></li>
+            <li><a href="#locations">Locations</a></li>
+            <li><a href="#schema">Schema</a></li>
+            <li><a href="#shell">Shell</a></li>
+          </ul>
+        </nav>
+      </main>
+    </body></html>`
+
+    const picked = pickDocsNavHtml(html)
+    expect(picked).toContain('class="docs-sidebar"')
+    expect(picked).not.toContain('class="docs-toc"')
+
+    const entries = extractGenericWebDocToc(html, 'https://opencode.ai/v2/docs/config/')
+    expect(entries.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:Intro',
+      '0:Config',
+      '0:Migrate',
+      '0:Configure',
+      '1:Agents',
+      '1:Models',
+    ])
+  })
 })

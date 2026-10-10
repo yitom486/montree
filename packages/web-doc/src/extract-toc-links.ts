@@ -103,6 +103,10 @@ export function extractBalancedElements(html: string, tagName: string): string[]
 
 /**
  * 选取最可能是「站点目录」的 nav：完整主侧栏优先于章节内嵌套 nav。
+ * 核心原则：
+ * 1. 强力区分「全站跨页主侧栏」与「页内锚点大纲（On this page）」：
+ *    - 链接绝大多数为 #hash 锚点、或标有 On this page/docs-toc 的导航直接降权排除；
+ * 2. 优先重奖含有大量跨页面相对路径链接、具有 sidebar 标识与多层分组的导航容器。
  */
 export function pickDocsNavHtml(html: string): string | null {
   const cleaned = stripScriptsAndStyles(html)
@@ -115,31 +119,79 @@ export function pickDocsNavHtml(html: string): string | null {
   const scored = navBlocks.map((block) => {
     const openTag = block.match(/^<nav\b[^>]*>/i)?.[0] ?? ''
     let score = 0
-    if (/\bid=["']sidebar["']/i.test(openTag)) score += 100
-    if (/md-nav--primary/i.test(openTag)) score += 120
-    if (/aria-label=["'][^"']*(pages|导航|navigation|sidebar|docs|toc|目录)[^"']*["']/i.test(openTag)) {
-      score += 80
+
+    // 统计链接特征：跨页同站链接 vs 纯 #hash 本页锚点
+    const allAnchors = block.match(/<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi) ?? []
+    const totalAnchors = allAnchors.length
+    let hashAnchorCount = 0
+    let crossPageAnchorCount = 0
+    for (const a of allAnchors) {
+      const hrefMatch = a.match(/\bhref=["']([^"']+)["']/i)
+      if (!hrefMatch) continue
+      const h = hrefMatch[1]!.trim()
+      if (h.startsWith('#')) {
+        hashAnchorCount += 1
+      } else if (!h.startsWith('javascript:') && !h.startsWith('mailto:') && !h.startsWith('tel:')) {
+        crossPageAnchorCount += 1
+      }
     }
-    if (/\brole=["']navigation["']/i.test(openTag)) score += 40
-    if (/sidebar-group|sidebar-title|md-nav__list/i.test(block)) score += 50
-    // 页眉/页脚/页内 TOC 降权
-    if (
+
+    const isMostlyHash = totalAnchors >= 2 && hashAnchorCount / totalAnchors >= 0.6
+    const isInPageToc =
+      /aria-label=["'][^"']*(on this page|page outline|table of contents|本页|页内|in this article)[^"']*["']/i.test(openTag) ||
+      /\bclass=["'][^"']*(docs-toc|page-toc|on-this-page|in-page-toc|table-of-contents)[^"']*["']/i.test(openTag) ||
+      /<h[2-4][^>]*>(on this page|page outline|本页目录|本页大纲|in this article)<\/h[2-4]>/i.test(block)
+
+    const isHeaderOrFooter =
       /md-header|md-footer|md-nav--secondary/i.test(openTag) ||
-      /aria-label=["'][^"']*页眉[^"']*["']/i.test(openTag) ||
-      /aria-label=["'][^"']*页脚[^"']*["']/i.test(openTag)
-    ) {
+      /aria-label=["'][^"']*(页眉|页脚|header|footer)[^"']*["']/i.test(openTag)
+
+    // 页内大纲与页眉页脚强力降权，严防错选
+    if (isMostlyHash || isInPageToc) {
+      score -= 200
+    }
+    if (isHeaderOrFooter) {
       score -= 100
     }
-    const linkCount = (block.match(/<a\b/gi) ?? []).length
+
+    // 主侧栏标志重赏
+    if (
+      /\b(id|class)=["'][^"']*(sidebar|docs-sidebar|nav-sidebar|documentation-sidebar|site-sidebar|main-sidebar)[^"']*["']/i.test(
+        openTag,
+      )
+    ) {
+      score += 120
+    }
+    if (/md-nav--primary/i.test(openTag)) {
+      score += 120
+    }
+    if (
+      /aria-label=["'][^"']*(documentation|docs|navigation|sidebar|site navigation|全站|pages)[^"']*["']/i.test(
+        openTag,
+      )
+    ) {
+      score += 80
+    }
+    if (/\brole=["']navigation["']/i.test(openTag)) {
+      score += 40
+    }
+    if (/sidebar-group|sidebar-title|md-nav__list/i.test(block)) {
+      score += 50
+    }
+
+    // 跨页有效链接数重奖
+    score += Math.min(crossPageAnchorCount * 4, 160)
     const ulCount = (block.match(/<ul\b/gi) ?? []).length
+    score += Math.min(ulCount * 3, 30)
     const nestedNavCount = (block.match(/<nav\b/gi) ?? []).length
-    score += Math.min(linkCount, 120) + Math.min(ulCount * 3, 40) + Math.min(nestedNavCount * 5, 40)
-    return { block, score, linkCount }
+    score += Math.min(nestedNavCount * 5, 40)
+
+    return { block, score, crossPageAnchorCount, totalAnchors }
   })
 
-  scored.sort((a, b) => b.score - a.score || b.linkCount - a.linkCount)
+  scored.sort((a, b) => b.score - a.score || b.crossPageAnchorCount - a.crossPageAnchorCount)
   const best = scored[0]
-  if (!best || best.linkCount < 2) return null
+  if (!best || best.score <= 0 || best.crossPageAnchorCount < 2) return null
   return best.block
 }
 
