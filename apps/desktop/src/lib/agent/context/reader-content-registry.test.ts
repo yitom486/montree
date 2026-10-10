@@ -12,10 +12,18 @@ describe('normalizeReaderText', () => {
     expect(normalizeReaderText('  第一段  \n\n\n\n第二段\t\n')).toBe('第一段\n\n第二段')
   })
 
-  it('超长时截断并标注', () => {
-    const text = normalizeReaderText('字'.repeat(READER_TEXT_MAX_CHARS + 100))
+  it('超长时截断并标注引导下文', () => {
+    const text = normalizeReaderText('字'.repeat(READER_TEXT_MAX_CHARS + 1000))
     expect(text).toContain('已截断')
-    expect(text.length).toBeLessThan(READER_TEXT_MAX_CHARS + 100)
+    expect(text).toContain('montree_read(offset=')
+    expect(text.length).toBeLessThan(READER_TEXT_MAX_CHARS + 1000)
+  })
+
+  it('支持传入 offset 接续阅读下文', () => {
+    const raw = '零一二三四五六七八九'
+    const result = normalizeReaderText(raw, { offset: 5, maxChars: 5 })
+    expect(result).toContain('五六七八九')
+    expect(result).toContain('[接续阅读：从第 5 字开始]')
   })
 })
 

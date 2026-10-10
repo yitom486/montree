@@ -1,10 +1,17 @@
 import type { ReaderImageReference } from '@montree/contracts'
 
 /** 单次返回给 Agent 的正文上限：一章再长也不该一次灌满上下文 */
-export const READER_TEXT_MAX_CHARS = 20_000
+export const READER_TEXT_MAX_CHARS = 35_000
 
-/** 视口文本上限：一屏通常远小于此，仅作安全阀 */
-export const VIEWPORT_TEXT_MAX_CHARS = 8_000
+/** 视口文本默认上限：由 8_000 提升至 20_000，保障长篇在线文档首屏能读全 */
+export const VIEWPORT_TEXT_MAX_CHARS = 20_000
+
+export interface ReaderTextReadOptions {
+  /** 期望返回的最大字符数 */
+  maxChars?: number
+  /** 字符起始偏移量（用于续读截断内容） */
+  offset?: number
+}
 
 export interface ReaderUnitText {
   /** 人类可读定位：章节标题或「第 N 页」 */
@@ -76,14 +83,41 @@ export function getReaderContentProvider(): ReaderContentProvider | null {
   return current
 }
 
-/** 折叠空白并截断，避免把整本书塞进一次工具返回 */
-export function normalizeReaderText(raw: string, maxChars = READER_TEXT_MAX_CHARS): string {
+/** 折叠空白并截断，避免把整本书塞进一次工具返回；支持 offset 续读与智能引导 */
+export function normalizeReaderText(
+  raw: string,
+  options?: number | ReaderTextReadOptions,
+): string {
   const text = raw.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-  if (text.length <= maxChars) return text
-  return `${text.slice(0, maxChars)}\n\n…[已截断：过长，仅返回前 ${maxChars} 字]`
+  const opts: ReaderTextReadOptions =
+    typeof options === 'number' ? { maxChars: options } : (options ?? {})
+
+  const totalChars = text.length
+  const offset = Math.max(0, Math.trunc(opts.offset ?? 0))
+  const limit = Math.max(100, Math.min(opts.maxChars ?? READER_TEXT_MAX_CHARS, 60_000))
+
+  const slice = text.slice(offset, offset + limit)
+  const remaining = Math.max(0, totalChars - (offset + slice.length))
+
+  if (remaining === 0 && offset === 0) {
+    return slice
+  }
+
+  let result = slice
+  if (offset > 0) {
+    result = `[接续阅读：从第 ${offset} 字开始]\n\n${result}`
+  }
+  if (remaining > 0) {
+    const nextOffset = offset + slice.length
+    result += `\n\n…[已截断：当前返回前 ${slice.length} 字（第 ${offset} ~ ${nextOffset} 字），全文共 ${totalChars} 字，还剩 ${remaining} 字。如需继续阅读后续内容，请调用 montree_read(offset=${nextOffset})]`
+  }
+  return result
 }
 
-export async function readCurrentDocumentText(expectedFilePath?: string): Promise<string> {
+export async function readCurrentDocumentText(
+  expectedFilePath?: string,
+  options?: ReaderTextReadOptions,
+): Promise<string> {
   const provider = current
   if (!provider) {
     throw new Error('当前没有打开的文档，或该格式暂不支持提取正文')
@@ -91,12 +125,16 @@ export async function readCurrentDocumentText(expectedFilePath?: string): Promis
   if (expectedFilePath && provider.filePath !== expectedFilePath) {
     throw new Error('文档刚刚切换，请重新获取当前文档信息后再试')
   }
-  const text = normalizeReaderText(await provider.getCurrentText())
+  const maxChars = options?.maxChars ?? READER_TEXT_MAX_CHARS
+  const text = normalizeReaderText(await provider.getCurrentText(), { ...options, maxChars })
   return appendImageReferences(text, provider, 'current')
 }
 
 /** 当前窗口可见文本；未注册 getViewportText 时明确报错，避免误返回整章 */
-export async function readViewportText(expectedFilePath?: string): Promise<string> {
+export async function readViewportText(
+  expectedFilePath?: string,
+  options?: ReaderTextReadOptions,
+): Promise<string> {
   const provider = current
   if (!provider) {
     throw new Error('当前没有打开的文档，或该格式暂不支持提取正文')
@@ -107,7 +145,8 @@ export async function readViewportText(expectedFilePath?: string): Promise<strin
   if (!provider.getViewportText) {
     throw new Error('当前文档不支持视口文本（Markdown 请直接读文件；阅读器用 montree_read(scope=viewport)）')
   }
-  const text = normalizeReaderText(await provider.getViewportText(), VIEWPORT_TEXT_MAX_CHARS)
+  const maxChars = options?.maxChars ?? VIEWPORT_TEXT_MAX_CHARS
+  const text = normalizeReaderText(await provider.getViewportText(), { ...options, maxChars })
   return appendImageReferences(text, provider, 'viewport')
 }
 

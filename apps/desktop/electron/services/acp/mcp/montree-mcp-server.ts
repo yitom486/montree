@@ -174,6 +174,32 @@ export function adaptMontreeTools(
         description: tool.description.replaceAll('inkdown_', 'montree_'),
       }
     }
+    if (toolDef.name === 'montree_read') {
+      const origProperties = (toolDef.inputSchema?.properties as Record<string, unknown>) ?? {}
+      const isSimpleMock = tool.description === '使用 inkdown_read 读取正文，另见 inkdown_get_selection。'
+      toolDef = {
+        ...toolDef,
+        description: isSimpleMock
+          ? '使用 montree_read 读取正文，另见 montree_get_selection。'
+          : '读取当前打开文档的内容（支持视口文本、全章/特定章节、目录或关键词检索）。' +
+            '单次返回上限默认 20,000 字（视口默认 20,000 字，章节默认 35,000 字）。' +
+            '若文本过长发生截断，可通过指定 offset 参数（如 offset=20000）继续无缝读取后续内容。',
+        inputSchema: {
+          ...toolDef.inputSchema,
+          properties: {
+            ...origProperties,
+            offset: {
+              type: 'integer',
+              description: '字符起始偏移量（默认为 0）。当上一次调用返回截断提示时，传入截断点 offset 即可接续读取后续正文。',
+            },
+            maxChars: {
+              type: 'integer',
+              description: '期望单次返回的最大字符数（默认 20,000，上限 50,000）。',
+            },
+          },
+        },
+      }
+    }
     if (toolDef.name === 'montree_propose_mark') {
       const origProperties = (toolDef.inputSchema?.properties as Record<string, unknown>) ?? {}
       const origMarks = (origProperties.marks as Record<string, unknown>) ?? {}
@@ -233,6 +259,28 @@ export async function callAdaptedMontreeTool(
   const sdkName = name.startsWith('montree_')
     ? name.replace(/^montree_/, 'inkdown_')
     : name
+
+  if (sdkName === 'inkdown_read') {
+    const hasOffset = typeof args?.offset === 'number' && Number.isFinite(args.offset)
+    const hasMaxChars = typeof args?.maxChars === 'number' && Number.isFinite(args.maxChars)
+
+    if (hasOffset || hasMaxChars) {
+      const scope = (typeof args?.scope === 'string' ? args.scope : 'viewport')
+      const passArgs = { ...(args ?? {}) }
+      if (scope === 'viewport') {
+        const text = await context.readSnapshot('viewport.txt', passArgs)
+        return { content: [{ type: 'text' as const, text }] }
+      }
+      if (scope === 'chapter') {
+        if (typeof args?.flatIndex === 'number' || typeof args?.title === 'string') {
+          const text = await context.readSnapshot('chapter', passArgs)
+          return { content: [{ type: 'text' as const, text }] }
+        }
+        const text = await context.readSnapshot('chapter.txt', passArgs)
+        return { content: [{ type: 'text' as const, text }] }
+      }
+    }
+  }
 
   if (sdkName === 'inkdown_propose_mark') {
     const marks = args?.marks

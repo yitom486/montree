@@ -214,28 +214,42 @@ export async function resolveMontreeSnapshot(
       return JSON.stringify(buildTocSnapshot(), null, 2)
     case 'focused.json':
       return JSON.stringify(buildFocusedSnapshot(), null, 2)
-    case 'chapter.txt':
-      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'document' })))
-      return await readCurrentDocumentText()
-    case 'viewport.txt':
-      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'viewport', maxChars: 8000 })))
-      return await readViewportText()
+    case 'chapter.txt': {
+      const readOpts = args as { maxChars?: number; offset?: number } | undefined
+      if (getDocumentTools()?.kind === 'text') {
+        return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'document', ...readOpts })))
+      }
+      return await readCurrentDocumentText(undefined, readOpts)
+    }
+    case 'viewport.txt': {
+      const readOpts = args as { maxChars?: number; offset?: number } | undefined
+      if (getDocumentTools()?.kind === 'text') {
+        return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'viewport', maxChars: readOpts?.maxChars ?? 20000, ...readOpts })))
+      }
+      return await readViewportText(undefined, readOpts)
+    }
     case 'search':
       return JSON.stringify(await searchReaderContent(args?.query ?? ''), null, 2)
     case 'content-audit':
       return inspectIndexedContentForAgent(args?.query ?? '', args?.limit)
     case 'selection':
       return JSON.stringify(await readSelectionWithContext(), null, 2)
-    case 'chapter':
-      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'section', ...(args?.flatIndex !== undefined ? { flatIndex: args.flatIndex } : {}), ...(args?.title !== undefined ? { title: args.title } : {}) })))
+    case 'chapter': {
+      const chapterArgs = args as { flatIndex?: number; title?: string; offset?: number; maxChars?: number } | undefined
+      if (getDocumentTools()?.kind === 'text') {
+        return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'section', ...(chapterArgs?.flatIndex !== undefined ? { flatIndex: chapterArgs.flatIndex } : {}), ...(chapterArgs?.title !== undefined ? { title: chapterArgs.title } : {}), ...(chapterArgs ?? {}) })))
+      }
       return JSON.stringify(
         await readChapterByRef({
-          flatIndex: args?.flatIndex,
-          title: args?.title,
+          flatIndex: chapterArgs?.flatIndex,
+          title: chapterArgs?.title,
+          offset: chapterArgs?.offset,
+          maxChars: chapterArgs?.maxChars,
         }),
         null,
         2,
       )
+    }
     case 'marks':
       return JSON.stringify(
         await listMarksForAgent({

@@ -124,6 +124,10 @@ describe('montree-mcp-server 9 大阅读与卡片工具全量调用测试', () =
     const resSearch = await callAdaptedMontreeTool('montree_read', ctx, { scope: 'search', query: '关键逻辑' })
     expect(ctx.readSnapshot).toHaveBeenCalledWith('search', { query: '关键逻辑' })
     expect(resSearch.content[0].text).toContain('search')
+
+    const resOffset = await callAdaptedMontreeTool('montree_read', ctx, { scope: 'viewport', offset: 20000, maxChars: 15000 })
+    expect(ctx.readSnapshot).toHaveBeenCalledWith('viewport.txt', expect.objectContaining({ offset: 20000, maxChars: 15000 }))
+    expect(resOffset.content[0].text).toContain('viewport.txt')
   })
 
   it('2. montree_inspect_content：支持内容关键词检索', async () => {

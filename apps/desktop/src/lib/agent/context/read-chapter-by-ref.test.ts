@@ -113,7 +113,7 @@ describe('readChapterByRef', () => {
     dispose()
   })
 
-  it('超长整章截断并注记', async () => {
+  it('超长整章截断并注记，支持 offset 续读', async () => {
     useReaderNavigationStore.setState({
       ready: true,
       filePath: 'D:/book/a.pdf',
@@ -123,12 +123,15 @@ describe('readChapterByRef', () => {
     const dispose = registerReaderContent({
       filePath: 'D:/book/a.pdf',
       getCurrentText: () => '',
-      getUnitByIndex: async () => ({ label: '第4章 指令系统', text: '正'.repeat(25000) }),
+      getUnitByIndex: async () => ({ label: '第4章 指令系统', text: '正'.repeat(40000) }),
     })
     const result = await readChapterByRef({ flatIndex: 0 })
     expect(result.label).toBe('第4章 指令系统')
     expect(result.text).toContain('已截断')
-    expect(result.text.length).toBeLessThan(25000)
+    expect(result.text.length).toBeLessThan(40000)
+
+    const nextResult = await readChapterByRef({ flatIndex: 0, offset: 35000 })
+    expect(nextResult.text).toContain('[接续阅读：从第 35000 字开始]')
     dispose()
   })
 

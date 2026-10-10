@@ -11,6 +11,10 @@ export interface ReadChapterArgs {
   flatIndex?: number
   /** 章节标题；可与 flatIndex 二选一，精确匹配优先，其次包含匹配 */
   title?: string
+  /** 字符起始偏移量（用于长章节续读） */
+  offset?: number
+  /** 单次最大字符数 */
+  maxChars?: number
 }
 
 export interface ReadChapterResult {
@@ -88,7 +92,10 @@ export async function readChapterByRef(args: ReadChapterArgs): Promise<ReadChapt
   return {
     index,
     label: unit.label || label,
-    text: normalizeReaderText(unit.text, READER_TEXT_MAX_CHARS),
+    text: normalizeReaderText(unit.text, {
+      maxChars: args.maxChars ?? READER_TEXT_MAX_CHARS,
+      offset: args.offset,
+    }),
     matchedBy,
   }
 }
