@@ -37,6 +37,5 @@
 | `WebDocWorkspaceMain` | 在线文档阅读主区（顶栏地址栏 + Viewer）；向侧栏上报本页标题大纲 |
 | `WebDocAddressBar` | 在线文档 URL 输入与最近列表 |
 | `WebDocUrlField` | URL 输入（欢迎页使用） |
-| `WebDocSidebarPanel` | 侧栏内嵌在线文档快捷面板（展示最近 URL 快捷访问，输入已收敛至顶栏） |
 
 在线文档的正文/目录/站点谓词逻辑见 `@montree/web-doc`（`packages/web-doc/`）与 `lib/reader/web-doc/`。
