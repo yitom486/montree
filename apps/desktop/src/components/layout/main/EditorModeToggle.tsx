@@ -15,7 +15,7 @@ export function EditorModeToggle({ mode, onChange }: EditorModeToggleProps) {
       type="button"
       variant="ghost"
       size="xs"
-      title={isLive ? '当前为所见即所得，编辑原始 Markdown (Ctrl+/)' : '当前为源码编辑，返回所见即所得 (Ctrl+/)'}
+      title={isLive ? '切换到 Markdown 源码编辑 (Ctrl+/)' : '切换到可视编辑 (Ctrl+/)'}
       aria-label="编辑器所见即所得模式切换"
       aria-pressed={!isLive}
       data-editor-mode={mode}
@@ -26,7 +26,7 @@ export function EditorModeToggle({ mode, onChange }: EditorModeToggleProps) {
       onClick={() => onChange(isLive ? 'source' : 'live-preview')}
     >
       {isLive ? <Code className="size-3" /> : <Sparkles className="size-3 text-primary" />}
-      <span>{isLive ? '编辑源码' : '返回所见即所得'}</span>
+      <span>{isLive ? '编辑源码' : '可视编辑'}</span>
     </Button>
   )
 }

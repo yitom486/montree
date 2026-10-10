@@ -1,6 +1,7 @@
 import { Facet, StateEffect, StateField, type EditorState } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import { Table, parser as markdownLezerParser } from '@lezer/markdown'
+import { parser as htmlParser } from '@lezer/html'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { LivePreviewBlock } from '@/components/markdown/LivePreviewBlock'
@@ -41,11 +42,45 @@ function referenceId(token: Token, env: PreviewRenderEnv): string {
   return `fnref${footnoteId(token, env)}${subId > 0 ? `:${subId}` : ''}`
 }
 
+/** HTML grammar matches containers across Markdown blank lines; fences stay masked. */
+function detailsTokenRanges(state: EditorState, tokens: Token[]): Map<number, number> {
+  const htmlTokens = tokens.flatMap((token, index) => {
+    if (token.type !== 'html_block' || token.level !== 0 || !token.map) return []
+    return [{ index, from: state.doc.line(token.map[0] + 1).from,
+      to: state.doc.line(Math.min(token.map[1], state.doc.lines)).to }]
+  })
+  if (!htmlTokens.length) return new Map()
+  const source = state.doc.toString()
+  const chunks: string[] = []
+  let offset = 0
+  for (const token of htmlTokens) {
+    chunks.push(source.slice(offset, token.from).replace(/[^\r\n]/g, ' '), source.slice(token.from, token.to))
+    offset = token.to
+  }
+  chunks.push(source.slice(offset).replace(/[^\r\n]/g, ' '))
+  const htmlSource = chunks.join('')
+  const ranges = new Map<number, number>()
+  htmlParser.parse(htmlSource).iterate({ enter(node) {
+    if (node.name !== 'Element') return
+    const tag = node.node.getChild('OpenTag')?.getChild('TagName')
+    const close = node.node.getChild('CloseTag')
+    if (!tag || htmlSource.slice(tag.from, tag.to).toLowerCase() !== 'details' || !close) return
+    const first = htmlTokens.find((token) => token.from <= node.from && token.to > node.from)
+    const last = htmlTokens.find((token) => token.from <= close.from && token.to >= close.to)
+    if (first && last) {
+      ranges.set(first.index, Math.max(ranges.get(first.index) ?? 0, last.index + 1))
+      return false
+    }
+  } })
+  return ranges
+}
+
 /** markdown-it's source maps determine block boundaries; never serialize rendered HTML back. */
 export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
   const blocks: PreviewBlock[] = []
   const env: PreviewRenderEnv = {}
   const tokens = markdownParser.parse(state.doc.toString(), env)
+  const detailsRanges = detailsTokenRanges(state, tokens)
   const referenceKey = JSON.stringify(env.references ?? {})
   const blockEnv: PreviewRenderEnv = { references: env.references }
   const notes = tokens.flatMap((token, index) => token.type === 'footnote_open' ? [tokens.slice(index, blockEnd(tokens, index))] : [])
@@ -60,15 +95,22 @@ export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index]
     if (token.level !== 0 || !token.map) continue
-    const blockTokens = tokens.slice(index, blockEnd(tokens, index))
+    const detailsEnd = detailsRanges.get(index)
+    const blockTokens = tokens.slice(index, detailsEnd ?? blockEnd(tokens, index))
     const refs = footnoteRefs(blockTokens)
     let kind = token.type
     if (kind === 'paragraph_open') {
       const children = tokens[index + 1]?.children ?? []
       if (!refs.length && !children.some((child) => ['image', 'html_inline', 'math_inline', 'math_inline_double'].includes(child.type))) continue
       kind = 'rich-paragraph'
-    } else if (!refs.length && !['table_open', 'fence', 'code_block', 'html_block', 'math_block'].includes(kind)) continue
-    const [start, end] = token.map
+    } else if (!refs.length && !['table_open', 'fence', 'code_block', 'html_block', 'math_block', 'blockquote_open', 'alert_open'].includes(kind)) continue
+    let [start, end] = token.map
+    // The plugin maps alert_open to its body; alert_title maps the marker line.
+    if (kind === 'alert_open') start = tokens[index + 1]?.map?.[0] ?? start
+    if (detailsEnd) {
+      kind = 'details'
+      end = tokens[detailsEnd - 1].map![1]
+    }
     if (start >= state.doc.lines || end <= start) continue
     const from = state.doc.line(start + 1).from
     const to = state.doc.line(Math.min(end, state.doc.lines)).to
@@ -83,7 +125,7 @@ export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
       const definition = lastDefinitions.get(meta.label)
       return definition && definition.map[0] >= start && definition.map[1] <= end
     })
-    const renderedHtml = refs.length ? markdownParser.renderer.render(blockTokens, markdownParser.options, env) + noteHtml(attachedNotes) : undefined
+    const renderedHtml = refs.length || detailsEnd ? markdownParser.renderer.render(blockTokens, markdownParser.options, env) + noteHtml(attachedNotes) : undefined
     const footnoteTargets = refs.map((ref) => referenceId(ref, env))
     footnoteTargets.push(...attachedNotes.map((part) => `fn${footnoteId(part[0], env)}`))
     blocks.push({ from, to, source, kind, env: blockEnv, referenceKey, renderedHtml, footnoteTargets })

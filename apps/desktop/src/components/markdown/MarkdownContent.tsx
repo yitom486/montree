@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MermaidBlock } from '@/components/markdown/MermaidBlock'
-import { splitMarkdownParts } from '@/lib/editor/markdown-parts'
 import { cn } from '@/lib/utils'
 
 interface MarkdownContentProps {
@@ -12,38 +12,36 @@ interface MarkdownContentProps {
 
 /**
  * 预览与 Agent 共用的 Markdown DOM 渲染：
- * 拆出 mermaid → 独立块出图；其余片段 dangerouslySetInnerHTML。
+ * 保留完整 HTML 容器，Mermaid 通过 React portal 原位出图。
  */
 export function MarkdownContent({ html, className, deferMermaid = false }: MarkdownContentProps) {
-  const parts = useMemo(() => {
-    if (!html || deferMermaid) return null
-    return splitMarkdownParts(html)
+  const prepared = useMemo(() => {
+    if (!html || deferMermaid || typeof DOMParser === 'undefined') return { html, diagrams: [] }
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const diagrams = Array.from(doc.body.querySelectorAll('.mermaid, .mermaid-hydrating')).map((node, index) => {
+      const source = (node.getAttribute('data-mermaid-source') || node.textContent || '').trim()
+      const placeholder = doc.createElement('div')
+      placeholder.setAttribute('data-montree-mermaid-slot', String(index))
+      node.replaceWith(placeholder)
+      return source
+    })
+    return { html: diagrams.length ? doc.body.innerHTML : html, diagrams }
   }, [html, deferMermaid])
+  // Stable props prevent React from replacing the portal hosts or resetting native details.
+  const innerHtml = useMemo(() => ({ __html: prepared.html }), [prepared.html])
+  const container = useRef<HTMLDivElement>(null)
+  const [mounts, setMounts] = useState<{ prepared: typeof prepared; nodes: Element[] }>()
+  useEffect(() => {
+    setMounts({ prepared, nodes: Array.from(container.current?.querySelectorAll('[data-montree-mermaid-slot]') ?? []) })
+  }, [prepared])
 
   if (!html) return null
-
-  if (!parts) {
-    return (
-      <div
-        className={cn('min-w-0 max-w-full', className)}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    )
-  }
-
   return (
-    <div className={cn('min-w-0 max-w-full', className)}>
-      {parts.map((part, index) =>
-        part.type === 'mermaid' ? (
-          <MermaidBlock key={part.id} source={part.source} />
-        ) : (
-          <div
-            key={`html-${index}`}
-            className="min-w-0 max-w-full"
-            dangerouslySetInnerHTML={{ __html: part.html }}
-          />
-        ),
-      )}
-    </div>
+    <>
+      <div ref={container} className={cn('min-w-0 max-w-full', className)}
+        dangerouslySetInnerHTML={innerHtml} />
+      {mounts?.prepared === prepared && mounts.nodes.map((node, index) => prepared.diagrams[index]
+        ? createPortal(<MermaidBlock source={prepared.diagrams[index]} />, node, `mmd-${index}`) : null)}
+    </>
   )
 }

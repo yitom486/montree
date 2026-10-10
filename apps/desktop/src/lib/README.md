@@ -38,7 +38,7 @@
 | `deep-link` | 跨格式深度回跳协议解析与构建（`montree://open`） |
 | `markdown-it-wikilinks` | 双向链接 `[[target\|label]]` markdown-it 扩展 |
 | `markdown-it-page-marker` | OCR 页标记 chip 插件（独立成行 `<!-- Page N -->`→分页 chip，`data-page` 预留跳原图页） |
-| `markdown-it-alerts` / `.test.ts` | GitHub 风格 Note/Warning/Tip/Important/Caution 提示卡片 markdown-it 扩展 |
+| `markdown-it-alerts` / `.test.ts` | 社区 `@mdit/plugin-alert` 接入：GitHub 风格提示卡片与嵌套支持 |
 | `wikilink-completion` | CodeMirror 6 `[[` 实时自动补全源 |
 | `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位 |
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
@@ -67,7 +67,7 @@
 | `pdf-ocr/` | PDF OCR：页缓存 hydrate/预取/文字层挂载、目录缓存/门控/租约锁、自动页 OCR、探测反馈 |
 | `rosetta/` | 罗盘：目录归一/签名状态、块转 Agent 文本、只读取卫、目录 AI 整理（`toc-ai`） |
 | `marks/` | 阅读标记渲染/命中（PDF/MOBI/Web）、划词匹配、Anki 与读书笔记导出 |
-| `web-doc/` | 在线文档：正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、Agent 按页抓文 |
+| `web-doc/` | 在线文档：正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、一键转 Markdown 导出、Agent 按页抓文 |
 | `tts/` | 语音朗读：正文智能降噪清洗（过滤 URL/角标/脚注并保留链接正文）、静态声学物理停顿对齐器（严格 1:1 数量守恒与静态二分查表）、Web Audio 实时流式 PCM 播放器 |
 
 根目录留跨格式骨架：`reader-adapter` / `reader-unit-tree` / `scroll-anchor` / `reader-viewport-*`（测试助手）/ `wait-for-dom`。

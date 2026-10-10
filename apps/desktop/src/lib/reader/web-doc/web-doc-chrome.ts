@@ -7,7 +7,7 @@ const EDIT_PAGE_LABEL =
   /编辑此页|编辑本页|在\s*github\s*上编辑|edit this page|edit this file|edit on github|improve this page/i
 
 const DOC_CHROME_BUTTON_LABEL =
-  /copy(?:\s+(?:page|link|code))?|edit(?:\s+(?:this\s+)?(?:page|file))?|open\s+menu|search|toggle\s+(?:menu|navigation)|previous|next/i
+  /copy(?:\s+(?:page|link|code))?|edit(?:\s+(?:this\s+)?(?:page|file))?|open\s+menu|search|toggle\s+(?:menu|navigation)|previous|next|ask(?:\s+a\s+question)?/i
 
 const HEADING_SELECTOR = 'h1,h2,h3,h4,h5,h6'
 const DIVIDER_SPACING_TAGS = new Set([
@@ -247,11 +247,277 @@ function stripDocsEditChrome(root: HTMLElement): void {
   })
 }
 
+/**
+ * 文档站底部常见噪音：打分反馈（feedback）、上下页导航（pagination）、
+ * 全局页脚（footer，含 Powered by Mintlify / GitBook 等超大矢量 Logo）。
+ * 保留 blockquote 内部的引用来源 footer。
+ */
+function stripDocsFooterAndFeedbackChrome(root: HTMLElement): void {
+  // 1. 页脚与 contentinfo（保留 blockquote 内部正文引用）
+  root.querySelectorAll('footer, [role="contentinfo"], #footer, .footer, [class*="doc-footer"], [class*="page-footer"]').forEach((node) => {
+    if (node.closest('blockquote')) return
+    node.remove()
+  })
+
+  // 2. 打分、反馈与互动搜索挂件（如 Mintlify 的 feedback-toolbar / "Was this page helpful?"）
+  root.querySelectorAll(
+    '.feedback-toolbar, [class*="feedback-toolbar"], [data-component-part*="feedback"], [class*="page-feedback"], [class*="feedback-prompt"], [class*="feedback-widget"], [class*="rating-widget"]',
+  ).forEach((node) => {
+    node.remove()
+  })
+
+  // 3. 常见文档站 Powered-by 外部平台推广引流条
+  root.querySelectorAll('[class*="powered-by"], a[href*="mintlify.com/preview"], a[href="https://mintlify.com"]').forEach((node) => {
+    node.remove()
+  })
+
+  // 4. 上下页翻页链接容器（已抽取为独立阅读导航，正文末尾无需重复展示站点卡片）
+  root.querySelectorAll('#pagination, .pagination-nav, [class*="pagination-nav"], .prev-next, [class*="prev-next"]').forEach((node) => {
+    node.remove()
+  })
+
+  // 5. 语义文本匹配兜底：若包含 "Was this page helpful" 等反馈文本且含有操作按钮
+  root.querySelectorAll('div, section').forEach((element) => {
+    const text = element.textContent ?? ''
+    if (/was this page helpful|此页面是否有帮助|页面是否有帮助/i.test(text) && element.querySelectorAll('button, a').length >= 1) {
+      element.remove()
+    }
+  })
+
+  // 6. 剥离无 form 包裹的遗留搜索输入框、AI 问答框（如 Ask a question...）等表单交互控件（保留任务复选框）
+  root.querySelectorAll('input:not([type="checkbox"]), textarea, select, [role="search"]').forEach((node) => {
+    const searchWrapper = node.closest<HTMLElement>(
+      '[class*="search"], [class*="query"], [class*="ask"], [data-component-part*="search"], [class*="assistant"], .feedback-toolbar',
+    )
+    if (searchWrapper && searchWrapper !== root) {
+      searchWrapper.remove()
+    } else {
+      const parent = node.parentElement
+      node.remove()
+      if (parent && parent.children.length === 0 && !parent.textContent?.trim()) {
+        parent.remove()
+      }
+    }
+  })
+}
+
+const CALLOUT_SELECTOR = [
+  '[data-callout-type]',
+  '[data-callout]',
+  '.callout',
+  'div[role="note"]',
+  'aside[role="note"]',
+  'section[role="note"]',
+  '[class*="theme-admonition"]',
+  '.custom-block.info, .custom-block.tip, .custom-block.warning, .custom-block.danger, .custom-block.details, .custom-block.caution, .custom-block.note',
+  '.starlight-aside',
+  '[class*="markdown-alert-"]',
+].join(', ')
+
+export type WebDocCalloutType = 'info' | 'tip' | 'warning' | 'danger' | 'note'
+
+function resolveCalloutType(element: HTMLElement): WebDocCalloutType {
+  const rawType = (
+    element.getAttribute('data-callout-type') ||
+    element.getAttribute('data-callout') ||
+    ''
+  ).toLowerCase().trim()
+
+  if (/warn|caution/.test(rawType)) return 'warning'
+  if (/danger|error|critical|alert/.test(rawType)) return 'danger'
+  if (/tip|success|check/.test(rawType)) return 'tip'
+  if (/note|important/.test(rawType)) return 'note'
+  if (/info/.test(rawType)) return 'info'
+
+  const className = String(element.className ?? '').toLowerCase()
+  if (/warning|caution/.test(className)) return 'warning'
+  if (/danger|error|alert/.test(className)) return 'danger'
+  if (/tip|success|check/.test(className)) return 'tip'
+  if (/note|important/.test(className)) return 'note'
+  return 'info'
+}
+
+/**
+ * Mintlify / Docusaurus / VitePress / Starlight Callout 提示卡片：
+ * 统一转化为 Montree 语义类 .web-doc-callout 及类型修饰类，
+ * 保留卡片图标与正文结构，注入统一阅读器卡片排版。
+ */
+export function normalizeWebDocCallouts(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>(CALLOUT_SELECTOR).forEach((callout) => {
+    const type = resolveCalloutType(callout)
+    callout.classList.add('web-doc-callout', `web-doc-callout-${type}`)
+
+    // 寻找或标记图标容器
+    let icon = callout.querySelector<Element>(
+      '[data-component-part="callout-icon"], [class*="callout-icon"], [class*="admonition-icon"]',
+    )
+    if (!icon) {
+      const firstChild = callout.firstElementChild
+      if (
+        firstChild instanceof Element &&
+        (firstChild.tagName.toUpperCase() === 'SVG' ||
+          (Boolean(firstChild.querySelector('svg')) && !firstChild.textContent?.trim()))
+      ) {
+        icon = firstChild
+      }
+    }
+    if (icon) {
+      icon.classList.add('web-doc-callout-icon')
+      callout.classList.add('web-doc-callout-with-icon')
+    }
+
+    // 寻找或标记正文容器
+    const content = callout.querySelector<Element>(
+      '[data-component-part="callout-content"], [class*="callout-content"], [class*="admonition-content"]',
+    )
+    if (content) {
+      content.classList.add('web-doc-callout-content')
+    } else if (icon) {
+      // 若有图标但子元素未被容器包裹，归集非图标子节点到内容容器以保证横向并列排版
+      const wrapper = callout.ownerDocument.createElement('div')
+      wrapper.className = 'web-doc-callout-content'
+      const siblings = Array.from(callout.childNodes).filter((node) => node !== icon)
+      if (siblings.length > 0) {
+        for (const sib of siblings) {
+          wrapper.appendChild(sib)
+        }
+        callout.appendChild(wrapper)
+      }
+    }
+
+    // 标记标题（如有）
+    const title = callout.querySelector<HTMLElement>(
+      '[data-component-part="callout-title"], .custom-block-title, [class*="admonitionHeading"], [class*="markdown-alert-title"]',
+    )
+    if (title) {
+      title.classList.add('web-doc-callout-title')
+    }
+  })
+}
+
+/**
+ * 现代技术文档（如 React.dev、Vite、Docusaurus）常使用 Flex/Grid 将多张对比插图并排展示。
+ * 原站依赖 Tailwind 的 `flex-row` / `grid-cols-2` 等类；若不加处理在阅读模式下会退化为纵向堆叠。
+ * 这里识别包含 2 个及以上 figure 的行级容器，归一化为 `.web-doc-figure-row`。
+ */
+export function normalizeWebDocFigureRows(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('div, section').forEach((container) => {
+    const figures = Array.from(container.children).filter((child) => child.tagName === 'FIGURE')
+    if (figures.length < 2) return
+
+    const className = String(container.className || '')
+    const isRowLayout =
+      /(?:^|\s)(?:[a-z0-9_-]+:)?(?:flex-row|grid-cols-[2-9]|grid)(?:$|\s)/i.test(className) ||
+      figures.length === container.children.length
+
+    if (isRowLayout) {
+      container.classList.add('web-doc-figure-row')
+      figures.forEach((fig) => {
+        fig.classList.add('web-doc-figure-item')
+      })
+    }
+  })
+}
+
+/**
+ * 识别并归一化 React.dev 等站点的 Sandpack 交互代码沙箱。
+ * 将原站残缺的 SSR 占位结构重构为包含源码视图与实时执行预览的现代化 Playground。
+ */
+export function normalizeWebDocSandpackPlaygrounds(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.sandpack.sandpack--playground, [class*="sandpack--playground"]').forEach((container) => {
+    if (container.classList.contains('web-doc-playground')) return
+
+    const doc = container.ownerDocument
+    const tab =
+      container.querySelector('.sp-tab-button')?.textContent?.trim() ||
+      container.querySelector('[title$=".js"], [title$=".jsx"], [title$=".tsx"], [title$=".ts"]')?.textContent?.trim() ||
+      'App.js'
+
+    const pre = container.querySelector<HTMLPreElement>('.sp-code-editor pre, .sp-cm pre, pre')
+    const rawCode = pre?.textContent?.replace(/\u00a0/g, ' ').trim() || ''
+    if (!rawCode) return
+
+    const playground = doc.createElement('div')
+    playground.className = 'web-doc-playground'
+    playground.setAttribute('data-filename', tab)
+
+    const header = doc.createElement('div')
+    header.className = 'web-doc-playground-header'
+
+    const tabsWrap = doc.createElement('div')
+    tabsWrap.className = 'web-doc-playground-tabs'
+    const tabEl = doc.createElement('span')
+    tabEl.className = 'web-doc-playground-tab'
+    tabEl.textContent = tab
+    tabsWrap.appendChild(tabEl)
+
+    const actions = doc.createElement('div')
+    actions.className = 'web-doc-playground-actions'
+    const runBtn = doc.createElement('button')
+    runBtn.type = 'button'
+    runBtn.className = 'web-doc-playground-btn web-doc-playground-run-btn'
+    runBtn.setAttribute('title', '重新运行沙箱示例')
+    runBtn.textContent = '⚡ 重新运行'
+    actions.appendChild(runBtn)
+
+    header.appendChild(tabsWrap)
+    header.appendChild(actions)
+
+    const body = doc.createElement('div')
+    body.className = 'web-doc-playground-body'
+
+    const editorPane = doc.createElement('div')
+    editorPane.className = 'web-doc-playground-editor'
+    const newPre = doc.createElement('pre')
+    newPre.className = 'language-jsx'
+    const newCode = doc.createElement('code')
+    newCode.className = 'language-jsx'
+    newCode.textContent = rawCode
+    newPre.appendChild(newCode)
+    editorPane.appendChild(newPre)
+
+    const previewPane = doc.createElement('div')
+    previewPane.className = 'web-doc-playground-preview'
+
+    const previewHead = doc.createElement('div')
+    previewHead.className = 'web-doc-playground-preview-header'
+    previewHead.textContent = '实时交互预览 (Live Preview)'
+
+    const frameWrap = doc.createElement('div')
+    frameWrap.className = 'web-doc-playground-frame-wrap'
+
+    const iframe = doc.createElement('iframe')
+    iframe.className = 'web-doc-playground-iframe'
+    iframe.setAttribute('title', `${tab} Preview`)
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+
+    frameWrap.appendChild(iframe)
+    previewPane.appendChild(previewHead)
+    previewPane.appendChild(frameWrap)
+
+    body.appendChild(editorPane)
+    body.appendChild(previewPane)
+
+    const sourceData = doc.createElement('div')
+    sourceData.className = 'web-doc-playground-source'
+    sourceData.style.display = 'none'
+    sourceData.setAttribute('aria-hidden', 'true')
+    sourceData.textContent = rawCode
+
+    playground.appendChild(header)
+    playground.appendChild(body)
+    playground.appendChild(sourceData)
+
+    container.replaceWith(playground)
+  })
+}
+
 function stripGenericChrome(root: HTMLElement): void {
   root.querySelectorAll('form, [role="navigation"], nav').forEach((node) => node.remove())
   stripDisallowedWebDocEmbeds(root)
 
   stripDocsEditChrome(root)
+  stripDocsFooterAndFeedbackChrome(root)
   preserveSemanticButtonText(root)
 
   // 常见 docs 主题：面包屑工具条、标题旁「复制链接」图标（不绑域名）
@@ -267,6 +533,9 @@ function stripGenericChrome(root: HTMLElement): void {
   normalizeWebDocDividers(root)
   normalizeWebDocPermalinks(root)
   normalizeWebDocCards(root)
+  normalizeWebDocCallouts(root)
+  normalizeWebDocFigureRows(root)
+  normalizeWebDocSandpackPlaygrounds(root)
 }
 
 function stripPeopleDailyChrome(root: HTMLElement): void {

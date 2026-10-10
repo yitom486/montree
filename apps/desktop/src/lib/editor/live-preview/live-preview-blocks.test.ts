@@ -17,6 +17,42 @@ function state(doc = source, cursor = 0): EditorState {
   return EditorState.create({ doc, selection: { anchor: cursor }, extensions: [EditorState.allowMultipleSelections.of(true), markdown({ extensions: [GFM] }), livePreviewExtension()] })
 }
 describe('live preview block integration', () => {
+  it('嵌套引用和社区提示块整体渲染，包含提示标记的完整原文可编辑', () => {
+    const text = '# 文档\n\n> 普通引用\n>\n> > 嵌套引用\n> > - 列表 `code`\n\n> [!NOTE]\n> **提示内容**\n\n> [!WARNING]\n> 公式 $x>0$\n\n末尾'
+    const current = state(text, text.length)
+    const blocks = current.field(livePreviewBlocks).blocks
+    expect(blocks.map((block) => block.kind)).toEqual(['blockquote_open', 'alert_open', 'alert_open'])
+    expect(blocks[0].source).toContain('> > - 列表 `code`')
+    expect(blocks[1].source).toBe('> [!NOTE]\n> **提示内容**')
+    expect(blocks[2].source).toContain('> [!WARNING]')
+    const offset = text.indexOf('提示内容')
+    const edited = current.update({ selection: { anchor: offset }, changes: { from: offset, to: offset + 4, insert: '新提示' } }).state
+    expect(edited.field(livePreviewBlocks).blocks[1].source).toBe('> [!NOTE]\n> **新提示**')
+  })
+  it('跨空行的嵌套折叠区包含 Markdown、代码和表格，正文不泄漏为独立块', () => {
+    const text = '# 文档\n\n<details>\n<summary>展开</summary>\n\n正文 **粗体**\n\n```text\n<details>代码示例</details>\n```\n\n<details><summary>内层</summary>\n\n| 名称 |\n| --- |\n| 表格 |\n\n</details>\n\n</details>\n\n外部正文'
+    const current = state(text, text.length)
+    const blocks = current.field(livePreviewBlocks).blocks
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].kind).toBe('details')
+    expect(blocks[0].source).toBe(text.slice(text.indexOf('<details>'), text.lastIndexOf('</details>') + 10))
+    const container = document.createElement('div')
+    container.innerHTML = blocks[0].renderedHtml!
+    const outer = container.querySelector('details')!
+    expect(outer.querySelector('strong')?.textContent).toBe('粗体')
+    expect(outer.querySelector('table')?.textContent).toContain('表格')
+    expect(outer.querySelectorAll('details')).toHaveLength(1)
+    expect(outer.querySelector('code')?.textContent).toContain('<details>代码示例</details>')
+    expect(container.textContent).not.toContain('外部正文')
+    expect(current.doc.toString()).toBe(text)
+  })
+  it('伪折叠标签、HTML 注释和代码不参与跨块合并，相邻折叠区保持独立', () => {
+    const text = '# 文档\n\n<!-- <details> -->\n\n```html\n<details><summary>代码</summary>\n```\n\n<details><summary>一</summary>\n\n正文一\n\n</details>\n\n<details><summary>二</summary>\n\n正文二\n\n</details>\n\n末尾'
+    const blocks = state(text, text.length).field(livePreviewBlocks).blocks
+    expect(blocks.map((block) => block.kind)).toEqual(['fence', 'details', 'details'])
+    expect(blocks[1].source).not.toContain('正文二')
+    expect(blocks[2].source).not.toContain('末尾')
+  })
   it('中文混排、重复引用、行内注和未定义引用可共存', () => {
     const text = '# 文档\n\n这里有短脚注[^short]，长脚注[^long]，再次短脚注[^short]，行内注^[**行内说明**]，未知[^missing]。\n\n[^short]: 短\n\n[^long]: 长\n\n末尾'
     const html = state(text, text.length).field(livePreviewBlocks).blocks[0].renderedHtml!

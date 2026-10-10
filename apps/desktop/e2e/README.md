@@ -25,7 +25,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `reader-foliate-marks.spec.ts` | foliate 标注链路：划重点/批注/检查器/删除（EPUB+MOBI） |
 | `reader-footer-nav.spec.ts` | 底栏翻页：收进正文列（不横跨卡片轨）+ 上下单元与正文同步（真实多章节 EPUB） |
 | `reader-smoke.spec.ts` | Markdown 预览（Mermaid/公式/高亮）+ PDF 画布文字层（自研最小 fixture） |
-| `markdown-live-preview.spec.ts` | 实时预览真实 Electron 回归：表格对齐与精确源单元格、HTML/Markdown 本地图片、KaTeX、Mermaid、代码复制、details、XSS 清理、自动链接/引用定义、脚注编号与跨视口回链/长脚注编辑、暗色对比度、源码切换/撤销及新文档默认/TXT 保留原文；附截图 |
+| `markdown-live-preview.spec.ts` | 实时预览真实 Electron 回归：表格对齐与精确源单元格、HTML/Markdown 本地图片、KaTeX、Mermaid、代码复制、嵌套引用/提示块、跨空行 details 和内嵌 Mermaid 展开/收起（含独立预览）、XSS 清理、自动链接/引用定义、脚注编号与跨视口回链/长脚注编辑、暗色对比度、源码切换/撤销及新文档默认/TXT 保留原文；附截图 |
 | `reader-pdf-structure.spec.ts` | PDF 结构化 WASM：生产包真加载（非回退）+ Agent 正文走结构化（`E2E_PDF_STRUCTURE` 门控测试钩子） |
 | `reader-pdf-ocr.spec.ts` | 扫描版 PDF 单页 OCR：「更多工具 → 识别本页」落缓存 + 文字层可读（当前页无文字层会自动识别；`apps/desktop/e2e/fixtures/ocr/scanned-hello.pdf`） |
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |

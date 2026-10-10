@@ -364,4 +364,174 @@ describe('web-doc-html', () => {
     expect(result.bodyHtml).not.toContain('custom-nav')
     expect(result.bodyHtml).not.toContain('custom-footer')
   })
+
+  it('Mintlify 页面剥离底部页脚超大 Logo、打分反馈与翻页噪音', () => {
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Agent Client Protocol</h1>
+      <p>Introduction content.</p>
+      <div class="feedback-toolbar">
+        <span>Was this page helpful?</span>
+        <button>Yes</button>
+        <button>No</button>
+        <input placeholder="Ask a question..." />
+      </div>
+      <nav id="pagination">
+        <a href="/protocol/v1/overview">Next: Protocol Overview</a>
+      </nav>
+      <footer id="footer">
+        <a href="https://mintlify.com/preview">
+          Powered by
+          <svg width="1274" height="367" viewBox="0 0 1274 367"><path d="M1" /></svg>
+        </a>
+      </footer>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://agentclientprotocol.com/get-started/introduction')
+    expect(result.bodyHtml).toContain('Agent Client Protocol')
+    expect(result.bodyHtml).toContain('Introduction content.')
+    expect(result.bodyHtml).not.toContain('feedback-toolbar')
+    expect(result.bodyHtml).not.toContain('Was this page helpful?')
+    expect(result.bodyHtml).not.toContain('pagination')
+    expect(result.bodyHtml).not.toContain('Next: Protocol Overview')
+    expect(result.bodyHtml).not.toContain('footer')
+    expect(result.bodyHtml).not.toContain('width="1274"')
+    expect(result.bodyHtml).not.toContain('Powered by')
+  })
+
+  it('Mintlify Callout 提示卡片标准化并注入主题样式', () => {
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Document</h1>
+      <div role="note" class="callout" data-callout-type="info">
+        <div data-component-part="callout-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /></svg>
+        </div>
+        <div data-component-part="callout-content">
+          <p>This is an important info callout.</p>
+        </div>
+      </div>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://agentclientprotocol.com/get-started/introduction')
+    expect(result.bodyHtml).toContain('web-doc-callout')
+    expect(result.bodyHtml).toContain('web-doc-callout-info')
+    expect(result.bodyHtml).toContain('web-doc-callout-with-icon')
+    expect(result.bodyHtml).toContain('web-doc-callout-icon')
+    expect(result.bodyHtml).toContain('web-doc-callout-content')
+    expect(result.bodyHtml).toContain('This is an important info callout.')
+
+    const readerDocument = buildWebDocReaderDocument(
+      {
+        title: 'Document',
+        bodyHtml: result.bodyHtml,
+        baseUrl: 'https://agentclientprotocol.com/get-started/introduction',
+      },
+      'dark',
+    )
+    expect(readerDocument).toContain('.web-doc-callout')
+    expect(readerDocument).toContain('.web-doc-callout-info')
+    expect(readerDocument).toContain('border-left-color: #60a5fa')
+  })
+
+  it('常见文档站无明确 component-part 的警告框能自适应归集图标与内容', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Warning Test</h1>
+      <div class="custom-block warning" data-callout="warning">
+        <svg viewBox="0 0 24 24"><polygon points="12,2 22,22 2,22" /></svg>
+        <p>First warning paragraph.</p>
+        <p>Second warning paragraph.</p>
+      </div>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/guide')
+    expect(result.bodyHtml).toContain('web-doc-callout')
+    expect(result.bodyHtml).toContain('web-doc-callout-warning')
+    expect(result.bodyHtml).toContain('web-doc-callout-with-icon')
+    expect(result.bodyHtml).toContain('web-doc-callout-icon')
+    expect(result.bodyHtml).toContain('web-doc-callout-content')
+    expect(result.bodyHtml).toContain('First warning paragraph.')
+    expect(result.bodyHtml).toContain('Second warning paragraph.')
+  })
+
+  it('react.dev 的 Next.js 响应式图片 srcset 与 source 改写为完整绝对路径', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Sharing data</h1>
+      <picture>
+        <source srcset="/_next/image?url=%2Fpic.png&w=640 1x, /_next/image?url=%2Fpic.png&w=828 2x" />
+        <img src="/_next/image?url=%2Fpic.png&w=828" srcset="/_next/image?url=%2Fpic.png&w=640 1x, /_next/image?url=%2Fpic.png&w=828 2x" alt="Diagram" />
+      </picture>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://react.dev/learn')
+    expect(result.bodyHtml).toContain('src="https://react.dev/_next/image?url=%2Fpic.png&amp;w=828"')
+    expect(result.bodyHtml).toContain('srcset="https://react.dev/_next/image?url=%2Fpic.png&amp;w=640 1x, https://react.dev/_next/image?url=%2Fpic.png&amp;w=828 2x"')
+    expect(result.bodyHtml).not.toContain('srcset="/_next/image')
+  })
+
+  it('在线文档阅读器生成 base 标签并在暗色模式下隐藏 .light-image、在浅色模式下隐藏 .dark-image', () => {
+    const content = {
+      title: 'Sharing data',
+      baseUrl: 'https://react.dev/learn',
+      bodyHtml: '<div class="dark-image"><img src="https://react.dev/dark.png" /></div><div class="light-image"><img src="https://react.dev/light.png" /></div>',
+    }
+
+    const darkDoc = buildWebDocReaderDocument(content, 'dark')
+    expect(darkDoc).toContain('<base href="https://react.dev/learn" />')
+    expect(darkDoc).toContain('body .light-image')
+    expect(darkDoc).toContain('display: none !important')
+
+    const lightDoc = buildWebDocReaderDocument(content, 'light')
+    expect(lightDoc).toContain('<base href="https://react.dev/learn" />')
+    expect(lightDoc).toContain('body .dark-image')
+    expect(lightDoc).toContain('display: none !important')
+  })
+
+  it('React 官方文档等多图对照 figure 容器归一化为横向并排 .web-doc-figure-row', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h2>Sharing data between components</h2>
+      <div class="flex flex-col sm:flex-row py-2 sm:p-0 justify-center items-start sm:items-center w-full">
+        <figure class="flex flex-col px-0 p-0 sm:p-10 justify-center items-center">
+          <img src="/fig1.png" alt="fig1" />
+          <figcaption><p>Initially, each MyButton's count state is 0</p></figcaption>
+        </figure>
+        <figure class="flex flex-col px-0 p-0 sm:p-10 justify-center items-center">
+          <img src="/fig2.png" alt="fig2" />
+          <figcaption><p>The first MyButton updates its count to 1</p></figcaption>
+        </figure>
+      </div>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://react.dev/learn')
+    expect(result.bodyHtml).toContain('web-doc-figure-row')
+    expect(result.bodyHtml).toContain('web-doc-figure-item')
+
+    const doc = buildWebDocReaderDocument({ title: 'Test', bodyHtml: result.bodyHtml, baseUrl: 'https://react.dev/learn' }, 'dark')
+    expect(doc).toContain('.web-doc-figure-row')
+    expect(doc).toContain('display: flex !important')
+  })
+
+  it('React 官方文档 Sandpack 交互沙箱转换为 web-doc-playground 并提供代码与预览', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Counters that update together</h1>
+      <div class="sandpack sandpack--playground w-full my-8" dir="ltr">
+        <div class="sp-wrapper">
+          <div class="sp-tabs"><button class="sp-tab-button">App.js</button></div>
+          <div class="sp-code-editor">
+            <pre class="sp-cm sp-javascript"><code>export default function MyApp() { return &lt;button&gt;Click&lt;/button&gt;; }</code></pre>
+          </div>
+          <iframe title="Sandbox Preview"></iframe>
+        </div>
+      </div>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://react.dev/learn')
+    expect(result.bodyHtml).toContain('web-doc-playground')
+    expect(result.bodyHtml).toContain('web-doc-playground-iframe')
+    expect(result.bodyHtml).toContain('export default function MyApp()')
+
+    const doc = buildWebDocReaderDocument({ title: 'Playground Test', bodyHtml: result.bodyHtml, baseUrl: 'https://react.dev/learn' }, 'dark')
+    expect(doc).toContain('.web-doc-playground')
+    expect(doc).toContain('web-doc-playground-run-btn')
+    expect(doc).toContain('loadScript')
+    expect(doc).toContain('ReactDOM.createRoot')
+  })
 })

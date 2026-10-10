@@ -27,4 +27,12 @@ describe('markdown-it-alerts', () => {
     expect(html).toContain('<details><summary>展开更多</summary>')
     expect(html).not.toContain('&lt;details&gt;')
   })
+  it('社区插件保留嵌套提示块、行内样式与公式，转义提示标记仍是正文', () => {
+    const html = renderMarkdown('> 普通引用\n>\n> > [!NOTE]\n> > **嵌套提示**\n\n> [!WARNING]\n> 公式 $x>0$\n\n> \\[!NOTE]\n> 转义标记')
+    expect(html).toContain('markdown-alert-note')
+    expect(html).toContain('<strong>嵌套提示</strong>')
+    expect(html).toContain('markdown-alert-warning')
+    expect(html).toContain('class="katex"')
+    expect(html).toContain('[!NOTE]')
+  })
 })

@@ -5,7 +5,7 @@ import {
   useMemo,
   useRef,
 } from 'react'
-import { ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import { ExternalLink, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
@@ -24,6 +24,8 @@ import { useReaderSidePanels } from '@/hooks/reader/useReaderSidePanels'
 import { useReaderExportMenu } from '@/hooks/reader/useReaderExportMenu'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
 import { appApi } from '@/api/app-api'
+import { fileApi } from '@/api/file-api'
+import { buildWebDocMarkdown, sanitizeExportFileName } from '@/lib/reader/web-doc/web-doc-markdown-export'
 import { queryKeys } from '@/api/query-keys'
 import { useTtsStore } from '@/stores/tts-store'
 import type { MarkdownHeading } from '@/lib/editor/markdown-headings'
@@ -200,6 +202,31 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       void appApi.openExternal(pageUrl)
     }
 
+    const handleExportMarkdown = async () => {
+      if (!data?.content) return
+      try {
+        const title = data.content.title || displayTitle
+        const markdown = buildWebDocMarkdown({
+          title,
+          baseUrl: pageUrl,
+          bodyHtml: data.content.bodyHtml,
+        })
+        const suggestedName = `${sanitizeExportFileName(title)}.md`
+        const result = await fileApi.exportMarkdown({
+          content: markdown,
+          suggestedName,
+          title: '导出在线文档为 Markdown',
+        })
+        if (isOk(result)) {
+          toast.success('已导出为 Markdown 文件', {
+            description: result.value.filePath,
+          })
+        }
+      } catch (err: unknown) {
+        toast.error(`导出失败: ${err instanceof Error ? err.message : '未知错误'}`)
+      }
+    }
+
     const { handleExportNotes, handleExportAnkiCards } = useReaderExportMenu({
       marks,
       filePath: documentId,
@@ -273,6 +300,15 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
               </Button>
               <Button variant="ghost" size="icon-sm" onClick={handleOpenInBrowser} title="在浏览器中打开">
                 <ExternalLink className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!ready || !data}
+                onClick={() => void handleExportMarkdown()}
+                title="一键导出为 Markdown"
+              >
+                <FileDown className="size-4" />
               </Button>
               {(isLoading || isFetching) && !data ? (
                 <Loader2 className="size-4 animate-spin text-muted-foreground" />

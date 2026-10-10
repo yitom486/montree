@@ -46,6 +46,7 @@ export function isAllowedWebDocEmbedUrl(src: string | null | undefined): boolean
 
 export function isAllowedWebDocEmbedIframe(node: Element): boolean {
   if (node.tagName !== 'IFRAME') return false
+  if (node.classList.contains('web-doc-playground-iframe')) return true
   return isAllowedWebDocEmbedUrl(node.getAttribute('src'))
 }
 
