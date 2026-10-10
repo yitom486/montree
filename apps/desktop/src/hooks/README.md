@@ -20,6 +20,7 @@
 | 文件 | 功能 |
 |------|------|
 | `useMarkdownPreview` | 把 Markdown debounce 渲染成消毒后的 HTML（含本地图片转 data URL） |
+| `useTextDocumentTools` | Markdown/TXT 当前缓冲区 MCP 注册、精确选区、共享 CodeMirror 历史与磁盘原文冲突校验保存 |
 | `useScrollSync` | 编辑器 ↔ 预览滚动同步，并记住各文件滚动位置 |
 | `usePasteImage` | 粘贴图片写入文档旁目录，返回 Markdown 相对路径 |
 | `useExportDocument` | 当前文档导出 HTML / PDF |

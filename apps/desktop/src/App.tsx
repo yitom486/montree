@@ -94,6 +94,7 @@ function App() {
     openRecentFile,
     openExternalFilePath,
     saveFile,
+    textDocument,
     saveFileAs,
     restoreDraft,
     quitApp,
@@ -425,16 +426,23 @@ function App() {
     if (!filePath || getDocumentKind(filePath) !== 'markdown' || readerDocumentKind || webPageUrl) return
     return registerReaderContent({
       filePath,
-      getImages: () => collectMarkdownImages(editorContentRef.current, filePath),
+      getImages: () => /\.txt$/i.test(filePath) ? [] : collectMarkdownImages(textDocument?.text ?? editorContentRef.current, filePath),
       imageScope: 'current',
-      getImageCount: () => collectMarkdownImages(editorContentRef.current, filePath).length,
-      getCurrentText: () => editorContentRef.current,
+      getImageCount: () => /\.txt$/i.test(filePath) ? 0 : collectMarkdownImages(textDocument?.text ?? editorContentRef.current, filePath).length,
+      getCurrentText: () => textDocument?.text ?? editorContentRef.current,
+      getUnits: () => textDocument?.units() ?? [],
+      getCurrentUnitIndex: () => textDocument?.currentIndex() ?? 0,
+      getUnitByIndex: (index) => textDocument?.unit(index) ?? null,
+      getViewportText: () => {
+        const result = textDocument?.read({ target: 'viewport' })
+        return result && 'text' in result ? result.text : ''
+      },
       // Markdown 只有一个单元，检索即整篇全文
       iterateUnits: async function* () {
-        yield { label: baseName(filePath), text: editorContentRef.current }
+        yield { label: baseName(filePath), text: textDocument?.text ?? editorContentRef.current }
       },
     })
-  }, [filePath, readerDocumentKind, webPageUrl])
+  }, [filePath, readerDocumentKind, webPageUrl, textDocument])
 
   const handleOpenWebDoc = useCallback(
     (url: string) => {
@@ -518,6 +526,7 @@ function App() {
         ) : (
           <EditorWorkspaceMain
             ref={editorMainRef}
+            textDocument={textDocument}
             filePath={filePath}
             isDirty={isDirty}
             content={content}

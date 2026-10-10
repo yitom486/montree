@@ -2,7 +2,7 @@ import type { DocumentSelection, SlideViewContext } from '@montree/contracts'
 
 export interface DocumentToolProvider {
   filePath: string
-  kind: 'table' | 'slide'
+  kind: 'table' | 'slide' | 'text'
   isDirty: () => boolean
   save: () => Promise<void>
   undo: () => void
@@ -26,11 +26,12 @@ export function registerDocumentTools(provider: DocumentToolProvider): () => voi
 export function getDocumentTools(filePath?: string): DocumentToolProvider | null {
   return current && (!filePath || current.filePath === filePath) ? current : null
 }
-export function requireDocumentTools(kind: 'table' | 'slide', args: Record<string, unknown>): DocumentToolProvider {
+export function requireDocumentTools(kind: DocumentToolProvider['kind'], args: Record<string, unknown>): DocumentToolProvider {
   if (!current || current.kind !== kind) throw new Error('当前文档尚未就绪或不支持此工具')
   if (typeof args.documentPath !== 'string' || args.documentPath !== current.filePath) throw new Error('documentPath 与当前文档不匹配，请重新读取')
   return current
 }
 export function selectionText(selection: DocumentSelection): string {
+  if (selection.kind === 'text') return `文本 ${selection.from}–${selection.to}`
   return selection.kind === 'table' ? `${selection.sheet}!${selection.ranges.join(', ')}` : `幻灯片 ${selection.slide}：${selection.elementIds.join(', ')}`
 }

@@ -30,6 +30,8 @@ export interface OpenDialogOptions {
 export interface SaveFilePayload {
   filePath?: string
   content: string
+  /** Loaded disk text; when supplied, refuse to overwrite external changes. */
+  expectedContent?: string
   /** 另存为对话框的初始路径（含文件名） */
   defaultPath?: string
 }

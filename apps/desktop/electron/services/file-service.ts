@@ -230,6 +230,11 @@ export async function saveFileDialog(
       filePath = selectedPath
     }
 
+    if (payload.expectedContent !== undefined) {
+      if (typeof payload.expectedContent !== 'string' || await readFile(filePath, 'utf-8') !== payload.expectedContent) {
+        return err({ code: 'FILE_WRITE_ERROR', message: '文件已被其他程序修改，请重新打开后再保存' })
+      }
+    }
     await writeFile(filePath, payload.content, 'utf-8')
     return ok({ filePath })
   } catch (error) {

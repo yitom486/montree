@@ -7,6 +7,7 @@ import {
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { languages } from '@codemirror/language-data'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import type { TextDocument } from '@/lib/editor/text-document'
 import {
   bracketMatching,
   foldGutter,
@@ -56,6 +57,7 @@ export interface MarkdownEditorHandle {
 }
 
 interface MarkdownEditorProps {
+  textDocument?: TextDocument
   value: string
   filePath?: string
   theme?: AppTheme
@@ -75,6 +77,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   function MarkdownEditor(
     {
       value,
+      textDocument,
       filePath,
       theme = 'dark',
       tabSize = 2,
@@ -166,13 +169,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       if (!containerRef.current) return
 
       const updateListener = EditorView.updateListener.of((update) => {
+        textDocument?.accept(update.state)
         if (!update.docChanged) return
         // 外部 setValue 同步时不回写，避免 CRLF→LF 等归一化造成误判 dirty
         if (update.transactions.every((tr) => tr.annotation(Transaction.remote))) return
         onChangeRef.current(update.state.doc.toString())
       })
 
-      const state = EditorState.create({
+      const createState = textDocument ? (config: Parameters<typeof EditorState.create>[0]) => textDocument.createEditorState(config) : EditorState.create
+      const state = createState({
         doc: value,
         extensions: [
           tabSizeCompartment.of(EditorState.tabSize.of(tabSize)),
@@ -181,6 +186,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           highlightActiveLineGutter(),
           highlightActiveLine(),
           history(),
+          EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           bracketMatching(),
           closeBrackets(),
@@ -228,16 +234,18 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       })
 
       viewRef.current = view
+      const detachDocument = textDocument?.attach(view)
 
       const handleScroll = () => onScrollRef.current?.()
       view.scrollDOM.addEventListener('scroll', handleScroll, { passive: true })
 
       return () => {
         view.scrollDOM.removeEventListener('scroll', handleScroll)
+        detachDocument?.()
         view.destroy()
         viewRef.current = null
       }
-    }, [])
+    }, [textDocument])
 
     useEffect(() => {
       const view = viewRef.current

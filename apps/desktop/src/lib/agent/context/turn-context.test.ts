@@ -112,7 +112,7 @@ describe('MONTREE_STATIC_SKILL', () => {
     expect(MONTREE_STATIC_SKILL).toContain('.epub')
     expect(MONTREE_STATIC_SKILL).toContain('turn-context')
     expect(MONTREE_STATIC_SKILL).toContain('Soft cues')
-    expect(MONTREE_STATIC_SKILL).toContain('normal workspace file read/write')
+    expect(MONTREE_STATIC_SKILL).toContain('Native workspace tools')
     expect(MONTREE_STATIC_SKILL).toContain('No user workspace folder')
     expect(MONTREE_STATIC_SKILL).toContain('Do **not** call tools only to "prove"')
     expect(MONTREE_STATIC_SKILL).toContain('montree_read')

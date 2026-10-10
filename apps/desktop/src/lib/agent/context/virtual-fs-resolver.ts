@@ -194,11 +194,14 @@ export async function resolveMontreeSnapshot(
     }
     case 'table-read':
     case 'table-edit':
+    case 'text-read':
+    case 'text-edit':
     case 'slide-read':
     case 'slide-edit': {
       const values = (args ?? {}) as Record<string, unknown>
-      const provider = requireDocumentTools(resource.startsWith('table') ? 'table' : 'slide', values)
-      return JSON.stringify(resource.endsWith('read') ? provider.read(values) : provider.edit(values))
+      const provider = requireDocumentTools(resource.startsWith('text') ? 'text' : resource.startsWith('table') ? 'table' : 'slide', values)
+      const result = resource.endsWith('read') ? provider.read(values) : provider.edit(values)
+      return JSON.stringify(resource === 'text-read' ? await withTextImages(result) : result)
     }
     case 'visual-context':
       return JSON.stringify(await readReaderVisualContext(args?.scope === 'viewport' ? 'viewport' : 'current'))
@@ -212,8 +215,10 @@ export async function resolveMontreeSnapshot(
     case 'focused.json':
       return JSON.stringify(buildFocusedSnapshot(), null, 2)
     case 'chapter.txt':
+      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'document' })))
       return await readCurrentDocumentText()
     case 'viewport.txt':
+      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'viewport', maxChars: 8000 })))
       return await readViewportText()
     case 'search':
       return JSON.stringify(await searchReaderContent(args?.query ?? ''), null, 2)
@@ -222,6 +227,7 @@ export async function resolveMontreeSnapshot(
     case 'selection':
       return JSON.stringify(await readSelectionWithContext(), null, 2)
     case 'chapter':
+      if (getDocumentTools()?.kind === 'text') return JSON.stringify(await withTextImages(getDocumentTools()!.read({ target: 'section', ...(args?.flatIndex !== undefined ? { flatIndex: args.flatIndex } : {}), ...(args?.title !== undefined ? { title: args.title } : {}) })))
       return JSON.stringify(
         await readChapterByRef({
           flatIndex: args?.flatIndex,
@@ -285,6 +291,13 @@ export async function resolveMontreeSnapshot(
       throw new Error(`未知的快照资源: ${String(_exhaustive)}`)
     }
   }
+}
+
+async function withTextImages(result: unknown) {
+  const provider = getReaderContentProvider()
+  const references = await provider?.getImages?.('current') ?? []
+  return { ...(result as Record<string, unknown>), images: references.slice(0, 8), imageCount: references.length,
+    imagesTruncated: references.length > 8, imageScope: 'document' }
 }
 
 /**

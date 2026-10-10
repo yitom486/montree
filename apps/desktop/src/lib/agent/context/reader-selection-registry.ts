@@ -10,6 +10,7 @@ export interface SelectionProvider {
   filePath: string
   /** 读取当前 DOM / 编辑器里的选区纯文本；无选区返回 null */
   getSelectionText: () => string | null
+  getSelectionTarget?: () => DocumentSelection | null
 }
 
 let current: SelectionProvider | null = null

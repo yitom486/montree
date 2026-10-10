@@ -42,6 +42,7 @@
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
+| `text-document` / `.test.ts` | Markdown/TXT 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区、跨视图 CodeMirror 撤销历史 |
 
 ## preview/
 
@@ -97,7 +98,7 @@
 |------|------|
 | `acp-composer` | 输入框附件、工作区路径拖入 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
-| `context/document-tool-registry` / `.test.ts` | 当前表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
+| `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
 | `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示 |
 | `acp-plan` | 计划条目解析与进度摘要 |
 | `acp-config-preferences` | Mode/Model 等配置记忆 |

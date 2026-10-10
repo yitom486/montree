@@ -23,6 +23,7 @@ import { clearDraftForFile } from '@/hooks/editor/useDraftPersistence'
 import { getOpenDialogDefaultPath } from '@/lib/workspace/dialog-default-path'
 import { normalizeNewlines } from '@/lib/editor/text-normalize'
 import type { DocumentDraft } from '@/lib/editor/draft-utils'
+import { useTextDocumentTools } from '@/hooks/editor/useTextDocumentTools'
 
 function getFileName(filePath?: string): string {
   if (!filePath) return '未命名'
@@ -40,6 +41,10 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const [content, setContent] = useState('')
   const [filePath, setFilePath] = useState<string>()
   const [savedContent, setSavedContent] = useState('')
+  const [diskContent, setDiskContent] = useState('')
+  const [textSession, setTextSession] = useState(0)
+  const textDocument = useTextDocumentTools({ filePath, content, savedContent, diskContent, session: textSession,
+    onChange: setContent, onSaved: (text) => { setSavedContent(text); setDiskContent(text) } })
   const [unsavedAction, setUnsavedAction] = useState<UnsavedAction | null>(null)
   const unsavedActionRef = useRef<UnsavedAction | null>(null)
 
@@ -91,6 +96,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       setFilePath(result.filePath)
       setContent(content)
       setSavedContent(content)
+      setDiskContent(result.content)
+      setTextSession((session) => session + 1)
       syncTitle(result.filePath, false)
       trackOpenedPath(result.filePath)
     },
@@ -227,7 +234,10 @@ export function useFileOperations(onError?: (error: AppError) => void) {
         return
       }
       setFilePath(result.value.filePath)
-      setSavedContent(variables.content)
+      if (getDocumentTools(result.value.filePath)?.kind !== 'text') {
+        setSavedContent(variables.content)
+        setDiskContent(variables.content)
+      }
       syncTitle(result.value.filePath, false)
       trackOpenedPath(result.value.filePath)
       clearDraftForFile(result.value.filePath)
@@ -253,6 +263,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       }
       setFilePath(result.value.filePath)
       setSavedContent(variables.content)
+      setDiskContent(variables.content)
       syncTitle(result.value.filePath, false)
       trackOpenedPath(result.value.filePath)
       clearDraftForFile(result.value.filePath)
@@ -360,12 +371,16 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   )
 
   const restoreDraft = useCallback(
-    (draft: DocumentDraft) => {
+    async (draft: DocumentDraft) => {
       const content = normalizeNewlines(draft.content)
       const baseline = normalizeNewlines(draft.baselineContent)
+      const disk = draft.filePath ? await fileApi.readFile(draft.filePath) : null
       setFilePath(draft.filePath)
       setContent(content)
       setSavedContent(baseline)
+      // CRLF drafts retain a raw disk baseline only if the restored baseline still matches.
+      setDiskContent(disk && isOk(disk) && normalizeNewlines(disk.value.content) === baseline ? disk.value.content : draft.baselineContent)
+      setTextSession((session) => session + 1)
       syncTitle(draft.filePath, content !== baseline)
     },
     [syncTitle],
@@ -513,6 +528,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
 
   return {
     content,
+    textDocument,
     setContent,
     filePath,
     fileName,

@@ -24,6 +24,8 @@ export type MontreeSnapshotResource =
   | 'visual-context'
   | 'viewport-image'
   | 'table-read'
+  | 'text-read'
+  | 'text-edit'
   | 'table-edit'
   | 'slide-read'
   | 'slide-edit'

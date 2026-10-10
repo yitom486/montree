@@ -94,7 +94,18 @@ export interface SlideAnimation {
   unsupported: string[]
 }
 
-export type DocumentSelection = TableSelection | SlideSelection
+export interface TextSelection {
+  kind: 'text'
+  documentPath: string
+  revision: number
+  selectionId: string
+  /** CodeMirror UTF-16 offsets: from inclusive, to exclusive. */
+  from: number
+  to: number
+  ranges: Array<{ from: number; to: number; text: string; textTruncated?: boolean }>
+}
+
+export type DocumentSelection = TableSelection | SlideSelection | TextSelection
 
 export interface TableTarget {
   range?: string

@@ -25,7 +25,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { useScrollSync } from '@/hooks/editor/useScrollSync'
-import { registerSelectionProvider } from '@/lib/agent/context/reader-selection-registry'
+import type { TextDocument } from '@/lib/editor/text-document'
 import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 
 function TextDataReaderContext({ filePath, content, kind, root }: { filePath: string; content: string; kind: string; root: () => HTMLElement | null }) {
@@ -74,6 +74,7 @@ export interface EditorOutlineState {
 }
 
 interface EditorWorkspaceMainProps {
+  textDocument?: TextDocument
   filePath?: string
   isDirty: boolean
   content: string
@@ -97,6 +98,7 @@ export const EditorWorkspaceMain = forwardRef<
 >(function EditorWorkspaceMain(
   {
     filePath,
+    textDocument,
     isDirty,
     content,
     workspaceRoot,
@@ -123,14 +125,6 @@ export const EditorWorkspaceMain = forwardRef<
   const tabSize = useAppSettingsStore((state) => state.tabSize)
   const editorFontSize = useAppSettingsStore((state) => state.editorFontSize)
 
-  useEffect(() => {
-    if (!filePath || getDocumentKind(filePath) !== 'markdown') return
-    return registerSelectionProvider({
-      filePath,
-      getSelectionText: () => editorRef.current?.getSelectionText() ?? null,
-    })
-  }, [filePath])
-
   const viewMode = fileState.viewMode
   const previewHtml = useMarkdownPreview(content, filePath, previewDebounceMs)
   const { handlePasteImage } = usePasteImage(filePath)
@@ -142,6 +136,16 @@ export const EditorWorkspaceMain = forwardRef<
       return []
     }
   }, [content, filePath])
+  useEffect(() => {
+    if (!textDocument) return
+    textDocument.previewUnitIndex = () => {
+      const activeId = previewRef.current?.getActiveHeadingId()
+      const heading = headings.find((item) => item.id === activeId)
+      const offset = heading ? textDocument.state.doc.line(Math.min(textDocument.state.doc.lines, heading.line + 1)).from : 0
+      return Math.max(0, textDocument.units().findLastIndex((unit) => unit.from <= offset))
+    }
+    return () => { textDocument.previewUnitIndex = undefined }
+  }, [textDocument, headings])
   const [activeHeadingId, setActiveHeadingId] = useState<string>()
   const [findReplace, setFindReplace] = useState<{ open: boolean; mode: 'find' | 'replace' }>({
     open: false,
@@ -372,6 +376,7 @@ export const EditorWorkspaceMain = forwardRef<
                     <MarkdownEditor
                       ref={editorRef}
                       value={content}
+                      textDocument={textDocument}
                       filePath={filePath}
                       theme={theme}
                       tabSize={tabSize}

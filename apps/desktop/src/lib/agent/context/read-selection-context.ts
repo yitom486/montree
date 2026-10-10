@@ -1,6 +1,6 @@
 import { buildSelectionContext, type SelectionContextResult } from './expand-selection-context'
 import { readCurrentDocumentText } from './reader-content-registry'
-import { readSelectionText, getStickyReaderSelection } from './reader-selection-registry'
+import { readSelectionText, getStickyReaderSelection, getSelectionProvider } from './reader-selection-registry'
 import type { DocumentSelection } from '@montree/contracts'
 
 /**
@@ -10,8 +10,14 @@ import type { DocumentSelection } from '@montree/contracts'
  */
 export async function readSelectionWithContext(): Promise<SelectionContextResult & { target?: DocumentSelection }> {
   const sticky = getStickyReaderSelection()
-  if (sticky?.target) {
+  if (sticky?.target && sticky.target.kind !== 'text') {
     return { selection: sticky.text, excerpt: sticky.text, expanded: false, selectionLength: sticky.text.length, target: sticky.target }
+  }
+  const provider = getSelectionProvider()
+  const target = provider?.getSelectionTarget?.()
+  if (target?.kind === 'text') {
+    const selection = target.ranges.map((range) => range.text).join('\n')
+    return { selection, excerpt: selection, expanded: false, selectionLength: selection.length, target }
   }
   const selection = readSelectionText()
   if (!selection) {
