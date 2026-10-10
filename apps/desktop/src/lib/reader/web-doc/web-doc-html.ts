@@ -923,85 +923,85 @@ export function buildWebDocPlaygroundRuntimeScript(): string {
       '<span>正在准备组件运行环境…</span>' +
       '</div></div>' +
       '<script>' +
-      'var rawSource = ' + rawJson + ';\n' +
-      'function loadScript(src) {\n' +
-      '  return new Promise(function(resolve, reject) {\n' +
-      '    var s = document.createElement("script");\n' +
-      '    s.src = src;\n' +
-      '    s.onload = resolve;\n' +
-      '    s.onerror = reject;\n' +
-      '    document.head.appendChild(s);\n' +
-      '  });\n' +
-      '}\n' +
-      'function showError(msg) {\n' +
-      '  var root = document.getElementById("root");\n' +
-      '  if (root) {\n' +
-      '    root.innerHTML = "<div style=\\"padding:1rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:0.5rem;font-size:0.85rem;line-height:1.4;\\">" +\n' +
-      '      "<div style=\\"font-weight:600;margin-bottom:0.25rem;\\">⚠️ 运行提示</div>" +\n' +
-      '      "<div>" + (msg || "网络连接受阻，无法加载在线 React 运行时") + "</div>" +\n' +
-      '      "<div style=\\"margin-top:0.5rem;\\"><button type=\\"button\\" onclick=\\"startLoading()\\" style=\\"padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;\\">重新尝试</button></div>" +\n' +
-      '      "</div>";\n' +
-      '  }\n' +
-      '}\n' +
-      'function renderComponent() {\n' +
-      '  try {\n' +
-      '    var clean = rawSource.replace(/import\\\\s+[\\\\s\\\\S]*?\\\\s+from\\\\s+[\'"][^\'"]+[\'"];?/g, "");\n' +
-      '    var match = clean.match(/export\\\\s+default\\\\s+function\\\\s+([A-Za-z0-9_]+)/) ||\n' +
-      '                clean.match(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/) ||\n' +
-      '                clean.match(/export\\\\s+default\\\\s+([A-Za-z0-9_]+)/) ||\n' +
-      '                clean.match(/function\\\\s+([A-Z][A-Za-z0-9_]+)/);\n' +
-      '    var rootName = match ? match[1] : "MyApp";\n' +
-      '    clean = clean.replace(/export\\\\s+default\\\\s+function\\\\s+([A-Za-z0-9_]+)/g, "function $1");\n' +
-      '    clean = clean.replace(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/g, "class $1");\n' +
-      '    clean = clean.replace(/export\\\\s+default\\\\s+[A-Za-z0-9_]+;?/g, "");\n' +
-      '    clean = clean.replace(/export\\\\s+/g, "");\n' +
-      '    var wrapped = "(function(){\\\\n" +\n' +
-      '      "var useState = React.useState;\\\\n" +\n' +
-      '      "var useEffect = React.useEffect;\\\\n" +\n' +
-      '      "var useRef = React.useRef;\\\\n" +\n' +
-      '      "var useMemo = React.useMemo;\\\\n" +\n' +
-      '      "var useCallback = React.useCallback;\\\\n" +\n' +
-      '      clean + "\\\\n" +\n' +
-      '      "var __Target = typeof " + rootName + " !== \\"undefined\\" ? " + rootName + " : " +\n' +
-      '      "(typeof MyApp !== \\"undefined\\" ? MyApp : (typeof App !== \\"undefined\\" ? App : (typeof Square !== \\"undefined\\" ? Square : null)));\\\\n" +\n' +
-      '      "if (__Target) {\\\\n" +\n' +
-      '      "  var root = document.getElementById(\\"root\\");\\\\n" +\n' +
-      '      "  root.innerHTML = \\"\\";\\\\n" +\n' +
-      '      "  ReactDOM.createRoot(root).render(React.createElement(__Target));\\\\n" +\n' +
-      '      "}\\\\n" +\n' +
-      '      "})();";\n' +
-      '    var compiled = Babel.transform(wrapped, { presets: ["react"] }).code;\n' +
-      '    eval(compiled);\n' +
-      '  } catch (err) {\n' +
-      '    showError(err.message || String(err));\n' +
-      '  }\n' +
-      '}\n' +
-      'function startLoading() {\n' +
-      '  var root = document.getElementById("root");\n' +
-      '  if (root) {\n' +
-      '    root.innerHTML = "<div style=\\"display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;color:#71717a;font-size:0.88rem;gap:0.75rem;\\">" +\n' +
-      '      "<div style=\\"width:24px;height:24px;border:2px solid #a1a1aa;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;\\"></div>" +\n' +
-      '      "<span>正在连接运行时资源…</span></div>";\n' +
-      '  }\n' +
-      '  if (window.React && window.ReactDOM && window.Babel) {\n' +
-      '    renderComponent();\n' +
-      '    return;\n' +
-      '  }\n' +
-      '  loadScript("https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js")\n' +
-      '    .then(function() {\n' +
-      '      return loadScript("https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js");\n' +
-      '    })\n' +
-      '    .then(function() {\n' +
-      '      return loadScript("https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js");\n' +
-      '    })\n' +
-      '    .then(function() {\n' +
-      '      renderComponent();\n' +
-      '    })\n' +
-      '    .catch(function(e) {\n' +
-      '      showError("无法从 CDN 下载 React / Babel 运行时（请检查网络连接）");\n' +
-      '    });\n' +
-      '}\n' +
-      'startLoading();\n' +
+      'var rawSource = ' + rawJson + '; ' +
+      'function loadScript(src) { ' +
+      '  return new Promise(function(resolve, reject) { ' +
+      '    var s = document.createElement("script"); ' +
+      '    s.src = src; ' +
+      '    s.onload = resolve; ' +
+      '    s.onerror = reject; ' +
+      '    document.head.appendChild(s); ' +
+      '  }); ' +
+      '} ' +
+      'function showError(msg) { ' +
+      '  var root = document.getElementById("root"); ' +
+      '  if (root) { ' +
+      '    root.innerHTML = "<div style=\\"padding:1rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:0.5rem;font-size:0.85rem;line-height:1.4;\\">" + ' +
+      '      "<div style=\\"font-weight:600;margin-bottom:0.25rem;\\">⚠️ 运行提示</div>" + ' +
+      '      "<div>" + (msg || "网络连接受阻，无法加载在线 React 运行时") + "</div>" + ' +
+      '      "<div style=\\"margin-top:0.5rem;\\"><button type=\\"button\\" onclick=\\"startLoading()\\" style=\\"padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;\\">重新尝试</button></div>" + ' +
+      '      "</div>"; ' +
+      '  } ' +
+      '} ' +
+      'function renderComponent() { ' +
+      '  try { ' +
+      '    var clean = rawSource.replace(/import\\\\s+[\\\\s\\\\S]*?\\\\s+from\\\\s+[\'"][^\'"]+[\'"];?/g, ""); ' +
+      '    var match = clean.match(/export\\\\s+default\\\\s+function\\\\s+([A-Za-z0-9_]+)/) || ' +
+      '                clean.match(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/) || ' +
+      '                clean.match(/export\\\\s+default\\\\s+([A-Za-z0-9_]+)/) || ' +
+      '                clean.match(/function\\\\s+([A-Z][A-Za-z0-9_]+)/); ' +
+      '    var rootName = match ? match[1] : "MyApp"; ' +
+      '    clean = clean.replace(/export\\\\s+default\\\\s+function\\\\s+([A-Za-z0-9_]+)/g, "function $1"); ' +
+      '    clean = clean.replace(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/g, "class $1"); ' +
+      '    clean = clean.replace(/export\\\\s+default\\\\s+[A-Za-z0-9_]+;?/g, ""); ' +
+      '    clean = clean.replace(/export\\\\s+/g, ""); ' +
+      '    var wrapped = "(function(){\\n" + ' +
+      '      "var useState = React.useState;\\n" + ' +
+      '      "var useEffect = React.useEffect;\\n" + ' +
+      '      "var useRef = React.useRef;\\n" + ' +
+      '      "var useMemo = React.useMemo;\\n" + ' +
+      '      "var useCallback = React.useCallback;\\n" + ' +
+      '      clean + "\\n" + ' +
+      '      "var __Target = typeof " + rootName + " !== \\"undefined\\" ? " + rootName + " : " + ' +
+      '      "(typeof MyApp !== \\"undefined\\" ? MyApp : (typeof App !== \\"undefined\\" ? App : (typeof Square !== \\"undefined\\" ? Square : null)));\\n" + ' +
+      '      "if (__Target) {\\n" + ' +
+      '      "  var root = document.getElementById(\\"root\\");\\n" + ' +
+      '      "  root.innerHTML = \\"\\";\\n" + ' +
+      '      "  ReactDOM.createRoot(root).render(React.createElement(__Target));\\n" + ' +
+      '      "}\\n" + ' +
+      '      "})();"; ' +
+      '    var compiled = Babel.transform(wrapped, { presets: ["react"] }).code; ' +
+      '    eval(compiled); ' +
+      '  } catch (err) { ' +
+      '    showError(err.message || String(err)); ' +
+      '  } ' +
+      '} ' +
+      'function startLoading() { ' +
+      '  var root = document.getElementById("root"); ' +
+      '  if (root) { ' +
+      '    root.innerHTML = "<div style=\\"display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;color:#71717a;font-size:0.88rem;gap:0.75rem;\\">" + ' +
+      '      "<div style=\\"width:24px;height:24px;border:2px solid #a1a1aa;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;\\"></div>" + ' +
+      '      "<span>正在连接运行时资源…</span></div>"; ' +
+      '  } ' +
+      '  if (window.React && window.ReactDOM && window.Babel) { ' +
+      '    renderComponent(); ' +
+      '    return; ' +
+      '  } ' +
+      '  loadScript("https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js") ' +
+      '    .then(function() { ' +
+      '      return loadScript("https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"); ' +
+      '    }) ' +
+      '    .then(function() { ' +
+      '      return loadScript("https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"); ' +
+      '    }) ' +
+      '    .then(function() { ' +
+      '      renderComponent(); ' +
+      '    }) ' +
+      '    .catch(function(e) { ' +
+      '      showError("无法从 CDN 下载 React / Babel 运行时（请检查网络连接）"); ' +
+      '    }); ' +
+      '} ' +
+      'startLoading(); ' +
       '<' + '/script></body></html>';
   }
 
@@ -1083,7 +1083,6 @@ export function buildWebDocReaderDocument(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <base href="${DOMPurify.sanitize(content.baseUrl)}" />
   <title>${safeTitle}</title>
   ${buildWebDocKatexStylesheetLink()}
   <style>${layoutCss}</style>

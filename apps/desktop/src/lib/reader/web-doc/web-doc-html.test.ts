@@ -467,7 +467,7 @@ describe('web-doc-html', () => {
     expect(result.bodyHtml).not.toContain('srcset="/_next/image')
   })
 
-  it('在线文档阅读器生成 base 标签并在暗色模式下隐藏 .light-image、在浅色模式下隐藏 .dark-image', () => {
+  it('在线文档阅读器在暗色模式下隐藏 .light-image、在浅色模式下隐藏 .dark-image', () => {
     const content = {
       title: 'Sharing data',
       baseUrl: 'https://react.dev/learn',
@@ -475,12 +475,12 @@ describe('web-doc-html', () => {
     }
 
     const darkDoc = buildWebDocReaderDocument(content, 'dark')
-    expect(darkDoc).toContain('<base href="https://react.dev/learn" />')
+    expect(darkDoc).not.toContain('<base href=')
     expect(darkDoc).toContain('body .light-image')
     expect(darkDoc).toContain('display: none !important')
 
     const lightDoc = buildWebDocReaderDocument(content, 'light')
-    expect(lightDoc).toContain('<base href="https://react.dev/learn" />')
+    expect(lightDoc).not.toContain('<base href=')
     expect(lightDoc).toContain('body .dark-image')
     expect(lightDoc).toContain('display: none !important')
   })

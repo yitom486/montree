@@ -72,7 +72,7 @@ export function formatWebDocPathLabel(pageUrl: string, pageTitle?: string): stri
 /**
  * 目录发现入口（缓存键）：
  * - 人民日报：同一「版」共享
- * - 其它：同一路径首段共享（/learn/x → /learn/），避免各页 SSR 侧栏不一致
+ * - 现代技术文档站：智能识别版本号（/v2/）、语言（/zh/）与文档根（/docs/、/learn/ 等），避免因截断过短跌入过渡/重定向空页
  */
 export function resolveWebDocTocDiscoveryUrl(pageUrl: string, siteId: WebDocSiteId): string {
   try {
@@ -81,10 +81,25 @@ export function resolveWebDocTocDiscoveryUrl(pageUrl: string, siteId: WebDocSite
       return resolvePeopleDailyEditionUrl(pageUrl) ?? url.toString()
     }
     const parts = url.pathname.split('/').filter(Boolean)
-    if (parts.length >= 1) {
-      return `${url.origin}/${parts[0]}/`
+    if (parts.length === 0) return `${url.origin}/`
+
+    // 1. 如果路径中包含常见的文档根关键字（docs / doc / learn / guide / tutorial / manual / api）
+    const docIndex = parts.findIndex((p) =>
+      /^(docs?|learn|guides?|tutorials?|manual|reference|api)$/i.test(p),
+    )
+    if (docIndex >= 0) {
+      const docParts = parts.slice(0, docIndex + 1)
+      return `${url.origin}/${docParts.join('/')}/`
     }
-    return `${url.origin}/`
+
+    // 2. 检查是否首段是版本（v1, v2 等）或语言代码（zh, en 等）且还有后续段落
+    const isVersionOrLang = /^(v\d+(\.\d+)*|[a-z]{2}(-[a-z]{2,4})?|latest|next)$/i.test(parts[0]!)
+    if (isVersionOrLang && parts.length >= 2) {
+      return `${url.origin}/${parts[0]}/${parts[1]}/`
+    }
+
+    // 3. 缺省回落第一段
+    return `${url.origin}/${parts[0]}/`
   } catch {
     return pageUrl
   }

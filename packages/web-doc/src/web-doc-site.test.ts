@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeWebDocInputUrl, stripWebDocFragment } from './web-doc-site'
+import { normalizeWebDocInputUrl, resolveWebDocTocDiscoveryUrl, stripWebDocFragment } from './web-doc-site'
 
 describe('web-doc-site URL state', () => {
   it('保留输入 URL 的 fragment，供阅读器导航状态使用', () => {
@@ -22,4 +22,19 @@ describe('web-doc-site URL state', () => {
     expect(stripWebDocFragment('https://agentclientprotocol.com/protocol/v1/initialization'))
       .toBe('https://agentclientprotocol.com/protocol/v1/initialization')
   })
+
+  it('智能识别包含版本号与 docs 前缀的文档根发现入口', () => {
+    expect(
+      resolveWebDocTocDiscoveryUrl('https://opencode.ai/v2/docs/config/', 'generic-ssr'),
+    ).toBe('https://opencode.ai/v2/docs/')
+
+    expect(
+      resolveWebDocTocDiscoveryUrl('https://react.dev/learn/tutorial-tic-tac-toe', 'generic-ssr'),
+    ).toBe('https://react.dev/learn/')
+
+    expect(
+      resolveWebDocTocDiscoveryUrl('https://agentclientprotocol.com/get-started/introduction', 'generic-ssr'),
+    ).toBe('https://agentclientprotocol.com/get-started/')
+  })
 })
+
