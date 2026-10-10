@@ -246,6 +246,57 @@ describe('audio-aligner 纯声学物理停顿对齐', () => {
     expect(aligned[0].alignmentType).toBe('proportional')
     expect(aligned[2].endTime).toBe(6.0)
   })
+
+  it('alignSentencesWithBoundaries 在仅有 WordBoundary 且带 textOffset 时能按字符区间聚合对齐并延伸至音频总时长', () => {
+    const boundaries = [
+      { text: '在中国', audioOffsetMs: 100, durationMs: 800, textOffset: 0, boundaryType: 'WordBoundary' },
+      { text: '历史上', audioOffsetMs: 1000, durationMs: 800, textOffset: 4, boundaryType: 'WordBoundary' },
+      { text: '春秋', audioOffsetMs: 2000, durationMs: 600, textOffset: 9, boundaryType: 'WordBoundary' },
+      { text: '战国', audioOffsetMs: 2700, durationMs: 700, textOffset: 11, boundaryType: 'WordBoundary' },
+      { text: '时代', audioOffsetMs: 3500, durationMs: 800, textOffset: 20, boundaryType: 'WordBoundary' },
+      { text: '各派', audioOffsetMs: 4500, durationMs: 800, textOffset: 26, boundaryType: 'WordBoundary' },
+      { text: '学者', audioOffsetMs: 5400, durationMs: 900, textOffset: 28, boundaryType: 'WordBoundary' },
+      { text: '影响', audioOffsetMs: 6500, durationMs: 1000, textOffset: 38, boundaryType: 'WordBoundary' },
+    ]
+
+    const aligned = alignSentencesWithBoundaries(sampleSentences, boundaries, 8.0)
+    expect(aligned.length).toBe(3)
+    expect(aligned[0].startTime).toBe(0.1)
+    expect(aligned[0].endTime).toBeCloseTo(1.8, 1)
+    expect(aligned[1].startTime).toBe(2.0)
+    expect(aligned[1].endTime).toBeCloseTo(4.3, 1)
+    expect(aligned[2].startTime).toBe(4.5)
+    expect(aligned[2].endTime).toBe(8.0)
+    expect(aligned[2].alignmentType).toBe('azure-boundary')
+  })
+
+  it('alignSentencesWithBoundaries 在时间轴严重塌缩（覆盖不足50%）时自动平滑回退比例对齐保护', () => {
+    const collapsedBoundaries = [
+      { text: '词1', audioOffsetMs: 100, durationMs: 500, boundaryType: 'SentenceBoundary' },
+      { text: '词2', audioOffsetMs: 700, durationMs: 400, boundaryType: 'SentenceBoundary' },
+      { text: '词3', audioOffsetMs: 1200, durationMs: 300, boundaryType: 'SentenceBoundary' },
+    ]
+
+    const aligned = alignSentencesWithBoundaries(sampleSentences, collapsedBoundaries, 10.0)
+    expect(aligned.length).toBe(3)
+    expect(aligned[0].alignmentType).toBe('proportional')
+    expect(aligned[2].endTime).toBe(10.0)
+    expect(aligned[1].endTime).toBeGreaterThan(3.0)
+  })
+
+  it('alignSentencesWithBoundaries 在纯 WordBoundary 且无 textOffset 时绝不按下标错配，而是回退比例对齐', () => {
+    const rawWordBoundaries = [
+      { text: '在', audioOffsetMs: 100, durationMs: 150, boundaryType: 'WordBoundary' },
+      { text: '中', audioOffsetMs: 250, durationMs: 150, boundaryType: 'WordBoundary' },
+      { text: '国', audioOffsetMs: 400, durationMs: 150, boundaryType: 'WordBoundary' },
+    ]
+
+    const aligned = alignSentencesWithBoundaries(sampleSentences, rawWordBoundaries, 12.0)
+    expect(aligned.length).toBe(3)
+    expect(aligned[0].alignmentType).toBe('proportional')
+    expect(aligned[2].endTime).toBe(12.0)
+    expect(aligned[0].endTime).toBeGreaterThan(1.5)
+  })
 })
 
 

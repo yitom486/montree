@@ -209,16 +209,29 @@ function splitIntoSentences(text: string): string[] {
       continue
     }
 
-    // 中文句末标点：。 ！？ ；
+    // 中文句末标点：。 ！？ ； 省略号
     if (char === '。' || char === '！' || char === '？' || char === '；' || char === '…') {
-      // 查看下一个字符是否是右引号/右括号
-      const next = text[i + 1]
-      if (next === '”' || next === '’' || next === '」' || next === '）' || next === '"') {
-        buffer += next
-        i++
+      // 若是省略号，吞入所有连续省略号
+      if (char === '…') {
+        while (text[i + 1] === '…') {
+          buffer += text[++i]
+        }
       }
-      if (buffer.trim()) result.push(buffer.trim())
-      buffer = ''
+      // 查看下一个字符是否是右引号/右括号
+      while (
+        text[i + 1] === '”' ||
+        text[i + 1] === '’' ||
+        text[i + 1] === '」' ||
+        text[i + 1] === '）' ||
+        text[i + 1] === '"'
+      ) {
+        buffer += text[++i]
+      }
+      const trimmed = buffer.trim()
+      if (trimmed && /[^\s。！？；…“”‘’「」）\(\[\]{}、，,]/.test(trimmed)) {
+        result.push(trimmed)
+        buffer = ''
+      }
       continue
     }
 
@@ -227,14 +240,22 @@ function splitIntoSentences(text: string): string[] {
       const next = text[i + 1]
       // 避免把浮点数或缩写误判为句末
       if (!next || /\s/.test(next)) {
-        if (buffer.trim()) result.push(buffer.trim())
-        buffer = ''
+        const trimmed = buffer.trim()
+        if (trimmed && /[^\s。！？；…“”‘’「」）\(\[\]{}、，,.!?]/.test(trimmed)) {
+          result.push(trimmed)
+          buffer = ''
+        }
       }
     }
   }
 
-  if (buffer.trim()) {
-    result.push(buffer.trim())
+  const remaining = buffer.trim()
+  if (remaining) {
+    if (!/[^\s。！？；…“”‘’「」）\(\[\]{}、，,.!?]/.test(remaining) && result.length > 0) {
+      result[result.length - 1] += remaining
+    } else {
+      result.push(remaining)
+    }
   }
 
   return result

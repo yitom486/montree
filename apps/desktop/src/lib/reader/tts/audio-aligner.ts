@@ -489,29 +489,27 @@ export function alignSentencesWithBoundaries(
   totalDurationSeconds: number,
 ): SentenceItem[] {
   if (sentences.length === 0) return []
-  if (!boundaries || boundaries.length === 0) {
+  const fallbackProportional = () => {
     const staticMarkers = buildStaticCueMarkers(sentences, totalDurationSeconds)
     return sentences.map((s, idx) => ({
       ...s,
       startTime: staticMarkers[idx]?.startTime ?? 0,
       endTime: staticMarkers[idx]?.endTime ?? totalDurationSeconds,
       detectedPauseSec: staticMarkers[idx]?.detectedPauseSec ?? 0,
-      alignmentType: 'proportional',
+      alignmentType: 'proportional' as const,
     }))
   }
 
-  // 筛选出整句边界（若有 SentenceBoundary 优先使用，否则全量使用）
+  if (!boundaries || boundaries.length === 0 || totalDurationSeconds <= 0) {
+    return fallbackProportional()
+  }
+
+  // 1. 若具有严格 1:1 的整句边界（SentenceBoundary），直接按索引绝对对齐
   const sentenceBoundaries = boundaries.filter((b) => b.boundaryType === 'SentenceBoundary')
-  const activeBoundaries = sentenceBoundaries.length > 0 ? sentenceBoundaries : boundaries
-
-  let prevEndTime = 0
-  return sentences.map((s, idx) => {
-    let b = activeBoundaries[idx]
-    if (!b && activeBoundaries.length > 0) {
-      b = activeBoundaries[activeBoundaries.length - 1]
-    }
-
-    if (b) {
+  if (sentenceBoundaries.length === sentences.length) {
+    let prevEndTime = 0
+    const result = sentences.map((s, idx) => {
+      const b = sentenceBoundaries[idx]
       const start = Math.max(prevEndTime, b.audioOffsetMs / 1000)
       const dur = b.durationMs > 0 ? b.durationMs / 1000 : 0.5
       const end = Math.min(totalDurationSeconds, Math.max(start + 0.1, start + dur))
@@ -523,15 +521,77 @@ export function alignSentencesWithBoundaries(
         detectedPauseSec: 0,
         alignmentType: 'azure-boundary' as const,
       }
+    })
+
+    const lastEnd = result[result.length - 1]?.endTime ?? 0
+    // 塌缩保护：如果整句边界覆盖的时长不足音频时长的 50%（且总时长大于 5 秒），说明时间轴严重失真，回退比例对齐
+    if (totalDurationSeconds > 5 && lastEnd < totalDurationSeconds * 0.5) {
+      console.warn('[Audio Aligner] 官方整句边界覆盖时长严重不足，启用平滑比例对齐保护:', {
+        lastEnd,
+        totalDurationSeconds,
+      })
+      return fallbackProportional()
     }
 
-    return {
-      ...s,
-      startTime: prevEndTime,
-      endTime: totalDurationSeconds,
-      detectedPauseSec: 0,
-      alignmentType: 'azure-boundary' as const,
+    return result
+  }
+
+  // 2. 若存在 textOffset，按全文字符区间聚合对齐（支持 WordBoundary 或句子数不匹配的场景）
+  const hasValidTextOffsets = boundaries.some((b) => typeof b.textOffset === 'number' && b.textOffset >= 0)
+  if (hasValidTextOffsets) {
+    let fullText = ''
+    const spans: Array<{ start: number; end: number }> = []
+    for (const s of sentences) {
+      const start = fullText.length
+      fullText += s.text
+      spans.push({ start, end: fullText.length })
     }
-  })
+
+    let prevEnd = 0
+    const mapped = sentences.map((s, idx) => {
+      const span = spans[idx]
+      const inSpan = boundaries.filter(
+        (b) => typeof b.textOffset === 'number' && b.textOffset >= span.start && b.textOffset < span.end,
+      )
+
+      let start = prevEnd
+      let end = prevEnd + 0.5
+      if (inSpan.length > 0) {
+        start = Math.max(prevEnd, inSpan[0].audioOffsetMs / 1000)
+        const lastBound = inSpan[inSpan.length - 1]
+        const dur = lastBound.durationMs > 0 ? lastBound.durationMs / 1000 : 0.2
+        end = Math.max(start + 0.1, lastBound.audioOffsetMs / 1000 + dur)
+      } else {
+        const remainingChars = spans.slice(idx).reduce((sum, sp) => sum + (sp.end - sp.start), 0)
+        const charRatio = (span.end - span.start) / Math.max(1, remainingChars)
+        const nextBound = boundaries.find((b) => typeof b.textOffset === 'number' && b.textOffset >= span.end)
+        const targetEnd = nextBound ? nextBound.audioOffsetMs / 1000 : totalDurationSeconds
+        end = Math.max(start + 0.1, start + (targetEnd - start) * charRatio)
+      }
+
+      end = Math.min(totalDurationSeconds, end)
+      prevEnd = end
+      return {
+        ...s,
+        startTime: start,
+        endTime: end,
+        detectedPauseSec: 0,
+        alignmentType: 'azure-boundary' as const,
+      }
+    })
+
+    const lastEnd = mapped[mapped.length - 1]?.endTime ?? 0
+    if (totalDurationSeconds <= 5 || lastEnd >= totalDurationSeconds * 0.5) {
+      if (mapped.length > 0) {
+        mapped[mapped.length - 1].endTime = totalDurationSeconds
+      }
+      return mapped
+    }
+  }
+
+  // 3. 兜底与防塌缩保护：
+  // 缺乏 1:1 整句边界或有效字符偏移时，坚决禁止将 WordBoundary 直接按下标映射给句子
+  // 回退至客观字符比例加权对齐，保证全章节句子均匀覆盖整个音频时长
+  return fallbackProportional()
 }
 

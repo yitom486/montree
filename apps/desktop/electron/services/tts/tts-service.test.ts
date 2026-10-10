@@ -11,6 +11,9 @@ import {
   cancelTtsStream,
   listTtsVoices,
   GEMINI_CORE_VOICES,
+  isAzureVoiceName,
+  resolveAzureVoice,
+  resolveGeminiVoice,
 } from './tts-service'
 
 const { generate, readFile, writeFile, clientKeys } = vi.hoisted(() => ({ generate: vi.fn(), readFile: vi.fn(), writeFile: vi.fn(), clientKeys: [] as string[] }))
@@ -42,6 +45,31 @@ describe('tts-service', () => {
     expect(resolveTtsModelId('')).toBe('gemini-3.8-flash-lite-tts')
     expect(resolveTtsModelId('gemini-2.0-flash')).toBe('gemini-2.0-flash')
     expect(resolveTtsModelId('gemini-3.8-flash-tts')).toBe('gemini-3.8-flash-tts')
+  })
+
+  it('应当严格校验并隔离 Azure 与 Gemini 的音色名，防止跨厂商状态泄露与 locale 异常', () => {
+    // 1. isAzureVoiceName 识别
+    expect(isAzureVoiceName('zh-CN-XiaoxiaoNeural')).toBe(true)
+    expect(isAzureVoiceName('en-US-JennyNeural')).toBe(true)
+    expect(isAzureVoiceName('wuu-CN-XiaotongNeural')).toBe(true)
+    expect(isAzureVoiceName('Aoede')).toBe(false)
+    expect(isAzureVoiceName('Puck')).toBe(false)
+    expect(isAzureVoiceName('zh-female')).toBe(false)
+    expect(isAzureVoiceName('')).toBe(false)
+
+    // 2. resolveAzureVoice 自愈隔离
+    expect(resolveAzureVoice('zh-CN-YunxiNeural')).toBe('zh-CN-YunxiNeural')
+    // 传入 Gemini 音色 Aoede 时，必须自动自愈为有效 Azure 音色，绝不能原样透传
+    expect(resolveAzureVoice('Aoede', 'zh-CN-XiaoxiaoNeural')).toBe('zh-CN-XiaoxiaoNeural')
+    expect(resolveAzureVoice('Aoede')).toBe('zh-CN-XiaoxiaoNeural')
+    expect(resolveAzureVoice('Puck', 'en-US-JennyNeural')).toBe('en-US-JennyNeural')
+
+    // 3. resolveGeminiVoice 反向自愈隔离
+    expect(resolveGeminiVoice('Aoede')).toBe('Aoede')
+    expect(resolveGeminiVoice('Puck')).toBe('Puck')
+    // 传入 Azure 音色时，必须自动自愈回退为 Gemini 音色
+    expect(resolveGeminiVoice('zh-CN-XiaoxiaoNeural', 'Puck')).toBe('Puck')
+    expect(resolveGeminiVoice('zh-CN-XiaoxiaoNeural')).toBe('Aoede')
   })
 
   it('应当将底层复杂或 JSON 报错转化为友好清晰的中文提示', () => {

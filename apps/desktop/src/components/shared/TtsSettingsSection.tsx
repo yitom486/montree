@@ -298,8 +298,8 @@ export function TtsSettingsSection() {
         region,
         endpoint,
         text: '测试连接成功，音质清晰正常。',
-        voiceName: prov === 'azure' ? (azureVoice || 'zh-CN-XiaoxiaoNeural') : voiceName,
-        modelId: activeModelId,
+        voiceName: prov === 'azure' ? (azureVoice || 'zh-CN-XiaoxiaoNeural') : prov === 'local' ? (localVoice || 'zh-female') : voiceName,
+        modelId: prov === 'local' ? (localModel || 'kokoro') : activeModelId,
       })
 
       if (!res.ok) {
@@ -361,8 +361,8 @@ export function TtsSettingsSection() {
       const res = await ttsApi.synthesize({
         text: textToPlay,
         provider,
-        voiceName: provider === 'azure' ? (azureVoice || 'zh-CN-XiaoxiaoNeural') : voiceName,
-        modelId,
+        voiceName: provider === 'azure' ? (azureVoice || 'zh-CN-XiaoxiaoNeural') : provider === 'local' ? (localVoice || 'zh-female') : voiceName,
+        modelId: provider === 'local' ? (localModel || 'kokoro') : modelId,
         rate,
         primaryApiKey,
         secondaryApiKey,

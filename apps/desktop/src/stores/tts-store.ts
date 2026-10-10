@@ -207,8 +207,13 @@ function prefetchNextChapter(): void {
           void ttsApi.synthesize({
             text: fullCleanText,
             provider: state.provider,
-            voiceName: state.voiceName,
-            modelId: state.modelId,
+            voiceName:
+              state.provider === 'azure'
+                ? (state.azureVoice || 'zh-CN-XiaoxiaoNeural')
+                : state.provider === 'local'
+                  ? state.localVoice
+                  : state.voiceName,
+            modelId: state.provider === 'local' ? (state.localModel || 'kokoro') : (state.modelId || 'gemini-3.8-flash-lite-tts'),
             rate: state.rate,
             unitLabel: nextLabel,
             priority: 'background',

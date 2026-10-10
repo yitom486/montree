@@ -107,4 +107,13 @@ describe('text-sanitizer', () => {
     expect(sentences[1].isParagraphEnd).toBe(true)
     expect(sentences[2].isParagraphEnd).toBe(true)
   })
+
+  it('应当正确处理中文连续省略号与后置引号，避免生成纯标点碎片单字句', () => {
+    const raw = `门阀政治是中国历史上一种变态的政治形式……后世并没有出现过门阀政治。“这是核心结论。”`
+    const { sentences } = sanitizeReaderText(raw)
+    expect(sentences).toHaveLength(3)
+    expect(sentences[0].text).toBe('门阀政治是中国历史上一种变态的政治形式……')
+    expect(sentences[1].text).toBe('后世并没有出现过门阀政治。')
+    expect(sentences[2].text).toBe('“这是核心结论。”')
+  })
 })

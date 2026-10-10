@@ -68,6 +68,32 @@ function getCacheDirPath(): string {
   return join(app.getPath('userData'), 'tts-cache')
 }
 
+export function isAzureVoiceName(voice?: string): boolean {
+  if (!voice || typeof voice !== 'string') return false
+  const trimmed = voice.trim()
+  return /^[a-z]{2,3}-[a-z]{2,4}-[a-z0-9]+/i.test(trimmed)
+}
+
+export function resolveAzureVoice(requestedVoice?: string, configVoice?: string): string {
+  if (requestedVoice && isAzureVoiceName(requestedVoice)) {
+    return requestedVoice.trim()
+  }
+  if (configVoice && isAzureVoiceName(configVoice)) {
+    return configVoice.trim()
+  }
+  return 'zh-CN-XiaoxiaoNeural'
+}
+
+export function resolveGeminiVoice(requestedVoice?: string, configVoice?: string): string {
+  if (requestedVoice && !isAzureVoiceName(requestedVoice)) {
+    return requestedVoice.trim()
+  }
+  if (configVoice && !isAzureVoiceName(configVoice)) {
+    return configVoice.trim()
+  }
+  return 'Aoede'
+}
+
 export function resolveTtsModelId(modelId?: string): string {
   const clean = (modelId || '').trim()
   if (
@@ -484,7 +510,7 @@ export async function synthesizeTts(
     if (activeProvider === 'azure') {
       const azureKey = payload.azureApiKey?.trim() || config.azureApiKey?.trim() || ''
       const azureRegion = payload.azureRegion?.trim() || config.azureRegion?.trim() || 'eastasia'
-      const azureVoice = payload.voiceName?.trim() || config.azureVoice?.trim() || 'zh-CN-XiaoxiaoNeural'
+      const azureVoice = resolveAzureVoice(payload.voiceName, config.azureVoice)
 
       if (!azureKey) {
         return err({
@@ -621,7 +647,7 @@ export async function synthesizeTts(
     }
 
     // ==================== 3. Google Gemini TTS ====================
-    const voiceName = payload.voiceName || config.voiceName || 'Aoede'
+    const voiceName = resolveGeminiVoice(payload.voiceName, config.voiceName)
     const modelId = resolveTtsModelId(payload.modelId || config.modelId)
 
     const cacheKey = buildCacheKey({ text, voiceName, modelId, rate })
@@ -781,13 +807,13 @@ export async function synthesizeTtsStream(
     const rate = payload.rate ?? config.rate ?? 1.0
 
     const azureRegion = payload.azureRegion?.trim() || config.azureRegion?.trim() || 'eastasia'
-    const azureVoice = payload.voiceName?.trim() || config.azureVoice?.trim() || 'zh-CN-XiaoxiaoNeural'
+    const azureVoice = resolveAzureVoice(payload.voiceName, config.azureVoice)
     const voiceName =
       activeProvider === 'azure'
         ? `${azureRegion}:${azureVoice}`
         : activeProvider === 'local'
           ? payload.localVoice?.trim() || config.localVoice?.trim() || 'zh-female'
-          : payload.voiceName?.trim() || config.voiceName || 'Aoede'
+          : resolveGeminiVoice(payload.voiceName, config.voiceName)
     const modelId =
       activeProvider === 'local'
         ? payload.localModel?.trim() || config.localModel?.trim() || 'kokoro'
@@ -978,7 +1004,7 @@ export async function testTtsKey(
         return err({ code: 'INVALID_ARGUMENT', message: 'Azure Speech Key 不能为空' })
       }
       const region = payload.region?.trim() || 'eastasia'
-      const voiceName = payload.voiceName?.trim() || 'zh-CN-XiaoxiaoNeural'
+      const voiceName = resolveAzureVoice(payload.voiceName)
       const res = await azureProvider.synthesize(
         {
           text: testText,
@@ -1018,7 +1044,7 @@ export async function testTtsKey(
     if (!key) {
       return err({ code: 'INVALID_ARGUMENT', message: 'Gemini API Key 不能为空' })
     }
-    const voiceName = payload.voiceName?.trim() || 'Aoede'
+    const voiceName = resolveGeminiVoice(payload.voiceName)
     const modelId = resolveTtsModelId(payload.modelId)
 
     const result = await invokeGeminiTTS({
