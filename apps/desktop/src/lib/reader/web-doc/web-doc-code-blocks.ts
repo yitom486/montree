@@ -303,15 +303,69 @@ export function buildWebDocTabsRuntimeScript(): string {  return `<script>(funct
 export const WEB_DOC_TABS_RUNTIME_SCRIPT_SHA256 =
   'sha256-o5eUpYe6xVdLRtL5mmEZtzhPc0HijWnKllVh5rCb/60='
 
+/**
+ * 将 arXiv / LaTeXML 的学术代码清单 (`.ltx_lstlisting` / `.ltx_listing`)
+ * 规范化为标准 `<pre><code class="language-...">` 结构，
+ * 将行内代码拼装完整，并支持一键复制与语言标签识别。
+ */
+export function normalizeWebDocLatexListings(root: ParentNode): void {
+  const candidates = [...root.querySelectorAll('.ltx_listing, .ltx_lstlisting, .ltx_float')]
+  const listings = candidates.filter((el) => {
+    if (el.tagName === 'FIGURE' && el.querySelector('.ltx_listing, .ltx_lstlisting')) {
+      return false
+    }
+    return el.querySelector('.ltx_listingline') !== null
+  })
+
+  for (const listing of listings) {
+    if (!(listing instanceof HTMLElement)) continue
+    if (listing.closest('.code-block')) continue
+
+    const lines = [...listing.querySelectorAll('.ltx_listingline')]
+    if (lines.length === 0) continue
+
+    const langElement =
+      (listing.getAttribute('class')?.includes('ltx_lst_language_') ? listing : null) ??
+      listing.closest('[class*="ltx_lst_language_"]') ??
+      listing.querySelector('[class*="ltx_lst_language_"]') ??
+      listing
+    const langClass = langElement?.getAttribute('class') ?? ''
+    const langMatch = langClass.match(/(?:^|\s)ltx_lst_language_([a-zA-Z0-9_-]+)/i)
+    const lang = langMatch ? langMatch[1].toLowerCase() : 'text'
+
+    const doc = listing.ownerDocument
+    const pre = doc.createElement('pre')
+    pre.className = `language-${lang}`
+    const code = doc.createElement('code')
+    code.className = `language-${lang}`
+
+    code.innerHTML = lines.map((line) => line.innerHTML).join('\n')
+    pre.appendChild(code)
+
+    // 清理掉 arXiv 原始可能存在的孤立下载箭头，统一由 CodeBlock 提供工具栏
+    listing.querySelector('.ltx_listing_data')?.remove()
+
+    listing.replaceWith(pre)
+  }
+}
+
 /** 为在线文档正文中的 pre/code 注入与 Markdown 预览一致的复制工具栏 */
 export function enhanceWebDocCodeBlocks(html: string): string {
-  if (!html.includes('<pre') && !html.includes('tabbed-set')) return html
+  if (
+    !html.includes('<pre') &&
+    !html.includes('tabbed-set') &&
+    !html.includes('ltx_listing') &&
+    !html.includes('ltx_lstlisting')
+  ) {
+    return html
+  }
 
   const doc = new DOMParser().parseFromString(`<div id="web-doc-code-root">${html}</div>`, 'text/html')
   const root = doc.getElementById('web-doc-code-root')
   if (!root) return html
 
   normalizeWebDocTabbedSets(root)
+  normalizeWebDocLatexListings(root)
 
   for (const host of collectCodeBlockHosts(root)) {
     wrapCodeBlockHost(host)
@@ -435,6 +489,28 @@ export function buildWebDocCodeBlockCss(mode: EpubThemeMode): string {
     }
     .code-block .token {
       background: transparent !important;
+    }
+    /* arXiv / LaTeXML listing 语法高亮与行排版强化 */
+    .code-block .ltx_font_typewriter,
+    .code-block .ltx_listingline {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    }
+    .code-block .ltx_lst_keyword {
+      color: ${mode === 'dark' ? '#c084fc' : '#7c3aed'} !important;
+      font-weight: 600 !important;
+    }
+    .code-block .ltx_lst_identifier {
+      color: ${mode === 'dark' ? '#38bdf8' : '#0284c7'} !important;
+    }
+    .code-block .ltx_lst_string {
+      color: ${mode === 'dark' ? '#4ade80' : '#16a34a'} !important;
+    }
+    .code-block .ltx_lst_comment {
+      color: ${mode === 'dark' ? '#9ca3af' : '#6b7280'} !important;
+      font-style: italic !important;
+    }
+    .code-block .ltx_lst_number {
+      color: ${mode === 'dark' ? '#fb923c' : '#ea580c'} !important;
     }
   `
 }

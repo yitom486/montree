@@ -7,6 +7,8 @@ import {
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { languages } from '@codemirror/language-data'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { GFM, Table, TaskList, Strikethrough } from '@lezer/markdown'
+import { livePreviewExtension } from '@/lib/editor/live-preview'
 import type { TextDocument } from '@/lib/editor/text-document'
 import {
   bracketMatching,
@@ -57,7 +59,6 @@ export interface MarkdownEditorHandle {
 }
 
 interface MarkdownEditorProps {
-  textDocument?: TextDocument
   value: string
   filePath?: string
   theme?: AppTheme
@@ -67,21 +68,25 @@ interface MarkdownEditorProps {
   onScroll?: () => void
   onPasteImage?: (blob: Blob, mimeType: string) => Promise<string | null>
   getWikilinkCandidates?: () => WikilinkCandidate[]
+  livePreview?: boolean
+  textDocument?: TextDocument
 }
 
 const themeCompartment = new Compartment()
 const tabSizeCompartment = new Compartment()
 const indentUnitCompartment = new Compartment()
+const livePreviewCompartment = new Compartment()
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
   function MarkdownEditor(
     {
       value,
-      textDocument,
       filePath,
       theme = 'dark',
       tabSize = 2,
       fontSize = 15,
+      livePreview = true,
+      textDocument,
       onChange,
       onScroll,
       onPasteImage,
@@ -201,10 +206,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           markdown({
             base: markdownLanguage,
             codeLanguages: languages,
+            extensions: [GFM, Table, TaskList, Strikethrough],
           }),
+          livePreviewCompartment.of(livePreview ? livePreviewExtension({ filePath }) : []),
           search({ top: false }),
           highlightSelectionMatches(),
-          themeCompartment.of(buildThemeExtensions(theme, fontSize)),
+          themeCompartment.of(buildThemeExtensions(theme, fontSize, livePreview)),
           keymap.of([
             ...markdownFormattingKeymap,
             ...closeBracketsKeymap,
@@ -252,9 +259,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       if (!view) return
 
       view.dispatch({
-        effects: themeCompartment.reconfigure(buildThemeExtensions(theme, fontSize)),
+        effects: themeCompartment.reconfigure(buildThemeExtensions(theme, fontSize, livePreview)),
       })
-    }, [theme, fontSize])
+    }, [theme, fontSize, livePreview])
 
     useEffect(() => {
       const view = viewRef.current
@@ -267,6 +274,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         ],
       })
     }, [tabSize])
+
+    useEffect(() => {
+      const view = viewRef.current
+      if (!view) return
+
+      view.dispatch({
+        effects: livePreviewCompartment.reconfigure(livePreview ? livePreviewExtension({ filePath }) : []),
+      })
+    }, [livePreview, filePath])
 
     useEffect(() => {
       const view = viewRef.current

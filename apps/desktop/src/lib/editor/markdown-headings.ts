@@ -1,3 +1,7 @@
+import MarkdownIt from 'markdown-it'
+
+const outlineParser = new MarkdownIt({ html: true })
+
 export interface MarkdownHeading {
   level: number
   text: string
@@ -37,17 +41,16 @@ export function assignHeadingIds(texts: string[]): string[] {
 }
 
 export function parseMarkdownHeadings(content: string): MarkdownHeading[] {
-  const lines = content.split('\n')
+  const tokens = outlineParser.parse(content, {})
   const raw: { level: number; text: string; line: number }[] = []
 
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i]?.match(/^(#{1,6})\s+(.+)$/)
-    if (!match) continue
-
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (token.type !== 'heading_open' || !token.map) continue
     raw.push({
-      level: match[1].length,
-      text: match[2],
-      line: i,
+      level: Number(token.tag.slice(1)),
+      text: tokens[i + 1]?.content ?? '',
+      line: token.map[0],
     })
   }
 

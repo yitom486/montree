@@ -8,6 +8,12 @@ import {
 } from './markdown-headings'
 
 describe('markdown-headings', () => {
+  it('使用 CommonMark 标题结构，排除代码和 HTML 内的伪标题并支持 Setext', () => {
+    const content = '# 正文\n\n```python\n# 代码注释\n```\n\n    # 缩进代码\n\n<div>\n# HTML 内部\n</div>\n\nSetext 标题\n---\n\n## 尾部 ##'
+    expect(parseMarkdownHeadings(content).map(({ text, line }) => ({ text, line }))).toEqual([
+      { text: '正文', line: 0 }, { text: 'Setext 标题', line: 12 }, { text: '尾部', line: 15 },
+    ])
+  })
   it('解析文档标题并分配稳定 id', () => {
     const content = ['# Hello', '## World', '### Hello'].join('\n')
     const headings = parseMarkdownHeadings(content)

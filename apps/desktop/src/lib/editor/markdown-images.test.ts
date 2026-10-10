@@ -9,6 +9,11 @@ import {
 } from './markdown-images'
 
 describe('markdown-images', () => {
+  it('HTML 图片属性保留空格，并解码 Markdown 解析器编码的资源路径', () => {
+    expect(resolveLocalImagePath('D:\\book\\note.md', './my image.png', true)).toBe('D:\\book\\my image.png')
+    expect(resolveLocalImagePath('D:\\book\\note.md', './my%20image.png', true)).toBe('D:\\book\\my image.png')
+    expect(resolveLocalImagePath('D:\\book\\note.md', 'https://example.com/a%20b.png', true)).toBeNull()
+  })
   it('识别外部图片地址', () => {
     expect(isExternalImageSrc('https://example.com/a.png')).toBe(true)
     expect(isExternalImageSrc('data:image/png;base64,abc')).toBe(true)

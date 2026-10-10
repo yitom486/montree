@@ -27,7 +27,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| `markdown` | markdown-it 解析器（预览与导出同源） |
+| `markdown` | markdown-it 解析器（预览与导出同源）；沿用社区脚注插件，补充原始定义范围供实时预览编辑 |
 | `markdown-parts` | 把 Markdown 拆成普通段 / Mermaid 块 |
 | `markdown-headings` | 标题大纲、滚动比例 |
 | `markdown-images` | 本地图片路径 ↔ data URL |
@@ -38,7 +38,9 @@
 | `deep-link` | 跨格式深度回跳协议解析与构建（`montree://open`） |
 | `markdown-it-wikilinks` | 双向链接 `[[target\|label]]` markdown-it 扩展 |
 | `markdown-it-page-marker` | OCR 页标记 chip 插件（独立成行 `<!-- Page N -->`→分页 chip，`data-page` 预留跳原图页） |
+| `markdown-it-alerts` / `.test.ts` | GitHub 风格 Note/Warning/Tip/Important/Caution 提示卡片 markdown-it 扩展 |
 | `wikilink-completion` | CodeMirror 6 `[[` 实时自动补全源 |
+| `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位 |
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
@@ -49,6 +51,7 @@
 | 文件 | 功能 |
 |------|------|
 | `preview-sanitize` | 预览 HTML 消毒选项 |
+| `render-preview` / `.test.ts` | 独立预览与实时预览共享 Markdown/DOMPurify/本地图片解析，HTML 属性经 DOM 解析，重复资源合并读取 |
 | `code-block-copy` / `code-block-chrome` | 代码块「复制」按钮 DOM 与共享工具栏 HTML |
 | `mermaid-hydrate` / `mermaid-debug` / `mermaid-repair` | 在容器内渲染 Mermaid、错误容错与源码断行自愈 |
 

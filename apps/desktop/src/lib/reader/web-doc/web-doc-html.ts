@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import { Readability } from '@mozilla/readability'
 import type { WebDocPageContent, WebDocSiteId } from '@montree/contracts'
 import { normalizeWebDocCards, stripWebDocChrome } from '@/lib/reader/web-doc/web-doc-chrome'
 import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@montree/reader-core'
@@ -404,15 +405,37 @@ export function pickArticleRoot(
 
   const body = doc.body
   const bodyText = body?.textContent?.trim() ?? ''
-  // 仅当赢家缺失或过小（如 37 字导航碎片）且页面文本很长时进密度兜底；
-  // 正常命中的大正文块原样返回，零回归面。短页面保持原行为。
-  if (bodyText.length >= DENSE_BODY_TEXT && body instanceof HTMLElement) {
-    const winnerTiny = !winner || (winner.textContent?.trim().length ?? 0) < TINY_WINNER_TEXT
-    if (winnerTiny) {
-      // 无块可选再退整 body（下游 chrome 清洗），也好过碎片
+  const isHijacked = winner && (winner.textContent?.trim().length ?? 0) < TINY_WINNER_TEXT && bodyText.length >= DENSE_BODY_TEXT
+  const noSelectorMatch = !winner && body instanceof HTMLElement && bodyText.length >= 50
+
+  if (isHijacked || noSelectorMatch) {
+    // 优先调用工业级 Mozilla Readability 算法自适应抽取正文
+    try {
+      const cloneDoc = doc.cloneNode(true) as Document
+      if (pageUrl && cloneDoc.head) {
+        const baseEl = cloneDoc.createElement('base')
+        baseEl.href = pageUrl
+        cloneDoc.head.appendChild(baseEl)
+      }
+      const reader = new Readability(cloneDoc)
+      const parsed = reader.parse()
+      if (parsed?.content) {
+        const tempDiv = doc.createElement('div')
+        tempDiv.innerHTML = parsed.content
+        if (tempDiv.firstElementChild instanceof HTMLElement && (tempDiv.textContent?.trim().length ?? 0) >= 50) {
+          return tempDiv.firstElementChild
+        }
+      }
+    } catch {
+      // Readability 容错降级
+    }
+
+    if (bodyText.length >= DENSE_BODY_TEXT && body instanceof HTMLElement) {
+      // 无块可选再退密度兜底
       return pickDensestContentRoot(body, winner) ?? body
     }
   }
+
   if (winner) return winner
 
   if (body instanceof HTMLElement && bodyText) {
@@ -615,11 +638,14 @@ export function buildWebDocReaderDocument(
     .web-doc-object-image { display: block; width: 100%; margin: 0 auto; }
     body .web-doc-reader-content figure { margin: 1.5em 0; max-width: 100%; }
     body .web-doc-reader-content figcaption,
-    body .web-doc-reader-content caption {
+    body .web-doc-reader-content caption,
+    body .web-doc-reader-content .ltx_figure_panel,
+    body .web-doc-reader-content .ltx_caption {
       font-size: 0.88em !important;
       line-height: 1.55 !important;
       text-align: left;
       margin: 0.8em 0;
+      opacity: 0.85;
     }
     body .web-doc-table-scroll {
       max-width: 100%;

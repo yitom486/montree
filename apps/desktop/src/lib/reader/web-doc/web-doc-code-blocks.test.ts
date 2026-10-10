@@ -100,6 +100,26 @@ describe('enhanceWebDocCodeBlocks', () => {
 
     document.body.innerHTML = ''
   })
+
+  it('arXiv / LaTeXML listing 规范化为 code-block 并识别语言与复制', () => {
+    const html = `
+      <figure class="ltx_float ltx_lstlisting">
+        <p class="ltx_figure_panel">A minimal sandbox session through libdsec.</p>
+        <div class="ltx_listing ltx_lst_language_Python ltx_lstlisting">
+          <div class="ltx_listing_data"><a href="data:text/plain;base64,YWJj" download="test.py">⬇</a></div>
+          <div class="ltx_listingline"><span class="ltx_text ltx_lst_identifier">client</span> = <span class="ltx_text ltx_lst_identifier">DSecClient</span>()</div>
+          <div class="ltx_listingline"><span class="ltx_text ltx_lst_keyword">await</span> client.open()</div>
+        </div>
+      </figure>
+    `
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    expect(enhanced).toContain('class="code-block"')
+    expect(enhanced).toContain('class="code-block-lang">python')
+    expect(enhanced).toContain('class="code-block-copy"')
+    expect(enhanced).toContain('DSecClient')
+    expect(enhanced).toContain('await')
+    expect(enhanced).not.toContain('⬇')
+  })
 })
 
 describe('buildWebDocReaderDocument', () => {

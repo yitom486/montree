@@ -346,4 +346,22 @@ describe('web-doc-html', () => {
     expect(result.bodyHtml).toContain('正经文章段落')
     expect(result.bodyHtml).not.toContain('推荐阅读标题条目')
   })
+
+  it('通过 Mozilla Readability 智能自适应提取深层嵌套网页正文', () => {
+    const longArticle = '这是深度报道正文。'.repeat(150)
+    const html = `<!DOCTYPE html><html><head><title>深度科技文章</title></head><body>
+      <nav class="custom-nav"><a href="/">首页</a><a href="/about">关于</a></nav>
+      <div class="unusual-wrapper-abc">
+        <div class="deep-nested-zone">
+          <p>${longArticle}</p>
+        </div>
+      </div>
+      <footer class="custom-footer">Copyright 2026</footer>
+    </body></html>`
+
+    const result = extractWebDocArticle(html, 'https://tech.example.com/deep', 'generic-ssr')
+    expect(result.bodyHtml).toContain('这是深度报道正文')
+    expect(result.bodyHtml).not.toContain('custom-nav')
+    expect(result.bodyHtml).not.toContain('custom-footer')
+  })
 })

@@ -8,7 +8,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | 文件 | 功能 |
 |------|------|
 | `editor-ui-store.ts` | 主题、视图模式、侧栏、各文件滚动位置等编辑器 UI |
-| `app-settings-store.ts` | 用户设置（自动保存间隔、verbose 日志等） |
+| `app-settings-store.ts` / `.test.ts` | 用户设置（自动保存间隔、verbose 日志等）；Markdown 默认所见即所得，源码切换不持久化，兼容旧设置迁移 |
 | `active-document-store.ts` | 当前打开文档路径/类型（供 Agent turn-context 等） |
 | `draft-store.ts` | 未保存草稿（localStorage） |
 | `error-log-store.ts` | 渲染端错误日志列表 |

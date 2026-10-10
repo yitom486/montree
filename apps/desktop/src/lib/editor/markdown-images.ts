@@ -66,10 +66,14 @@ export function parseMarkdownImageSrc(raw: string): string {
 export function resolveLocalImagePath(
   markdownFilePath: string | undefined,
   src: string,
+  literalSrc = false,
 ): string | null {
-  const imageSrc = parseMarkdownImageSrc(src)
+  let imageSrc = literalSrc ? src.trim() : parseMarkdownImageSrc(src)
   if (!imageSrc || isExternalImageSrc(imageSrc)) return null
   if (!markdownFilePath) return null
+  if (literalSrc) {
+    try { imageSrc = decodeURIComponent(imageSrc) } catch { /* Keep literal malformed escapes. */ }
+  }
 
   const separator = detectPathSeparator(markdownFilePath)
 

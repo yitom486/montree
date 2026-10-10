@@ -12,6 +12,7 @@ import { useDefaultLayout } from 'react-resizable-panels'
 import { FileBreadcrumb } from '@/components/layout/panels/FileBreadcrumb'
 import { WelcomePage } from '@/components/layout/main/WelcomePage'
 import { ViewModeToggle } from '@/components/layout/main/ViewModeToggle'
+import { EditorModeToggle } from '@/components/layout/main/EditorModeToggle'
 import {
   MarkdownEditor,
   type MarkdownEditorHandle,
@@ -51,7 +52,7 @@ import {
 } from '@/lib/editor/markdown-headings'
 import { useEditorUiStore, useFileUiState, type EditorViewMode } from '@/stores/editor-ui-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
-import { getDocumentKind, type FileTreeNode } from '@montree/contracts'
+import { getDocumentKind, getFileExtension, type FileTreeNode } from '@montree/contracts'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
 import { DataSheetViewer } from '@/components/data/DataSheetViewer'
@@ -124,6 +125,9 @@ export const EditorWorkspaceMain = forwardRef<
   const previewDebounceMs = useAppSettingsStore((state) => state.previewDebounceMs)
   const tabSize = useAppSettingsStore((state) => state.tabSize)
   const editorFontSize = useAppSettingsStore((state) => state.editorFontSize)
+  const markdownEditorMode = useAppSettingsStore((state) => state.markdownEditorMode)
+  const setMarkdownEditorMode = useAppSettingsStore((state) => state.setMarkdownEditorMode)
+  const toggleMarkdownEditorMode = useAppSettingsStore((state) => state.toggleMarkdownEditorMode)
 
   const viewMode = fileState.viewMode
   const previewHtml = useMarkdownPreview(content, filePath, previewDebounceMs)
@@ -258,6 +262,15 @@ export const EditorWorkspaceMain = forwardRef<
     }
   }, [headings, updateActiveHeading, viewMode])
 
+  const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
+  // TXT shares Markdown's file routing, but should not receive Markdown preview decorations.
+  const isMarkdown = documentKind === 'markdown' && (!filePath || getFileExtension(filePath) !== '.txt')
+  const dataRoot = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    setMarkdownEditorMode('live-preview')
+  }, [filePath, setMarkdownEditorMode])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return
@@ -280,6 +293,15 @@ export const EditorWorkspaceMain = forwardRef<
         return
       }
 
+      if (key === '/' || code === 'Slash') {
+        if (filePath && isMarkdown) {
+          event.preventDefault()
+          toggleMarkdownEditorMode()
+          if (viewMode === 'preview') setViewMode(filePath, 'editor')
+        }
+        return
+      }
+
       if (!filePath) return
 
       const shortcuts: Record<string, EditorViewMode> = {
@@ -296,10 +318,8 @@ export const EditorWorkspaceMain = forwardRef<
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [filePath, setViewMode])
+  }, [filePath, setViewMode, isMarkdown, viewMode, toggleMarkdownEditorMode])
 
-  const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
-  const dataRoot = useRef<HTMLElement>(null)
   const isTextData = documentKind === 'json' || documentKind === 'log'
   const isDataOrOfficeDoc =
     documentKind === 'csv' ||
@@ -319,7 +339,18 @@ export const EditorWorkspaceMain = forwardRef<
         welcome={showWelcome}
         trailing={
           showWelcome || isDataOrOfficeDoc ? undefined : (
-            <ViewModeToggle mode={viewMode} onChange={(mode) => setViewMode(filePath, mode)} />
+            <div className="flex items-center gap-1.5">
+              {isMarkdown && (
+                <EditorModeToggle
+                  mode={markdownEditorMode}
+                  onChange={(mode) => {
+                    setMarkdownEditorMode(mode)
+                    if (!showEditor) setViewMode(filePath, 'editor')
+                  }}
+                />
+              )}
+              <ViewModeToggle mode={viewMode} onChange={(mode) => setViewMode(filePath, mode)} />
+            </div>
           )
         }
       />
@@ -381,6 +412,7 @@ export const EditorWorkspaceMain = forwardRef<
                       theme={theme}
                       tabSize={tabSize}
                       fontSize={editorFontSize}
+                      livePreview={isMarkdown && markdownEditorMode === 'live-preview'}
                       onChange={onContentChange}
                       onScroll={handleEditorScroll}
                       onPasteImage={handlePasteImage}

@@ -28,6 +28,8 @@ export {
 export type AutoSaveIntervalMs = 15000 | 30000 | 60000
 export type PreviewDebounceMs = 150 | 300 | 500
 export type WorkspaceActiveSurface = 'none' | 'file' | 'web-doc'
+/** Markdown 编辑器内部模式：沉浸式实时预览 / 纯源码 */
+export type MarkdownEditorMode = 'live-preview' | 'source'
 
 export const AUTO_SAVE_INTERVAL_OPTIONS: Array<{ value: AutoSaveIntervalMs; label: string }> = [
   { value: 15000, label: '15 秒' },
@@ -42,9 +44,9 @@ export const PREVIEW_DEBOUNCE_OPTIONS: Array<{ value: PreviewDebounceMs; label: 
 ]
 
 export const DEFAULT_VIEW_MODE_OPTIONS: Array<{ value: EditorViewMode; label: string }> = [
-  { value: 'editor', label: '编辑' },
-  { value: 'split', label: '分屏' },
-  { value: 'preview', label: '预览' },
+  { value: 'editor', label: '单栏编辑' },
+  { value: 'split', label: '双栏分屏' },
+  { value: 'preview', label: '独立预览' },
 ]
 
 export const TAB_SIZE_OPTIONS = [2, 4] as const
@@ -89,6 +91,8 @@ export interface AppSettingsState {
   /** PDF 页面渲染倍率，影响 OCR 速度与清晰度 */
   pdfOcrScale: PdfOcrScale
   verboseRendererLogs: boolean
+  /** Markdown 编辑器内部模式：沉浸式实时预览 / 纯源码 */
+  markdownEditorMode: MarkdownEditorMode
 }
 
 interface AppSettingsStore extends AppSettingsState {
@@ -111,6 +115,8 @@ interface AppSettingsStore extends AppSettingsState {
   setPdfOcrAgentAutoOcr: (enabled: boolean) => void
   setPdfOcrScale: (scale: PdfOcrScale) => void
   setVerboseRendererLogs: (enabled: boolean) => void
+  setMarkdownEditorMode: (mode: MarkdownEditorMode) => void
+  toggleMarkdownEditorMode: () => void
   addRecentFile: (filePath: string) => void
   removeRecentFile: (filePath: string) => void
   clearRecentFiles: () => void
@@ -127,7 +133,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       autoSaveIntervalMs: 30000,
       maxRecentFiles: 10,
       recentFiles: [],
-      defaultViewMode: 'split',
+      defaultViewMode: 'editor',
       previewDebounceMs: 300,
       restoreLastFileOnStartup: true,
       lastActiveSurface: 'none',
@@ -137,6 +143,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       lastWorkspaceRoot: undefined,
       tabSize: 2,
       editorFontSize: 15,
+      markdownEditorMode: 'live-preview',
       readerFontSize: DEFAULT_READER_TYPOGRAPHY.fontSize,
       readerLineHeight: DEFAULT_READER_TYPOGRAPHY.lineHeight,
       pdfOcrBackgroundPrefetch: false,
@@ -187,6 +194,11 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       setPdfOcrScale: (scale) => set({ pdfOcrScale: scale }),
 
       setVerboseRendererLogs: (enabled) => set({ verboseRendererLogs: enabled }),
+      setMarkdownEditorMode: (mode) => set({ markdownEditorMode: mode }),
+      toggleMarkdownEditorMode: () =>
+        set((state) => ({
+          markdownEditorMode: state.markdownEditorMode === 'live-preview' ? 'source' : 'live-preview',
+        })),
 
       setMaxRecentFiles: (limit) =>
         set((state) => ({
@@ -241,6 +253,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         return {
           ...current,
           ...p,
+          // Older settings persisted source mode; every launch starts in live preview.
+          markdownEditorMode: 'live-preview',
           restoreLastFileOnStartup: p.restoreLastFileOnStartup ?? true,
           lastActiveSurface: p.lastActiveSurface ?? 'none',
           pdfOcrBackgroundPrefetch: p.pdfOcrBackgroundPrefetch ?? false,

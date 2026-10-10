@@ -64,4 +64,26 @@ describe('markdownParser', () => {
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('checked')
   })
+
+  it('渲染脚注（Footnote）', () => {
+    const html = renderMarkdown('文中脚注[^1]\n\n[^1]: 底部解释说明。')
+    expect(html).toContain('class="footnote-ref"')
+    expect(html).toContain('class="footnotes"')
+    expect(html).toContain('底部解释说明。')
+  })
+
+  it('渲染上下标与高亮（sub/sup/mark）', () => {
+    const html = renderMarkdown('H~2~O 与 X^2^ 以及 ==重点关注==')
+    expect(html).toContain('<sub>2</sub>')
+    expect(html).toContain('<sup>2</sup>')
+    expect(html).toContain('<mark>重点关注</mark>')
+  })
+
+  it('容错规范化内联裸 SVG Data-URI 图片', () => {
+    const raw = '![inline-svg](data:image/svg+xml;utf8,<svg width="10"><rect/></svg> "测试标题")'
+    const html = renderMarkdown(raw)
+    expect(html).toContain('<img src="data:image/svg+xml;utf8,%3Csvg')
+    expect(html).toContain('alt="inline-svg"')
+    expect(html).toContain('title="测试标题"')
+  })
 })

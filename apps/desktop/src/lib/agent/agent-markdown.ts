@@ -7,12 +7,10 @@ export type { AgentMarkdownPart, MarkdownPart } from '@/lib/editor/markdown-part
 export { splitAgentMarkdownParts, splitMarkdownParts } from '@/lib/editor/markdown-parts'
 
 /** 与预览同源消毒策略；保留 pre.mermaid / code-block class 供后续 hook 使用 */
-const AGENT_SANITIZE_OPTIONS: Config = {
-  ALLOWED_URI_REGEXP:
-    /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-  ADD_TAGS: ['input'],
-  ADD_ATTR: ['type', 'checked', 'disabled', 'class', 'id', 'aria-hidden', 'aria-label', 'title'],
-}
+import { PREVIEW_SANITIZE_OPTIONS } from '@/lib/preview/preview-sanitize'
+
+/** 与预览同源消毒策略；保留 details / HTML 样式 / Alerts 供聊天卡片使用 */
+const AGENT_SANITIZE_OPTIONS: Config = PREVIEW_SANITIZE_OPTIONS
 
 /**
  * 包一层再消毒：sole-root 的 `<pre>` / `<div class="mermaid">` 在 DOMPurify+happy-dom
@@ -41,7 +39,7 @@ export function renderAgentMarkdown(
   const patched = options?.streaming
     ? patchStreamingMathDelimiters(patchStreamingMarkdownFences(text))
     : text
-  return sanitizeAgentHtml(renderMarkdown(patched))
+  return sanitizeAgentHtml(renderMarkdown(patched, undefined, { strictSafe: true }))
 }
 
 /** @deprecated 使用 renderAgentMarkdown(text, { streaming: true }) */

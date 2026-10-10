@@ -1,21 +1,31 @@
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { markdownLanguage } from '@codemirror/lang-markdown'
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { EditorView } from '@codemirror/view'
 import type { AppTheme } from '@/stores/editor-ui-store'
 
-export function buildThemeExtensions(theme: AppTheme, fontSize: number) {
+const proseHighlight = HighlightStyle.define([], {
+  scope: markdownLanguage,
+  all: { textDecoration: 'none' },
+})
+
+export function buildThemeExtensions(theme: AppTheme, fontSize: number, livePreview = false) {
   const isDark = theme === 'dark'
+  const codeHighlight = isDark ? oneDarkHighlightStyle : defaultHighlightStyle
 
   return [
-    syntaxHighlighting(isDark ? oneDarkHighlightStyle : defaultHighlightStyle, {
-      fallback: true,
-    }),
+    livePreview ? [
+      // Prose decorations supply semantic styles. Keep code highlighting in nested languages.
+      syntaxHighlighting(proseHighlight),
+      syntaxHighlighting({ style: codeHighlight.style, scope: (node) => !proseHighlight.scope?.(node) }),
+      EditorView.styleModule.of(codeHighlight.module!),
+    ] : syntaxHighlighting(codeHighlight, { fallback: true }),
     EditorView.theme({
       '&': {
         height: '100%',
         fontSize: `${fontSize}px`,
         backgroundColor: 'var(--editor)',
-        color: isDark ? '#d4d4d4' : 'var(--foreground)',
+        color: 'var(--foreground)',
       },
       '.cm-scroller': {
         overflow: 'auto',
@@ -24,7 +34,7 @@ export function buildThemeExtensions(theme: AppTheme, fontSize: number) {
       },
       '.cm-content': {
         padding: '20px 0',
-        caretColor: isDark ? '#7aa2f7' : 'var(--primary)',
+        caretColor: 'var(--primary)',
       },
       '.cm-line': {
         padding: '0 20px',

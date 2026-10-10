@@ -13,9 +13,9 @@ const VIEW_MODES: {
   label: string
   icon: typeof PenLine
 }[] = [
-  { value: 'editor', label: '编辑', icon: PenLine },
-  { value: 'split', label: '分屏', icon: Columns2 },
-  { value: 'preview', label: '预览', icon: Eye },
+  { value: 'editor', label: '单栏编辑', icon: PenLine },
+  { value: 'split', label: '双栏分屏', icon: Columns2 },
+  { value: 'preview', label: '独立预览', icon: Eye },
 ]
 
 export function ViewModeToggle({ mode, onChange }: ViewModeToggleProps) {

@@ -436,3 +436,189 @@
   flex: 1;
   border-top: 1px dashed var(--border);
 }
+
+/* 折叠块 details 与 summary */
+.markdown-preview details {
+  margin: 1.1rem 0;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: color-mix(in oklch, var(--muted) 40%, transparent);
+  transition: all 0.16s ease;
+}
+
+.markdown-preview details:hover {
+  border-color: color-mix(in oklch, var(--border) 80%, var(--foreground));
+}
+
+.markdown-preview details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--foreground);
+  user-select: none;
+  outline: none;
+  transition: color 0.15s ease;
+}
+
+.markdown-preview details > summary:hover {
+  color: var(--primary);
+}
+
+.markdown-preview details[open] {
+  padding-bottom: 0.85rem;
+  background-color: color-mix(in oklch, var(--muted) 25%, transparent);
+}
+
+.markdown-preview details[open] > summary {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+/* 键盘按键与高亮 mark */
+.markdown-preview kbd {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.82em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--border);
+  color: var(--foreground);
+  vertical-align: 1px;
+}
+
+.markdown-preview mark {
+  background-color: color-mix(in oklch, #facc15 35%, transparent);
+  color: inherit;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+/* GitHub 风格 Alert / Callout 提示卡片 */
+.markdown-preview .markdown-alert {
+  margin: 1.25rem 0;
+  padding: 0.85rem 1.15rem;
+  border-left: 4px solid var(--border);
+  border-radius: 6px;
+  background-color: color-mix(in oklch, var(--muted) 35%, transparent);
+}
+
+.markdown-preview .markdown-alert .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  font-size: 0.95em;
+  margin-bottom: 0.45rem;
+  user-select: none;
+}
+
+.markdown-preview .markdown-alert .alert-icon {
+  flex-shrink: 0;
+}
+
+.markdown-preview .markdown-alert > p:first-of-type {
+  margin-top: 0;
+}
+
+.markdown-preview .markdown-alert > p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview .markdown-alert-note {
+  border-left-color: #3b82f6;
+  background-color: color-mix(in oklch, #3b82f6 8%, transparent);
+}
+.markdown-preview .markdown-alert-note .markdown-alert-title {
+  color: #3b82f6;
+}
+
+.markdown-preview .markdown-alert-tip {
+  border-left-color: #10b981;
+  background-color: color-mix(in oklch, #10b981 8%, transparent);
+}
+.markdown-preview .markdown-alert-tip .markdown-alert-title {
+  color: #10b981;
+}
+
+.markdown-preview .markdown-alert-important {
+  border-left-color: #8b5cf6;
+  background-color: color-mix(in oklch, #8b5cf6 8%, transparent);
+}
+.markdown-preview .markdown-alert-important .markdown-alert-title {
+  color: #8b5cf6;
+}
+
+.markdown-preview .markdown-alert-warning {
+  border-left-color: #f59e0b;
+  background-color: color-mix(in oklch, #f59e0b 8%, transparent);
+}
+.markdown-preview .markdown-alert-warning .markdown-alert-title {
+  color: #f59e0b;
+}
+
+.markdown-preview .markdown-alert-caution {
+  border-left-color: #ef4444;
+  background-color: color-mix(in oklch, #ef4444 8%, transparent);
+}
+.markdown-preview .markdown-alert-caution .markdown-alert-title {
+  color: #ef4444;
+}
+
+/* 脚注 Footnotes 与上下标样式 */
+.markdown-preview .footnotes-sep {
+  margin: 2.5rem 0 1rem;
+  border: none;
+  border-top: 1px dashed var(--border);
+}
+
+.markdown-preview .footnotes {
+  font-size: 0.88em;
+  color: var(--muted-foreground);
+}
+
+.markdown-preview .footnotes-list {
+  padding-left: 1.5rem;
+  margin: 0;
+}
+
+.markdown-preview .footnote-item {
+  margin: 0.4rem 0;
+}
+
+.markdown-preview .footnote-ref a {
+  color: var(--info);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0 0.15em;
+}
+
+.markdown-preview .footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview .footnote-backref {
+  color: var(--info);
+  text-decoration: none;
+  margin-left: 0.3em;
+}
+
+.markdown-preview sub,
+.markdown-preview sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.markdown-preview sup {
+  top: -0.5em;
+}
+
+.markdown-preview sub {
+  bottom: -0.25em;
+}
+
+

@@ -43,4 +43,19 @@ describe('repairMermaidSource', () => {
     const healed = repairMermaidSource(broken)
     expect(healed).toContain('A["起点"] --> B["终点"]')
   })
+
+  it('preserves sequence diagram double arrows like -->> and ->>', () => {
+    const raw = `sequenceDiagram
+    participant U as 用户
+    participant M as Montree
+    participant R as 渲染引擎
+    U->>M: 打开文档
+    M->>R: 解析 Markdown
+    R-->>M: 返回 HTML/SVG
+    M-->>U: 显示预览`
+    const repaired = repairMermaidSource(raw)
+    expect(repaired).toContain('R-->>M: 返回 HTML/SVG')
+    expect(repaired).toContain('M-->>U: 显示预览')
+    expect(repaired).not.toContain('--> >')
+  })
 })

@@ -6,6 +6,7 @@ export const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
 }
 
 /** MIME → 扩展名（粘贴图片保存用） */

@@ -30,13 +30,14 @@ export function repairMermaidSource(raw: string): string {
 
   // 3. 头部与后续第一个语句在同一行时，强制拆行
   code = code.replace(
-    /^(\s*(?:flowchart|graph)\s+(?:TD|TB|BT|RL|LR)|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|gitGraph|quadrantChart|xychart-beta|timeline|zenuml|sankey-beta)\s+([^\n]+)/i,
+    /^(\s*(?:flowchart|graph)\s+(?:TD|TB|BT|RL|LR)|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|gitGraph|quadrantChart|xychart-beta|timeline|zenuml|sankey-beta)[ \t]+([^\r\n]+)/i,
     '$1\n  $2',
   )
 
   // 3.5 智能自愈被意外截断或插入换行的箭头连线（如 `--\n>` => `-->`, `==\n>` => `==>`, `-.-\n>` => `-.->`）
   code = code.replace(/(--|==|-\.-)\s*\n+\s*>/g, '$1>')
-  code = code.replace(/(--|==)\s*>\s*/g, '$1> ')
+  code = code.replace(/(--|==|-\.-)\s+>(?!>)/g, '$1>')
+  code = code.replace(/(--|->)\s+>/g, '$1>')
 
   // 4. 将引号外部的分号转为换行（Mermaid 允许分号分隔语句；避免破坏双引号字符串内的内容）
   code = code.replace(/;(?=(?:(?:[^"]*"){2})*[^"]*$)\s*/g, '\n  ')
