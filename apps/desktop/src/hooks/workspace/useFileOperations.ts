@@ -47,7 +47,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
     ? documentKind
     : undefined
   const isMarkdownDocument = documentKind === 'markdown'
-  const isEditableDocument = isMarkdownDocument || isDataDocumentKind(documentKind)
+  const isEditableDocument =
+    isMarkdownDocument || isDataDocumentKind(documentKind) || documentKind === 'html'
   const isDirty = isEditableDocument && content !== savedContent
   const fileName = getFileName(filePath)
 
@@ -172,7 +173,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const openPathMutation = useMutation({
     mutationFn: async (path: string): Promise<Result<OpenDocumentResult, AppError>> => {
       const kind = getDocumentKind(path)
-      if (kind === 'markdown' || isDataDocumentKind(kind)) {
+      if (kind === 'markdown' || isDataDocumentKind(kind) || kind === 'html') {
         const result = await fileApi.readFile(path)
         if (!isOk(result)) return result
         return ok({

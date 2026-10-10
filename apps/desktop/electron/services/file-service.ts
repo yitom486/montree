@@ -5,6 +5,7 @@ import {
   ALL_DOCUMENT_EXTENSIONS,
   DATA_EXTENSIONS,
   DEFAULT_SAVE_FILENAME,
+  HTML_EXTENSIONS,
   MARKDOWN_EXTENSIONS,
   OFFICE_EXTENSIONS,
   getDocumentKind,
@@ -42,6 +43,7 @@ export const MARKDOWN_DIALOG_FILTERS = [
 export const DOCUMENT_DIALOG_FILTERS = [
   { name: '所有支持格式', extensions: [...ALL_DOCUMENT_EXTENSIONS] },
   { name: 'Markdown', extensions: [...MARKDOWN_EXTENSIONS] },
+  { name: 'HTML 网页', extensions: [...HTML_EXTENSIONS] },
   { name: 'PDF', extensions: ['pdf'] },
   { name: 'EPUB', extensions: ['epub'] },
   { name: 'MOBI / Kindle', extensions: ['mobi', 'azw3', 'azw'] },
@@ -77,7 +79,7 @@ export async function openDocumentDialog(
     const filePath = filePaths[0]!
     const kind = getDocumentKind(filePath)
 
-    if (kind === 'markdown' || isDataDocumentKind(kind)) {
+    if (kind === 'markdown' || isDataDocumentKind(kind) || kind === 'html') {
       const content = await readFile(filePath, 'utf-8')
       return ok({ filePath, kind, content })
     }
@@ -153,10 +155,10 @@ export async function readFileByPath(
 ): Promise<Result<OpenFileResult, AppError>> {
   try {
     const kind = getDocumentKind(filePath)
-    if (kind !== 'markdown' && !isDataDocumentKind(kind)) {
+    if (kind !== 'markdown' && !isDataDocumentKind(kind) && kind !== 'html') {
       return err({
         code: 'UNSUPPORTED_FORMAT',
-        message: '该文件不是可读取的 Markdown 或数据文档',
+        message: '该文件不是可读取的 Markdown、HTML 或数据文档',
       })
     }
 

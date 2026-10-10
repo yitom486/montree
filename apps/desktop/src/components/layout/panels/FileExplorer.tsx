@@ -105,6 +105,8 @@ const FileIcon = memo(function FileIcon({ documentKind }: { documentKind?: FileT
       return <FileSpreadsheet className="size-3.5 shrink-0 text-emerald-600/90" />
     case 'pptx':
       return <Presentation className="size-3.5 shrink-0 text-orange-500/90" />
+    case 'html':
+      return <Globe className="size-3.5 shrink-0 text-orange-500/90" />
     default:
       return <FileText className="size-3.5 shrink-0" />
   }

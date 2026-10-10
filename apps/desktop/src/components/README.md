@@ -14,6 +14,7 @@ React UI。按产品域分子目录；shadcn 落在 `ui/`。
 | [`agent/`](./agent/) | ACP Agent 面板与消息卡片 |
 | [`data/`](./data/) | CSV/TSV 表格工作区、JSON 树形折叠、LOG 日志流高亮与多维过滤视图 |
 | [`office/`](./office/) | DOCX 高保真排版预览与多主题护眼适配（`docx-preview`）、多工作表 Excel 表格（`xlsx` / Univer 1.0）、PPTX 演示文稿幻灯片（`fflate`） |
+| [`html/`](./html/) | 本地 HTML 网页与静态文档渲染器（沙箱预览、分屏实时编辑、源码高亮） |
 | [`shared/`](./shared/) | 跨工作区对话框、错误边界 |
 
 命名：组件 `PascalCase.tsx`。样式优先 Tailwind + `cn()`；阅读器特殊样式见 `src/styles/`。

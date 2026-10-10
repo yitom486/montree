@@ -12,7 +12,7 @@ export interface OpenFileResult {
 
 /** 打开对话框的结果：文本类含 content；二进制类仅含 filePath 避免占用 IPC 字符串 */
 export type OpenDocumentResult =
-  | { filePath: string; kind: 'markdown' | DataDocumentKind; content: string }
+  | { filePath: string; kind: 'markdown' | 'html' | DataDocumentKind; content: string }
   | { filePath: string; kind: 'pdf' | 'epub' | 'mobi' | OfficeDocumentKind }
 
 

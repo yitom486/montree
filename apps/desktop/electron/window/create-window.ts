@@ -240,9 +240,10 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     console.error('[did-fail-load]', errorCode, errorDescription, validatedURL)
   })
 
-  window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+  window.webContents.on('console-message', (event) => {
+    const { level, message, lineNumber, sourceId } = event
     if (shouldLogRendererConsole(level, message)) {
-      console.error('[renderer]', message, `(${sourceId}:${line})`)
+      console.error('[renderer]', message, `(${sourceId}:${lineNumber})`)
     }
   })
 

@@ -17,6 +17,8 @@ describe('document-types', () => {
     expect(getDocumentKind('05-报告.docx')).toBe('docx')
     expect(getDocumentKind('06-预算.xlsx')).toBe('xlsx')
     expect(getDocumentKind('07-汇报.pptx')).toBe('pptx')
+    expect(getDocumentKind('index.html')).toBe('html')
+    expect(getDocumentKind('D:\\sites\\page.htm')).toBe('html')
     expect(getDocumentKind('image.png')).toBe('unknown')
   })
 })

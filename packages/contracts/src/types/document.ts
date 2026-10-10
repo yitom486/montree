@@ -1,5 +1,6 @@
 import {
   DATA_EXTENSION_SET,
+  HTML_EXTENSION_SET,
   MARKDOWN_EXTENSION_SET,
   OFFICE_EXTENSION_SET,
   READER_EXTENSION_SET,
@@ -18,6 +19,7 @@ export type DocumentKind =
   | 'epub'
   | 'mobi'
   | 'web'
+  | 'html'
   | DataDocumentKind
   | OfficeDocumentKind
   | 'unknown'
@@ -44,6 +46,7 @@ export function getDocumentKind(filePath: string): DocumentKind {
   if (isWebDocumentPath(filePath)) return 'web'
   const extension = getFileExtension(filePath)
   if (MARKDOWN_EXTENSION_SET.has(extension)) return 'markdown'
+  if (HTML_EXTENSION_SET.has(extension)) return 'html'
   if (extension === '.pdf') return 'pdf'
   if (extension === '.epub') return 'epub'
   if (extension === '.mobi' || extension === '.azw3' || extension === '.azw') return 'mobi'
@@ -69,13 +72,18 @@ export function isOfficeDocumentKind(kind: DocumentKind): kind is OfficeDocument
   return kind === 'docx' || kind === 'xlsx' || kind === 'pptx'
 }
 
-/** 工作区侧栏是否展示该扩展名（Markdown + 阅读器 + 数据表格 + Office 格式） */
+export function isHtmlDocumentKind(kind: DocumentKind): boolean {
+  return kind === 'html'
+}
+
+/** 工作区侧栏是否展示该扩展名（Markdown + 阅读器 + 数据表格 + Office + HTML 格式） */
 export function isWorkspaceFileExtension(extension: string): boolean {
   return (
     MARKDOWN_EXTENSION_SET.has(extension) ||
     READER_EXTENSION_SET.has(extension) ||
     DATA_EXTENSION_SET.has(extension) ||
-    OFFICE_EXTENSION_SET.has(extension)
+    OFFICE_EXTENSION_SET.has(extension) ||
+    HTML_EXTENSION_SET.has(extension)
   )
 }
 

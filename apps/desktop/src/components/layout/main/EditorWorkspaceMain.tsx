@@ -44,6 +44,7 @@ import { LogStreamViewer } from '@/components/data/LogStreamViewer'
 import { DocxViewer } from '@/components/office/DocxViewer'
 import { SpreadsheetViewer } from '@/components/office/SpreadsheetViewer'
 import { PptxViewer } from '@/components/office/PptxViewer'
+import { HtmlViewer } from '@/components/html/HtmlViewer'
 
 export interface EditorWorkspaceMainHandle {
   selectHeading: (heading: MarkdownHeading) => void
@@ -285,7 +286,8 @@ export const EditorWorkspaceMain = forwardRef<
     documentKind === 'log' ||
     documentKind === 'docx' ||
     documentKind === 'xlsx' ||
-    documentKind === 'pptx'
+    documentKind === 'pptx' ||
+    documentKind === 'html'
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -300,7 +302,7 @@ export const EditorWorkspaceMain = forwardRef<
         }
       />
 
-      <main className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
+      <main data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
         {showWelcome ? (
           <WelcomePage
             recentFiles={recentFiles}
@@ -311,6 +313,8 @@ export const EditorWorkspaceMain = forwardRef<
             onOpenRecentFile={onOpenRecentFile}
             onOpenWebDoc={onOpenWebDoc}
           />
+        ) : documentKind === 'html' && filePath ? (
+          <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} />
         ) : documentKind === 'docx' && filePath ? (
           <DocxViewer filePath={filePath} />
         ) : documentKind === 'xlsx' && filePath ? (

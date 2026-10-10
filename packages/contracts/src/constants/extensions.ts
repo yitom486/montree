@@ -10,6 +10,9 @@ export const DATA_EXTENSIONS = ['csv', 'tsv', 'json', 'log'] as const
 /** Office 套件支持的扩展名（不含点） */
 export const OFFICE_EXTENSIONS = ['docx', 'xlsx', 'pptx'] as const
 
+/** HTML 网页与静态文档支持的扩展名（不含点） */
+export const HTML_EXTENSIONS = ['html', 'htm'] as const
+
 /** 带点号的扩展名集合，用于工作区扫描 */
 export const MARKDOWN_EXTENSION_SET = new Set<string>(
   MARKDOWN_EXTENSIONS.map((ext) => `.${ext}`),
@@ -27,11 +30,16 @@ export const OFFICE_EXTENSION_SET = new Set<string>(
   OFFICE_EXTENSIONS.map((ext) => `.${ext}`),
 )
 
+export const HTML_EXTENSION_SET = new Set<string>(
+  HTML_EXTENSIONS.map((ext) => `.${ext}`),
+)
+
 export const ALL_DOCUMENT_EXTENSIONS = [
   ...MARKDOWN_EXTENSIONS,
   ...READER_EXTENSIONS,
   ...DATA_EXTENSIONS,
   ...OFFICE_EXTENSIONS,
+  ...HTML_EXTENSIONS,
 ] as const
 
 /** 工作区扫描支持的扩展名展示（带点） */

@@ -14,7 +14,7 @@ import {
   type QuickOpenMatchResult,
 } from '@/lib/workspace/quick-open'
 import type { FileTreeNode } from '@montree/contracts'
-import { Book, BookOpen, Clock, FileCode, FileText, Search } from 'lucide-react'
+import { Book, BookOpen, Clock, FileCode, FileText, Globe, Search } from 'lucide-react'
 
 interface QuickOpenDialogProps {
   open: boolean
@@ -29,6 +29,8 @@ function getFileIcon(documentKind: string): ReactNode {
   switch (documentKind) {
     case 'markdown':
       return <FileText className="size-4 shrink-0 text-blue-500 dark:text-blue-400" />
+    case 'html':
+      return <Globe className="size-4 shrink-0 text-orange-500 dark:text-orange-400" />
     case 'pdf':
       return <FileText className="size-4 shrink-0 text-rose-500 dark:text-rose-400" />
     case 'epub':
