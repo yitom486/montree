@@ -4,6 +4,8 @@ import type { ReaderFormat } from '@montree/reader-core'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
+import { getDocumentTools } from './document-tool-registry'
+import { getReaderContentProvider } from './reader-content-registry'
 
 export const TOC_TOP_LEVEL_LIMIT = 10
 export const TOC_TOP_LEVEL_LABEL_MAX = 40
@@ -29,6 +31,11 @@ export function resolveReaderLocationKey(
 
 /** 从 navigation store 读 format/pageNum/flatIndex，供 buildMontreePromptPrefix 使用 */
 export function collectReaderLocationKey(): string | null {
+  const document = collectActiveDocument()
+  if (document?.kind === 'pptx') {
+    const view = getDocumentTools(document.path)?.getSlideView?.()
+    return view ? `pptx:${view.visibleSlide}:${view.visibleSlides.join(',')}:${view.navigationSlide}:${view.selectionSlide ?? '-'}` : null
+  }
   const reader = useReaderNavigationStore.getState()
   if (!reader.ready) return null
   return resolveReaderLocationKey(reader.format, reader.pageNum, reader.nav.flatIndex)
@@ -103,6 +110,14 @@ export function collectReadingState(
   doc: MontreeActiveDocument | null,
 ): MontreeReadingState | undefined {
   if (!doc) return undefined
+  if (doc.kind === 'pptx') {
+    const view = getDocumentTools(doc.path)?.getSlideView?.()
+    const provider = getReaderContentProvider()
+    if (!view || provider?.filePath !== doc.path) return undefined
+    const count = provider.getUnits?.().length
+    return { current: `幻灯片 ${view.visibleSlide}`, slide: view.visibleSlide, visibleSlides: view.visibleSlides, navigationSlide: view.navigationSlide,
+      selectionSlide: view.selectionSlide, unitCount: count }
+  }
   const reader = useReaderNavigationStore.getState()
   if (!reader.ready || reader.filePath !== doc.path) return undefined
 
@@ -131,6 +146,10 @@ export function collectTocTopLevelForDocument(
   doc: MontreeActiveDocument | null,
 ): string[] | undefined {
   if (!doc) return undefined
+  if (doc.kind === 'pptx') {
+    const provider = getReaderContentProvider()
+    return provider?.filePath === doc.path ? collectTocTopLevel(provider.getUnits?.() ?? []) : undefined
+  }
   const reader = useReaderNavigationStore.getState()
   if (!reader.ready || reader.filePath !== doc.path) return undefined
   return collectTocTopLevel(reader.units)

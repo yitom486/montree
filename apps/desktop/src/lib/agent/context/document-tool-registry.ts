@@ -1,4 +1,4 @@
-import type { DocumentSelection } from '@montree/contracts'
+import type { DocumentSelection, SlideViewContext } from '@montree/contracts'
 
 export interface DocumentToolProvider {
   filePath: string
@@ -8,6 +8,7 @@ export interface DocumentToolProvider {
   undo: () => void
   read: (args: Record<string, unknown>) => unknown
   edit: (args: Record<string, unknown>) => unknown
+  getSlideView?: () => SlideViewContext
 }
 
 let current: DocumentToolProvider | null = null

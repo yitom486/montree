@@ -1,6 +1,7 @@
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
 import type { SlideSelection } from '@montree/contracts'
 import { presentationAppearance, presentationPreviewContext, type PresentationAppearance } from './presentation-preview'
+import { editPresentationText } from './presentation-text-edit'
 
 const P = 'http://schemas.openxmlformats.org/presentationml/2006/main'
 const A = 'http://schemas.openxmlformats.org/drawingml/2006/main'
@@ -36,6 +37,8 @@ export class PresentationDocument {
   private savedBytes: Uint8Array
   revision = 0
   activeSlide = 1
+  navigationSlide = 1
+  visibleSlides = [1]
   selection: SlideSelection | null = null
   private selectionSerial = 0
   private previewCache = new Map<number, { background: string; elements: PresentationElement[] }>()
@@ -116,25 +119,41 @@ export class PresentationDocument {
     return elements
   }
   background(number: number): string { this.elements(number); return this.previewCache.get(number)!.background }
-  select(slide: number, elementIds: string[]): SlideSelection {
+  select(slide: number, elementIds: string[], focus?: { paragraphId?: string; runId?: string }): SlideSelection {
     const elements = this.elements(slide)
     if (!elementIds.length || elementIds.some((id) => !elements.some((element) => element.id === id))) throw new Error('选中元素不存在')
-    this.activeSlide = slide
-    this.selection = { kind: 'slide', documentPath: this.filePath, slide, elementIds, revision: this.revision, selectionId: `${this.filePath}:${++this.selectionSerial}:${this.revision}` }
+    if (focus?.paragraphId) {
+      if (elementIds.length !== 1) throw new Error('段落选区只能属于一个元素')
+      const paragraph = elements.find((item) => item.id === elementIds[0])?.appearance.paragraphs.find((item) => item.id === focus.paragraphId)
+      if (!paragraph || focus.runId && !paragraph.runs.some((run) => run.id === focus.runId)) throw new Error('段落或文字片段不存在')
+    }
+    this.selection = { kind: 'slide', documentPath: this.filePath, slide, elementIds, revision: this.revision, selectionId: `${this.filePath}:${++this.selectionSerial}:${this.revision}`, ...focus }
     return this.selection
   }
+  context() { return { visibleSlide: this.activeSlide, visibleSlides: this.visibleSlides, navigationSlide: this.navigationSlide, selectionSlide: this.selection?.slide ?? null } }
   read(args: Record<string, unknown>) {
     if (args.slide === undefined) return { documentPath: this.filePath, revision: this.revision, slideCount: this.slidePaths.length,
-      width: this.width, height: this.height, units: 'points', dirty: this.dirty, selection: this.selection,
+      width: this.width, height: this.height, units: 'points', dirty: this.dirty, selection: this.selection, context: this.context(), textOffsets: 'UTF-16; start inclusive, end exclusive; relative to paragraph or selected run; IDs valid only at this revision',
       slides: this.slidePaths.map((_, i) => ({ slide: i + 1, title: this.elements(i + 1).find((element) => element.text)?.text.split('\n')[0] ?? `幻灯片 ${i + 1}` })),
-      capabilities: ['read', 'edit-text', 'edit-position', 'edit-font', 'delete', 'undo', 'save'], unsupported: ['theme', 'master', 'animation', 'group-child-edit', 'chart-edit'] }
+      capabilities: ['read', 'edit-text', 'edit-paragraph', 'edit-run', 'edit-text-range', 'edit-position', 'edit-font', 'delete', 'undo', 'save'], unsupported: ['theme', 'master', 'animation', 'group-child-edit', 'chart-edit'] }
     const slide = Number(args.slide)
     const elements = this.elements(slide).map(({ image: _image, ...element }) => element)
-    return { documentPath: this.filePath, revision: this.revision, slide, units: 'points', elements }
+    return { documentPath: this.filePath, revision: this.revision, slide, units: 'points', elements, context: this.context(), selection: this.selection, textOffsets: 'UTF-16; start inclusive, end exclusive; relative to paragraph or selected run; IDs valid only at this revision' }
   }
   edit(args: Record<string, unknown>) {
     if (args.revision !== this.revision) throw new Error('文档版本已变化，请重新读取')
-    if (!['update', 'delete'].includes(String(args.operation))) throw new Error('operation 只能为 update 或 delete')
+    if (args.operation === 'text') {
+      if (Object.keys(args).some((key) => !['documentPath', 'revision', 'slide', 'operation', 'edits', 'expectedCount', 'selectionId'].includes(key))) throw new Error('精细文字编辑包含不支持的参数')
+      if (!Number.isInteger(args.slide)) throw new Error('slide 必须为整数')
+      const slide = Number(args.slide); const doc = this.slide(slide)
+      if (args.selectionId !== undefined) {
+        if (this.selection?.selectionId !== args.selectionId || this.selection.slide !== slide || this.selection.revision !== this.revision) throw new Error('选区已过期，请重新读取')
+        if (!Array.isArray(args.edits) || args.edits.some((edit) => !edit || !this.selection!.elementIds.includes(edit.elementId))) throw new Error('文字目标不属于当前选区')
+      }
+      const ids = editPresentationText(doc, this.shapeElements(doc), args.edits, args.expectedCount)
+      return this.commit(doc, slide, ids, Number(args.expectedCount))
+    }
+    if (!['update', 'delete'].includes(String(args.operation))) throw new Error('operation 只能为 update、text 或 delete')
     let ids = args.elementIds
     const slide = Number(args.slide)
     if (args.selectionId !== undefined) {
@@ -161,6 +180,7 @@ export class PresentationDocument {
         if (patch.text !== undefined) {
           const body = nodes(element, P, 'txBody')[0]
           if (!body) throw new Error('该形状没有可编辑文本体')
+          if (nodes(body, A, 'p').length > 1) throw new Error('多段落文本框请使用 montree_ppt_edit_text，避免覆盖其他段落样式')
           const oldPara = nodes(body, A, 'p')[0]
           const oldProps = oldPara && nodes(oldPara, A, 'rPr')[0]
           const paraProps = oldPara && nodes(oldPara, A, 'pPr')[0]
@@ -201,11 +221,22 @@ export class PresentationDocument {
       if (remaining.some((node) => targets.includes(node.getAttribute('spid') ?? node.getAttribute('id')))) throw new Error('元素被动画或连接线引用，暂不支持删除；请先处理对应关系')
       selected.forEach((element) => element.remove())
     }
+    return this.commit(doc, slide, ids, ids.length)
+  }
+  private commit(doc: Document, slide: number, ids: string[], changedCount: number) {
     this.history.push({ ...this.files }); if (this.history.length > 30) this.history.shift()
     this.files = { ...this.files, [this.slidePaths[slide - 1]]: strToU8(new XMLSerializer().serializeToString(doc)) }
     this.previewCache.clear()
     this.revision++
-    return { documentPath: this.filePath, revision: this.revision, slide, elementIds: ids, changedCount: ids.length, dirty: this.dirty }
+    this.refreshSelection()
+    return { documentPath: this.filePath, revision: this.revision, slide, elementIds: ids, changedCount, dirty: this.dirty, elements: this.read({ slide }).elements, context: this.context(), selection: this.selection }
   }
-  undo(): void { const files = this.history.pop(); if (!files) throw new Error('没有可撤销的 PPT 修改'); this.files = files; this.previewCache.clear(); this.revision++ }
+  private refreshSelection(): void {
+    if (!this.selection) return
+    const { slide, elementIds, paragraphId } = this.selection
+    const ids = elementIds.filter((id) => this.elements(slide).some((element) => element.id === id))
+    const focus = ids.length === 1 && paragraphId && this.elements(slide).find((item) => item.id === ids[0])?.appearance.paragraphs.some((item) => item.id === paragraphId) ? { paragraphId } : undefined
+    this.selection = ids.length ? this.select(slide, ids, focus) : null
+  }
+  undo(): void { const files = this.history.pop(); if (!files) throw new Error('没有可撤销的 PPT 修改'); this.files = files; this.previewCache.clear(); this.revision++; this.refreshSelection() }
 }

@@ -45,6 +45,7 @@ import type { SaveBinaryDocumentPayload } from '@montree/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
 import { callReaderVisualTool } from '../services/acp/mcp/reader-visual-tools'
 import { callDocumentTool } from '../services/acp/mcp/document-tools'
+import { startMontreeMcpServer } from '../services/acp/mcp/montree-mcp-server'
 import type {
   DetectPdfTocPagesPayload,
   GetPdfOcrTocPayload,
@@ -381,6 +382,7 @@ export function registerIpcHandlers(): void {
     Object.assign(globalThis, { __montreeE2eDocumentTools: (name: string, args?: Record<string, unknown>) =>
       callDocumentTool(name, { readSnapshot: handleSnapshotRequest }, args),
       __montreeE2eDocumentSnapshot: (resource: Parameters<typeof handleSnapshotRequest>[0], args?: Parameters<typeof handleSnapshotRequest>[1]) => handleSnapshotRequest(resource, args),
+      __montreeE2eMcpEndpoint: async () => { const server = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest }); return { url: server.url, authToken: server.authToken } },
     })
   }
 

@@ -16,6 +16,47 @@ export interface SlideSelection {
   elementIds: string[]
   revision: number
   selectionId: string
+  paragraphId?: string
+  runId?: string
+}
+
+export interface SlideTextPatch {
+  text?: string
+  fontSize?: number
+  color?: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  fontFamily?: string
+  align?: 'left' | 'center' | 'right' | 'justify'
+  spaceBefore?: number
+  spaceAfter?: number
+}
+
+export interface SlideTextEdit {
+  elementId: string
+  paragraphId: string
+  runId?: string
+  start?: number
+  end?: number
+  expectedText?: string
+  patch: SlideTextPatch
+}
+
+export interface SlideTextEditArgs {
+  documentPath: string
+  revision: number
+  slide: number
+  selectionId?: string
+  edits: SlideTextEdit[]
+  expectedCount: number
+}
+
+export interface SlideViewContext {
+  visibleSlide: number
+  visibleSlides: number[]
+  navigationSlide: number
+  selectionSlide: number | null
 }
 
 export type DocumentSelection = TableSelection | SlideSelection

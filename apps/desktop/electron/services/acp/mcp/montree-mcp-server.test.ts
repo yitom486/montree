@@ -277,6 +277,7 @@ describe('montree-mcp-server HTTP JSON-RPC 端点与协议交互测试', () => {
     expect(toolNames).toContain('montree_table_edit')
     expect(toolNames).toContain('montree_ppt_read')
     expect(toolNames).toContain('montree_ppt_edit')
+    expect(toolNames).toContain('montree_ppt_edit_text')
     expect(toolNames).toContain('montree_ppt_delete')
     expect(toolNames).toContain('montree_document_save')
     expect(toolNames).toContain('montree_document_undo')
@@ -288,6 +289,13 @@ describe('montree-mcp-server HTTP JSON-RPC 端点与协议交互测试', () => {
     })
     expect(editResponse.status).toBe(200)
     expect(mockContext.readSnapshot).toHaveBeenCalledWith('table-edit', documentArgs)
+    const textArgs = { documentPath: '/slides.pptx', revision: 3, slide: 1, expectedCount: 1, edits: [{ elementId: '10', paragraphId: 'p2', runId: 'r1', expectedText: 'old', patch: { text: 'new', bold: true } }] }
+    const textResponse = await fetch(serverHandle.url, {
+      method: 'POST', headers: { Authorization: `Bearer ${serverHandle.authToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'montree_ppt_edit_text', arguments: textArgs } }),
+    })
+    expect(textResponse.status).toBe(200)
+    expect(mockContext.readSnapshot).toHaveBeenCalledWith('slide-edit', { ...textArgs, operation: 'text' })
 
     // 4. 验证 tools/call 正常调用 montree_read
     const callRes = await fetch(serverHandle.url, {

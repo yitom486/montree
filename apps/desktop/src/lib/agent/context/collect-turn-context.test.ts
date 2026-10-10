@@ -6,6 +6,11 @@ import {
   TOC_TOP_LEVEL_LIMIT,
 } from './collect-turn-context'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { registerDocumentTools } from './document-tool-registry'
+import { registerReaderContent } from './reader-content-registry'
+import { useActiveDocumentStore } from '@/stores/active-document-store'
+import { buildMontreePromptPrefix } from './build-prompt-prefix'
+import { resetTurnContextTracker } from './should-attach-turn-context'
 
 describe('collectTocTopLevel', () => {
   it('取最小 level 的条目并去重、截断条数', () => {
@@ -36,6 +41,27 @@ describe('collectTocTopLevel', () => {
 })
 
 describe('collectReadingState', () => {
+  it('PPT发送当前可见页与独立选区页，滚动换页触发下一轮位置更新且不复用旧阅读器', () => {
+    let slide = 1
+    const disposeTools = registerDocumentTools({ filePath: '/slides.pptx', kind: 'slide', isDirty: () => false, read: () => ({}), edit: () => ({}), save: async () => {}, undo: () => {},
+      getSlideView: () => ({ visibleSlide: slide, visibleSlides: [slide], navigationSlide: 1, selectionSlide: 1 }) })
+    const disposeContent = registerReaderContent({ filePath: '/slides.pptx', getCurrentText: () => '', getCurrentUnitIndex: () => slide - 1,
+      getUnits: () => [{ label: '幻灯片 1' }, { label: '幻灯片 2' }] })
+    const previousPath = useActiveDocumentStore.getState().filePath
+    useActiveDocumentStore.setState({ filePath: '/slides.pptx' })
+    try {
+      resetTurnContextTracker('ppt-context-test')
+      const first = buildMontreePromptPrefix('ppt-context-test', { includeBootstrap: false })
+      expect(first.map((block) => block.type === 'text' ? block.text : '').join('')).toContain('"slide":1')
+      const second = buildMontreePromptPrefix('ppt-context-test', { includeBootstrap: false })
+      expect(second.map((block) => block.type === 'text' ? block.text : '').join('')).not.toContain('<montree-turn-context>')
+      slide = 2
+      const changed = buildMontreePromptPrefix('ppt-context-test', { includeBootstrap: false }).map((block) => block.type === 'text' ? block.text : '').join('')
+      expect(changed).toContain('"slide":2'); expect(changed).toContain('"selectionSlide":1'); expect(changed).toContain('"navigationSlide":1')
+      expect(changed).toContain('"documentChanged":false')
+      expect(collectReadingState({ path: '/other.pptx', kind: 'pptx', name: 'other' })).toBeUndefined()
+    } finally { disposeTools(); disposeContent(); useActiveDocumentStore.setState({ filePath: previousPath }); resetTurnContextTracker('ppt-context-test') }
+  })
   function setupPdf(pageNum: number | null) {
     useReaderNavigationStore.setState({
       filePath: '/book/a.pdf',

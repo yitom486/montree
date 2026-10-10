@@ -11,3 +11,5 @@ MCP 工具表与传输纯逻辑已独立至 `@yitom/acp-client`；快照/虚拟�
 增删或改名后，更新 `apps/desktop/src/lib/README.md`。
 
 `document-tool-registry.ts` 连接当前表格/PPT 内存模型和 MCP 读写，同时供文件操作读取 dirty 状态、撤销和保存。坐标选区契约见 `packages/contracts/src/agent/document-tools.ts`；空白单元格同样有效。`useDocumentReader` 将 HTML、JSON、LOG、DOCX、表格和 PPT 接入正文/搜索/目录工具。
+
+PPT 的 `montree_ppt_edit_text` 使用读取结果中的段落/片段编号及 UTF-16 范围进行局部修改；替换文字必须核对 expectedText，整批核对 expectedCount 和 revision。读取结果的 context 分别返回可见页、导航页及选区页，不以滚动位置猜测选中目标。

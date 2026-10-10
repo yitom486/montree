@@ -16,7 +16,9 @@ export interface PresentationTextStyle {
   fontFamily?: string
 }
 export interface PresentationParagraph extends PresentationTextStyle {
-  runs: Array<PresentationTextStyle & { text: string }>
+  id: string
+  text: string
+  runs: Array<PresentationTextStyle & { id: string; kind: 'text' | 'break' | 'field'; editable: boolean; text: string }>
   align: 'left' | 'center' | 'right' | 'justify'
   before: number
   after: number
@@ -120,19 +122,20 @@ export function presentationAppearance(element: Element, context: PresentationPr
   const body = child(element, 'txBody')
   const bodyProps = child(body, 'bodyPr')
   const listStyle = child(body, 'lstStyle')
-  const paragraphs = children(body, 'p').map((paragraph): PresentationParagraph => {
+  const paragraphs = children(body, 'p').map((paragraph, paragraphIndex): PresentationParagraph => {
     const pPr = child(paragraph, 'pPr')
     const level = child(listStyle, `lvl${Number(pPr?.getAttribute('lvl') ?? 0) + 1}pPr`)
     const style = { fontSize: 18, ...textStyle(child(level, 'defRPr'), context), ...textStyle(child(pPr, 'defRPr'), context) }
     const runs: PresentationParagraph['runs'] = []
     for (const run of Array.from(paragraph.children)) {
-      if (run.localName === 'br') runs.push({ ...style, text: '\n' })
-      else if (['r', 'fld'].includes(run.localName)) runs.push({ ...style, ...textStyle(child(run, 'rPr'), context), text: children(run, 't').map((node) => node.textContent ?? '').join('') })
+      const id = `r${runs.length + 1}`
+      if (run.localName === 'br') runs.push({ ...style, id, kind: 'break', editable: false, text: '\n' })
+      else if (['r', 'fld'].includes(run.localName)) runs.push({ ...style, ...textStyle(child(run, 'rPr'), context), id, kind: run.localName === 'r' ? 'text' : 'field', editable: run.localName === 'r', text: children(run, 't').map((node) => node.textContent ?? '').join('') })
     }
     const attr = (name: string): string | null | undefined => pPr?.getAttribute(name) || level?.getAttribute(name)
     const space = (name: string): number => Number(child(child(pPr, name) ?? child(level, name), 'spcPts')?.getAttribute('val') ?? 0) / 100
     const spacing = child(pPr, 'lnSpc') ?? child(level, 'lnSpc')
-    return { ...style, runs, align: ({ ctr: 'center', r: 'right', just: 'justify' } as const)[attr('algn') as 'ctr' | 'r' | 'just'] ?? 'left', before: space('spcBef'), after: space('spcAft'),
+    return { ...style, id: `p${paragraphIndex + 1}`, text: runs.map((run) => run.text).join(''), runs, align: ({ ctr: 'center', r: 'right', just: 'justify' } as const)[attr('algn') as 'ctr' | 'r' | 'just'] ?? 'left', before: space('spcBef'), after: space('spcAft'),
       ...(child(spacing, 'spcPts') ? { lineSpacing: Number(child(spacing, 'spcPts')!.getAttribute('val')) / 100 } : {}),
       ...(child(spacing, 'spcPct') ? { lineHeight: Number(child(spacing, 'spcPct')!.getAttribute('val')) / 100000 } : {}),
       indent: Number(attr('marL') ?? 0) / POINT,

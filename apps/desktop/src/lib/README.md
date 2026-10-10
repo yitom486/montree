@@ -133,6 +133,7 @@
 | `spreadsheet-document` / `.test.ts` | CSV/TSV/XLSX 原地址读写、区域和版本校验、批量撤销；XLSX 定点修改 XML 保留其他部件 |
 | `presentation-document` / `.test.ts` | PPTX 原始元素 ID 查询/删改、关系排序、引用保护、撤销与保留未修改部件 |
 | `presentation-preview` | PPTX 段落默认样式、文字块覆盖、换行、形状外观及原稿背景/主题颜色解析 |
+| `presentation-text-edit` / `.test.ts` | PPT 段落/片段/UTF-16 范围原子编辑，原文/数量/重叠/字段校验，保留范围外样式 |
 | `xml-test-dom` | Office 单元测试的标准 XML DOM 适配（只被测试引用） |
 
 ---

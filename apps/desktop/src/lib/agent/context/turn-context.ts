@@ -22,6 +22,11 @@ export interface MontreeReadingState {
   unitCount?: number
   /** T1：PDF 当前页（正整数）；EPUB 不填，禁止编造 */
   page?: number
+  /** PPT 实际可见页与选区页分别返回。 */
+  slide?: number
+  visibleSlides?: number[]
+  navigationSlide?: number
+  selectionSlide?: number | null
 }
 
 export interface MontreeTurnContext {
@@ -75,7 +80,7 @@ export function formatTurnContextBlock(
       activeDocument: context.activeDocument,
       ...(context.hasSelection ? { hasSelection: true } : {}),
       reading: reading
-        ? compactReading({ percent: reading.percent, current: reading.current, page: reading.page })
+        ? compactReading({ percent: reading.percent, current: reading.current, page: reading.page, slide: reading.slide, navigationSlide: reading.navigationSlide, selectionSlide: reading.selectionSlide })
         : undefined,
     },
     // 退化 3：只剩文件本身

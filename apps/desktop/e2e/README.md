@@ -17,6 +17,8 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `export-pdf.spec.ts` | Markdown 导出 PDF（`E2E_AUTO_EXPORT_PATH`） |
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开 |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
+| `ppt-tools-integration.spec.ts` | mock 模型工具调用输出 → 真实 HTTP MCP → IPC → PPT 模型/预览/磁盘保存与重开；局部样式保留、拒绝原子性、外部冲突、可见页/选区页和按需检查器，附前后截图与工具记录 |
+| `ppt-slideshow.spec.ts` | 真实全屏单页放映、键盘/鼠标翻页、退出按钮/Esc/系统退出、AI 当前页同步、阅读模式与缩放恢复及全屏拒绝回退和宽高适配 |
 | `reader-foliate.spec.ts` | foliate 统一阅读器：EPUB/MOBI 章节可读（`E2E_FOLIATE_READER` 门控测试钩子） |
 | `reader-foliate-marks.spec.ts` | foliate 标注链路：划重点/批注/检查器/删除（EPUB+MOBI） |
 | `reader-footer-nav.spec.ts` | 底栏翻页：收进正文列（不横跨卡片轨）+ 上下单元与正文同步（真实多章节 EPUB） |
