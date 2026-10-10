@@ -1,6 +1,7 @@
 import type { EpubThemeMode } from '@montree/reader-core'
 import { READER_PALETTE } from '@montree/reader-core'
 import { buildCodeBlockToolbarHtml } from '@/lib/preview/code-block-chrome'
+import { stripCodeBlockLineNumbers } from '@/lib/reader/web-doc/web-doc-chrome'
 
 const LANGUAGE_CLASS = /\blanguage-([\w-]+)\b/i
 const LANG_CLASS = /\blang-([\w-]+)\b/i
@@ -364,6 +365,7 @@ export function enhanceWebDocCodeBlocks(html: string): string {
   const root = doc.getElementById('web-doc-code-root')
   if (!root) return html
 
+  stripCodeBlockLineNumbers(root)
   normalizeWebDocTabbedSets(root)
   normalizeWebDocLatexListings(root)
 

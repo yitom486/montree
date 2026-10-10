@@ -512,6 +512,60 @@ export function normalizeWebDocSandpackPlaygrounds(root: HTMLElement): void {
   })
 }
 
+/**
+ * 剥离代码块中内嵌的装饰性行号栏（Line Numbers Gutter）。
+ * 现代文档站（如 Shiki / Astro / Prism / Highlight.js / Pygments）常在 SSR 代码块内部嵌入独立的行号 DOM 节点；
+ * 在阅读模式或纯净排版中缺少原站定位 CSS 时，会导致行号作为普通文本被拼接到代码正文首部，严重破坏可读性、复制与导出。
+ */
+export function stripCodeBlockLineNumbers(root: ParentNode): void {
+  const gutterSelectors = [
+    '.syntax-highlighter-line-numbers',
+    '.syntax-highlighter-line-number',
+    '.line-numbers-rows',
+    '.line-numbers-wrapper',
+    '.linenodiv',
+    'td.linenos',
+    '.linenos',
+    '.hljs-ln-numbers',
+    '.blob-num',
+    '.diff-line-num',
+  ]
+
+  root.querySelectorAll(gutterSelectors.join(',')).forEach((el) => {
+    if (el.tagName === 'PRE' || el.tagName === 'CODE') return
+    if (el.closest('pre, code, .highlight, .code-sample, table')) {
+      el.remove()
+    }
+  })
+
+  // 行号容器：仅清理 pre / code 内部带有 line-numbers 类的子级辅助节点（避免误伤 pre.line-numbers 自身）
+  root.querySelectorAll('pre .line-numbers, code .line-numbers').forEach((el) => {
+    if (el.tagName === 'PRE' || el.tagName === 'CODE') return
+    const text = (el.textContent ?? '').trim()
+    if (!text || /^(\d+[\s\n]*)+$/.test(text)) {
+      el.remove()
+    }
+  })
+
+  // 针对 pre / code 内带有 aria-hidden="true" 且文本全为纯数字/换行符的预格式内节点进行语义剥离
+  root.querySelectorAll('pre [aria-hidden="true"], code [aria-hidden="true"]').forEach((el) => {
+    if (el.tagName === 'PRE' || el.tagName === 'CODE') return
+    const text = (el.textContent ?? '').trim()
+    if (text && /^(\d+[\s\n]*)+$/.test(text)) {
+      el.remove()
+    }
+  })
+
+  // 解构 Pygments / MkDocs 等基于 table.highlighttable 的双栏代码块，保留纯净代码 pre
+  root.querySelectorAll('table.highlighttable, table.hljs-ln').forEach((table) => {
+    const codeCell = table.querySelector('td.code, td.hljs-ln-code, td:last-child')
+    const pre = codeCell?.querySelector('pre')
+    if (pre) {
+      table.replaceWith(pre)
+    }
+  })
+}
+
 function stripGenericChrome(root: HTMLElement): void {
   root.querySelectorAll('form, [role="navigation"], nav').forEach((node) => node.remove())
   stripDisallowedWebDocEmbeds(root)
@@ -536,6 +590,7 @@ function stripGenericChrome(root: HTMLElement): void {
   normalizeWebDocCallouts(root)
   normalizeWebDocFigureRows(root)
   normalizeWebDocSandpackPlaygrounds(root)
+  stripCodeBlockLineNumbers(root)
 }
 
 function stripPeopleDailyChrome(root: HTMLElement): void {

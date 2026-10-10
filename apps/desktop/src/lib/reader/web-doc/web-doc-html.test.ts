@@ -534,4 +534,23 @@ describe('web-doc-html', () => {
     expect(doc).toContain('loadScript')
     expect(doc).toContain('ReactDOM.createRoot')
   })
+
+  it('Shiki / Astro 风格代码块抽取正文时剥离行号元素，保持代码纯净', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>App Server</h1>
+      <pre class="shiki syntax-highlighter" data-language="ts"><code><span aria-hidden="true" class="syntax-highlighter-line-numbers"><span class="syntax-highlighter-line-number">1<!-- -->\n</span><span class="syntax-highlighter-line-number">2<!-- -->\n</span></span><span class="syntax-highlighter-line">import { spawn } from "chatgpt-app-server";</span></code></pre>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://learn.chatgpt.com/docs/app-server')
+    expect(result.bodyHtml).not.toContain('syntax-highlighter-line-numbers')
+    expect(result.bodyHtml).not.toContain('syntax-highlighter-line-number')
+    expect(result.bodyHtml).toContain('import { spawn } from "chatgpt-app-server";')
+
+    const doc = buildWebDocReaderDocument(
+      { title: 'App Server', bodyHtml: result.bodyHtml, baseUrl: 'https://learn.chatgpt.com/docs/app-server' },
+      'dark',
+    )
+    expect(doc).toContain('import { spawn } from "chatgpt-app-server";')
+    expect(doc).not.toMatch(/^\s*1\s*2/m)
+  })
 })

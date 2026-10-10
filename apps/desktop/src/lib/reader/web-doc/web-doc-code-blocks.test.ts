@@ -120,6 +120,33 @@ describe('enhanceWebDocCodeBlocks', () => {
     expect(enhanced).toContain('await')
     expect(enhanced).not.toContain('⬇')
   })
+
+  it('剥离 Shiki / Astro 风格的独立行号栏（如 learn.chatgpt.com）', () => {
+    const html = `<pre class="shiki syntax-highlighter" data-language="typescript"><code><span aria-hidden="true" class="syntax-highlighter-line-numbers"><span class="syntax-highlighter-line-number">1<!-- -->\n</span><span class="syntax-highlighter-line-number">2<!-- -->\n</span></span><span class="syntax-highlighter-line">import { spawn } from "chatgpt-app-server";</span></code></pre>`
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    expect(enhanced).not.toContain('syntax-highlighter-line-numbers')
+    expect(enhanced).not.toContain('syntax-highlighter-line-number')
+    expect(enhanced).toContain('import { spawn } from "chatgpt-app-server";')
+    expect(enhanced).not.toMatch(/^\s*1\s*2/m)
+
+    document.body.innerHTML = enhanced
+    const button = document.querySelector('.code-block-copy')!
+    expect(getCodeBlockTextFromCopyButton(button)).toBe('import { spawn } from "chatgpt-app-server";')
+    document.body.innerHTML = ''
+  })
+
+  it('剥离 Prism 风格伪元素与 Pygments table.highlighttable 行号列', () => {
+    const prismHtml = `<pre class="line-numbers language-js"><code>const x = 42;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>`
+    const prismEnhanced = enhanceWebDocCodeBlocks(prismHtml)
+    expect(prismEnhanced).not.toContain('line-numbers-rows')
+    expect(prismEnhanced).toContain('const x = 42;')
+
+    const pygmentsHtml = `<table class="highlighttable"><tbody><tr><td class="linenos"><pre>1\n2</pre></td><td class="code"><div class="highlight"><pre><span></span>print("hello")</pre></div></td></tr></tbody></table>`
+    const pygmentsEnhanced = enhanceWebDocCodeBlocks(pygmentsHtml)
+    expect(pygmentsEnhanced).not.toContain('highlighttable')
+    expect(pygmentsEnhanced).not.toContain('linenos')
+    expect(pygmentsEnhanced).toContain('print("hello")')
+  })
 })
 
 describe('buildWebDocReaderDocument', () => {
