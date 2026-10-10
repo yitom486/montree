@@ -6,7 +6,10 @@ import {
   useMemo,
   useRef,
   useState,
+  Suspense,
+  lazy,
 } from 'react'
+import { Loader2 } from 'lucide-react'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { FileBreadcrumb } from '@/components/layout/panels/FileBreadcrumb'
@@ -55,13 +58,24 @@ import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { getDocumentKind, getFileExtension, type FileTreeNode } from '@montree/contracts'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
-import { DataSheetViewer } from '@/components/data/DataSheetViewer'
-import { JsonTreeViewer } from '@/components/data/JsonTreeViewer'
-import { LogStreamViewer } from '@/components/data/LogStreamViewer'
-import { DocxViewer } from '@/components/office/DocxViewer'
-import { SpreadsheetViewer } from '@/components/office/SpreadsheetViewer'
-import { PptxViewer } from '@/components/office/PptxViewer'
-import { HtmlViewer } from '@/components/html/HtmlViewer'
+const JsonTreeViewer = lazy(() =>
+  import('@/components/data/JsonTreeViewer').then((m) => ({ default: m.JsonTreeViewer })),
+)
+const LogStreamViewer = lazy(() =>
+  import('@/components/data/LogStreamViewer').then((m) => ({ default: m.LogStreamViewer })),
+)
+const DocxViewer = lazy(() =>
+  import('@/components/office/DocxViewer').then((m) => ({ default: m.DocxViewer })),
+)
+const SpreadsheetViewer = lazy(() =>
+  import('@/components/office/SpreadsheetViewer').then((m) => ({ default: m.SpreadsheetViewer })),
+)
+const PptxViewer = lazy(() =>
+  import('@/components/office/PptxViewer').then((m) => ({ default: m.PptxViewer })),
+)
+const HtmlViewer = lazy(() =>
+  import('@/components/html/HtmlViewer').then((m) => ({ default: m.HtmlViewer })),
+)
 
 export interface EditorWorkspaceMainHandle {
   selectHeading: (heading: MarkdownHeading) => void
@@ -368,19 +382,33 @@ export const EditorWorkspaceMain = forwardRef<
             onOpenWebDoc={onOpenWebDoc}
           />
         ) : documentKind === 'html' && filePath ? (
-          <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 HTML 视图…</div>}>
+            <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} />
+          </Suspense>
         ) : documentKind === 'docx' && filePath ? (
-          <DocxViewer filePath={filePath} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 DOCX 视图…</div>}>
+            <DocxViewer filePath={filePath} />
+          </Suspense>
         ) : documentKind === 'xlsx' && filePath ? (
-          <SpreadsheetViewer filePath={filePath} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载表格视图…</div>}>
+            <SpreadsheetViewer filePath={filePath} />
+          </Suspense>
         ) : documentKind === 'pptx' && filePath ? (
-          <PptxViewer filePath={filePath} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载幻灯片视图…</div>}>
+            <PptxViewer filePath={filePath} />
+          </Suspense>
         ) : documentKind === 'csv' || documentKind === 'tsv' ? (
-          <SpreadsheetViewer filePath={filePath} content={content} onChange={onContentChange} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载表格视图…</div>}>
+            <SpreadsheetViewer filePath={filePath} content={content} onChange={onContentChange} />
+          </Suspense>
         ) : documentKind === 'json' ? (
-          <JsonTreeViewer content={content} onChange={onContentChange} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 JSON 视图…</div>}>
+            <JsonTreeViewer content={content} onChange={onContentChange} />
+          </Suspense>
         ) : documentKind === 'log' ? (
-          <LogStreamViewer content={content} onChange={onContentChange} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载日志视图…</div>}>
+            <LogStreamViewer content={content} onChange={onContentChange} />
+          </Suspense>
         ) : (
           <ResizablePanelGroup
             id={`markdown-editor-content-${viewMode}`}

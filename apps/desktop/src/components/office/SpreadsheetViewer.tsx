@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, Suspense, lazy } from 'react'
 import * as XLSX from 'xlsx'
 import { isOk, type CellInput } from '@montree/contracts'
 import { fileApi } from '@/api/file-api'
@@ -8,9 +8,13 @@ import { registerDocumentTools, notifyDocumentTools } from '@/lib/agent/context/
 import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { UniverSheetViewer } from './UniverSheetViewer'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
+
+const UniverSheetViewer = lazy(() =>
+  import('./UniverSheetViewer').then((m) => ({ default: m.UniverSheetViewer })),
+)
 
 interface SpreadsheetViewerProps { filePath?: string; content?: string; onChange?: (content: string) => void; readOnly?: boolean; className?: string }
 
@@ -203,7 +207,33 @@ export function SpreadsheetViewer({ filePath = '', content = '', onChange, readO
       </div>
     )}
 
-    {error ? <p className="p-4 text-destructive">{error}</p> : !doc ? <p className="p-4">正在读取表格…</p> : mode === 'univer' ? <UniverSheetViewer filePath={filePath} workbook={doc.workbook} revision={doc.revision} readOnly onSelection={(name, ranges) => { const target = doc.select(name, ranges); commitDocumentSelection(target, `${name}!${ranges.join(', ')}`); refresh((n) => n + 1) }} /> : <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+    {error ? (
+      <p className="p-4 text-destructive">{error}</p>
+    ) : !doc ? (
+      <p className="p-4">正在读取表格…</p>
+    ) : mode === 'univer' ? (
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            正在加载 Univer 表格画布…
+          </div>
+        }
+      >
+        <UniverSheetViewer
+          filePath={filePath}
+          workbook={doc.workbook}
+          revision={doc.revision}
+          readOnly
+          onSelection={(name, ranges) => {
+            const target = doc.select(name, ranges)
+            commitDocumentSelection(target, `${name}!${ranges.join(', ')}`)
+            refresh((n) => n + 1)
+          }}
+        />
+      </Suspense>
+    ) : (
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
       <table className="border-collapse text-xs"><thead><tr><th className="sticky top-0 bg-muted p-2">#</th>{columns.map((c) => <th key={c} className="sticky top-0 min-w-32 border bg-muted p-2" onClick={() => select([`${XLSX.utils.encode_col(c)}1:${XLSX.utils.encode_col(c)}${bounds!.e.r + 1}`])}>{XLSX.utils.encode_col(c)}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r}><th className="border bg-muted p-2" onClick={() => select([`A${r + 1}:${XLSX.utils.encode_col(bounds!.e.c)}${r + 1}`])}>{r + 1}</th>{columns.map((c) => {
           const cell = doc.cell(sheet, r, c)
@@ -259,7 +289,8 @@ export function SpreadsheetViewer({ filePath = '', content = '', onChange, readO
           </td>
         })}</tr>)}</tbody></table>
       <p className="p-2 text-xs text-muted-foreground">网格一次展示最多500行100列；单元格默认显示公式计算结果，点击或在公式栏可编辑原始公式。</p>
-    </div>}
+    </div>
+    )}
     <div className="flex shrink-0 gap-2 border-t p-2">{doc?.workbook.SheetNames.map((name) => <Button key={name} size="xs" variant={sheet === name ? 'secondary' : 'ghost'} onClick={() => { doc.activeSheet = name; doc.selection = null; clearReaderSelection(); setOrigin({ r: 0, c: 0 }); setActiveAddress('A1'); refresh((n) => n + 1) }}>{name}</Button>)}</div>
   </div>
 }
