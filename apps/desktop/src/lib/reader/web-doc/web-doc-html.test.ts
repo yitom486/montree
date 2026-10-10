@@ -7,8 +7,56 @@ import {
   rewriteRelativeUrls,
   sanitizeWebDocBodyHtml,
 } from './web-doc-html'
+import { normalizeWebDocImageObjects } from './web-doc-embeds'
 
 describe('web-doc-html', () => {
+  it('arXiv SVG object 在插件清洗前转为图片并保留图注', () => {
+    const html = `<article><h1>Paper</h1><figure id="S3.F1">
+      <object type="image/svg+xml" data="2609.22978v1/arch.svg" width="476" height="291"></object>
+      <figcaption>Figure 1: Architecture</figcaption></figure></article>`
+    const result = extractWebDocArticle(html, 'https://arxiv.org/html/2609.22978v1')
+    expect(result.bodyHtml).toContain('https://arxiv.org/html/2609.22978v1/arch.svg')
+    expect(result.bodyHtml).toContain('web-doc-object-image')
+    expect(result.bodyHtml).toContain('Figure 1: Architecture')
+    expect(result.bodyHtml).not.toContain('<object')
+  })
+
+  it('图片 object 只复制显示属性，不保留插件事件或任意协议', () => {
+    const root = document.createElement('div')
+    root.innerHTML = `<object id="diagram" type="image/svg+xml" data="/plot.svg" width="476"
+      onload="alert(1)" style="display:none"></object>
+      <object type="image/svg+xml" data="javascript:alert(1)"></object>
+      <object type="image/svg+xml" data="file:///private.svg"></object>
+      <object type="text/html" data="/active.html"></object>`
+    normalizeWebDocImageObjects(root, 'https://example.com/paper')
+    const image = root.querySelector('img')!
+    expect(image.getAttribute('src')).toBe('https://example.com/plot.svg')
+    expect(image.id).toBe('diagram')
+    expect(image.getAttribute('width')).toBe('476')
+    expect(image.hasAttribute('onload')).toBe(false)
+    expect(image.hasAttribute('style')).toBe(false)
+    expect(root.querySelectorAll('img')).toHaveLength(1)
+    expect(sanitizeWebDocBodyHtml(root.innerHTML)).not.toContain('<object')
+  })
+
+  it('论文表格保留合并单元格与对齐类，重复构建不会嵌套滚动容器', () => {
+    const content = {
+      title: 'Paper', baseUrl: 'https://example.com/paper',
+      bodyHtml: `<figure><figcaption>Table 1: Results</figcaption><table><tbody>
+        <tr><th rowspan="2">Metric</th><td class="ltx_align_center ltx_border_tt">●◐○</td></tr>
+        <tr><td colspan="2">Merged</td></tr></tbody></table></figure>`,
+    }
+    const first = new DOMParser().parseFromString(buildWebDocReaderDocument(content, 'dark'), 'text/html')
+    expect(first.querySelectorAll('.web-doc-table-scroll')).toHaveLength(1)
+    expect(first.querySelector('th')?.getAttribute('rowspan')).toBe('2')
+    expect(first.querySelector('td[colspan]')?.getAttribute('colspan')).toBe('2')
+    expect(first.querySelector('td.ltx_align_center')?.textContent).toBe('●◐○')
+    const second = new DOMParser().parseFromString(buildWebDocReaderDocument({
+      ...content, bodyHtml: first.body.innerHTML,
+    }, 'dark'), 'text/html')
+    expect(second.querySelectorAll('.web-doc-table-scroll')).toHaveLength(1)
+  })
+
   it('优先从 article 提取正文并改写相对链接', () => {
     const html = `<!DOCTYPE html><html><head><title>Site</title></head><body>
       <nav>skip</nav>

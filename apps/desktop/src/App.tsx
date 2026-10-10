@@ -42,6 +42,8 @@ import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { useWebDocStore } from '@/stores/web-doc-store'
 import { baseName } from '@/lib/agent/context/collect-turn-context'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
+import { getDocumentKind } from '@montree/contracts'
+import { collectMarkdownImages } from '@/lib/agent/context/reader-visual-context'
 import { isMarkdownEditorFocused } from '@/lib/editor/editor-focus'
 import type { MarkdownHeading } from '@/lib/editor/markdown-headings'
 
@@ -420,9 +422,12 @@ function App() {
   const editorContentRef = useRef(content)
   editorContentRef.current = content
   useEffect(() => {
-    if (!filePath || readerDocumentKind || webPageUrl) return
+    if (!filePath || getDocumentKind(filePath) !== 'markdown' || readerDocumentKind || webPageUrl) return
     return registerReaderContent({
       filePath,
+      getImages: () => collectMarkdownImages(editorContentRef.current, filePath),
+      imageScope: 'current',
+      getImageCount: () => collectMarkdownImages(editorContentRef.current, filePath).length,
       getCurrentText: () => editorContentRef.current,
       // Markdown 只有一个单元，检索即整篇全文
       iterateUnits: async function* () {

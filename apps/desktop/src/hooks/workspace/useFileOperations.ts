@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { getDocumentTools, subscribeDocumentTools } from '@/lib/agent/context/document-tool-registry'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { appApi, fileApi } from '@/api/file-api'
@@ -49,7 +50,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const isMarkdownDocument = documentKind === 'markdown'
   const isEditableDocument =
     isMarkdownDocument || isDataDocumentKind(documentKind) || documentKind === 'html'
-  const isDirty = isEditableDocument && content !== savedContent
+  const toolDirty = useSyncExternalStore(subscribeDocumentTools, () => getDocumentTools(filePath)?.isDirty() ?? false)
+  const isDirty = getDocumentTools(filePath) ? toolDirty : isEditableDocument && content !== savedContent
   const fileName = getFileName(filePath)
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const loadFile = useCallback(
     (result: { filePath: string; content: string }) => {
       useWebDocStore.getState().closePage()
-      const content = normalizeNewlines(result.content)
+      const content = getDocumentKind(result.filePath) === 'markdown' ? normalizeNewlines(result.content) : result.content
       setFilePath(result.filePath)
       setContent(content)
       setSavedContent(content)
@@ -210,8 +212,15 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   })
 
   const saveFileMutation = useMutation({
-    mutationFn: (payload: { filePath?: string; content: string; silent?: boolean }) =>
-      fileApi.saveFile(payload),
+    mutationFn: async (payload: { filePath?: string; content: string; silent?: boolean }) => {
+      const provider = payload.filePath ? getDocumentTools(payload.filePath) : null
+      if (provider) {
+        try { await provider.save(); return ok({ filePath: provider.filePath }) }
+        catch (reason) { return err({ code: 'FILE_WRITE_ERROR' as const, message: reason instanceof Error ? reason.message : String(reason) }) }
+      }
+      if (payload.filePath && isOfficeDocumentKind(getDocumentKind(payload.filePath))) return err({ code: 'INVALID_STATE' as const, message: '文档尚未就绪或不支持编辑保存' })
+      return fileApi.saveFile(payload)
+    },
     onSuccess: (result, variables) => {
       if (!isOk(result)) {
         reportError(result.error)
@@ -452,7 +461,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       } else if (isMarkdownDocument && (key === 's' || code === 'KeyS') && event.shiftKey) {
         event.preventDefault()
         void saveFileAs()
-      } else if (isMarkdownDocument && (key === 's' || code === 'KeyS')) {
+      } else if ((isEditableDocument || getDocumentTools(filePath)) && (key === 's' || code === 'KeyS') && !event.shiftKey) {
         event.preventDefault()
         void saveFile()
       }
@@ -460,7 +469,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [isMarkdownDocument, openFile, openFolder, saveFile, saveFileAs])
+  }, [filePath, isEditableDocument, isMarkdownDocument, openFile, openFolder, saveFile, saveFileAs])
 
   const notifyPathDeleted = useCallback(
     (path: string) => {

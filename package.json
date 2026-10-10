@@ -92,6 +92,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.1",
+    "@xmldom/xmldom": "^0.9.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron": "^44.0.0",

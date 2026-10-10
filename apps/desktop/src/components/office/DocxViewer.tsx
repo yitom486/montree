@@ -19,6 +19,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 
 interface DocxViewerProps {
   filePath: string
@@ -35,6 +36,9 @@ export function DocxViewer({ filePath, className }: DocxViewerProps) {
   const [zoom, setZoom] = useState(100)
   const [paperTheme, setPaperTheme] = useState<DocxPaperTheme>('auto')
   const [pageCount, setPageCount] = useState<number | null>(null)
+  useDocumentReader({ filePath, root: () => loading || error ? null : containerRef.current,
+    units: () => Array.from(containerRef.current?.querySelectorAll('.docx-document-wrapper > section, .docx-document-wrapper > article') ?? [])
+      .map((page, i) => ({ label: `第 ${i + 1} 页`, text: (page as HTMLElement).innerText ?? page.textContent ?? '' })) })
 
   const loadAndRenderDocx = useCallback(async () => {
     if (!filePath || !containerRef.current) return

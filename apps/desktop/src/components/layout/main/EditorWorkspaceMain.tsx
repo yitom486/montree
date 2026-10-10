@@ -26,6 +26,22 @@ import {
 } from '@/components/ui/resizable'
 import { useScrollSync } from '@/hooks/editor/useScrollSync'
 import { registerSelectionProvider } from '@/lib/agent/context/reader-selection-registry'
+import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
+
+function TextDataReaderContext({ filePath, content, kind, root }: { filePath: string; content: string; kind: string; root: () => HTMLElement | null }) {
+  useDocumentReader({ filePath, root, text: () => content,
+    units: () => {
+      if (kind === 'json') {
+        try {
+          const parsed: unknown = JSON.parse(content)
+          if (parsed && typeof parsed === 'object') return Object.entries(parsed).map(([key, value]) => ({ label: `/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`, text: JSON.stringify(value, null, 2) }))
+        } catch { /* 无效 JSON 仍可读取源码和搜索。 */ }
+      }
+      const lines = content.split('\n')
+      return Array.from({ length: Math.max(1, Math.ceil(lines.length / 200)) }, (_, i) => ({ label: `第 ${i * 200 + 1}–${Math.min(lines.length, (i + 1) * 200)} 行`, text: lines.slice(i * 200, (i + 1) * 200).map((line, j) => `${i * 200 + j + 1}: ${line}`).join('\n') }))
+    } })
+  return null
+}
 import { useMarkdownPreview } from '@/hooks/editor/useMarkdownPreview'
 import { usePasteImage } from '@/hooks/editor/usePasteImage'
 import {
@@ -108,7 +124,7 @@ export const EditorWorkspaceMain = forwardRef<
   const editorFontSize = useAppSettingsStore((state) => state.editorFontSize)
 
   useEffect(() => {
-    if (!filePath) return
+    if (!filePath || getDocumentKind(filePath) !== 'markdown') return
     return registerSelectionProvider({
       filePath,
       getSelectionText: () => editorRef.current?.getSelectionText() ?? null,
@@ -279,6 +295,8 @@ export const EditorWorkspaceMain = forwardRef<
   }, [filePath, setViewMode])
 
   const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
+  const dataRoot = useRef<HTMLElement>(null)
+  const isTextData = documentKind === 'json' || documentKind === 'log'
   const isDataOrOfficeDoc =
     documentKind === 'csv' ||
     documentKind === 'tsv' ||
@@ -302,7 +320,8 @@ export const EditorWorkspaceMain = forwardRef<
         }
       />
 
-      <main data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
+      <main ref={dataRoot} data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
+        {isTextData && filePath && <TextDataReaderContext filePath={filePath} content={content} kind={documentKind} root={() => dataRoot.current} />}
         {showWelcome ? (
           <WelcomePage
             recentFiles={recentFiles}

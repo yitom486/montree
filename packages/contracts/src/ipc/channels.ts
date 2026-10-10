@@ -83,6 +83,7 @@ export const IPC = {
   FILE_READ: 'file:read',
   /** invoke：按路径读二进制文件 */
   FILE_READ_BINARY: 'file:read-binary',
+  FILE_SAVE_BINARY_DOCUMENT: 'file:save-binary-document',
   /** invoke：保存到当前路径（可弹对话框） */
   FILE_SAVE: 'file:save',
   /** invoke：另存为 */

@@ -6,4 +6,8 @@ Montree → Agent 上下文：静态 Skill、turn-context、阅读器内容/选�
 
 MCP 工具表与传输纯逻辑已独立至 `@yitom/acp-client`；快照/虚拟文件类型见 `@montree/contracts`（`packages/contracts/src/agent/`）。
 
+`reader-visual-context.ts` 收集图片引用和阅读区范围（图片内容不自动注入）；`reader-content-registry.ts` 的正文读取附带简短图片提示。宿主新增 `montree_list_images` 与 `montree_capture_viewport`，截图返回 PNG 内容，保持链接与像素语义分离。契约见 `packages/contracts/src/agent/reader-visual-context.ts`。
+
 增删或改名后，更新 `apps/desktop/src/lib/README.md`。
+
+`document-tool-registry.ts` 连接当前表格/PPT 内存模型和 MCP 读写，同时供文件操作读取 dirty 状态、撤销和保存。坐标选区契约见 `packages/contracts/src/agent/document-tools.ts`；空白单元格同样有效。`useDocumentReader` 将 HTML、JSON、LOG、DOCX、表格和 PPT 接入正文/搜索/目录工具。

@@ -271,6 +271,23 @@ describe('montree-mcp-server HTTP JSON-RPC 端点与协议交互测试', () => {
     expect(toolNames).toContain('montree_propose_mark')
     expect(toolNames).toContain('montree_generate_diagram')
     expect(toolNames).toContain('montree_cross_reference')
+    expect(toolNames).toContain('montree_list_images')
+    expect(toolNames).toContain('montree_capture_viewport')
+    expect(toolNames).toContain('montree_table_read')
+    expect(toolNames).toContain('montree_table_edit')
+    expect(toolNames).toContain('montree_ppt_read')
+    expect(toolNames).toContain('montree_ppt_edit')
+    expect(toolNames).toContain('montree_ppt_delete')
+    expect(toolNames).toContain('montree_document_save')
+    expect(toolNames).toContain('montree_document_undo')
+
+    const documentArgs = { documentPath: '/table.csv', revision: 2, sheet: 'Sheet1', target: { range: 'A1:B2' }, operation: 'fill', value: 'new', expectedCount: 4 }
+    const editResponse = await fetch(serverHandle.url, {
+      method: 'POST', headers: { Authorization: `Bearer ${serverHandle.authToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'montree_table_edit', arguments: documentArgs } }),
+    })
+    expect(editResponse.status).toBe(200)
+    expect(mockContext.readSnapshot).toHaveBeenCalledWith('table-edit', documentArgs)
 
     // 4. 验证 tools/call 正常调用 montree_read
     const callRes = await fetch(serverHandle.url, {
@@ -294,6 +311,21 @@ describe('montree-mcp-server HTTP JSON-RPC 端点与协议交互测试', () => {
       result?: { content?: Array<{ type: string; text: string }> }
     }
     expect(callJson.result?.content?.[0]?.text).toContain('viewport.txt')
+
+    mockContext.readSnapshot.mockImplementation(async (target: string) => target === 'viewport-image'
+      ? JSON.stringify({ documentPath: '/book.pdf', mimeType: 'image/png', data: 'iVBORw0KGgo=', width: 600, height: 400 })
+      : JSON.stringify({ total: 1, images: [{ src: 'https://example.com/figure.svg' }] }))
+    const screenshotResponse = await fetch(serverHandle.url, {
+      method: 'POST', headers: { Authorization: `Bearer ${serverHandle.authToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'montree_capture_viewport', arguments: {} } }),
+    })
+    const screenshotJson = await screenshotResponse.json() as { result: { content: Array<{ type: string; data?: string; mimeType?: string }> } }
+    expect(screenshotJson.result.content[1]).toMatchObject({ type: 'image', mimeType: 'image/png', data: 'iVBORw0KGgo=' })
+    const imagesResponse = await fetch(serverHandle.url, {
+      method: 'POST', headers: { Authorization: `Bearer ${serverHandle.authToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'montree_list_images', arguments: { scope: 'current' } } }),
+    })
+    expect(JSON.stringify(await imagesResponse.json())).toContain('https://example.com/figure.svg')
 
     delete process.env.MONTREE_MCP_PORT
   })

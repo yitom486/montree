@@ -23,6 +23,7 @@ import {
 } from '@/lib/reader/marks/mark-linkage'
 import { searchReaderContent } from '@/lib/agent/context/search-reader-content'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
+import { collectDomImages } from '@/lib/agent/context/reader-visual-context'
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
 import { commitReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-agent-composer'
@@ -782,6 +783,8 @@ export function useFoliateBookSession({
   useEffect(() => {
     return registerReaderContent({
       filePath,
+      getImages: (scope) => collectDomImages(getRenderedDocs().map((item) => item.doc), scope),
+      getImageCount: () => collectDomImages(getRenderedDocs().map((item) => item.doc), 'current').length,
       getCurrentText: async () => {
         const domText = getRenderedDocs()
           .map((item) => extractDocumentText(item.doc))

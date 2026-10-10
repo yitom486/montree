@@ -1,769 +1,174 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { isOk, type CellInput } from '@montree/contracts'
 import { fileApi } from '@/api/file-api'
-import { isOk } from '@montree/contracts'
+import { SpreadsheetDocument, tableRange } from '@/lib/data/spreadsheet-document'
+import { commitDocumentSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
+import { registerDocumentTools, notifyDocumentTools } from '@/lib/agent/context/document-tool-registry'
+import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { toast } from 'sonner'
-import {
-  Table as TableIcon,
-  Plus,
-  Trash2,
-  Search,
-  Download,
-  Layers,
-  Loader2,
-  AlertCircle,
-  FileSpreadsheet,
-  Sparkles,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Eraser,
-  Copy,
-  Edit2,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { UniverSheetViewer } from './UniverSheetViewer'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
-interface SpreadsheetViewerProps {
-  filePath?: string
-  content?: string
-  onChange?: (newContent: string) => void
-  readOnly?: boolean
-  className?: string
-}
+interface SpreadsheetViewerProps { filePath?: string; content?: string; onChange?: (content: string) => void; readOnly?: boolean; className?: string }
 
-interface SheetData {
-  name: string
-  headers: string[]
-  rows: string[][]
-}
-
-interface ContextMenuState {
-  x: number
-  y: number
-  target: 'cell' | 'row' | 'col'
-  rowIndex: number
-  colIndex: number
-}
-
-export function SpreadsheetViewer({
-  filePath,
-  content,
-  onChange,
-  readOnly = false,
-  className,
-}: SpreadsheetViewerProps) {
-  const [viewMode, setViewMode] = useState<'univer' | 'grid'>('grid')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [sheetNames, setSheetNames] = useState<string[]>([])
-  const [activeSheet, setActiveSheet] = useState<string>('')
-  const [sheetsMap, setSheetsMap] = useState<Record<string, SheetData>>({})
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const [editingHeaderIndex, setEditingHeaderIndex] = useState<number | null>(null)
-  const [headerEditValue, setHeaderEditValue] = useState('')
-
-  const isBinaryExcel = filePath?.endsWith('.xlsx') || filePath?.endsWith('.xls')
-
-  // 全局关闭右键菜单
-  useEffect(() => {
-    const handleClose = () => setContextMenu(null)
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null)
-    }
-    window.addEventListener('click', handleClose)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('click', handleClose)
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
-
-  // 加载数据（支持 .xlsx 二进制文件与 .csv/.tsv 文本内容）
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
+export function SpreadsheetViewer({ filePath = '', content = '', onChange, readOnly = false, className }: SpreadsheetViewerProps) {
+  const model = useRef<SpreadsheetDocument | null>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const hash = useRef('')
+  const emitted = useRef(content)
+  const callbacks = useRef({ onChange, readOnly })
+  callbacks.current = { onChange, readOnly }
+  const [, refresh] = useState(0)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [mode, setMode] = useState<'grid' | 'univer'>('grid')
+  const [jump, setJump] = useState('A1')
+  const [origin, setOrigin] = useState({ r: 0, c: 0 })
+  const anchor = useRef<{ r: number; c: number } | null>(null)
+  const binary = /\.xlsx$/i.test(filePath)
+  const update = useCallback(() => {
+    if (!model.current) return
+    if (!binary) { emitted.current = model.current.serializeText(); callbacks.current.onChange?.(emitted.current) }
+    refresh((n) => n + 1)
+    notifyDocumentTools()
+  }, [binary])
+  const edit = useCallback((args: Record<string, unknown>) => {
+    if (callbacks.current.readOnly) throw new Error('当前表格为只读')
+    const result = model.current!.edit(args)
+    update()
+    return result
+  }, [update])
+  const save = useCallback(async () => {
+    const doc = model.current
+    if (!doc) throw new Error('表格正在加载')
+    if (callbacks.current.readOnly) throw new Error('当前表格为只读')
+    const savedState = doc.snapshotKey()
+    setSaving(true)
     try {
-      let workbook: XLSX.WorkBook
-
-      if (isBinaryExcel && filePath) {
-        const res = await fileApi.readBinaryFile(filePath)
-        if (!isOk(res)) {
-          setError(res.error.message || '无法读取 Excel 表格文件')
-          setLoading(false)
-          return
-        }
-        workbook = XLSX.read(res.value.data.buffer, { type: 'buffer' })
-      } else {
-        const text = content ?? ''
-        workbook = XLSX.read(text, { type: 'string' })
-      }
-
-      const names = workbook.SheetNames
-      if (names.length === 0) {
-        setSheetNames([])
-        setSheetsMap({})
-        setActiveSheet('')
-        setLoading(false)
-        return
-      }
-
-      const map: Record<string, SheetData> = {}
-      for (const name of names) {
-        const worksheet = workbook.Sheets[name]
-        const rawRows = XLSX.utils.sheet_to_json<string[]>(worksheet, {
-          header: 1,
-          defval: '',
-          raw: false,
-        })
-
-        if (rawRows.length > 0) {
-          const headers = (rawRows[0] || []).map((h, i) => String(h || `列 ${i + 1}`))
-          const dataRows = rawRows.slice(1).map((r) => {
-            const rowArr: string[] = []
-            for (let i = 0; i < headers.length; i++) {
-              rowArr.push(r[i] !== undefined && r[i] !== null ? String(r[i]) : '')
-            }
-            return rowArr
-          })
-          map[name] = { name, headers, rows: dataRows }
-        } else {
-          map[name] = { name, headers: ['列 1', '列 2', '列 3'], rows: [] }
-        }
-      }
-
-      setSheetNames(names)
-      setSheetsMap(map)
-      setActiveSheet((prev) => (names.includes(prev) ? prev : names[0]))
-      setLoading(false)
-    } catch (err: unknown) {
-      console.error('[SpreadsheetViewer] Failed to parse spreadsheet:', err)
-      setError(err instanceof Error ? err.message : '表格文件解析失败')
-      setLoading(false)
-    }
-  }, [filePath, content, isBinaryExcel])
-
+      const result = binary ? await fileApi.saveBinaryDocument({ filePath, data: doc.serializeBinary(), expectedHash: hash.current }) : await fileApi.saveFile({ filePath, content: doc.serializeText() })
+      if (!isOk(result)) throw new Error(result.error.message)
+      if ('hash' in result.value && typeof result.value.hash === 'string') hash.current = result.value.hash
+      doc.markSaved(savedState)
+      refresh((n) => n + 1); notifyDocumentTools()
+    } finally { setSaving(false) }
+  }, [binary, filePath])
   useEffect(() => {
-    void loadData()
-  }, [loadData])
-
-  const currentSheet = useMemo<SheetData>(() => {
-    if (activeSheet && sheetsMap[activeSheet]) {
-      return sheetsMap[activeSheet]
-    }
-    return { name: '', headers: [], rows: [] }
-  }, [activeSheet, sheetsMap])
-
-  // 双向更新存盘
-  const syncCsvContent = useCallback(
-    (headers: string[], rows: string[][]) => {
-      if (!isBinaryExcel && onChange) {
-        const fullAoa = [headers, ...rows]
-        const csvText = XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(fullAoa))
-        onChange(csvText)
-      }
-    },
-    [isBinaryExcel, onChange],
-  )
-
-  // 单元格数据就地修改
-  const handleCellChange = (rowIndex: number, colIndex: number, val: string) => {
-    if (readOnly || !activeSheet) return
-
-    setSheetsMap((prev) => {
-      const sheet = prev[activeSheet]
-      if (!sheet) return prev
-
-      const nextRows = sheet.rows.map((r, rIdx) => {
-        if (rIdx !== rowIndex) return r
-        const nextRow = [...r]
-        nextRow[colIndex] = val
-        return nextRow
-      })
-
-      const updatedSheet: SheetData = { ...sheet, rows: nextRows }
-      syncCsvContent(sheet.headers, nextRows)
-      return { ...prev, [activeSheet]: updatedSheet }
-    })
-  }
-
-  // 插入行（指定在上方或下方）
-  const handleInsertRow = useCallback(
-    (targetRowIndex: number, position: 'above' | 'below') => {
-      if (readOnly || !activeSheet) return
-      setSheetsMap((prev) => {
-        const sheet = prev[activeSheet]
-        if (!sheet) return prev
-        const insertAt = position === 'above' ? targetRowIndex : targetRowIndex + 1
-        const emptyRow = new Array(sheet.headers.length).fill('')
-        const nextRows = [
-          ...sheet.rows.slice(0, insertAt),
-          emptyRow,
-          ...sheet.rows.slice(insertAt),
-        ]
-        const updatedSheet = { ...sheet, rows: nextRows }
-        syncCsvContent(sheet.headers, nextRows)
-        return { ...prev, [activeSheet]: updatedSheet }
-      })
-      setContextMenu(null)
-      toast.success(`已在第 ${targetRowIndex + 1} 行${position === 'above' ? '上方' : '下方'}插入 1 行`)
-    },
-    [readOnly, activeSheet, syncCsvContent],
-  )
-
-  // 插入列（指定在左侧或右侧）
-  const handleInsertCol = useCallback(
-    (targetColIndex: number, position: 'left' | 'right') => {
-      if (readOnly || !activeSheet) return
-      setSheetsMap((prev) => {
-        const sheet = prev[activeSheet]
-        if (!sheet) return prev
-        const insertAt = position === 'left' ? targetColIndex : targetColIndex + 1
-        const newColName = `新列 ${sheet.headers.length + 1}`
-        const nextHeaders = [
-          ...sheet.headers.slice(0, insertAt),
-          newColName,
-          ...sheet.headers.slice(insertAt),
-        ]
-        const nextRows = sheet.rows.map((row) => [
-          ...row.slice(0, insertAt),
-          '',
-          ...row.slice(insertAt),
-        ])
-        const updatedSheet = { ...sheet, headers: nextHeaders, rows: nextRows }
-        syncCsvContent(nextHeaders, nextRows)
-        return { ...prev, [activeSheet]: updatedSheet }
-      })
-      setContextMenu(null)
-      toast.success(`已在${position === 'left' ? '左侧' : '右侧'}插入 1 列`)
-    },
-    [readOnly, activeSheet, syncCsvContent],
-  )
-
-  // 删除行
-  const handleDeleteRow = useCallback(
-    (index: number) => {
-      if (readOnly || !activeSheet) return
-      setSheetsMap((prev) => {
-        const sheet = prev[activeSheet]
-        if (!sheet) return prev
-        const nextRows = sheet.rows.filter((_, idx) => idx !== index)
-        const updatedSheet = { ...sheet, rows: nextRows }
-        syncCsvContent(sheet.headers, nextRows)
-        return { ...prev, [activeSheet]: updatedSheet }
-      })
-      setContextMenu(null)
-      toast.success(`已删除第 ${index + 1} 行`)
-    },
-    [readOnly, activeSheet, syncCsvContent],
-  )
-
-  // 删除列
-  const handleDeleteCol = useCallback(
-    (index: number) => {
-      if (readOnly || !activeSheet) return
-      setSheetsMap((prev) => {
-        const sheet = prev[activeSheet]
-        if (!sheet) return prev
-        if (sheet.headers.length <= 1) {
-          toast.warning('至少需要保留 1 列')
-          return prev
+    let cancelled = false
+    let dispose: (() => void) | undefined
+    emitted.current = content
+    model.current = null; setError(''); setOrigin({ r: 0, c: 0 }); anchor.current = null
+    async function load() {
+      try {
+        let data: string | Uint8Array = emitted.current
+        if (binary) {
+          const result = await fileApi.readBinaryFile(filePath)
+          if (!isOk(result)) throw new Error(result.error.message)
+          data = result.value.data; hash.current = result.value.hash ?? ''
         }
-        const colName = sheet.headers[index]
-        const nextHeaders = sheet.headers.filter((_, idx) => idx !== index)
-        const nextRows = sheet.rows.map((row) => row.filter((_, idx) => idx !== index))
-        const updatedSheet = { ...sheet, headers: nextHeaders, rows: nextRows }
-        syncCsvContent(nextHeaders, nextRows)
-        return { ...prev, [activeSheet]: updatedSheet }
-      })
-      setContextMenu(null)
-      toast.success('已删除列')
-    },
-    [readOnly, activeSheet, syncCsvContent],
-  )
-
-  // 清空单元格
-  const handleClearCell = useCallback(
-    (rIdx: number, cIdx: number) => {
-      handleCellChange(rIdx, cIdx, '')
-      setContextMenu(null)
-      toast.success('单元格内容已清空')
-    },
-    [],
-  )
-
-  // 复制单元格内容
-  const handleCopyCell = useCallback(
-    (val: string) => {
-      navigator.clipboard.writeText(val)
-      setContextMenu(null)
-      toast.success('已复制单元格内容')
-    },
-    [],
-  )
-
-  // 重命名列
-  const handleSaveHeaderRename = (colIndex: number) => {
-    if (readOnly || !activeSheet || !headerEditValue.trim()) {
-      setEditingHeaderIndex(null)
-      return
+        if (cancelled) return
+        model.current = new SpreadsheetDocument(filePath, data)
+        dispose = registerDocumentTools({ filePath, kind: 'table', isDirty: () => Boolean(model.current?.dirty), save,
+          undo: () => { model.current!.undo(); update() }, read: (args) => model.current!.read(args), edit })
+        refresh((n) => n + 1)
+      } catch (reason) { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)) }
     }
-    setSheetsMap((prev) => {
-      const sheet = prev[activeSheet]
-      if (!sheet) return prev
-      const nextHeaders = [...sheet.headers]
-      nextHeaders[colIndex] = headerEditValue.trim()
-      const updatedSheet = { ...sheet, headers: nextHeaders }
-      syncCsvContent(nextHeaders, sheet.rows)
-      return { ...prev, [activeSheet]: updatedSheet }
-    })
-    setEditingHeaderIndex(null)
-    toast.success('列名已更新')
+    void load()
+    return () => { cancelled = true; dispose?.(); clearReaderSelection() }
+  }, [filePath, binary, edit, save, update])
+  useEffect(() => {
+    if (binary) return
+    if (content !== emitted.current) {
+      emitted.current = content
+      if (model.current) {
+        const next = new SpreadsheetDocument(filePath, content)
+        next.revision = model.current.revision + 1
+        model.current = next
+        refresh((n) => n + 1); notifyDocumentTools()
+      }
+    }
+  }, [content, binary, filePath])
+  const unitText = (sheet: string): string => {
+    const doc = model.current!
+    const bounds = doc.bounds(sheet)
+    const lines: string[] = []
+    for (let r = 0; r <= Math.min(bounds.e.r, 199); r++) {
+      const values = Array.from({ length: Math.min(bounds.e.c + 1, 40) }, (_, c) => doc.cell(sheet, r, c))
+      lines.push(values.map((cell) => `${cell.address}=${cell.formula ? `=${cell.formula}` : JSON.stringify(cell.value)}`).join('\t'))
+    }
+    return `工作表 ${sheet}；范围 ${XLSX.utils.encode_range(bounds)}；revision=${doc.revision}\n${lines.join('\n')}\n[正文最多展示前200行40列，其他区域请用 montree_table_read 按地址读取。]`
   }
-
-  // 触发右键上下文菜单
-  const openContextMenu = (
-    e: React.MouseEvent,
-    target: 'cell' | 'row' | 'col',
-    rowIndex: number,
-    colIndex: number,
-  ) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setSelectedCell({ row: rowIndex, col: colIndex })
-    const menuWidth = 220
-    const menuHeight = 290
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10)
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10)
-    setContextMenu({ x, y, target, rowIndex, colIndex })
+  useDocumentReader({ filePath, root: () => model.current ? root.current : null, selectionManaged: true,
+    text: () => { if (!model.current) throw new Error('表格正在加载'); return unitText(model.current.activeSheet) },
+    units: () => model.current?.workbook.SheetNames.map((sheet) => ({ label: sheet, text: unitText(sheet) })) ?? [],
+    currentIndex: () => model.current?.workbook.SheetNames.indexOf(model.current.activeSheet) ?? 0,
+    viewportText: () => Array.from(root.current?.querySelectorAll<HTMLInputElement>('input[aria-label*="!"]') ?? [])
+      .filter((input) => { const rect = input.getBoundingClientRect(); const host = root.current!.getBoundingClientRect(); return rect.bottom > host.top && rect.top < host.bottom && rect.right > host.left && rect.left < host.right })
+      .map((input) => `${input.getAttribute('aria-label')}=${JSON.stringify(input.value)}`).join('\n'),
+    iterateUnits: async function* () {
+      const current = model.current
+      if (!current) throw new Error('表格正在加载')
+      for (const name of current.workbook.SheetNames) {
+        const cells = Object.keys(current.workbook.Sheets[name]).filter((address) => /^[A-Z]+[1-9]\d*$/.test(address))
+        for (let i = 0; i < cells.length; i += 100) {
+          yield { label: `${name} · ${cells[i]}–${cells[Math.min(cells.length - 1, i + 99)]}`,
+            text: cells.slice(i, i + 100).map((address) => { const pos = XLSX.utils.decode_cell(address); const cell = current.cell(name, pos.r, pos.c); return `${address}=${cell.formula ? `=${cell.formula}` : JSON.stringify(cell.value)}` }).join('\n') }
+        }
+      }
+    } })
+  const doc = model.current
+  const sheet = doc?.activeSheet ?? ''
+  const bounds = doc?.bounds(sheet)
+  const run = (action: () => void): void => { try { action() } catch (reason) { toast.error(reason instanceof Error ? reason.message : String(reason)) } }
+  const select = (ranges: string[]): void => {
+    if (!doc) return
+    const target = doc.select(sheet, ranges)
+    commitDocumentSelection(target, `${sheet}!${ranges.join(', ')}`)
+    refresh((n) => n + 1)
   }
-
-  // 导出 CSV
-  const handleExportCsv = () => {
-    if (!currentSheet.headers.length) return
-    const fullAoa = [currentSheet.headers, ...currentSheet.rows]
-    const csvContent = XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(fullAoa))
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${currentSheet.name || 'sheet'}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  const selectCell = (r: number, c: number, extend: boolean, additive: boolean): void => {
+    if (!extend || !anchor.current) anchor.current = { r, c }
+    const start = anchor.current
+    const range = XLSX.utils.encode_range({ s: { r: Math.min(start.r, r), c: Math.min(start.c, c) }, e: { r: Math.max(start.r, r), c: Math.max(start.c, c) } })
+    select(additive && doc?.selection ? [...doc.selection.ranges, range] : [range])
   }
-
-  // 搜索过滤
-  const filteredRows = useMemo(() => {
-    if (!searchQuery.trim()) return currentSheet.rows
-    const q = searchQuery.toLowerCase()
-    return currentSheet.rows.filter((row) => row.some((cell) => cell.toLowerCase().includes(q)))
-  }, [currentSheet.rows, searchQuery])
-
-  const fileName = filePath?.split(/[/\\]/).pop() ?? '电子数据表'
-
-  return (
-    <div className={cn('relative flex h-full w-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-background text-foreground', className)}>
-      {/* 顶部工具栏 */}
-      <div className="flex flex-wrap items-center justify-between border-b border-border bg-muted/40 px-3 py-2 text-xs backdrop-blur-sm gap-2">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="size-4 text-primary" />
-          <span className="font-medium text-foreground max-w-[200px] truncate" title={fileName}>
-            {fileName}
-          </span>
-          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-            {isBinaryExcel ? 'EXCEL 工作簿' : '数据表'}
-          </span>
-          {viewMode === 'grid' && (
-            <span className="text-[11px] text-muted-foreground">
-              {currentSheet.rows.length} 行 × {currentSheet.headers.length} 列
-            </span>
-          )}
-        </div>
-
-        {/* 模式切换与操作 */}
-        <div className="flex items-center gap-2">
-          {/* 模式切换胶囊 */}
-          <div className="flex items-center rounded-md border border-border bg-muted/60 p-0.5">
-            <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="xs"
-              onClick={() => setViewMode('grid')}
-              className="h-6 gap-1 px-2 text-xs"
-              title="专业数据网格（支持右键增删行列、就地编辑）"
-            >
-              <TableIcon className="size-3 text-primary" />
-              数据网格
-            </Button>
-            <Button
-              variant={viewMode === 'univer' ? 'secondary' : 'ghost'}
-              size="xs"
-              onClick={() => setViewMode('univer')}
-              className="h-6 gap-1 px-2 text-xs"
-              title="Univer 工业级 Excel 画布（支持公式栏、样式与选区）"
-            >
-              <Sparkles className="size-3 text-primary" />
-              Univer Excel
-            </Button>
-          </div>
-
-          {viewMode === 'grid' && (
-            <>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="搜索检索..."
-                  className="h-7 w-32 pl-7 text-xs bg-background"
-                />
-              </div>
-
-              {!readOnly && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => handleInsertRow(currentSheet.rows.length, 'below')}
-                    className="h-7 gap-1 text-[11px]"
-                    title="在末尾新增一行"
-                  >
-                    <Plus className="size-3 text-primary" />
-                    加一行
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => handleInsertCol(currentSheet.headers.length, 'right')}
-                    className="h-7 gap-1 text-[11px]"
-                    title="在末尾新增一列"
-                  >
-                    <Plus className="size-3 text-primary" />
-                    加一列
-                  </Button>
-                </>
-              )}
-
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={handleExportCsv}
-                title="导出当前工作表为 CSV"
-                className="h-7 gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                <Download className="size-3" />
-                导出
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 主体渲染区 */}
-      {viewMode === 'univer' ? (
-        <div className="flex-1 min-h-0 min-w-0 relative overflow-hidden">
-          <UniverSheetViewer filePath={filePath} content={content} readOnly={readOnly} />
-        </div>
-      ) : (
-        <div className="relative flex-1 min-h-0 min-w-0 w-full max-w-full overflow-hidden bg-background">
-          {loading && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-xs">
-              <Loader2 className="size-6 animate-spin text-primary" />
-              <span className="text-xs text-muted-foreground">正在加载数据表格...</span>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-center p-6">
-              <AlertCircle className="size-8 text-destructive" />
-              <div className="text-sm font-medium text-destructive">{error}</div>
-              <Button variant="outline" size="sm" onClick={() => void loadData()}>
-                重试
-              </Button>
-            </div>
-          )}
-
-          {!loading && !error && currentSheet.headers.length > 0 && (
-            <ScrollArea type="always" className="h-full w-full">
-              <table className="w-max min-w-full border-collapse text-left font-mono text-xs select-text">
-              {/* 表头固定 (冻结顶部) */}
-              <thead className="sticky top-0 z-20 bg-muted/95 backdrop-blur-sm border-b border-border shadow-xs">
-                <tr>
-                  {/* 左上角交叉格 (双向冻结顶部与左侧) */}
-                  <th className="sticky left-0 top-0 z-30 w-12 bg-muted px-2.5 py-1.5 text-center text-[10px] font-bold text-muted-foreground border-r border-b border-border select-none">
-                    #
-                  </th>
-                  {currentSheet.headers.map((header, colIdx) => (
-                    <th
-                      key={colIdx}
-                      onContextMenu={(e) => openContextMenu(e, 'col', 0, colIdx)}
-                      className="border-r border-border px-3 py-1.5 font-semibold text-foreground select-none hover:bg-muted cursor-context-menu min-w-[120px]"
-                      title="右键可在左侧/右侧插入列，或删除/重命名此列"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        {editingHeaderIndex === colIdx ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={headerEditValue}
-                            onChange={(e) => setHeaderEditValue(e.target.value)}
-                            onBlur={() => handleSaveHeaderRename(colIdx)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveHeaderRename(colIdx)
-                              if (e.key === 'Escape') setEditingHeaderIndex(null)
-                            }}
-                            className="w-full rounded bg-background px-1 py-0.5 text-xs font-semibold text-foreground border border-primary outline-none"
-                          />
-                        ) : (
-                          <span
-                            onDoubleClick={() => {
-                              if (!readOnly) {
-                                setEditingHeaderIndex(colIdx)
-                                setHeaderEditValue(header)
-                              }
-                            }}
-                            className="truncate"
-                          >
-                            {header}
-                          </span>
-                        )}
-                        <span className="text-[9px] text-muted-foreground/60">
-                          {String.fromCharCode(65 + (colIdx % 26))}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-                  {!readOnly && (
-                    <th className="w-10 px-1 py-1.5 text-center select-none">
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => handleInsertCol(currentSheet.headers.length, 'right')}
-                        title="在末尾添加一列"
-                        className="size-5 text-muted-foreground hover:text-primary"
-                      >
-                        <Plus className="size-3" />
-                      </Button>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-
-              {/* 数据单元格 */}
-              <tbody className="divide-y divide-border/60">
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={currentSheet.headers.length + (readOnly ? 1 : 2)}
-                      className="py-16 text-center text-muted-foreground"
-                    >
-                      没有数据行，点击顶部「加一行」快速开始
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row, rowIdx) => (
-                    <tr key={rowIdx} className="group transition-colors hover:bg-muted/30">
-                      {/* 行号 (冻结在左侧，支持右键) */}
-                      <td
-                        onContextMenu={(e) => openContextMenu(e, 'row', rowIdx, 0)}
-                        className="sticky left-0 z-10 w-12 bg-background px-2.5 py-1 text-center text-[10px] text-muted-foreground/60 border-r border-border select-none group-hover:bg-muted/80 group-hover:text-foreground cursor-context-menu hover:bg-primary/10"
-                        title="右键可在上方/下方插入行，或删除此行"
-                      >
-                        {rowIdx + 1}
-                      </td>
-
-                      {/* 单元格（支持右键） */}
-                      {row.map((cellValue, colIdx) => {
-                        const isSelected =
-                          selectedCell?.row === rowIdx && selectedCell?.col === colIdx
-                        return (
-                          <td
-                            key={colIdx}
-                            onClick={() => setSelectedCell({ row: rowIdx, col: colIdx })}
-                            onContextMenu={(e) => openContextMenu(e, 'cell', rowIdx, colIdx)}
-                            className={cn(
-                              'border-r border-border/70 p-0 cursor-context-menu',
-                              isSelected && 'ring-1 ring-primary bg-primary/5',
-                            )}
-                          >
-                            {readOnly ? (
-                              <div className="px-2.5 py-1.5 truncate max-w-[280px]" title={cellValue}>
-                                {cellValue}
-                              </div>
-                            ) : (
-                              <input
-                                type="text"
-                                value={cellValue}
-                                onChange={(e) => handleCellChange(rowIdx, colIdx, e.target.value)}
-                                className="h-full w-full bg-transparent px-2.5 py-1.5 text-xs text-foreground outline-none focus:bg-background focus:ring-1 focus:ring-primary"
-                              />
-                            )}
-                          </td>
-                        )
-                      })}
-
-                      {/* 快速删除行 */}
-                      {!readOnly && (
-                        <td className="w-10 px-1 py-0.5 text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => handleDeleteRow(rowIdx)}
-                            title="删除此行"
-                            className="size-6 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <ScrollBar orientation="horizontal" className="z-40 h-2.5 border-t border-border bg-muted/40" />
-            <ScrollBar orientation="vertical" className="z-40 w-2.5 border-l border-border bg-muted/40" />
-          </ScrollArea>
-        )}
-      </div>
-    )}
-
-      {/* 底部多工作表 Sheet 标签栏 */}
-      {viewMode === 'grid' && sheetNames.length > 0 && (
-        <div className="shrink-0 flex items-center gap-1 border-t border-border bg-muted/40 px-2 py-1.5 text-xs overflow-x-auto select-none">
-          <div className="flex items-center gap-1 text-muted-foreground mr-1 select-none">
-            <Layers className="size-3.5 text-primary" />
-            <span className="text-[10px] font-semibold">工作表:</span>
-          </div>
-
-          {sheetNames.map((name) => {
-            const isActive = name === activeSheet
-            return (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setActiveSheet(name)}
-                className={cn(
-                  'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none',
-                  isActive
-                    ? 'bg-background text-primary shadow-xs border border-border/80'
-                    : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
-                )}
-              >
-                <TableIcon className="size-3" />
-                <span>{name}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* 媲美 Excel 的右键上下文菜单（Context Menu） */}
-      {contextMenu && !readOnly && (
-        <div
-          className="fixed z-50 min-w-52 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 text-xs select-none"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 行操作 */}
-          <button
-            onClick={() => handleInsertRow(contextMenu.rowIndex, 'above')}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-          >
-            <ArrowUp className="size-3.5 text-primary" />
-            <span>在上方插入一行</span>
-          </button>
-          <button
-            onClick={() => handleInsertRow(contextMenu.rowIndex, 'below')}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-          >
-            <ArrowDown className="size-3.5 text-primary" />
-            <span>在下方插入一行</span>
-          </button>
-
-          <div className="my-1 h-px bg-border/60" />
-
-          {/* 列操作 */}
-          <button
-            onClick={() => handleInsertCol(contextMenu.colIndex, 'left')}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-          >
-            <ArrowLeft className="size-3.5 text-primary" />
-            <span>在左侧插入一列</span>
-          </button>
-          <button
-            onClick={() => handleInsertCol(contextMenu.colIndex, 'right')}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-          >
-            <ArrowRight className="size-3.5 text-primary" />
-            <span>在右侧插入一列</span>
-          </button>
-
-          <div className="my-1 h-px bg-border/60" />
-
-          {/* 单元格与重命名 */}
-          {contextMenu.target === 'col' && (
-            <button
-              onClick={() => {
-                setEditingHeaderIndex(contextMenu.colIndex)
-                setHeaderEditValue(currentSheet.headers[contextMenu.colIndex] || '')
-                setContextMenu(null)
-              }}
-              className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-            >
-              <Edit2 className="size-3.5 text-primary" />
-              <span>重命名此列</span>
-            </button>
-          )}
-
-          {contextMenu.target === 'cell' && (
-            <>
-              <button
-                onClick={() => {
-                  const cellVal =
-                    currentSheet.rows[contextMenu.rowIndex]?.[contextMenu.colIndex] ?? ''
-                  handleCopyCell(cellVal)
-                }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-              >
-                <Copy className="size-3.5 text-muted-foreground" />
-                <span>复制单元格内容</span>
-              </button>
-              <button
-                onClick={() => handleClearCell(contextMenu.rowIndex, contextMenu.colIndex)}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-left cursor-pointer"
-              >
-                <Eraser className="size-3.5 text-muted-foreground" />
-                <span>清空单元格内容</span>
-              </button>
-              <div className="my-1 h-px bg-border/60" />
-            </>
-          )}
-
-          {/* 删除操作 */}
-          <button
-            onClick={() => handleDeleteRow(contextMenu.rowIndex)}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 text-left cursor-pointer"
-          >
-            <Trash2 className="size-3.5" />
-            <span>删除第 {contextMenu.rowIndex + 1} 行</span>
-          </button>
-          <button
-            onClick={() => handleDeleteCol(contextMenu.colIndex)}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 text-left cursor-pointer"
-          >
-            <Trash2 className="size-3.5" />
-            <span>删除第 {contextMenu.colIndex + 1} 列 ({currentSheet.headers[contextMenu.colIndex]})</span>
-          </button>
-        </div>
-      )}
+  const rows = bounds ? Array.from({ length: Math.min(500, Math.max(bounds.e.r + 1, origin.r + 30) - origin.r) }, (_, i) => origin.r + i)
+    .filter((r) => !search || Array.from({ length: Math.min(bounds.e.c + 1, 100) }, (_, c) => doc!.cell(sheet, r, c).display).some((value) => value.toLowerCase().includes(search.toLowerCase()))) : []
+  const columns = bounds ? Array.from({ length: Math.min(100, Math.max(bounds.e.c + 1, origin.c + 10) - origin.c) }, (_, i) => origin.c + i) : []
+  const selected = doc?.selection?.ranges.map(tableRange) ?? []
+  const commitCell = (address: string, raw: string): void => {
+    if (!doc) return
+    const pos = XLSX.utils.decode_cell(address)
+    const old = doc.cell(sheet, pos.r, pos.c)
+    if (raw === (old.formula ? `=${old.formula}` : old.display)) return
+    const value: CellInput = binary && raw.startsWith('=') ? { formula: raw.slice(1) } : raw
+    run(() => { edit({ revision: doc.revision, sheet, target: { range: address }, operation: 'set', values: [[value]], expectedCount: 1 }) })
+  }
+  return <div ref={root} className={cn('flex h-full min-h-0 min-w-0 flex-col overflow-hidden', className)}>
+    <div className="flex flex-wrap items-center gap-2 border-b p-2 text-xs">
+      <span>{filePath.split(/[/\\]/).pop()}{doc?.dirty ? ' · 未保存' : ''}</span>
+      <Button size="xs" onClick={() => setMode(mode === 'grid' ? 'univer' : 'grid')}>{mode === 'grid' ? '画布预览' : '数据网格'}</Button>
+      <Input aria-label="搜索表格" placeholder="搜索行…" value={search} onChange={(e) => setSearch(e.target.value)} className="h-7 w-32" />
+      <Input aria-label="单元格地址" value={jump} onChange={(e) => setJump(e.target.value)} className="h-7 w-24" onKeyDown={(e) => { if (e.key === 'Enter') run(() => { const range = tableRange(jump.toUpperCase()); setOrigin(range.s); select([jump.toUpperCase()]) }) }} />
+      <Button size="xs" disabled={!doc || readOnly} onClick={() => run(() => { doc!.undo(); update() })}>撤销</Button>
+      <Button size="xs" disabled={!doc || !doc.dirty || saving || readOnly} onClick={() => void save().then(() => toast.success('表格已保存')).catch((reason: Error) => toast.error(reason.message))}>{saving ? '保存中…' : '保存'}</Button>
+      <Button size="xs" disabled={!doc || readOnly} onClick={() => run(() => { const range = `${XLSX.utils.encode_col(bounds!.e.c + 1)}1`; edit({ revision: doc!.revision, sheet, target: { range }, operation: 'fill', value: '', expectedCount: 1 }) })}>加一列</Button>
+      <Button size="xs" disabled={!doc || readOnly} onClick={() => run(() => { edit({ revision: doc!.revision, sheet, target: { row: bounds!.e.r + 2, start: 1, count: bounds!.e.c + 1 }, operation: 'fill', value: '', expectedCount: bounds!.e.c + 1 }) })}>加一行</Button>
+      <span className="text-muted-foreground">Shift 扩展选区，Ctrl 添加选区；输入地址可定位。画布暂为只读预览。</span>
     </div>
-  )
+    {error ? <p className="p-4 text-destructive">{error}</p> : !doc ? <p className="p-4">正在读取表格…</p> : mode === 'univer' ? <UniverSheetViewer filePath={filePath} workbook={doc.workbook} revision={doc.revision} readOnly onSelection={(name, ranges) => { const target = doc.select(name, ranges); commitDocumentSelection(target, `${name}!${ranges.join(', ')}`); refresh((n) => n + 1) }} /> : <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+      <table className="border-collapse text-xs"><thead><tr><th className="sticky top-0 bg-muted p-2">#</th>{columns.map((c) => <th key={c} className="sticky top-0 min-w-32 border bg-muted p-2" onClick={() => select([`${XLSX.utils.encode_col(c)}1:${XLSX.utils.encode_col(c)}${bounds!.e.r + 1}`])}>{XLSX.utils.encode_col(c)}</th>)}</tr></thead>
+        <tbody>{rows.map((r) => <tr key={r}><th className="border bg-muted p-2" onClick={() => select([`A${r + 1}:${XLSX.utils.encode_col(bounds!.e.c)}${r + 1}`])}>{r + 1}</th>{columns.map((c) => {
+          const cell = doc.cell(sheet, r, c); const active = selected.some((range) => r >= range.s.r && r <= range.e.r && c >= range.s.c && c <= range.e.c)
+          return <td key={`${cell.address}:${doc.revision}`} data-cell-address={cell.address} className={cn('border', active && 'bg-primary/15 ring-1 ring-inset ring-primary')} onMouseDown={(e) => selectCell(r, c, e.shiftKey, e.ctrlKey || e.metaKey)} onMouseEnter={(e) => { if (e.buttons === 1) selectCell(r, c, true, false) }}>
+            <input aria-label={`${sheet}!${cell.address}`} readOnly={readOnly} defaultValue={cell.formula ? `=${cell.formula}` : cell.display} className="w-36 bg-transparent px-2 py-1.5 outline-none" onBlur={(e) => commitCell(cell.address, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+          </td>
+        })}</tr>)}</tbody></table>
+      <p className="p-2 text-xs text-muted-foreground">网格一次展示最多500行100列；工具可按任意合法地址读取与修改，每次最多5000格。</p>
+    </div>}
+    <div className="flex shrink-0 gap-2 border-t p-2">{doc?.workbook.SheetNames.map((name) => <Button key={name} size="xs" variant={sheet === name ? 'secondary' : 'ghost'} onClick={() => { doc.activeSheet = name; doc.selection = null; clearReaderSelection(); setOrigin({ r: 0, c: 0 }); refresh((n) => n + 1) }}>{name}</Button>)}</div>
+  </div>
 }

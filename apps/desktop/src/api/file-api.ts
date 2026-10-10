@@ -1,4 +1,5 @@
 import type { AppError } from '@montree/contracts'
+import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '@montree/contracts'
 import type {
   ExportDocumentPayload,
   ExportDocumentResult,
@@ -111,6 +112,12 @@ export const fileApi = {
     const api = requireElectronAPI()
     if (!api.ok) return api
     return api.value.readImage(filePath)
+  },
+
+  async saveBinaryDocument(payload: SaveBinaryDocumentPayload): Promise<Result<SaveBinaryDocumentResult, AppError>> {
+    const api = requireElectronAPI()
+    if (!api.ok) return api
+    return api.value.saveBinaryDocument(payload)
   },
 
   async saveFile(payload: SaveFilePayload): Promise<Result<SaveFileResult, AppError>> {

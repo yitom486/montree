@@ -59,12 +59,13 @@ export async function readChapterByRef(args: ReadChapterArgs): Promise<ReadChapt
   }
 
   const reader = useReaderNavigationStore.getState()
-  if (!reader.ready || reader.units.length === 0) {
+  const units = provider.getUnits?.() ?? (reader.filePath === provider.filePath && reader.ready ? reader.units : [])
+  if (units.length === 0) {
     throw new Error('目录尚未就绪，请稍后再试或先调用 montree_read(scope=toc)')
   }
 
-  const { index, matchedBy } = resolveUnitIndex(reader.units, args)
-  const label = reader.units[index]!.label
+  const { index, matchedBy } = resolveUnitIndex(units, args)
+  const label = units[index]!.label
 
   let unit: ReaderUnitText | null = null
   if (provider.getUnitByIndex) {

@@ -27,6 +27,7 @@ import {
 import { extractDocumentText, extractViewportText } from '@/lib/agent/context/extract-dom-text'
 import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-agent-composer'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
+import { collectDomImages } from '@/lib/agent/context/reader-visual-context'
 import { registerReaderMarks, type CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
 import {
   clearReaderSelection,
@@ -555,6 +556,8 @@ export function useWebDocSession({
   useEffect(() => {
     return registerReaderContent({
       filePath: pageUrl,
+      getImages: (scope) => collectDomImages(iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : [], scope, pageUrl),
+      getImageCount: () => collectDomImages(iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : [], 'current', pageUrl).length,
       getCurrentText: () => extractDocumentText(iframeRef.current?.contentDocument),
       getViewportText: () => extractViewportText(iframeRef.current?.contentDocument),
       getUnitByIndex: async (flatIndex) => {

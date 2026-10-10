@@ -33,6 +33,7 @@ export interface MontreeTurnContext {
   hasSelection?: boolean
   /** 目录顶层标题（最多约 10 条），便于记住全书结构；完整目录仍走 montree_get_toc */
   tocTopLevel?: string[]
+  visual?: { imageCount?: number; screenshotAvailable: boolean }
 }
 
 /** turn-context 块的稳定首尾标记：回放清洗（strip-replay-scaffolding）据此剥离 */

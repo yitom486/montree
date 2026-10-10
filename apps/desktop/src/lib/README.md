@@ -96,6 +96,8 @@
 | 文件 | 功能 |
 |------|------|
 | `acp-composer` | 输入框附件、工作区路径拖入 |
+| `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
+| `context/document-tool-registry` / `.test.ts` | 当前表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
 | `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示 |
 | `acp-plan` | 计划条目解析与进度摘要 |
 | `acp-config-preferences` | Mode/Model 等配置记忆 |
@@ -128,6 +130,10 @@
 | `json-tree-model` | 树形 JSON 节点构建、JSONPath 寻址、节点 CRUD、容错解析与无损序列化 |
 | `log-parser` | 高性能多行系统日志流解析、级别提取、堆栈行吸附、级别掩码过滤与日志条目 CRUD |
 | `dataset-integration.test` | 真实商业报表 CSV、真实应用配置 JSON 与真实服务崩溃 LOG 的解析与增删改查集成测试 |
+| `spreadsheet-document` / `.test.ts` | CSV/TSV/XLSX 原地址读写、区域和版本校验、批量撤销；XLSX 定点修改 XML 保留其他部件 |
+| `presentation-document` / `.test.ts` | PPTX 原始元素 ID 查询/删改、关系排序、引用保护、撤销与保留未修改部件 |
+| `presentation-preview` | PPTX 段落默认样式、文字块覆盖、换行、形状外观及原稿背景/主题颜色解析 |
+| `xml-test-dom` | Office 单元测试的标准 XML DOM 适配（只被测试引用） |
 
 ---
 

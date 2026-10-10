@@ -9,6 +9,8 @@ import {
 import { beginPromptSelectionCycle } from './reader-selection-registry'
 import { takeTurnContextDecision } from './should-attach-turn-context'
 import { documentKey, formatTurnContextBlock } from './turn-context'
+import { getReaderContentProvider } from './reader-content-registry'
+import { getReaderViewportRect } from './reader-visual-context'
 
 /**
  * 每次 session/prompt 的前缀：静态 Skill（可被上游缓存） + 可选的 turn-context。
@@ -45,6 +47,10 @@ export function buildMontreePromptPrefix(
   if (!decision.attach) return blocks
 
   const tocTopLevel = collectTocTopLevelForDocument(activeDocument)
+  const provider = getReaderContentProvider()
+  const visual = provider?.filePath === activeDocument?.path ? {
+    imageCount: provider?.getImageCount?.(), screenshotAvailable: Boolean(getReaderViewportRect()),
+  } : undefined
   blocks.push({
     type: 'text',
     text: formatTurnContextBlock({
@@ -53,6 +59,7 @@ export function buildMontreePromptPrefix(
       reading: collectReadingState(activeDocument),
       ...(hasSelection ? { hasSelection: true } : {}),
       ...(tocTopLevel ? { tocTopLevel } : {}),
+      ...(visual ? { visual } : {}),
     }),
   })
   return blocks

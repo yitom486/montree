@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { SaveBinaryDocumentPayload } from '@montree/contracts'
 import { IPC } from '@montree/contracts'
 import type { AppError } from '@montree/contracts'
 import type { Result } from '@montree/contracts'
@@ -82,6 +83,7 @@ const electronAPI: ElectronAPI = {
   },
   readFile: (filePath: string) => ipcRenderer.invoke(IPC.FILE_READ, filePath),
   readBinaryFile: (filePath: string) => ipcRenderer.invoke(IPC.FILE_READ_BINARY, filePath),
+  saveBinaryDocument: (payload: SaveBinaryDocumentPayload) => ipcRenderer.invoke(IPC.FILE_SAVE_BINARY_DOCUMENT, payload),
   readImage: (filePath: string) => ipcRenderer.invoke(IPC.FILE_READ_IMAGE, filePath),
   saveFile: (payload: SaveFilePayload) => ipcRenderer.invoke(IPC.FILE_SAVE, payload),
   saveFileAs: (payload: SaveFilePayload) => ipcRenderer.invoke(IPC.FILE_SAVE_AS, payload),

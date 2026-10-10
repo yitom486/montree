@@ -17,6 +17,39 @@ function mainPanel(window: Awaited<ReturnType<Awaited<ReturnType<typeof launchBu
 }
 
 test.describe('在线文档阅读', () => {
+  test('论文 SVG 插图可加载，表格保留对齐和合并，宽表只在自身横向滚动', async () => {
+    const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir() })
+    try {
+      const window = await app.firstWindow()
+      await window.route('https://e2e.montree.test/docs/academic/architecture.svg', (route) => route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="476" height="291"><rect width="476" height="291" fill="white"/><text x="24" y="50">Sandbox architecture</text></svg>',
+      }))
+      await window.waitForLoadState('domcontentloaded')
+      await welcomeWebDocUrlField(window).fill('https://e2e.montree.test/docs/academic')
+      await welcomeWebDocUrlField(window).press('Enter')
+      const frame = webDocFrame(window)
+      const image = frame.locator('img.web-doc-object-image')
+      await expect(image).toBeVisible()
+      await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBe(476)
+      await expect(image).toHaveAttribute('src', 'https://e2e.montree.test/docs/academic/architecture.svg')
+      await expect(frame.locator('object')).toHaveCount(0)
+      expect(await image.evaluate(() => (window as Window & { __objectExecuted?: boolean }).__objectExecuted)).toBeUndefined()
+      const tables = frame.locator('.web-doc-table-scroll')
+      await expect(tables).toHaveCount(2)
+      await expect(tables.first().locator('td').first()).toHaveCSS('text-align', 'center')
+      await expect(tables.first().locator('th').first()).toHaveCSS('border-top-width', '2px')
+      await expect(tables.first().locator('th').first()).toHaveCSS('border-top-style', 'solid')
+      await expect(tables.first().locator('th[rowspan]')).toHaveAttribute('rowspan', '2')
+      await expect(tables.first().locator('td[colspan]')).toHaveAttribute('colspan', '4')
+      await expect(tables.last()).toHaveCSS('overflow-x', 'auto')
+      expect(await tables.last().evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+      expect(await tables.last().evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    } finally {
+      await app.close()
+    }
+  })
+
   test('欢迎页打开 fixture 文档并显示正文', async () => {
     const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir() })
 

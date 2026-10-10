@@ -2,6 +2,35 @@
 const EMBED_HOST_SUFFIXES = ['.pythontutor.com'] as const
 const EMBED_HOSTS = new Set(['pythontutor.com', 'www.pythontutor.com'])
 
+/** arXiv/LaTeXML 把插图放进 object；在插件清洗前降级为无脚本的图片。 */
+export function normalizeWebDocImageObjects(root: HTMLElement, baseUrl: string): void {
+  root.querySelectorAll('object[type]').forEach((node) => {
+    const type = node.getAttribute('type')?.trim().toLowerCase()
+    if (!type || !/^image\/(?:svg\+xml|png|jpeg|gif|webp|avif)$/.test(type)) return
+    const data = node.getAttribute('data')?.trim()
+    if (!data) return
+
+    let url: URL
+    try {
+      url = new URL(data, baseUrl)
+    } catch {
+      return
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return
+
+    const image = root.ownerDocument.createElement('img')
+    image.src = url.toString()
+    image.className = `${node.getAttribute('class') ?? ''} web-doc-object-image`.trim()
+    image.alt = node.getAttribute('aria-label') || node.getAttribute('title') ||
+      node.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || '文档插图'
+    for (const attribute of ['id', 'width', 'height']) {
+      const value = node.getAttribute(attribute)
+      if (value) image.setAttribute(attribute, value)
+    }
+    node.replaceWith(image)
+  })
+}
+
 export function isAllowedWebDocEmbedUrl(src: string | null | undefined): boolean {
   if (!src?.trim()) return false
   try {

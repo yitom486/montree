@@ -32,6 +32,7 @@ import type {
 } from '@montree/contracts'
 import { scanWorkspace } from './workspace'
 import { resolveExportSavePath } from './export-save-path'
+import { documentHash } from './binary-document-service'
 
 /** Electron 文件对话框过滤器 */
 export const MARKDOWN_DIALOG_FILTERS = [
@@ -182,7 +183,7 @@ export async function readBinaryFileByPath(
     }
 
     const buffer = await readFile(filePath)
-    return ok({ filePath, data: new Uint8Array(buffer) })
+    return ok({ filePath, data: new Uint8Array(buffer), hash: documentHash(buffer) })
   } catch (error) {
     return err(toAppError(error, '读取文件失败'))
   }

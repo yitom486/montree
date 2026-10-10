@@ -23,6 +23,7 @@ import type {
   WorkspaceSearchMarkdownResult,
 } from '../types/file'
 import type { AppError } from '../core/errors'
+import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '../agent/document-tools'
 import type { RendererErrorPayload } from '../types/error-log'
 import type { Result } from '../core/result'
 import type {
@@ -197,6 +198,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<Result<OpenFileResult, AppError>>
   /** 按路径读二进制文件 */
   readBinaryFile: (filePath: string) => Promise<Result<ReadBinaryResult, AppError>>
+  saveBinaryDocument: (payload: SaveBinaryDocumentPayload) => Promise<Result<SaveBinaryDocumentResult, AppError>>
   /** 读图片并转 data URL */
   readImage: (filePath: string) => Promise<Result<ReadImageResult, AppError>>
   /** 保存到当前路径 */

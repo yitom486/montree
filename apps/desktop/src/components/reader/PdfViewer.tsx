@@ -491,6 +491,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           <div
             ref={containerRef}
             className="h-full min-h-0 overflow-auto bg-[var(--color-bg-base)]"
+            data-reader-viewport
             onMouseMove={handlePdfMarkHoverMove}
             onMouseLeave={handlePdfMarkHoverLeave}
           >

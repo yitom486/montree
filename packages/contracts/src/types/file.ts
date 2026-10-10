@@ -20,6 +20,7 @@ export interface ReadBinaryResult {
   filePath: string
   /** IPC 传输后通常为 Uint8Array */
   data: Uint8Array
+  hash?: string
 }
 
 export interface OpenDialogOptions {

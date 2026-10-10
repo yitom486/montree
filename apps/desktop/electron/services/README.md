@@ -13,6 +13,8 @@
 | `workspace-watcher.ts` | 监听工作区变更并通知渲染进程 |
 | `export-save-path.ts` | 导出 HTML/PDF/Markdown 的保存路径 |
 | `web-doc-service.ts` | 在线文档抓取与目录发现入口（网络边界留守：SSRF 策略与重定向校验见 `web-doc/url-policy.ts`；目录抽取/站点谓词已迁 `@montree/web-doc`，本树 `web-doc/` 仅留 `url-policy`/`site-registry`/`e2e-fixture`） |
+| `reader-screenshot-service.ts` / `.test.ts` | Agent 按需截图 owner 窗口的阅读区，返回内存 PNG；裁剪与无文档保护 |
+| `binary-document-service.ts` / `.test.ts` | XLSX/PPTX 保存：摘要冲突检测、同目录临时文件替换，避免覆盖外部修改 |
 
 ## PDF 解析（pdf-inspector）
 

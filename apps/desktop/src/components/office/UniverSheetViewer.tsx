@@ -15,6 +15,9 @@ import { cn } from '@/lib/utils'
 interface UniverSheetViewerProps {
   filePath?: string
   content?: string
+  workbook?: XLSX.WorkBook
+  revision?: number
+  onSelection?: (sheet: string, ranges: string[]) => void
   readOnly?: boolean
   className?: string
 }
@@ -22,9 +25,15 @@ interface UniverSheetViewerProps {
 export function UniverSheetViewer({
   filePath,
   content,
+  workbook,
+  revision,
+  onSelection,
+  readOnly = false,
   className,
 }: UniverSheetViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const selectionCallback = useRef(onSelection)
+  selectionCallback.current = onSelection
   const univerInstanceRef = useRef<{ dispose: () => void } | null>(null)
   const theme = useEditorUiStore((state) => state.theme)
   const [loading, setLoading] = useState(true)
@@ -56,7 +65,9 @@ export function UniverSheetViewer({
       try {
         let workbookData: XLSX.WorkBook
 
-        if (isBinaryExcel && filePath) {
+        if (workbook) {
+          workbookData = workbook
+        } else if (isBinaryExcel && filePath) {
           const res = await fileApi.readBinaryFile(filePath)
           if (!isOk(res)) {
             if (!isCancelled) {
@@ -134,11 +145,16 @@ export function UniverSheetViewer({
 
         const sheetOrder = Object.keys(sheetObj)
 
-        univerAPI.createWorkbook({
+        const createdWorkbook = univerAPI.createWorkbook({
           id: 'montree-univer-workbook',
           name: fileName,
           sheets: sheetObj,
           sheetOrder,
+        })
+        createdWorkbook.setEditable(!readOnly)
+        univerAPI.addEvent(univerAPI.Event.SelectionChanged, ({ worksheet, selections }) => {
+          const name = sheetObj[worksheet.getSheetId()]?.name as string | undefined
+          if (name && selections.length) selectionCallback.current?.(name, selections.map((range) => XLSX.utils.encode_range({ s: { r: range.startRow, c: range.startColumn }, e: { r: range.endRow, c: range.endColumn } })))
         })
 
         if (!isCancelled) {
@@ -166,7 +182,7 @@ export function UniverSheetViewer({
         univerInstanceRef.current = null
       }
     }
-  }, [filePath, content, isBinaryExcel, theme, fileName])
+  }, [filePath, content, isBinaryExcel, theme, fileName, workbook, readOnly, revision])
 
   return (
     <div className={cn('relative flex h-full w-full flex-col bg-background text-foreground', className)}>

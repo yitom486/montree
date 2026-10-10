@@ -224,6 +224,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       <PaneErrorBoundary name="在线文档" filePath={pageUrl}>
         <div
           className={cn('web-doc-viewer-host relative h-full min-h-0 bg-[var(--color-bg-base)]', `theme-${theme}`)}
+          data-reader-viewport
           data-theme={theme}
         >
           {isLoading && !data ? (

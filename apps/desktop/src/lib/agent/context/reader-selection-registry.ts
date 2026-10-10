@@ -1,6 +1,9 @@
+import type { DocumentSelection } from '@montree/contracts'
+
 export interface StickyReaderSelection {
   filePath: string
   text: string
+  target?: DocumentSelection
 }
 
 export interface SelectionProvider {
@@ -44,6 +47,12 @@ export function commitReaderSelection(filePath: string, text: string): void {
     return
   }
   sticky = { filePath, text: trimmed }
+  selectionNotifyPending = true
+}
+
+/** 坐标选区允许内容为空；地址才是编辑目标，不能通过相同文字反查。 */
+export function commitDocumentSelection(target: DocumentSelection, text: string): void {
+  sticky = { filePath: target.documentPath, text, target }
   selectionNotifyPending = true
 }
 

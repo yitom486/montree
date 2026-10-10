@@ -252,6 +252,7 @@ export function FoliateReaderViewer({
             <div
               ref={containerRef}
               className="foliate-reader-host relative h-full min-h-0 overflow-hidden bg-[var(--color-bg-base)]"
+              data-reader-viewport
               data-theme={theme}
             >
               {isLoading && (

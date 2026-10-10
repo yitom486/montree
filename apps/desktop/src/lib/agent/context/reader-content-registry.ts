@@ -1,3 +1,5 @@
+import type { ReaderImageReference } from '@montree/contracts'
+
 /** 单次返回给 Agent 的正文上限：一章再长也不该一次灌满上下文 */
 export const READER_TEXT_MAX_CHARS = 20_000
 
@@ -11,6 +13,13 @@ export interface ReaderUnitText {
 }
 
 export interface ReaderContentProvider {
+  getUnits?: () => Array<{ label: string; level?: number }>
+  getCurrentUnitIndex?: () => number
+  /** 图片地址只是引用；像素由截图工具按需读取。 */
+  getImages?: (scope: 'current' | 'viewport') => ReaderImageReference[] | Promise<ReaderImageReference[]>
+  /** 源码/页面绘制列表无法精确筛选视口时，明确返回当前单元范围。 */
+  imageScope?: 'current'
+  getImageCount?: () => number
   /** provider 所属文件，切档时用于校验，避免返回上一本书的内容 */
   filePath: string
   /**
@@ -82,7 +91,8 @@ export async function readCurrentDocumentText(expectedFilePath?: string): Promis
   if (expectedFilePath && provider.filePath !== expectedFilePath) {
     throw new Error('文档刚刚切换，请重新获取当前文档信息后再试')
   }
-  return normalizeReaderText(await provider.getCurrentText())
+  const text = normalizeReaderText(await provider.getCurrentText())
+  return appendImageReferences(text, provider, 'current')
 }
 
 /** 当前窗口可见文本；未注册 getViewportText 时明确报错，避免误返回整章 */
@@ -97,5 +107,22 @@ export async function readViewportText(expectedFilePath?: string): Promise<strin
   if (!provider.getViewportText) {
     throw new Error('当前文档不支持视口文本（Markdown 请直接读文件；阅读器用 montree_read(scope=viewport)）')
   }
-  return normalizeReaderText(await provider.getViewportText(), VIEWPORT_TEXT_MAX_CHARS)
+  const text = normalizeReaderText(await provider.getViewportText(), VIEWPORT_TEXT_MAX_CHARS)
+  return appendImageReferences(text, provider, 'viewport')
+}
+
+async function appendImageReferences(text: string, provider: ReaderContentProvider, scope: 'current' | 'viewport'): Promise<string> {
+  let images: ReaderImageReference[]
+  try {
+    images = await provider.getImages?.(scope) ?? []
+  } catch {
+    if (current !== provider) throw new Error('文档刚刚切换，请重新读取')
+    return `${text}\n\n[图片信息暂不可用；可用 montree_capture_viewport 查看当前阅读区。]`
+  }
+  if (current !== provider) throw new Error('文档刚刚切换，请重新读取')
+  if (images.length === 0) return text
+  const shown = images.slice(0, 8)
+  while (shown.length > 1 && JSON.stringify(shown).length > 5500) shown.pop()
+  const summary = JSON.stringify({ total: images.length, truncated: shown.length < images.length, images: shown })
+  return `${text}\n\n[文档图片：${images.length} 项；以下是图片引用，尚未提供图片像素。可调用 montree_list_images 查看列表，montree_capture_viewport 查看当前阅读区。]\n${summary}`
 }

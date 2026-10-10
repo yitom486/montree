@@ -7,6 +7,7 @@ import { buildWebDocCodeBlockCss, buildWebDocTabsRuntimeScript, enhanceWebDocCod
 import {
   buildWebDocEmbedCss,
   normalizeAllowedWebDocEmbeds,
+  normalizeWebDocImageObjects,
   stripDisallowedWebDocEmbeds,
 } from '@/lib/reader/web-doc/web-doc-embeds'
 import {
@@ -540,6 +541,7 @@ export function extractWebDocArticle(
   const doc = parseHtmlDocument(html)
   const root = pickArticleRoot(doc, siteId, pageUrl)
   const clone = root.cloneNode(true) as HTMLElement
+  normalizeWebDocImageObjects(clone, pageUrl)
   stripWebDocChrome(clone, siteId)
   rewriteRelativeUrls(clone, pageUrl)
   const sanitized = sanitizeWebDocBodyHtml(clone.innerHTML)
@@ -574,6 +576,17 @@ export function buildWebDocReaderDocument(
     const root = doc.getElementById('montree-reader-body')
     if (!root) return content.bodyHtml
     normalizeWebDocCards(root)
+    root.querySelectorAll('table').forEach((table) => {
+      if (table.parentElement?.classList.contains('web-doc-table-scroll') || table.parentElement?.closest('table')) return
+      const wrapper = doc.createElement('div')
+      wrapper.className = 'web-doc-table-scroll'
+      wrapper.setAttribute('role', 'region')
+      wrapper.setAttribute('aria-label', table.querySelector('caption')?.textContent?.trim() ||
+        table.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || '文档表格')
+      wrapper.setAttribute('tabindex', '0')
+      table.replaceWith(wrapper)
+      wrapper.appendChild(table)
+    })
     return root.innerHTML
   })()
   const body = neutralizeWebDocNavigationLinks(
@@ -599,6 +612,47 @@ export function buildWebDocReaderDocument(
     [data-montree-href] { cursor: pointer; }
     pre { overflow-x: auto; }
     img { max-width: 100%; height: auto; }
+    .web-doc-object-image { display: block; width: 100%; margin: 0 auto; }
+    body .web-doc-reader-content figure { margin: 1.5em 0; max-width: 100%; }
+    body .web-doc-reader-content figcaption,
+    body .web-doc-reader-content caption {
+      font-size: 0.88em !important;
+      line-height: 1.55 !important;
+      text-align: left;
+      margin: 0.8em 0;
+    }
+    body .web-doc-table-scroll {
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      margin: 1em 0;
+      line-height: 1.5 !important;
+    }
+    .web-doc-table-scroll > table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9em;
+    }
+    body .web-doc-table-scroll th,
+    body .web-doc-table-scroll td {
+      padding: 0.6em 0.85em !important;
+      vertical-align: top;
+      text-align: left;
+      border-bottom: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+    }
+    body .web-doc-table-scroll thead th,
+    body .web-doc-table-scroll .ltx_font_bold { font-weight: 600; }
+    body .web-doc-table-scroll .ltx_font_italic { font-style: italic; }
+    body .web-doc-table-scroll .ltx_align_center { text-align: center; }
+    body .web-doc-table-scroll .ltx_align_right { text-align: right; }
+    body .web-doc-table-scroll .ltx_align_left { text-align: left; }
+    body .web-doc-table-scroll .ltx_align_middle { vertical-align: middle; }
+    body .web-doc-table-scroll .ltx_border_t { border-top: 1px solid currentColor; }
+    body .web-doc-table-scroll .ltx_border_tt { border-top: 2px solid currentColor; }
+    body .web-doc-table-scroll .ltx_border_b { border-bottom: 1px solid currentColor; }
+    body .web-doc-table-scroll .ltx_border_bb { border-bottom: 2px solid currentColor; }
+    body .web-doc-table-scroll .ltx_border_l { border-left: 1px solid currentColor; }
+    body .web-doc-table-scroll .ltx_border_r { border-right: 1px solid currentColor; }
     /* 无宽高的图标 SVG（如「编辑此页」）否则会按 viewBox 撑满版面 */
     svg { max-width: 100%; height: auto; max-height: min(70vh, 28rem); }
     .people-daily-edition-nav {

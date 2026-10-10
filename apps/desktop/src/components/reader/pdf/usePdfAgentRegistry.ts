@@ -13,6 +13,7 @@ declare global {
   }
 }
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
+import { pdfjsLib } from '@/lib/reader/pdf/pdf-worker'
 import { formatPdfPageTextForAgent } from '@/lib/reader/pdf/pdf-page-text'
 import { isStructuredPageTextUsable } from '@/lib/reader/pdf/pdf-structure'
 import { pdfStructureClient } from '@/lib/reader/pdf/pdf-structure-client'
@@ -187,7 +188,24 @@ export function usePdfAgentRegistry({
   useEffect(() => {
     const agentAutoOcr = () => useAppSettingsStore.getState().pdfOcrAgentAutoOcr
     return registerReaderContent({
+      imageScope: 'current',
       filePath,
+      getImages: async () => {
+        const doc = pdfDocRef.current
+        if (!doc) throw new Error('PDF 尚未加载完成')
+        const page = pageNumRef.current ?? 1
+        const operators = await (await doc.getPage(page)).getOperatorList()
+        const imageOps = new Set<number>([
+          pdfjsLib.OPS.paintImageXObject, pdfjsLib.OPS.paintInlineImageXObject,
+          pdfjsLib.OPS.paintImageMaskXObject, pdfjsLib.OPS.paintImageXObjectRepeat,
+          pdfjsLib.OPS.paintInlineImageXObjectGroup, pdfjsLib.OPS.paintImageMaskXObjectGroup,
+          pdfjsLib.OPS.paintImageMaskXObjectRepeat,
+        ])
+        return operators.fnArray.filter((op) => imageOps.has(op)).map((_, index) => ({
+          id: `page-${page}-image-${index + 1}`, kind: 'pdf-image' as const,
+          page, alt: `PDF 第 ${page} 页栅格图片绘制 ${index + 1}；可用截图查看`,
+        }))
+      },
       fileFingerprint: fileFingerprint || undefined,
       searchBlockedReason:
         resolvePdfAgentSearchBlock({

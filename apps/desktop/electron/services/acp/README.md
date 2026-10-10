@@ -11,7 +11,7 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 | 注册 | `@yitom/acp-client`（注册表） | 可用运行时（默认 `codex-acp`） |
 | 运行时 | `runtimes/`（`codex/` `claude/` `gemini/` `copilot/` `opencode/` `cursor/` `deepseek/` `agy/`；核心适配器矩阵已沉淀至 `@yitom/acp-client`，此处保留门面与兼容桥接） | 接线层仅消费 `GenericRuntimeAdapter`（`probeAuth`/`getSpawnEnv`/`orderAuthMethods`/`canSkipInteractiveAuth`/`resolveSpawnCommand`/`resolveSpawnBlocker` 可选），未知运行时回落中性空 adapter；Codex 自定义供应商/隔离、各家登录探测与 Cursor 安装路径解析、agy 经 bunx 直调（版本跟随 bunx，新鲜度不再逐次 `npm view`）及认证守门员（Antigravity 已淘汰，目录与桥接代码已删） |
 | 认证 | `codex-auth-preflight.ts` 留守（实现已归拢至 `runtimes/codex/`；类型单一源 `@montree/contracts`）；认证守门员已迁 `@yitom/acp-client` | 连接前探活、authMethods 顺序、`~/.codex` |
-| 代理 | `acp-proxy-service.ts` | Agent 子进程代理设置（userData 下 `agent/proxy` JSON 持久化）：spawn 注入 HTTP(S)_PROXY / ALL_PROXY，关闭时清理代理键 |
+| 代理与配置 | `acp-proxy-service.ts` / `provider-config-service.ts` | Agent 子进程代理设置（userData 下 `agent/proxy` JSON 持久化）：spawn 注入 HTTP(S)_PROXY / ALL_PROXY，关闭时清理代理键；供应商配置门面 |
 | 会话 | `session-open.ts` 留守；会话能力与选项解析已迁 `@yitom/acp-client` | `session/new`、能力、Mode/Model（resume→load→new + 瞬时错误重试 1 次，`session/new` 失败另有无 MCP（`mcpServers: []`）裸调重试 1 次（仍失败抛原错），超时 120s 由 `sdk-client.ts` 显式透传；`session/new`（及 load/resume）返回顶层 `models` 方言（数组 string / `{id\|value/name}` 对象 / `{availableModels, currentModelId}` 对象）且无 model 类 configOption 时合成一项 `model` 选项；initialize 的 `clientCapabilities` 另带 `session: { configOptions: { boolean: {} } }` 以解锁按 boolean 门控下发选项的 Agent） |
 | 回调 | `client-handlers.ts` 留守（含 `registerAcpClientHandlers`，SDK `onRequest`/`onNotification` 原生签名） | Agent → 客户端：权限（无桥接直接 cancelled，禁静默 allow）、fs、终端等；错误抛 `RequestError` |
 | IO | `acp-fs.ts` / `acp-terminal.ts` 留守；终端输出缓冲已迁 `@yitom/acp-client` | 虚拟/真实读文件、终端（虚拟文件定义见 `@montree/contracts`：`packages/contracts/src/agent/montree-virtual-fs.ts`，快照类型同目录 `packages/contracts/src/agent/montree-snapshot.ts`） |
@@ -19,6 +19,8 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 | 专篇 | `parameterized-model-picker.md` | cursor 参数化模型选择：两态、握手标记、Invalid params 根因与渲染三层设计 |
 | 专篇 | `mcp-endpoint-architecture.md` | MCP 本地端点架构：冷门固定端口（39281/39291）、端口冲突弹性顺延与跨重启鉴权稳定性设计 |
 
-`mcp/` 仅留传输挂载，不必再单独维护一份长 README；工具列表以 `@yitom/acp-client` 与 Skill 为准；目录副会话专用表见 `@yitom/acp-client`（`toc_*`，独立端点，仅 `toolScope: 'toc'` 的会话挂载）。
+`mcp/` 保留传输挂载与 `mcp/reader-visual-tools.ts`（宿主扩展 `montree_list_images` / `montree_capture_viewport`，后者返回 MCP image 内容块）；原有工具列表以 `@yitom/acp-client` 与 Skill 为准；目录副会话专用表见 `@yitom/acp-client`（`toc_*`，独立端点，仅 `toolScope: 'toc'` 的会话挂载）。
 
 标记提议模型 `mark-proposal`（单条·批量）与章级建议 `chapter-mark-plan` 已归 `@montree/annotations`（与渲染 `ChapterMarkPlanCard` / `ProposeMarkCard` 对接），不在本包。
+
+`mcp/document-tools.ts` 为宿主文档编辑扩展：`montree_table_read/edit`、`montree_ppt_read/edit/delete`、`montree_document_undo/save`，通过快照桥接操作当前内存模型；工具使用文档路径、revision、选区 ID 和匹配数量校验，不自行解析用户文件。

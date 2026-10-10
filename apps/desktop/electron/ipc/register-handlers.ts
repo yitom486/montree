@@ -39,6 +39,12 @@ import type {
 } from '@montree/contracts'
 import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@montree/contracts'
 import { resolveSnapshotTimeoutMs } from '@montree/contracts'
+import { captureReaderViewport } from '../services/reader-screenshot-service'
+import { saveBinaryDocument } from '../services/binary-document-service'
+import type { SaveBinaryDocumentPayload } from '@montree/contracts'
+import { handleSnapshotRequest } from '../services/acp/acp-bridges'
+import { callReaderVisualTool } from '../services/acp/mcp/reader-visual-tools'
+import { callDocumentTool } from '../services/acp/mcp/document-tools'
 import type {
   DetectPdfTocPagesPayload,
   GetPdfOcrTocPayload,
@@ -329,7 +335,7 @@ export function registerIpcHandlers(): void {
     }
     target.send(IPC.ACP_SNAPSHOT_REQUEST, { requestId, resource, args })
 
-    return await new Promise<string>((resolve, reject) => {
+    const content = await new Promise<string>((resolve, reject) => {
       // 快照来自渲染进程内存；可能触发 OCR 的资源用更长超时
       const timeoutMs = resolveSnapshotTimeoutMs(resource)
       const timer = setTimeout(() => {
@@ -338,10 +344,10 @@ export function registerIpcHandlers(): void {
       }, timeoutMs)
 
       const handler = (
-        _event: Electron.IpcMainEvent,
+        snapshotEvent: Electron.IpcMainEvent,
         payload: AcpSnapshotResponsePayload,
       ): void => {
-        if (payload?.requestId !== requestId) return
+        if (payload?.requestId !== requestId || snapshotEvent.sender.id !== target.id) return
         cleanup()
         if (payload.ok) resolve(payload.content)
         else {
@@ -362,7 +368,21 @@ export function registerIpcHandlers(): void {
 
       ipcMain.on(IPC.ACP_SNAPSHOT_RESPONSE, handler)
     })
+    return resource === 'viewport-image' ? JSON.stringify(await captureReaderViewport(target, content)) : content
   })
+
+  if (process.env.E2E_READER_VISUAL === '1') {
+    Object.assign(globalThis, {
+      __montreeE2eVisualTools: (name: string, args?: Record<string, unknown>) =>
+        callReaderVisualTool(name, { readSnapshot: handleSnapshotRequest }, args),
+    })
+  }
+  if (process.env.E2E_DOCUMENT_TOOLS === '1') {
+    Object.assign(globalThis, { __montreeE2eDocumentTools: (name: string, args?: Record<string, unknown>) =>
+      callDocumentTool(name, { readSnapshot: handleSnapshotRequest }, args),
+      __montreeE2eDocumentSnapshot: (resource: Parameters<typeof handleSnapshotRequest>[0], args?: Parameters<typeof handleSnapshotRequest>[1]) => handleSnapshotRequest(resource, args),
+    })
+  }
 
   // 流式输出 / 连接状态：全局一份 Agent，各窗面板要同一份数据
   onAcpSessionUpdate((event) => {
@@ -496,6 +516,7 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC.FILE_READ_IMAGE, (_event, filePath: string) => readImageAsDataUrl(filePath))
   ipcMain.handle(IPC.FILE_SAVE, (_event, payload: SaveFilePayload) => saveFileDialog(payload))
+  ipcMain.handle(IPC.FILE_SAVE_BINARY_DOCUMENT, (_event, payload: SaveBinaryDocumentPayload) => saveBinaryDocument(payload))
   ipcMain.handle(IPC.FILE_SAVE_AS, (_event, payload: SaveFilePayload) =>
     saveFileDialog({ ...payload, filePath: undefined }),
   )

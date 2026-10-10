@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { appApi } from '@/api/app-api'
 import { fileApi } from '@/api/file-api'
 import { isOk } from '@montree/contracts'
@@ -228,6 +229,12 @@ export const HtmlViewer = memo(function HtmlViewer({
   }, [debouncedContent, imageRefs, previewTheme])
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const sourceBody = useMemo(() => {
+    const doc = new DOMParser().parseFromString(content, 'text/html')
+    doc.querySelectorAll('script, style, template').forEach((element) => element.remove())
+    return doc.body
+  }, [content])
+  useDocumentReader({ filePath, root: () => iframeRef.current?.contentDocument?.body ?? sourceBody })
 
   // 应用缩放并拦截外部链接安全跳转
   const handleIframeLoad = useCallback(() => {

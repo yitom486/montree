@@ -8,8 +8,10 @@ import type {
   InkdownMcpToolContext,
   InkdownMcpToolDefinition,
 } from "@yitom/acp-client"
+import { callReaderVisualTool, READER_VISUAL_TOOLS, type ReaderVisualToolContext } from './reader-visual-tools'
+import { callDocumentTool, DOCUMENT_TOOLS } from './document-tools'
 
-export type MontreeMcpToolContext = InkdownMcpToolContext
+export type MontreeMcpToolContext = ReaderVisualToolContext
 export type MontreeMcpToolDefinition = InkdownMcpToolDefinition
 import { callInkdownMcpTool as callMontreeMcpTool, INKDOWN_MCP_TOOLS as MONTREE_MCP_TOOLS } from "@yitom/acp-client"
 import {
@@ -210,7 +212,7 @@ export function adaptMontreeTools(
  */
 export async function callAdaptedMontreeTool(
   name: string,
-  context: MontreeMcpToolContext,
+  context: InkdownMcpToolContext,
   args?: Record<string, unknown>,
 ) {
   const sdkName = name.startsWith('montree_')
@@ -259,7 +261,7 @@ export async function startMontreeMcpServer(
   const tools = adaptMontreeTools(MONTREE_MCP_TOOLS)
   const envPort = process.env.MONTREE_MCP_PORT ? Number(process.env.MONTREE_MCP_PORT) : undefined
   const preferredPort = Number.isInteger(envPort) && (envPort ?? 0) > 0 ? envPort : DEFAULT_MONTREE_MCP_PORT
-  handle = await serveMcpServer(context, tools, callAdaptedMontreeTool, 'montree', preferredPort)
+  handle = await serveMcpServer(context, [...tools, ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS], callAdaptedMontreeTool, 'montree', preferredPort)
   return handle
 }
 
@@ -312,7 +314,23 @@ async function serveMcpServer(
       }
 
       try {
-        const rpcResponse = await handleMontreeMcpRpc(message, context, tools, call)
+        // 外部包的工具结果类型目前只含 text；视觉工具在宿主层按 MCP image 格式返回。
+        const visualName = message.method === 'tools/call' && typeof message.params?.name === 'string'
+          ? message.params.name : ''
+        const isVisual = tools.some((tool) => tool.name === visualName) && [...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS].some((tool) => tool.name === visualName)
+        let rpcResponse: Record<string, unknown> | null
+        if (isVisual && message.id != null) {
+          try {
+            const rawArgs = message.params?.arguments
+            const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs as Record<string, unknown> : undefined
+            const invoke = DOCUMENT_TOOLS.some((tool) => tool.name === visualName) ? callDocumentTool : callReaderVisualTool
+            rpcResponse = { jsonrpc: '2.0', id: message.id, result: await invoke(visualName, context, args) }
+          } catch (error) {
+            rpcResponse = { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: error instanceof Error ? error.message : '视觉工具失败' }], isError: true } }
+          }
+        } else {
+          rpcResponse = await handleMontreeMcpRpc(message, context, tools, call)
+        }
         if (!rpcResponse) {
           response.writeHead(202).end()
           return

@@ -21,6 +21,14 @@ export type MontreeSnapshotResource =
   | 'toc-draft-read'
   | 'toc-draft-write'
   | 'content-audit'
+  | 'visual-context'
+  | 'viewport-image'
+  | 'table-read'
+  | 'table-edit'
+  | 'slide-read'
+  | 'slide-edit'
+  | 'document-save'
+  | 'document-undo'
 
 export interface MontreeSnapshotArgs {
   query?: string
@@ -65,6 +73,9 @@ export const ACP_SNAPSHOT_OCR_TIMEOUT_MS = 120_000
 
 export function resolveSnapshotTimeoutMs(resource: MontreeSnapshotResource): number {
   switch (resource) {
+    case 'visual-context':
+    case 'viewport-image':
+      return 15_000
     case 'viewport.txt':
     case 'chapter.txt':
     case 'chapter':

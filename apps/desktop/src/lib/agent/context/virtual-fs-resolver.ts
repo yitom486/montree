@@ -9,8 +9,10 @@ import { collectActiveDocument, collectReadingState } from './collect-turn-conte
 import {
   readCurrentDocumentText,
   readViewportText,
+  getReaderContentProvider,
 } from './reader-content-registry'
 import { readChapterByRef } from './read-chapter-by-ref'
+import { getReaderViewportRect, readReaderVisualContext } from './reader-visual-context'
 import {
   createBookmarkForAgent,
   createNoteForAgent,
@@ -29,6 +31,7 @@ import { readSelectionWithContext } from './read-selection-context'
 import { searchReaderContent } from './search-reader-content'
 import { inspectIndexedContentForAgent } from './inspect-indexed-content'
 import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
+import { requireDocumentTools, getDocumentTools } from './document-tool-registry'
 
 function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload {
   const marksRaw = (args as { marks?: unknown } | undefined)?.marks
@@ -131,6 +134,13 @@ export function buildTocEntries(
 
 function buildTocSnapshot(): MontreeTocSnapshot {
   const document = collectActiveDocument()
+  const provider = getReaderContentProvider()
+  if (provider?.filePath === document?.path && provider?.getUnits) {
+    const units = provider.getUnits()
+    const { entries, truncated } = buildTocEntries(units)
+    return { document, format: document?.kind ?? null, unitCount: units.length,
+      currentIndex: provider.getCurrentUnitIndex?.() ?? 0, truncated, entries }
+  }
   const reader = useReaderNavigationStore.getState()
   const sameFile = Boolean(document) && reader.filePath === document?.path
 
@@ -170,6 +180,33 @@ export async function resolveMontreeSnapshot(
   args?: MontreeSnapshotArgs,
 ): Promise<string> {
   switch (resource) {
+    case 'document-save':
+    case 'document-undo': {
+      const provider = getDocumentTools()
+      if (!provider) throw new Error('当前文档不支持此操作')
+      const values = (args ?? {}) as Record<string, unknown>
+      requireDocumentTools(provider.kind, values)
+      const state = provider.read({}) as { revision: number }
+      if (values.revision !== state.revision) throw new Error('文档版本已变化，请重新读取')
+      if (resource === 'document-save') await provider.save()
+      else provider.undo()
+      return JSON.stringify(provider.read({}))
+    }
+    case 'table-read':
+    case 'table-edit':
+    case 'slide-read':
+    case 'slide-edit': {
+      const values = (args ?? {}) as Record<string, unknown>
+      const provider = requireDocumentTools(resource.startsWith('table') ? 'table' : 'slide', values)
+      return JSON.stringify(resource.endsWith('read') ? provider.read(values) : provider.edit(values))
+    }
+    case 'visual-context':
+      return JSON.stringify(await readReaderVisualContext(args?.scope === 'viewport' ? 'viewport' : 'current'))
+    case 'viewport-image': {
+      const provider = getReaderContentProvider()
+      if (!provider) throw new Error('当前没有可截图的文档')
+      return JSON.stringify({ documentPath: provider.filePath, viewport: getReaderViewportRect() })
+    }
     case 'toc.json':
       return JSON.stringify(buildTocSnapshot(), null, 2)
     case 'focused.json':
@@ -242,6 +279,10 @@ export async function resolveMontreeSnapshot(
     }
     case 'toc-draft-write': {
       return JSON.stringify(applyTocDraftWrite(args), null, 2)
+    }
+    default: {
+      const _exhaustive: never = resource
+      throw new Error(`未知的快照资源: ${String(_exhaustive)}`)
     }
   }
 }
