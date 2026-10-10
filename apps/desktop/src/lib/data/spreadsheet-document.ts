@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
 import type { CellInput, TableSelection, TableTarget } from '@montree/contracts'
+import { FormulaEvaluator } from './formula-evaluator'
 
 export const TABLE_CELL_LIMIT = 5000
 const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
@@ -67,7 +68,12 @@ export class SpreadsheetDocument {
     }
     if (!this.workbook.SheetNames.length) XLSX.utils.book_append_sheet(this.workbook, XLSX.utils.aoa_to_sheet([['']]), 'Sheet1')
     this.activeSheet = this.workbook.SheetNames[0]
+    this.recalculate()
     this.savedState = this.stateKey()
+  }
+
+  recalculate(): void {
+    new FormulaEvaluator(this.workbook).evaluateAll()
   }
 
   private stateKey(): string { return JSON.stringify(this.workbook.Sheets, (key, value) => key === 'w' ? undefined : value) }
@@ -82,7 +88,9 @@ export class SpreadsheetDocument {
   cell(sheet: string, row: number, column: number) {
     const address = XLSX.utils.encode_cell({ r: row, c: column })
     const cell = this.workbook.Sheets[sheet]?.[address] as XLSX.CellObject | undefined
-    return { address, value: cell?.v ?? null, display: cell ? XLSX.utils.format_cell(cell) : '', ...(cell?.f ? { formula: cell.f } : {}) }
+    const formatted = cell ? XLSX.utils.format_cell(cell) : ''
+    const display = formatted || (cell?.v !== null && cell?.v !== undefined ? String(cell.v) : '')
+    return { address, value: cell?.v ?? null, display, ...(cell?.f ? { formula: cell.f } : {}) }
   }
   select(sheet: string, ranges: string[]): TableSelection {
     if (!this.workbook.Sheets[sheet]) throw new Error('工作表不存在')
@@ -119,7 +127,7 @@ export class SpreadsheetDocument {
   read(args: Record<string, unknown>) {
     if (args.sheet === undefined) return { documentPath: this.filePath, revision: this.revision,
       sheets: this.workbook.SheetNames.map((name) => ({ name, range: this.workbook.Sheets[name]['!ref'] ?? 'A1' })),
-      activeSheet: this.activeSheet, selection: this.selection, dirty: this.dirty, formulaCalculation: '公式保存后由 Excel 重算；应用不重算依赖公式' }
+      activeSheet: this.activeSheet, selection: this.selection, dirty: this.dirty, formulaCalculation: '已内置公式求值引擎自动计算依赖并缓存结果' }
     if (typeof args.sheet !== 'string' || !this.workbook.Sheets[args.sheet]) throw new Error('工作表不存在')
     const ranges = this.resolve(args.sheet, (args.target ?? { range: args.range ?? this.workbook.Sheets[args.sheet]['!ref'] ?? 'A1' }) as TableTarget)
     const decoded = ranges.map(tableRange)
@@ -176,6 +184,7 @@ export class SpreadsheetDocument {
       bounds.e.r = Math.max(bounds.e.r, pos.r); bounds.e.c = Math.max(bounds.e.c, pos.c)
     }
     ws['!ref'] = XLSX.utils.encode_range(bounds)
+    this.recalculate()
     this.touched.set(sheet, touched)
     this.revision++
     return { documentPath: this.filePath, revision: this.revision, sheet, ranges: addresses, changedCount: count, dirty: this.dirty }
@@ -185,6 +194,7 @@ export class SpreadsheetDocument {
     const previous = this.history.pop()
     if (!previous) throw new Error('没有可撤销的表格修改')
     this.workbook = previous
+    this.recalculate()
     this.revision++
   }
 

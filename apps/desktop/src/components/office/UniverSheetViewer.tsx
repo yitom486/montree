@@ -11,6 +11,7 @@ import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { Button } from '@/components/ui/button'
 import { FileSpreadsheet, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FormulaEvaluator } from '@/lib/data/formula-evaluator'
 
 interface UniverSheetViewerProps {
   filePath?: string
@@ -77,6 +78,7 @@ export function UniverSheetViewer({
             return
           }
           workbookData = XLSX.read(res.value.data.buffer, { type: 'buffer' })
+          new FormulaEvaluator(workbookData).evaluateAll()
         } else {
           // CSV / TSV 纯文本
           const text = content ?? ''
@@ -118,7 +120,7 @@ export function UniverSheetViewer({
             ? XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '', raw: true })
             : []
 
-          const cellData: Record<number, Record<number, { v: any }>> = {}
+          const cellData: Record<number, Record<number, { v: any; f?: string }>> = {}
           let maxCols = 10
 
           for (let r = 0; r < rawAoa.length; r++) {
@@ -126,9 +128,15 @@ export function UniverSheetViewer({
             if (row && row.length > maxCols) maxCols = row.length
             cellData[r] = {}
             for (let c = 0; c < (row ? row.length : 0); c++) {
-              const val = row[c]
-              if (val !== undefined && val !== null && val !== '') {
-                cellData[r][c] = { v: val }
+              const addr = XLSX.utils.encode_cell({ r, c })
+              const cellObj = ws ? (ws[addr] as XLSX.CellObject | undefined) : undefined
+              const val = cellObj?.v ?? row[c]
+              const formula = cellObj?.f
+              if ((val !== undefined && val !== null && val !== '') || formula) {
+                cellData[r][c] = {
+                  v: val,
+                  ...(formula ? { f: formula.startsWith('=') ? formula : `=${formula}` } : {}),
+                }
               }
             }
           }
