@@ -133,7 +133,20 @@ export async function downloadAppUpdate(): Promise<AppUpdateStatus> {
 export function installAppUpdate(): void {
   if (!app.isPackaged) return
   if (lastStatus.phase !== 'downloaded') return
-  resolveAutoUpdater()?.quitAndInstall()
+
+  const updater = resolveAutoUpdater()
+  if (!updater) return
+
+  // 释放所有窗口的 close 监听，确保应用退出流程不被阻塞
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.removeAllListeners('close')
+    }
+  }
+
+  // isSilent = true (完全后台静默，使用已有路径，绝不弹窗)
+  // isForceRunAfter = true (安装完成后自动重启拉起新版本)
+  updater.quitAndInstall(true, true)
 }
 
 export function initAppUpdater(): void {
@@ -142,7 +155,7 @@ export function initAppUpdater(): void {
   const updater = resolveAutoUpdater()
   if (!updater) return
 
-  updater.autoDownload = false
+  updater.autoDownload = true
   updater.autoInstallOnAppQuit = true
 
   updater.on('checking-for-update', () => {

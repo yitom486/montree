@@ -13,33 +13,7 @@ export function UpdatePromptHost() {
     const renderToast = (status: AppUpdateStatus) => {
       statusRef.current = status
 
-      if (status.phase === 'available') {
-        if (toastIdRef.current !== null) toast.dismiss(toastIdRef.current)
-        toastIdRef.current = toast.info(`${APP_TITLE} v${status.version} 可用`, {
-          description: status.message ?? '点击下载并在完成后重启安装',
-          duration: Infinity,
-          action: {
-            label: '立即更新',
-            onClick: () => {
-              void appApi.downloadAppUpdate()
-            },
-          },
-          cancel: {
-            label: '稍后',
-            onClick: () => undefined,
-          },
-        })
-        return
-      }
-
-      if (status.phase === 'downloading') {
-        if (toastIdRef.current !== null) toast.dismiss(toastIdRef.current)
-        toastIdRef.current = toast.loading(status.message ?? '正在下载更新…', {
-          description: status.percent != null ? `${status.percent}%` : undefined,
-        })
-        return
-      }
-
+      // 后台静默一条龙更新：下载阶段完全在后台无感进行，仅在下载就绪时轻量提示一键重启
       if (status.phase === 'downloaded') {
         if (toastIdRef.current !== null) toast.dismiss(toastIdRef.current)
         toastIdRef.current = toast.success(`v${status.version} 已就绪`, {
