@@ -16,6 +16,7 @@ import type { SdkStreamHandle } from './sdk-client'
 import type { SpawnedAcpProcess } from './process-manager'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
 import { AcpTerminalManager } from './acp-terminal'
+import { bindAcpContext, currentAcpContext, type AcpContext } from './acp-context'
 
 /** 协议版本（与 Agent initialize 握手协商一致，单点定义供 connection 读写） */
 export const PROTOCOL_VERSION = 1
@@ -41,10 +42,9 @@ export type AcpSnapshotBridge = (payload: {
 }) => Promise<string>
 
 /**
- * ACP 客户端单例状态（最底层模块，禁止 import ./acp-* 其他拆分模块，避免循环依赖）。
- * 原 `acp-client.ts` 顶层 `let` 全部收拢至此，connection / session-ops / bridges 经 `acpState` 读写。
+ * 每个窗口独立状态；异步上下文保留窗口身份，沿用已有模块的 acpState 接口。
  */
-export const acpState: {
+export interface AcpState {
   sdkApp: ClientApp | null
   sdkConn: ClientConnection | null
   sdkStream: SdkStreamHandle | null
@@ -100,39 +100,77 @@ export const acpState: {
   sessionUpdateListeners: Set<AcpSessionUpdateListener>
   statusListeners: Set<AcpStatusListener>
   activePromptSessionId: string | null
-} = {
-  sdkApp: null,
-  sdkConn: null,
-  sdkStream: null,
-  terminalManager: new AcpTerminalManager(),
-  processHandle: null,
-  sessionId: null,
-  runtimeId: null,
-  workspaceRoot: null,
-  loadSessionSupported: false,
-  resumeSessionSupported: false,
-  cachedPromptCapabilities: {},
-  pendingResumeSessionId: null,
-  pendingHasLocalHistory: null,
-  suppressSessionUpdates: false,
-  suppressSettleUntil: 0,
-  suppressSettleMonitorOnly: false,
-  settleTimer: null,
-  connectGeneration: 0,
-  cachedAgentName: undefined,
-  cachedAgentVersion: undefined,
-  cachedProtocolVersion: PROTOCOL_VERSION,
-  status: 'disconnected',
-  permissionBridge: null,
-  snapshotBridge: null,
-  snapshotRequestSeq: 0,
-  permissionSeq: 0,
-  montreeMcp: null,
-  tocMcp: null,
-  exitWatch: null,
-  sessionUpdateListeners: new Set<AcpSessionUpdateListener>(),
-  statusListeners: new Set<AcpStatusListener>(),
-  activePromptSessionId: null,
+  ownedSessionIds: Map<string, Set<string>>
+}
+
+function createAcpState(): AcpState {
+  return {
+    sdkApp: null,
+    sdkConn: null,
+    sdkStream: null,
+    terminalManager: new AcpTerminalManager(),
+    processHandle: null,
+    sessionId: null,
+    runtimeId: null,
+    workspaceRoot: null,
+    loadSessionSupported: false,
+    resumeSessionSupported: false,
+    cachedPromptCapabilities: {},
+    pendingResumeSessionId: null,
+    pendingHasLocalHistory: null,
+    suppressSessionUpdates: false,
+    suppressSettleUntil: 0,
+    suppressSettleMonitorOnly: false,
+    settleTimer: null,
+    connectGeneration: 0,
+    cachedAgentName: undefined,
+    cachedAgentVersion: undefined,
+    cachedProtocolVersion: PROTOCOL_VERSION,
+    status: 'disconnected',
+    permissionBridge: null,
+    snapshotBridge: null,
+    snapshotRequestSeq: 0,
+    permissionSeq: 0,
+    montreeMcp: null,
+    tocMcp: null,
+    exitWatch: null,
+    sessionUpdateListeners: new Set<AcpSessionUpdateListener>(),
+    statusListeners: new Set<AcpStatusListener>(),
+    activePromptSessionId: null,
+    ownedSessionIds: new Map<string, Set<string>>(),
+  }
+}
+
+const states = new WeakMap<AcpContext, AcpState>()
+
+export function getAcpState(context = currentAcpContext()): AcpState {
+  let state = states.get(context)
+  if (!state) {
+    state = createAcpState()
+    states.set(context, state)
+  }
+  return state
+}
+
+export const acpState = new Proxy({} as AcpState, {
+  get: (_target, property) => Reflect.get(getAcpState(), property),
+  set: (_target, property, value) => Reflect.set(getAcpState(), property, value),
+})
+
+/** ACP IDs are opaque and may repeat across independent runtimes/connections. */
+export function ownsAcpSession(sessionId: string, runtimeId = acpState.runtimeId, context = currentAcpContext()): boolean {
+  return getAcpState(context).ownedSessionIds.get(runtimeId?.trim() ?? '')?.has(sessionId.trim()) ?? false
+}
+
+export function claimAcpSession(sessionId: string, runtimeId = acpState.runtimeId): void {
+  const key = runtimeId?.trim() ?? ''
+  let ids = acpState.ownedSessionIds.get(key)
+  if (!ids) { ids = new Set(); acpState.ownedSessionIds.set(key, ids) }
+  ids.add(sessionId.trim())
+}
+
+export function releaseAcpSession(sessionId: string, runtimeId = acpState.runtimeId): void {
+  acpState.ownedSessionIds.get(runtimeId?.trim() ?? '')?.delete(sessionId.trim())
 }
 
 export function setStatus(next: AcpConnectionStatus, errorMessage?: string): void {
@@ -153,16 +191,18 @@ export function setStatus(next: AcpConnectionStatus, errorMessage?: string): voi
 }
 
 export function onAcpSessionUpdate(listener: AcpSessionUpdateListener): () => void {
-  acpState.sessionUpdateListeners.add(listener)
+  const listeners = acpState.sessionUpdateListeners
+  listeners.add(listener)
   return () => {
-    acpState.sessionUpdateListeners.delete(listener)
+    listeners.delete(listener)
   }
 }
 
 export function onAcpStatusChanged(listener: AcpStatusListener): () => void {
-  acpState.statusListeners.add(listener)
+  const listeners = acpState.statusListeners
+  listeners.add(listener)
   return () => {
-    acpState.statusListeners.delete(listener)
+    listeners.delete(listener)
   }
 }
 
@@ -183,7 +223,7 @@ function clearSettleTimer(): void {
 
 function restartSettleTimer(): void {
   clearSettleTimer()
-  acpState.settleTimer = setTimeout(onSettleTimerFired, SUPPRESS_SETTLE_WINDOW_MS)
+  acpState.settleTimer = setTimeout(bindAcpContext(onSettleTimerFired), SUPPRESS_SETTLE_WINDOW_MS)
   // 主进程常驻：超时器不撑住事件循环；单测用、心跳无影响
   const timer = acpState.settleTimer as unknown as { unref?: () => void }
   if (typeof timer.unref === 'function') timer.unref()

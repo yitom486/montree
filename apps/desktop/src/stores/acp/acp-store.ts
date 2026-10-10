@@ -16,6 +16,8 @@ import { createSessionSlice } from './session-slice'
 import { createChatSlice } from './chat-slice'
 import { createPermissionSlice } from './permission-slice'
 import { createHudSlice } from './hud-slice'
+import { appApi } from '@/api/app-api'
+import { createWindowChatStorage, windowChatStorageKey } from './window-storage'
 
 export const useAcpUiStore = create<AcpUiStore>()(
   persist(
@@ -26,8 +28,8 @@ export const useAcpUiStore = create<AcpUiStore>()(
       ...createHudSlice(...a),
     }),
     {
-      name: 'montree-acp-ui',
-      storage: createJSONStorage(() => createThrottledStorage(localStorage, 1500)),
+      name: windowChatStorageKey(appApi.getWindowScopeId()),
+      storage: createJSONStorage(() => createThrottledStorage(createWindowChatStorage(localStorage, appApi.getWindowScopeId()), 1500)),
       partialize: (state) => ({
         // 重启 / 更新后恢复 Agent 面板展开状态与伴读 HUD 模式
         panelOpen: state.panelOpen,
@@ -45,12 +47,13 @@ export const useAcpUiStore = create<AcpUiStore>()(
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AcpUiStore>
+        const freshThreads = current.threads.map((thread) => ({ ...thread, runtimeId: p.selectedRuntimeId || thread.runtimeId }))
         const rawThreads =
           Array.isArray(p.threads) && p.threads.length > 0
             ? p.threads
-            : current.threads
+            : freshThreads
         const pruned = pruneBlankThreads(rawThreads)
-        const ensured = (pruned.length > 0 ? pruned : current.threads).map(
+        const ensured = (pruned.length > 0 ? pruned : freshThreads).map(
           migrateLegacyThreadSessions,
         )
         const activeThreadId =

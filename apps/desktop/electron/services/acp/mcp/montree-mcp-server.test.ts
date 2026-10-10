@@ -7,7 +7,37 @@ import {
   DEFAULT_MONTREE_TOC_MCP_PORT,
   getOrCreateAuthToken,
   listenWithFallback,
+  startMontreeMcpServer,
+  stopMontreeMcpServer,
 } from './montree-mcp-server'
+import { getAcpContext, runInAcpContext, forgetAcpContext } from '../acp-context'
+import { handleSnapshotRequest, setAcpSnapshotBridge } from '../acp-bridges'
+
+describe('window-owned HTTP MCP endpoints', () => {
+  it('coalesces concurrent starts, fixes each callback to its owner and rejects another window token', async () => {
+    const a = getAcpContext('mcp-test-a'), b = getAcpContext('mcp-test-b')
+    try {
+      const start = (scope: typeof a, text: string) => runInAcpContext(scope, async () => {
+        setAcpSnapshotBridge(async () => text)
+        return startMontreeMcpServer({ readSnapshot: handleSnapshotRequest })
+      })
+      const [ha, haAgain, hb] = await Promise.all([start(a, 'owner a'), start(a, 'owner a'), start(b, 'owner b')])
+      expect(haAgain).toBe(ha)
+      expect(hb.url).not.toBe(ha.url)
+      expect(hb.authToken).not.toBe(ha.authToken)
+      const read = async (url: string, token: string) => fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'montree_read', arguments: { scope: 'viewport' } } }) })
+      expect((await read(ha.url, hb.authToken)).status).toBe(401)
+      // Request starts in B's context but A's HTTP callback must still read A's state.
+      const response = await runInAcpContext(b, () => read(ha.url, ha.authToken))
+      expect((await response.json()).result.content[0].text).toBe('owner a')
+      await runInAcpContext(a, stopMontreeMcpServer)
+      expect((await (await read(hb.url, hb.authToken)).json()).result.content[0].text).toBe('owner b')
+    } finally {
+      await Promise.all([a, b].map((scope) => runInAcpContext(scope, stopMontreeMcpServer)))
+      forgetAcpContext(a); forgetAcpContext(b)
+    }
+  })
+})
 import type { MontreeMcpToolDefinition, MontreeMcpToolContext } from './montree-mcp-server'
 
 describe('montree-mcp-server tool adaptation', () => {

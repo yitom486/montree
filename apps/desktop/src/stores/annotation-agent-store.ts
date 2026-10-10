@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { appApi } from '@/api/app-api'
+import { windowStorageKey } from './acp/window-storage'
 import { persist } from 'zustand/middleware'
 import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
@@ -518,7 +520,7 @@ export const useAnnotationAgentStore = create<AnnotationAgentStore>()(
         ),
     }),
     {
-      name: 'montree-annotation-agent',
+      name: windowStorageKey('montree-annotation-agent', appApi.getWindowScopeId()),
       partialize: (s) => ({
         byFileKey: s.byFileKey,
       }),

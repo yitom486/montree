@@ -2,7 +2,7 @@
  * ACP 客户端门面（Facade）。
  *
  * 实际逻辑已模块化拆解至同目录专职模块中：
- * - `acp-state.ts`：单例状态（connection/sessionId/runtimeId/status/监听器）+ setStatus/订阅/getter
+ * - `acp-context.ts` / `acp-state.ts`：窗口异步上下文与状态（connection/sessionId/runtimeId/status/监听器）+ setStatus/订阅/getter
  * - `acp-bridges.ts`：permission/snapshot bridge setter + handlePermissionRequest/handleSnapshotRequest + emitSessionUpdate + safe* 守卫/parseAuthMethods/toProtocolError/requireAgent
  * - `acp-connection.ts`：connectAcp/disconnectAcp/authenticateAcp + watchProcessExit + 代际守卫 + openSessionAfterAuth
  * - `acp-session-ops.ts`：createAcpSession/loadAcpSession/promptAcp/cancelAcp/setAcpConfigOption/disposeAllAcp

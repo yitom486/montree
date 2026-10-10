@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { bindAcpContext, currentAcpContext } from './acp-context'
 import {
   APP_TITLE,
   findBuiltinAcpRuntime,
@@ -36,7 +37,7 @@ import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAliv
 import { ensureBunForCommand } from '../bun-runtime'
 import { buildCursorMissingCliMessage, getCursorCatalogIds } from './runtimes/cursor'
 import { buildAgyMissingCliMessage } from './runtimes/agy'
-import { acpState, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
+import { acpState, claimAcpSession, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
 import {
   emitSessionUpdate,
   handlePermissionRequest,
@@ -114,6 +115,10 @@ export function resolveAcpPromptCapabilities(
 function resolveRuntimeTemplate(runtimeId: string): AcpRuntimeInfo | undefined {
   const normalized = runtimeId?.trim() ?? ''
   if (!normalized) return undefined
+  // 真实 Electron/stdio 集成测试专用；正常启动不接受自定义命令。
+  if (process.env.E2E_ACP_WINDOW_TEST === '1' && normalized === 'mock-window' && process.env.E2E_ACP_COMMAND && process.env.E2E_ACP_FIXTURE) {
+    return { id: normalized, name: 'Mock window Agent', description: 'E2E only', requiredEnvKeys: [], command: process.env.E2E_ACP_COMMAND, args: [process.env.E2E_ACP_FIXTURE] }
+  }
   try {
     const viaRegistry = getAcpRuntime(normalized)
     if (viaRegistry?.command) return viaRegistry
@@ -138,7 +143,7 @@ function watchProcessExit(handle: SpawnedAcpProcess, gen: number): void {
     acpState.exitWatch.handle.child.off('exit', acpState.exitWatch.listener)
     acpState.exitWatch = null
   }
-  const listener = () => {
+  const listener = bindAcpContext(() => {
     if (gen !== acpState.connectGeneration) return
     if (
       acpState.status === 'connected' ||
@@ -147,7 +152,7 @@ function watchProcessExit(handle: SpawnedAcpProcess, gen: number): void {
     ) {
       void disconnectAcp('Agent 进程已退出')
     }
-  }
+  })
   handle.child.once('exit', listener)
   acpState.exitWatch = { handle, listener }
 }
@@ -186,6 +191,8 @@ async function openSessionAfterAuth(
       },
     })
 
+    if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
+    claimAcpSession(opened.sessionId)
     acpState.sessionId = opened.sessionId
     acpState.workspaceRoot = cwd
     acpState.pendingResumeSessionId = null
@@ -246,6 +253,7 @@ export async function connectAcp(payload: {
   /** 渲染端激活线程是否有本地实质消息（空线程例外用，缺省按非空处理） */
   hasLocalHistory?: boolean
 }): Promise<Result<AcpConnectResult, AppError>> {
+  if (currentAcpContext().closed) return err({ code: 'ACP_NOT_CONNECTED', message: 'Agent 所属窗口已关闭' })
   // spawn 模板一律取自 findBuiltinAcpRuntime（经 resolveRuntimeTemplate），
   // 禁写死 codex bunx；command/args 缺失即判错，不触达 spawn。
   let runtime = resolveRuntimeTemplate(payload.runtimeId)
@@ -387,6 +395,7 @@ export async function connectAcp(payload: {
         console.warn('[acp] onColdStart 异常，继续冷启动', error)
       }
     }
+    if (currentAcpContext().closed || gen !== acpState.connectGeneration) throw new Error('Agent 连接已失效')
     if (warmHandle) {
       // 温进程复用：跳过 spawn，直接用原子进程 stdio 建新 SDK 连接并走握手
       acpState.processHandle = warmHandle
@@ -478,6 +487,9 @@ export async function connectAcp(payload: {
 
     const negotiated =
       typeof initResult.protocolVersion === 'number' ? initResult.protocolVersion : PROTOCOL_VERSION
+    if (currentAcpContext().closed || gen !== acpState.connectGeneration) {
+      throw new Error('Agent 连接已失效')
+    }
     if (negotiated !== PROTOCOL_VERSION) {
       // 协议对不上：该进程服务不了我们，杀掉避免温复用毒进程
       await disconnectAcp(`协议版本不兼容: Agent=${negotiated}`, { killProcess: true })

@@ -10,6 +10,7 @@ export interface WindowSession {
   closeController: WindowCloseController
   /** 通过「新建窗口」创建时为 true，渲染进程不恢复工作区/上次文件 */
   isFresh: boolean
+  windowScopeId?: string
 }
 
 const sessions = new Map<number, WindowSession>()

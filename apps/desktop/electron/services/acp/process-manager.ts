@@ -1,5 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
 import type { AcpRuntimeInfo } from '@montree/contracts'
+import { bindAcpContext, currentAcpContext } from './acp-context'
 
 export interface SpawnedAcpProcess {
   runtimeId: string
@@ -12,6 +13,11 @@ export interface SpawnedAcpProcess {
 }
 
 const active = new Map<string, SpawnedAcpProcess>()
+
+function processKey(runtimeId: string): string {
+  const context = currentAcpContext()
+  return context.id === 'default' ? runtimeId : `${context.id}:${runtimeId}`
+}
 
 /**
  * @deprecated 早退判定窗口已去窗口化（dsh 依赖解析慢退漏归因教训）：
@@ -59,13 +65,13 @@ function killProcessTree(pid: number): void {
 function resolveCommand(runtime: AcpRuntimeInfo): { file: string; shell: boolean } {
   // Windows 上 bunx 常为 .cmd，需 shell
   if (process.platform === 'win32') {
-    return { file: runtime.command, shell: true }
+    return { file: runtime.command, shell: !/\.(?:exe|com)$/i.test(runtime.command) }
   }
   return { file: runtime.command, shell: false }
 }
 
 /**
- * 多运行时温进程隔离：`active` 按 runtime.id 分键，绝不跨 runtime 串用。
+ * 温进程按窗口与 runtime.id 分键，绝不跨窗口或 runtime 串用。
  * connect 前一律经 `getLiveAcpProcess(runtime.id)` 取同 runtime 温进程；
  * 不同 runtime 即使 command 相同也各持独立句柄。
  */
@@ -76,7 +82,8 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
     throw new Error(`ACP 运行时模板缺失 command/args: ${options.runtime?.id ?? '(empty)'}`)
   }
   // 同 runtime 旧句柄先杀（换命令/参数后不复用）；其他 runtime 的温进程不受影响。
-  const existing = active.get(options.runtime.id)
+  const key = processKey(options.runtime.id)
+  const existing = active.get(key)
   if (existing) {
     existing.kill()
   }
@@ -126,7 +133,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
     }
   }
   child.stderr.setEncoding('utf8')
-  child.stderr.on('data', (chunk: string) => {
+  child.stderr.on('data', bindAcpContext((chunk: string) => {
     stderrBuffer += chunk
     while (true) {
       const idx = stderrBuffer.indexOf('\n')
@@ -141,7 +148,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
         options.onStderrLine?.(line)
       }
     }
-  })
+  }))
 
   const handle: SpawnedAcpProcess = {
     runtimeId: options.runtime.id,
@@ -170,20 +177,20 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
           }
         }
       }
-      active.delete(options.runtime.id)
+      if (active.get(key) === handle) active.delete(key)
     },
   }
 
-  child.on('exit', (code, signal) => {
+  child.on('exit', bindAcpContext((code, signal) => {
     // 无换行结尾的 stderr 残行落尾（harness 缺 key 秒退常为单行无换行输出，不丢）。
     const rest = stderrBuffer.trim()
     if (rest) pushStderrTailLine(rest)
     stderrBuffer = ''
-    active.delete(options.runtime.id)
+    if (active.get(key) === handle) active.delete(key)
     options.onExit?.(code, signal)
-  })
+  }))
 
-  active.set(options.runtime.id, handle)
+  active.set(key, handle)
   return handle
 }
 
@@ -224,14 +231,14 @@ export function disposeAllAcpProcesses(): void {
 }
 
 export function getActiveAcpProcess(runtimeId: string): SpawnedAcpProcess | undefined {
-  return active.get(runtimeId)
+  return active.get(processKey(runtimeId))
 }
 
 /** 当前仍存活的温进程 runtime 清单（调试/测试用，不暴露 child 句柄细节）。 */
 export function listLiveAcpRuntimeIds(): string[] {
   const ids: string[] = []
-  for (const [runtimeId, handle] of active) {
-    if (isSpawnedAcpProcessAlive(handle)) ids.push(runtimeId)
+  for (const [key, handle] of active) {
+    if (key === processKey(handle.runtimeId) && isSpawnedAcpProcessAlive(handle)) ids.push(handle.runtimeId)
   }
   return ids.sort()
 }
@@ -241,11 +248,18 @@ export function listLiveAcpRuntimeIds(): string[] {
  * 调用方应走冷启动并顺手清扫其残留临时目录。
  */
 export function getLiveAcpProcess(runtimeId: string): SpawnedAcpProcess | undefined {
-  const handle = active.get(runtimeId)
+  const key = processKey(runtimeId)
+  const handle = active.get(key)
   if (!handle) return undefined
   if (!isSpawnedAcpProcessAlive(handle)) {
-    active.delete(runtimeId)
+    active.delete(key)
     return undefined
   }
   return handle
+}
+
+export function disposeContextAcpProcesses(): void {
+  for (const [key, handle] of [...active]) {
+    if (key === processKey(handle.runtimeId)) handle.kill()
+  }
 }

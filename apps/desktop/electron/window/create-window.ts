@@ -1,11 +1,13 @@
 import { BrowserWindow, app, dialog, nativeImage, shell } from 'electron'
 import { watch, type FSWatcher } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { basename, dirname, join } from 'path'
 import { IPC } from '@montree/contracts'
 import { APP_TITLE } from '@montree/contracts'
 import { resolveAppIconPath } from '../services/app-paths'
 import { shouldLogRendererConsole } from '../services/runtime-state'
 import { createWindowCloseController } from './window-close'
+import { resolveWindowShortcut } from './window-shortcuts'
 import {
   getWindowSessionByWebContents,
   registerWindowSession,
@@ -97,6 +99,7 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     rendererHealth: 'ok',
     closeController: null as unknown as WindowSession['closeController'],
     isFresh: options.fresh ?? false,
+    windowScopeId: options.fresh ? randomUUID() : 'main',
   }
   session.closeController = createWindowCloseHandlers(session)
   registerWindowSession(session)
@@ -166,35 +169,16 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
   })
 
   window.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown') return
-    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+    const action = resolveWindowShortcut(input)
+    if (!action) return
+    event.preventDefault()
+    if (input.isAutoRepeat) return
+    if (action === 'devtools') {
       window.webContents.toggleDevTools()
-      event.preventDefault()
-      return
-    }
-
-    const mod = input.control || input.meta
-    if (mod && !input.shift && !input.alt) {
-      const key = input.key.toLowerCase()
-      const code = input.code
-
-      if (key === 'p' || code === 'KeyP') {
-        event.preventDefault()
-        window.webContents.send(IPC.APP_GLOBAL_ACTION, 'quick-open')
-        return
-      }
-
-      if (key === 'f' || code === 'KeyF') {
-        event.preventDefault()
-        window.webContents.send(IPC.APP_GLOBAL_ACTION, 'find')
-        return
-      }
-
-      if (key === 'h' || code === 'KeyH') {
-        event.preventDefault()
-        window.webContents.send(IPC.APP_GLOBAL_ACTION, 'replace')
-        return
-      }
+    } else if (action === 'new-window') {
+      createWindow({ fresh: true })
+    } else {
+      window.webContents.send(IPC.APP_GLOBAL_ACTION, action)
     }
   })
 
@@ -255,12 +239,14 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
 }
 
 export function getWindowInitByWebContents(sender: Electron.WebContents): {
+  windowScopeId: string
   isFreshWindow: boolean
   e2eFoliateReader: boolean
   e2ePdfStructure: boolean
 } {
   const session = getWindowSessionByWebContents(sender)
   return {
+    windowScopeId: session?.windowScopeId ?? `window-${sender.id}`,
     isFreshWindow: session?.isFresh ?? false,
     e2eFoliateReader: process.env['E2E_FOLIATE_READER'] === '1',
     e2ePdfStructure: process.env['E2E_PDF_STRUCTURE'] === '1',

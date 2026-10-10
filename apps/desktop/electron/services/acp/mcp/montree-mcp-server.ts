@@ -2,7 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { createServer, type Server } from 'node:http'
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
+import { bindAcpContext, currentAcpContext, type AcpContext } from '../acp-context'
 import { handleInkdownMcpRpc as handleMontreeMcpRpc, type McpRpcMessage } from "@yitom/acp-client"
 import type {
   InkdownMcpToolContext,
@@ -38,9 +39,23 @@ export interface MontreeMcpServerHandle {
   close: () => Promise<void>
 }
 
-let handle: MontreeMcpServerHandle | null = null
+interface WindowServers {
+  handle: MontreeMcpServerHandle | null
+  tocHandle: MontreeMcpServerHandle | null
+  pending?: Promise<MontreeMcpServerHandle>
+  tocPending?: Promise<MontreeMcpServerHandle>
+}
+const servers = new WeakMap<AcpContext, WindowServers>()
 /** 目录副会话专用端点（只挂目录工具，主会话看不到） */
-let tocHandle: MontreeMcpServerHandle | null = null
+function currentServers() {
+  const context = currentAcpContext()
+  let state = servers.get(context)
+  if (!state) {
+    state = { handle: null, tocHandle: null }
+    servers.set(context, state)
+  }
+  return state
+}
 
 function readBody(
   request: NodeJS.ReadableStream & { destroy: () => void },
@@ -252,17 +267,21 @@ export async function callAdaptedMontreeTool(
 
 /**
  * 进程内 MCP server（Streamable HTTP 的最小子集）。
- * 单例：一个 App 一个端点，工具调用最终落到渲染进程内存快照。
+ * 每个窗口独立端点，工具调用最终落到该窗口的渲染进程内存快照。
  */
 export async function startMontreeMcpServer(
   context: MontreeMcpToolContext,
 ): Promise<MontreeMcpServerHandle> {
-  if (handle) return handle
+  const state = currentServers()
+  if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
+  if (state.handle) return state.handle
+  if (state.pending) return state.pending
   const tools = adaptMontreeTools(MONTREE_MCP_TOOLS)
   const envPort = process.env.MONTREE_MCP_PORT ? Number(process.env.MONTREE_MCP_PORT) : undefined
   const preferredPort = Number.isInteger(envPort) && (envPort ?? 0) > 0 ? envPort : DEFAULT_MONTREE_MCP_PORT
-  handle = await serveMcpServer(context, [...tools, ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS], callAdaptedMontreeTool, 'montree', preferredPort)
-  return handle
+  state.pending = serveMcpServer(context, [...tools, ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS], callAdaptedMontreeTool, 'montree', preferredPort)
+  try { return state.handle = await state.pending }
+  finally { state.pending = undefined }
 }
 
 /**
@@ -272,11 +291,15 @@ export async function startMontreeMcpServer(
 export async function startTocMcpServer(
   context: MontreeMcpToolContext,
 ): Promise<MontreeMcpServerHandle> {
-  if (tocHandle) return tocHandle
+  const state = currentServers()
+  if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
+  if (state.tocHandle) return state.tocHandle
+  if (state.tocPending) return state.tocPending
   const envPort = process.env.MONTREE_TOC_MCP_PORT ? Number(process.env.MONTREE_TOC_MCP_PORT) : undefined
   const preferredPort = Number.isInteger(envPort) && (envPort ?? 0) > 0 ? envPort : DEFAULT_MONTREE_TOC_MCP_PORT
-  tocHandle = await serveMcpServer(context, MONTREE_TOC_MCP_TOOLS, callMontreeTocTool, 'montree-toc', preferredPort)
-  return tocHandle
+  state.tocPending = serveMcpServer(context, MONTREE_TOC_MCP_TOOLS, callMontreeTocTool, 'montree-toc', preferredPort)
+  try { return state.tocHandle = await state.tocPending }
+  finally { state.tocPending = undefined }
 }
 
 async function serveMcpServer(
@@ -286,10 +309,12 @@ async function serveMcpServer(
   label: string,
   preferredPort?: number,
 ): Promise<MontreeMcpServerHandle> {
-  const authToken = getOrCreateAuthToken(label)
+  const scope = currentAcpContext()
+  const authToken = scope.id === 'default' ? getOrCreateAuthToken(label) : randomBytes(24).toString('hex')
 
-  const server = createServer((request, response) => {
+  const server = createServer(bindAcpContext((request: IncomingMessage, response: ServerResponse) => {
     void (async () => {
+      if (scope.closed) { response.writeHead(410).end(); return }
       if (request.method !== 'POST') {
         response.writeHead(405, { Allow: 'POST' }).end()
         return
@@ -354,9 +379,14 @@ async function serveMcpServer(
         )
       }
     })()
-  })
+  }))
 
   const port = await listenWithFallback(server, preferredPort)
+  if (scope.closed) {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    throw new Error('Agent 所属窗口已关闭')
+  }
   console.info('[acp-mcp] server 已启动', { server: label, port })
 
   return {
@@ -373,8 +403,10 @@ async function serveMcpServer(
 }
 
 export async function stopMontreeMcpServer(): Promise<void> {
-  await handle?.close()
-  handle = null
-  await tocHandle?.close()
-  tocHandle = null
+  const state = currentServers()
+  await Promise.allSettled([state.pending, state.tocPending])
+  await state.handle?.close()
+  state.handle = null
+  await state.tocHandle?.close()
+  state.tocHandle = null
 }

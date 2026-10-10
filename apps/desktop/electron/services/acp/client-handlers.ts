@@ -8,6 +8,7 @@ import {
 import { methods, RequestError, type ClientApp } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from './acp-terminal'
+import { bindAcpContext } from './acp-context'
 
 export interface AcpClientHandlerDeps {
   getWorkspaceRoot: () => string | null
@@ -40,7 +41,7 @@ function toServerError(error: unknown, fallback: string): RequestError {
  * 无需手写 transport.respond/respondError。
  */
 export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandlerDeps): void {
-  app.onRequest(methods.client.session.requestPermission, async (ctx) => {
+  app.onRequest(methods.client.session.requestPermission, bindAcpContext(async (ctx) => {
     const params = ctx.params as unknown as Record<string, unknown>
     const toolCall = params.toolCall
     const toolHint =
@@ -76,9 +77,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
       console.error('[acp] request_permission 失败', error)
       return { outcome: { outcome: 'cancelled' } as AcpPermissionOutcome }
     }
-  })
+  }))
 
-  app.onRequest(methods.client.fs.readTextFile, async (ctx) => {
+  app.onRequest(methods.client.fs.readTextFile, bindAcpContext(async (ctx) => {
     const workspaceRoot = deps.getWorkspaceRoot()
     const filePath = ctx.params.path
     if (!workspaceRoot || !filePath) {
@@ -114,9 +115,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '读取文件失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.fs.writeTextFile, async (ctx) => {
+  app.onRequest(methods.client.fs.writeTextFile, bindAcpContext(async (ctx) => {
     const workspaceRoot = deps.getWorkspaceRoot()
     const filePath = ctx.params.path
     const content = ctx.params.content
@@ -134,9 +135,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '写入文件失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.terminal.create, async (ctx) => {
+  app.onRequest(methods.client.terminal.create, bindAcpContext(async (ctx) => {
     const workspaceRoot = deps.getWorkspaceRoot()
     const sessionId = ctx.params.sessionId
     const command = ctx.params.command
@@ -156,9 +157,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '创建终端失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.terminal.output, async (ctx) => {
+  app.onRequest(methods.client.terminal.output, bindAcpContext(async (ctx) => {
     const terminalId = ctx.params.terminalId
     if (!terminalId) {
       throw toInvalidParams('terminal/output 需要 terminalId')
@@ -168,9 +169,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '读取终端输出失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.terminal.waitForExit, async (ctx) => {
+  app.onRequest(methods.client.terminal.waitForExit, bindAcpContext(async (ctx) => {
     const terminalId = ctx.params.terminalId
     if (!terminalId) {
       throw toInvalidParams('terminal/wait_for_exit 需要 terminalId')
@@ -180,9 +181,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '等待终端退出失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.terminal.kill, async (ctx) => {
+  app.onRequest(methods.client.terminal.kill, bindAcpContext(async (ctx) => {
     const terminalId = ctx.params.terminalId
     if (!terminalId) {
       throw toInvalidParams('terminal/kill 需要 terminalId')
@@ -192,9 +193,9 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '终止终端失败')
     }
-  })
+  }))
 
-  app.onRequest(methods.client.terminal.release, async (ctx) => {
+  app.onRequest(methods.client.terminal.release, bindAcpContext(async (ctx) => {
     const terminalId = ctx.params.terminalId
     if (!terminalId) {
       throw toInvalidParams('terminal/release 需要 terminalId')
@@ -204,14 +205,14 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     } catch (error) {
       throw toServerError(error, '释放终端失败')
     }
-  })
+  }))
 
-  app.onNotification(methods.client.session.update, async (ctx) => {
+  app.onNotification(methods.client.session.update, bindAcpContext(async (ctx) => {
     deps.onSessionUpdate({
       sessionId: ctx.params.sessionId,
       update: ctx.params.update,
     } as unknown as Record<string, unknown>)
-  })
+  }))
 }
 
 function permissionOptionId(option: Record<string, unknown>): string | null {

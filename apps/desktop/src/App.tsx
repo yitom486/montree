@@ -347,12 +347,22 @@ function App() {
         handleOpenFind()
       } else if (action === 'replace') {
         handleOpenReplace()
+      } else if (action === 'settings') {
+        setSettingsOpen(true)
+      } else if (action === 'open-file') {
+        void openFile()
+      } else if (action === 'open-folder') {
+        void openFolder()
+      } else if (action === 'save') {
+        void saveFile()
+      } else if (action === 'save-as' && isMarkdownDocument) {
+        void saveFileAs()
       } else if (action.startsWith('deep-link:')) {
         const deepUrl = action.slice('deep-link:'.length)
         void handleOpenDeepLink(deepUrl)
       }
     })
-  }, [handleOpenDeepLink, handleOpenFind, handleOpenReplace, handleToggleQuickOpen])
+  }, [handleOpenDeepLink, handleOpenFind, handleOpenReplace, handleToggleQuickOpen, openFile, openFolder, saveFile, saveFileAs, isMarkdownDocument])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

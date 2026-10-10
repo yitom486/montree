@@ -1,3 +1,4 @@
+import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC } from '@montree/contracts'
 import type {
@@ -25,21 +26,10 @@ import type {
 } from '@montree/contracts'
 import type {
   AcpAuthPreflightPayload,
-  AcpAuthenticatePayload,
-  AcpCancelPayload,
-  AcpConnectPayload,
-  AcpLoadSessionPayload,
-  AcpPermissionResponsePayload,
-  AcpPromptPayload,
-  AcpSessionNewPayload,
-  AcpSetConfigOptionPayload,
-  AcpSnapshotResponsePayload,
   AcpProviderSavePayload,
   AcpProxySettings,
 } from '@montree/contracts'
 import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@montree/contracts'
-import { resolveSnapshotTimeoutMs } from '@montree/contracts'
-import { captureReaderViewport } from '../services/reader-screenshot-service'
 import { saveBinaryDocument } from '../services/binary-document-service'
 import type { SaveBinaryDocumentPayload } from '@montree/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
@@ -199,22 +189,7 @@ import {
   isCodexPreflightRuntime,
   probeCodexAuth,
 } from '../services/acp/codex-auth-preflight'
-import {
-  authenticateAcp,
-  cancelAcp,
-  connectAcp,
-  createAcpSession,
-  disconnectAcp,
-  loadAcpSession,
-  onAcpSessionUpdate,
-  onAcpStatusChanged,
-  promptAcp,
-  setAcpConfigOption,
-  setAcpPermissionBridge,
-  setAcpSnapshotBridge,
-} from '../services/acp/acp-client'
 import { installAgyCli, probeAgyCli } from '../services/acp/runtimes/agy'
-import { pickAllowOptionId } from '../services/acp/client-handlers'
 import {
   clearAcpProvider,
   getAcpProviderStatus,
@@ -225,209 +200,41 @@ import {
   saveAcpProxySettings,
 } from '../services/acp/acp-proxy-service'
 
-/**
- * 应用还在运行时，把同一条 IPC 推到每一扇还活着的窗。
- * 用于 ACP 全局单例：连接状态、流式 session/update、权限框（各窗 UI 都要同步）。
- * 不是退出时杀进程；已销毁的窗必须跳过，否则 send 会抛错。
- */
-function broadcastToAllWindows(channel: string, payload: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(channel, payload)
-    }
-  }
+/** 测试入口明确选测试窗口；生产路径始终使用 IPC sender。 */
+function withTestWindow<T>(callback: () => T): T {
+  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (!window) throw new Error('测试窗口未就绪')
+  return withAcpWindow(window.webContents, callback)
 }
 
-/**
- * 最后一次 ACP connect / prompt 来自哪扇窗的 webContents.id。
- * 快照（当前打开的书/编辑器正文）只存在于渲染进程，必须问对窗口。
- */
-let agentOwnerWebContentsId: number | null = null
-
-/** 把 IPC 的 event.sender 记为 Agent 归属窗（后写覆盖先写） */
-function rememberAgentOwner(sender: Electron.WebContents): void {
-  agentOwnerWebContentsId = sender.id
-}
-
-/**
- * 解析快照该发给谁。顺序：
- * 1. 记下的 owner 还在 → 用它（正常路径）
- * 2. 那扇窗已关 → 当前聚焦窗
- * 3. 再没有 → 任意一扇还活着的窗（兜底，内容可能已不是当初那本书）
- * 4. 一个窗都没有 → null，调用方应失败而不是空发
- */
-function resolveAgentOwnerWebContents(): Electron.WebContents | null {
-  const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
-  const owner = windows.find((win) => win.webContents.id === agentOwnerWebContentsId)
-  if (owner) return owner.webContents
-  const focused = BrowserWindow.getFocusedWindow()
-  if (focused && !focused.isDestroyed()) return focused.webContents
-  return windows[0]?.webContents ?? null
+/** 制卡会话指针按可信窗口分区；文档/书籍的数据本身仍可共享。 */
+function withAiSessionWindow<T extends { purpose?: string }>(sender: Electron.WebContents, payload: T): T {
+  const scope = getWindowInitByWebContents(sender).windowScopeId
+  return scope === 'main' ? payload : { ...payload, purpose: `${payload.purpose?.trim() || 'card-studio'}:${scope}` }
 }
 
 /** 集中注册 IPC；文件/书签等耗时操作均为 async，不阻塞主进程事件循环 */
 export function registerIpcHandlers(): void {
-  // --- ACP：权限/快照桥（须先于 handle，Agent 回调才能找到窗口） ---
-  // Agent 要跑工具时主进程拦下来，把选项交给 UI，等用户点允许/拒绝后再继续。
-  setAcpPermissionBridge(async ({ requestId, sessionId, params }) => {
-    const toolCall = params.toolCall
-    const title =
-      toolCall && typeof toolCall === 'object' && 'title' in toolCall
-        ? String((toolCall as { title?: unknown }).title ?? '工具调用')
-        : '工具调用'
-
-    console.info('[acp] 广播权限请求到渲染进程', {
-      requestId,
-      sessionId,
-      summary: title,
-      optionCount: Array.isArray(params.options) ? params.options.length : 0,
-    })
-
-    // 单例 Agent：每扇窗都可能开着面板，权限框目前广播（任一窗用同一 requestId 回复即可）
-    broadcastToAllWindows(IPC.ACP_PERMISSION_REQUEST, {
-      requestId,
-      sessionId,
-      toolCall:
-        toolCall && typeof toolCall === 'object'
-          ? (toolCall as Record<string, unknown>)
-          : undefined,
-      options: Array.isArray(params.options) ? params.options : undefined,
-      rawParams: params,
-      summary: title,
-    })
-
-    return await new Promise((resolve) => {
-      // 无人点按钮时不能让 Agent 永远挂起；有默认允许项则选它，否则当取消
-      const timer = setTimeout(() => {
-        cleanup()
-        const allowId = pickAllowOptionId(params)
-        console.warn('[acp] 权限请求 120s 超时，自动决议', {
-          requestId,
-          allowId,
-        })
-        if (allowId) resolve({ outcome: 'selected', optionId: allowId })
-        else resolve({ outcome: 'cancelled' })
-      }, 120_000)
-
-      const handler = (
-        _event: Electron.IpcMainEvent,
-        payload: AcpPermissionResponsePayload,
-      ): void => {
-        if (payload?.requestId !== requestId) return
-        cleanup()
-        console.info('[acp] 收到渲染进程权限响应', payload)
-        resolve(payload.outcome)
-      }
-
-      const cleanup = (): void => {
-        clearTimeout(timer)
-        ipcMain.removeListener(IPC.ACP_PERMISSION_RESPONSE, handler)
-      }
-
-      ipcMain.on(IPC.ACP_PERMISSION_RESPONSE, handler)
-    })
-  })
-
-  // 正文/阅读进度在渲染进程；只问 owner，避免多窗同目录时拍到别的书
-  setAcpSnapshotBridge(async ({ requestId, resource, args }) => {
-    const target = resolveAgentOwnerWebContents()
-    if (!target) {
-      throw new Error('没有可用窗口提供 Montree 快照')
-    }
-    target.send(IPC.ACP_SNAPSHOT_REQUEST, { requestId, resource, args })
-
-    const content = await new Promise<string>((resolve, reject) => {
-      // 快照来自渲染进程内存；可能触发 OCR 的资源用更长超时
-      const timeoutMs = resolveSnapshotTimeoutMs(resource)
-      const timer = setTimeout(() => {
-        cleanup()
-        reject(new Error(`Montree 快照请求超时：${resource}`))
-      }, timeoutMs)
-
-      const handler = (
-        snapshotEvent: Electron.IpcMainEvent,
-        payload: AcpSnapshotResponsePayload,
-      ): void => {
-        if (payload?.requestId !== requestId || snapshotEvent.sender.id !== target.id) return
-        cleanup()
-        if (payload.ok) resolve(payload.content)
-        else {
-          console.warn('[acp] snapshot 渲染端失败', {
-            requestId,
-            resource,
-            args,
-            message: payload.message,
-          })
-          reject(new Error(payload.message))
-        }
-      }
-
-      const cleanup = (): void => {
-        clearTimeout(timer)
-        ipcMain.removeListener(IPC.ACP_SNAPSHOT_RESPONSE, handler)
-      }
-
-      ipcMain.on(IPC.ACP_SNAPSHOT_RESPONSE, handler)
-    })
-    return resource === 'viewport-image' ? JSON.stringify(await captureReaderViewport(target, content)) : content
-  })
-
+  registerAcpWindowHandlers()
   if (process.env.E2E_READER_VISUAL === '1') {
     Object.assign(globalThis, {
       __montreeE2eVisualTools: (name: string, args?: Record<string, unknown>) =>
-        callReaderVisualTool(name, { readSnapshot: handleSnapshotRequest }, args),
+        withTestWindow(() => callReaderVisualTool(name, { readSnapshot: handleSnapshotRequest }, args)),
     })
   }
   if (process.env.E2E_DOCUMENT_TOOLS === '1') {
     Object.assign(globalThis, { __montreeE2eDocumentTools: (name: string, args?: Record<string, unknown>) =>
-      callDocumentTool(name, { readSnapshot: handleSnapshotRequest }, args),
-      __montreeE2eDocumentSnapshot: (resource: Parameters<typeof handleSnapshotRequest>[0], args?: Parameters<typeof handleSnapshotRequest>[1]) => handleSnapshotRequest(resource, args),
-      __montreeE2eMcpEndpoint: async () => { const server = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest }); return { url: server.url, authToken: server.authToken } },
+      withTestWindow(() => callDocumentTool(name, { readSnapshot: handleSnapshotRequest }, args)),
+      __montreeE2eDocumentSnapshot: (resource: Parameters<typeof handleSnapshotRequest>[0], args?: Parameters<typeof handleSnapshotRequest>[1]) => withTestWindow(() => handleSnapshotRequest(resource, args)),
+      __montreeE2eMcpEndpoint: () => withTestWindow(async () => { const server = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest }); return { url: server.url, authToken: server.authToken } }),
     })
   }
 
-  // 流式输出 / 连接状态：全局一份 Agent，各窗面板要同一份数据
-  onAcpSessionUpdate((event) => {
-    broadcastToAllWindows(IPC.ACP_SESSION_UPDATE, event)
-  })
 
-  onAcpStatusChanged((event) => {
-    broadcastToAllWindows(IPC.ACP_STATUS_CHANGED, event)
-  })
-
-  // --- ACP：连接、认证、session、prompt ---
   ipcMain.handle(IPC.ACP_LIST_RUNTIMES, () => ok(listAcpRuntimes()))
   ipcMain.handle(IPC.ACP_AUTH_PREFLIGHT, (_event, payload?: AcpAuthPreflightPayload) => {
     return ok(isCodexPreflightRuntime(payload?.runtimeId) ? probeCodexAuth() : emptyAcpAuthPreflight())
   })
-  ipcMain.handle(IPC.ACP_CONNECT, (event, payload: AcpConnectPayload) => {
-    // 这扇窗之后的快照都问它
-    rememberAgentOwner(event.sender)
-    return connectAcp(payload)
-  })
-  ipcMain.handle(IPC.ACP_AUTHENTICATE, (_event, payload: AcpAuthenticatePayload) =>
-    authenticateAcp(payload),
-  )
-  ipcMain.handle(IPC.ACP_LOAD_SESSION, (_event, payload: AcpLoadSessionPayload) =>
-    loadAcpSession({
-      sessionId: payload.sessionId,
-      cwd: payload.cwd,
-      secondary: payload.secondary,
-    }),
-  )
-  ipcMain.handle(IPC.ACP_DISCONNECT, () => disconnectAcp())
-  ipcMain.handle(IPC.ACP_SESSION_NEW, (_event, payload: AcpSessionNewPayload) =>
-    createAcpSession(payload?.cwd, payload?.toolScope === 'toc' ? 'toc' : 'full'),
-  )
-  ipcMain.handle(IPC.ACP_PROMPT, (event, payload: AcpPromptPayload) => {
-    // 换窗接着聊时，归属改到新的发起窗
-    rememberAgentOwner(event.sender)
-    return promptAcp(payload)
-  })
-  ipcMain.handle(IPC.ACP_CANCEL, (_event, payload: AcpCancelPayload) => cancelAcp(payload))
-  ipcMain.handle(IPC.ACP_SET_CONFIG_OPTION, (_event, payload: AcpSetConfigOptionPayload) =>
-    setAcpConfigOption(payload),
-  )
   // --- ACP：自定义模型供应商（base URL + API Key） ---
   ipcMain.handle(IPC.ACP_PROVIDER_GET, async () => ok(await getAcpProviderStatus()))
   ipcMain.handle(IPC.ACP_PROVIDER_SAVE, (_event, payload: AcpProviderSavePayload) =>
@@ -681,13 +488,13 @@ export function registerIpcHandlers(): void {
 
   // --- AI 会话指针（一书一会话） ---
   ipcMain.handle(IPC.AI_SESSIONS_GET, (_event, payload: AiSessionGetPayload) =>
-    getAiSession(payload),
+    getAiSession(withAiSessionWindow(_event.sender, payload)),
   )
   ipcMain.handle(IPC.AI_SESSIONS_PUT, (_event, payload: AiSessionPutPayload) =>
-    putAiSession(payload),
+    putAiSession(withAiSessionWindow(_event.sender, payload)),
   )
   ipcMain.handle(IPC.AI_SESSIONS_TOUCH, (_event, payload: AiSessionTouchPayload) =>
-    touchAiSession(payload),
+    touchAiSession(withAiSessionWindow(_event.sender, payload)),
   )
 
   // --- 在线文档 ---

@@ -14,13 +14,14 @@ import {
 } from './mcp/montree-mcp-server'
 import { sdkRequest } from './sdk-client'
 import { disposeAllAcpProcesses } from './process-manager'
-import { acpState, disarmSuppressSettle, setStatus } from './acp-state'
+import { acpState, claimAcpSession, disarmSuppressSettle, setStatus } from './acp-state'
 import {
   handleSnapshotRequest,
   requireAgent,
   toProtocolError,
 } from './acp-bridges'
 import { disconnectAcp } from './acp-connection'
+import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
 function mcpServerEntry(handle: MontreeMcpServerHandle, name: string): unknown[] {
   return [
@@ -82,6 +83,8 @@ export async function loadAcpSession(payload: {
     )
     const id =
       typeof result.sessionId === 'string' ? result.sessionId : payload.sessionId
+    if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
+    claimAcpSession(id)
     if (!secondary) {
       acpState.sessionId = id
       acpState.workspaceRoot = cwd
@@ -134,6 +137,8 @@ export async function createAcpSession(
     if (!id) {
       return err({ code: 'ACP_PROTOCOL_ERROR', message: 'session/new 未返回 sessionId' })
     }
+    if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
+    claimAcpSession(id)
     if (!acpState.workspaceRoot) acpState.workspaceRoot = resolvedCwd
     return ok({
       sessionId: id,
@@ -229,6 +234,9 @@ export function cancelAcp(payload: { sessionId: string }): Result<void, AppError
 
 export function disposeAllAcp(): void {
   // App 退出：整树杀干净，不保温
-  void disconnectAcp(undefined, { killProcess: true })
+  for (const context of listAcpContexts()) {
+    context.closed = true
+    runInAcpContext(context, () => { void disconnectAcp(undefined, { killProcess: true }) })
+  }
   disposeAllAcpProcesses()
 }

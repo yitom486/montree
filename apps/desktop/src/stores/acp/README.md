@@ -12,6 +12,7 @@ ACP 智能体交互与次世代伴读 HUD 专职状态管理。由原 1182 行�
 | `hud-slice.ts` | 伴读 HUD 面板开闭与输入框调度 |
 | `reader-hud-store.ts` | 伴读 HUD 独立表现层（三态切换、自由拖拽坐标、四大 Tab、卡轨开关、全屏图表模态） |
 | `acp-store.ts` | Slices 组装与持久化存储中间件（保持 `useAcpUiStore` 统一接口） |
+| `window-storage.ts` / `window-storage.test.ts` | 按 preload 窗口标识分区聊天历史；主窗口兼容旧历史，新窗口仅继承界面和运行时偏好 |
 | `index.ts` | 模块统一导出入口 |
 
 ---

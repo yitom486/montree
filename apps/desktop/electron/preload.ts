@@ -21,6 +21,7 @@ const e2ePdfStructure = windowInit?.e2ePdfStructure ?? false
 const electronAPI: ElectronAPI = {
   platform: process.platform,
   isFreshWindow,
+  windowScopeId: windowInit?.windowScopeId,
   e2eFoliateReader,
   e2ePdfStructure,
   getVersion: () => ipcRenderer.invoke(IPC.APP_GET_VERSION),

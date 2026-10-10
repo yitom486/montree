@@ -12,6 +12,7 @@ import type {
 } from '@montree/contracts'
 import type { ClientContext } from '@agentclientprotocol/sdk'
 import { getAcpRuntimeAdapter } from './runtimes'
+import { currentAcpContext } from './acp-context'
 import { mapSpawnErrorToAppError } from '../bun-runtime'
 import {
   acpState,
@@ -36,7 +37,7 @@ export function toProtocolError(error: unknown, fallback: string): AppError {
 }
 
 export function requireAgent(allowAuthPhase = false): Result<ClientContext, AppError> {
-  if (!acpState.sdkConn) {
+  if (currentAcpContext().closed || !acpState.sdkConn) {
     return err({ code: 'ACP_NOT_CONNECTED', message: 'ACP Agent 未连接' })
   }
   if (acpState.status === 'connected') return ok(acpState.sdkConn.agent)

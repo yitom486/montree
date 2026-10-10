@@ -90,6 +90,10 @@ export const appApi = {
     return getElectronAPI()?.isFreshWindow ?? false
   },
 
+  getWindowScopeId(): string {
+    return getElectronAPI()?.windowScopeId ?? 'main'
+  },
+
   /** 根据路径/脏标记更新窗口标题 */
   updateTitle(payload: { filePath?: string; isDirty: boolean }): void {
     getElectronAPI()?.updateTitle(payload)
