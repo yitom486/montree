@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.8] - 2026-10-11
+
 - ### 多窗口 Agent 隔离与快捷键修复
   - 每个窗口独立管理 Agent 连接、运行时子进程、消息、权限和 MCP 端点；文档工具固定读取请求所属窗口，关闭后不会改读其他窗口。
   - 新窗口默认独立对话，聊天、批注 AI 与制卡会话指针分别存储；主窗口保留旧历史。拒绝跨窗口使用会话 ID，并防止同时恢复同一个历史会话。
@@ -417,7 +421,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.7...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.8...HEAD
+[0.4.8]: https://github.com/yitom486/montree/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/yitom486/montree/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/yitom486/montree/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/yitom486/montree/compare/v0.4.4...v0.4.5
