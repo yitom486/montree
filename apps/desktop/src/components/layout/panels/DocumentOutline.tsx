@@ -27,9 +27,10 @@ export function DocumentOutline({
     >
       <button
         type="button"
-        className="flex w-full shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent/30 hover:text-foreground"
+        className="flex w-full shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent/30 hover:text-foreground transition-colors"
         onClick={onToggle}
         aria-expanded={!collapsed}
+        title={collapsed ? '展开目录大纲' : '折叠目录大纲'}
       >
         {collapsed ? (
           <ChevronRight className="size-3.5 shrink-0" />
@@ -37,9 +38,9 @@ export function DocumentOutline({
           <ChevronDown className="size-3.5 shrink-0" />
         )}
         <ListTree className="size-3.5 shrink-0" />
-        目录
+        <span>目录</span>
         {headings.length > 0 && (
-          <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground/80">
+          <span className="ml-auto rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-normal normal-case text-muted-foreground/80">
             {headings.length}
           </span>
         )}

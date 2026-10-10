@@ -30,12 +30,16 @@ function resolveFileKey(filePath?: string): string {
 interface EditorUiStore {
   theme: AppTheme
   outlineExpanded: boolean
+  webDocExpanded: boolean
+  fileTreeExpanded: boolean
   sidebarVisible: boolean
   fileStates: Record<string, FileUiState>
   setTheme: (theme: AppTheme) => void
   toggleTheme: () => void
   cycleTheme: () => void
   setOutlineExpanded: (expanded: boolean) => void
+  setWebDocExpanded: (expanded: boolean) => void
+  setFileTreeExpanded: (expanded: boolean) => void
   setSidebarVisible: (visible: boolean) => void
   toggleSidebar: () => void
   getFileState: (filePath?: string) => FileUiState
@@ -52,6 +56,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
     (set, get) => ({
       theme: 'light',
       outlineExpanded: false,
+      webDocExpanded: true,
+      fileTreeExpanded: true,
       sidebarVisible: true,
       fileStates: {},
 
@@ -70,6 +76,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
         }),
 
       setOutlineExpanded: (expanded) => set({ outlineExpanded: expanded }),
+      setWebDocExpanded: (expanded) => set({ webDocExpanded: expanded }),
+      setFileTreeExpanded: (expanded) => set({ fileTreeExpanded: expanded }),
 
       setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
 
@@ -127,6 +135,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
       partialize: (state) => ({
         theme: state.theme,
         outlineExpanded: state.outlineExpanded,
+        webDocExpanded: state.webDocExpanded,
+        fileTreeExpanded: state.fileTreeExpanded,
         sidebarVisible: state.sidebarVisible,
         fileStates: state.fileStates,
       }),

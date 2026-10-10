@@ -111,6 +111,10 @@ export function WorkspaceShell({
   const toggleSidebar = useEditorUiStore((state) => state.toggleSidebar)
   const outlineExpanded = useEditorUiStore((state) => state.outlineExpanded)
   const setOutlineExpanded = useEditorUiStore((state) => state.setOutlineExpanded)
+  const fileTreeExpanded = useEditorUiStore((state) => state.fileTreeExpanded)
+  const setFileTreeExpanded = useEditorUiStore((state) => state.setFileTreeExpanded)
+  const webDocExpanded = useEditorUiStore((state) => state.webDocExpanded)
+  const setWebDocExpanded = useEditorUiStore((state) => state.setWebDocExpanded)
   const agentPanelOpen = useAcpUiStore((state) => state.panelOpen)
   const dockedAgentVisible = useIsDockedAgentVisible()
   const isDockedPanelVisible = dockedAgentVisible && !suppressDockedAgent
@@ -229,6 +233,10 @@ export function WorkspaceShell({
               activeHeadingId={activeHeadingId}
               outlineExpanded={outlineExpanded && headings.length > 0}
               onOutlineToggle={() => setOutlineExpanded(!outlineExpanded)}
+              fileTreeExpanded={fileTreeExpanded}
+              onFileTreeToggle={() => setFileTreeExpanded(!fileTreeExpanded)}
+              webDocExpanded={webDocExpanded}
+              onWebDocToggle={() => setWebDocExpanded(!webDocExpanded)}
               onOpenFolder={onOpenFolder}
               onOpenWebDoc={onOpenWebDoc}
               onRescanWorkspace={onRescanWorkspace}

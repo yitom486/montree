@@ -24,7 +24,6 @@ import { getParentDir, isAncestorOrSelf, isAncestorPath, isMarkdownPath } from '
 import { cn } from '@/lib/utils'
 import type { useFileTreeActions } from '@/hooks/workspace/useFileTreeActions'
 import { FileExplorerOverflowMenu } from '@/components/layout/panels/FileExplorerOverflowMenu'
-import { WebDocSidebarPanel } from '@/components/layout/web-doc/WebDocSidebarPanel'
 
 type TreeActions = ReturnType<typeof useFileTreeActions>
 
@@ -32,6 +31,9 @@ interface FileExplorerProps {
   workspaceRoot?: string
   tree: FileTreeNode[]
   activeFilePath?: string
+  /** 侧栏折叠模式：仅显示标题栏 */
+  collapsed?: boolean
+  onToggle?: () => void
   /** 无工作区时：当前在线文档 URL */
   webPageUrl?: string | null
   /** 最近打开的网页 */
@@ -371,6 +373,8 @@ export function FileExplorer({
   workspaceRoot,
   tree,
   activeFilePath,
+  collapsed = false,
+  onToggle,
   webPageUrl,
   recentWebUrls = [],
   onOpenFolder,
@@ -507,13 +511,42 @@ export function FileExplorer({
   const canPaste = Boolean(treeActions?.clipboard)
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div
+      className={cn(
+        'min-h-0 flex-col bg-sidebar',
+        collapsed ? 'flex shrink-0' : 'flex h-full flex-1 overflow-hidden',
+      )}
+    >
       <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent/30 hover:text-foreground transition-colors rounded -ml-1 pl-1 py-0.5"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          title={
+            collapsed
+              ? webMode
+                ? '展开在线文档'
+                : '展开资源管理器'
+              : webMode
+                ? '折叠在线文档'
+                : '折叠资源管理器'
+          }
+        >
+          {collapsed ? (
+            <ChevronRight className="size-3.5 shrink-0" />
+          ) : (
+            <ChevronDown className="size-3.5 shrink-0" />
+          )}
           {webMode ? <Globe className="size-3.5 shrink-0" /> : <FolderOpen className="size-3.5 shrink-0" />}
           <span className="truncate">{webMode ? '在线文档' : '资源管理器'}</span>
-        </div>
-        <div className="flex items-center gap-1">
+          {workspaceRoot && rootName && !webMode ? (
+            <span className="truncate text-[10px] font-normal normal-case text-muted-foreground/80">
+              ({rootName})
+            </span>
+          ) : null}
+        </button>
+        <div className="flex items-center gap-1 shrink-0 ml-1">
           {onHideSidebar ? (
             <Button
               variant="ghost"
@@ -550,13 +583,14 @@ export function FileExplorer({
         </div>
       </div>
 
-      <div
-        className="min-h-0 flex-1 overflow-auto"
-        onContextMenu={(e) => {
-          if (!workspaceRoot) return
-          openMenu(e, 'root')
-        }}
-      >
+      {!collapsed && (
+        <div
+          className="min-h-0 flex-1 overflow-auto"
+          onContextMenu={(e) => {
+            if (!workspaceRoot) return
+            openMenu(e, 'root')
+          }}
+        >
         {!workspaceRoot ? (
           webMode && webPageUrl ? (
             <div className="space-y-3 p-2">
@@ -670,12 +704,9 @@ export function FileExplorer({
           </div>
         )}
       </div>
+    )}
 
-      {workspaceRoot && onOpenWebDoc ? (
-        <WebDocSidebarPanel onOpenWebDoc={onOpenWebDoc} recentWebUrls={recentWebUrls} />
-      ) : null}
-
-      {menu && treeActions && workspaceRoot ? (
+    {menu && treeActions && workspaceRoot ? (
         <div
           ref={menuRef}
           className="fixed z-50 min-w-44 rounded-md border border-border/80 bg-popover p-1 text-popover-foreground shadow-md"

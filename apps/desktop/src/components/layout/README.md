@@ -9,16 +9,16 @@
 | `AppTitleBar` | VS Code 风格统一自绘顶栏（无边框窗口融合、主题对齐、Command Center 居中胶囊标题、窗口控制三键与快捷工具） |
 | `WorkspaceShell` | ActivityBar + 可折叠侧栏 + 主区 + Agent 面板 + AppTitleBar 顶栏 |
 | `ActivityBar` | 左侧活动条 |
-| `Sidebar` | 侧栏（装配 panels/ 的内容面板） |
+| `Sidebar` | 侧栏（装配 panels/ 的手风琴内容面板，支持资源管理器、在线文档与大纲的折叠与拖拽分栏） |
 | `SplitPane` | 通用分栏容器 |
 
 ## panels/ 侧栏内容面板
 
 | 文件 | 功能 |
 |------|------|
-| `FileExplorer` | 文件树（新建/重命名/删除/拖拽等树操作见 `hooks/workspace/useFileTreeActions`；header 仅留 ⋯ 溢出菜单，设新建窗口/保存/导出/设置等入口） |
+| `FileExplorer` | 资源管理器（支持手风琴折叠展开，新建/重命名/删除/拖拽等树操作见 `hooks/workspace/useFileTreeActions`；header 留折叠与 ⋯ 溢出菜单） |
 | `FileBreadcrumb` | 文件面包屑（编辑/阅读主区共用） |
-| `DocumentOutline` | Markdown 大纲（侧栏消费） |
+| `DocumentOutline` | Markdown 大纲（侧栏消费，支持手风琴折叠） |
 
 ## main/ 主工作区（按文档模式）
 
@@ -37,6 +37,6 @@
 | `WebDocWorkspaceMain` | 在线文档阅读主区（顶栏地址栏 + Viewer）；向侧栏上报本页标题大纲 |
 | `WebDocAddressBar` | 在线文档 URL 输入与最近列表 |
 | `WebDocUrlField` | URL 输入（欢迎页使用） |
-| `WebDocSidebarPanel` | 侧栏底部的在线文档快捷入口（支持即时输入 URL 与最近列表快速切换） |
+| `WebDocSidebarPanel` | 侧栏在线文档手风琴面板（支持可折叠、即时输入 URL 与最近列表快速切换） |
 
 在线文档的正文/目录/站点谓词逻辑见 `@montree/web-doc`（`packages/web-doc/`）与 `lib/reader/web-doc/`。

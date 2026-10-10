@@ -1,6 +1,7 @@
 import { useDefaultLayout } from 'react-resizable-panels'
 import { FileExplorer } from '@/components/layout/panels/FileExplorer'
 import { DocumentOutline } from '@/components/layout/panels/DocumentOutline'
+import { WebDocSidebarPanel } from '@/components/layout/web-doc/WebDocSidebarPanel'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -20,6 +21,10 @@ interface SidebarProps {
   activeHeadingId?: string
   outlineExpanded: boolean
   onOutlineToggle: () => void
+  fileTreeExpanded?: boolean
+  onFileTreeToggle?: () => void
+  webDocExpanded?: boolean
+  onWebDocToggle?: () => void
   onOpenFolder: () => void
   onOpenWebDoc?: (url: string) => void
   onRescanWorkspace?: () => void
@@ -54,6 +59,10 @@ export function Sidebar({
   activeHeadingId,
   outlineExpanded,
   onOutlineToggle,
+  fileTreeExpanded = true,
+  onFileTreeToggle = () => undefined,
+  webDocExpanded = true,
+  onWebDocToggle = () => undefined,
   onOpenFolder,
   onOpenWebDoc,
   onRescanWorkspace,
@@ -81,9 +90,64 @@ export function Sidebar({
     panelIds: ['explorer', 'outline'],
   })
 
+  const renderFileExplorer = (collapsed = !fileTreeExpanded) => (
+    <FileExplorer
+      workspaceRoot={workspaceRoot}
+      tree={fileTree}
+      activeFilePath={activeFilePath}
+      collapsed={collapsed}
+      onToggle={onFileTreeToggle}
+      webPageUrl={webPageUrl}
+      recentWebUrls={recentWebUrls}
+      onOpenFolder={onOpenFolder}
+      onOpenWebDoc={onOpenWebDoc}
+      onRescanWorkspace={onRescanWorkspace}
+      isRescanning={isRescanningWorkspace}
+      onSelectFile={onSelectFile}
+      onHideSidebar={onHideSidebar}
+      treeActions={treeActions}
+      readOnly={readOnly}
+      onOpenFile={onOpenFile}
+      onQuickOpen={onQuickOpen}
+      onNewWindow={onNewWindow}
+      onSave={onSave}
+      onSaveAs={onSaveAs}
+      onExportHtml={onExportHtml}
+      onExportPdf={onExportPdf}
+      onOpenSettings={onOpenSettings}
+      onOpenErrorLog={onOpenErrorLog}
+      onOpenDevTools={onOpenDevTools}
+      onAbout={onAbout}
+      onQuit={onQuit}
+    />
+  )
+
+  const renderWebDoc = () =>
+    onOpenWebDoc ? (
+      <WebDocSidebarPanel
+        onOpenWebDoc={onOpenWebDoc}
+        recentWebUrls={recentWebUrls}
+        collapsed={!webDocExpanded}
+        onToggle={onWebDocToggle}
+      />
+    ) : null
+
+  const renderOutline = (collapsed = !outlineExpanded) => (
+    <DocumentOutline
+      headings={headings}
+      collapsed={collapsed}
+      activeHeadingId={activeHeadingId}
+      onToggle={onOutlineToggle}
+      onSelectHeading={onSelectHeading}
+    />
+  )
+
+  // 双长列表（文件树 + 目录）同时展开时，启用纵向分割拖拽手柄
+  const isSplitResizable = outlineExpanded && fileTreeExpanded
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
-      {outlineExpanded ? (
+      {isSplitResizable ? (
         <ResizablePanelGroup
           id="markdown-editor-explorer-outline"
           orientation="vertical"
@@ -91,83 +155,36 @@ export function Sidebar({
           onLayoutChanged={outlineLayout.onLayoutChanged}
           className="h-full min-h-0"
         >
-          <ResizablePanel id="explorer" defaultSize="68%" minSize="25%" className="min-h-0">
-            <FileExplorer
-              workspaceRoot={workspaceRoot}
-              tree={fileTree}
-              activeFilePath={activeFilePath}
-              webPageUrl={webPageUrl}
-              recentWebUrls={recentWebUrls}
-              onOpenFolder={onOpenFolder}
-              onOpenWebDoc={onOpenWebDoc}
-              onRescanWorkspace={onRescanWorkspace}
-              isRescanning={isRescanningWorkspace}
-              onSelectFile={onSelectFile}
-              onHideSidebar={onHideSidebar}
-              treeActions={treeActions}
-              readOnly={readOnly}
-              onOpenFile={onOpenFile}
-              onQuickOpen={onQuickOpen}
-              onNewWindow={onNewWindow}
-              onSave={onSave}
-              onSaveAs={onSaveAs}
-              onExportHtml={onExportHtml}
-              onExportPdf={onExportPdf}
-              onOpenSettings={onOpenSettings}
-              onOpenErrorLog={onOpenErrorLog}
-              onOpenDevTools={onOpenDevTools}
-              onAbout={onAbout}
-              onQuit={onQuit}
-            />
+          <ResizablePanel id="explorer" defaultSize="68%" minSize="25%" className="min-h-0 flex flex-col">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {renderFileExplorer(false)}
+            </div>
+            {renderWebDoc()}
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel id="outline" defaultSize="32%" minSize="15%" className="min-h-0">
-            <DocumentOutline
-              headings={headings}
-              activeHeadingId={activeHeadingId}
-              onToggle={onOutlineToggle}
-              onSelectHeading={onSelectHeading}
-            />
+          <ResizablePanel id="outline" defaultSize="32%" minSize="15%" className="min-h-0 flex flex-col">
+            {renderOutline(false)}
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
         <>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <FileExplorer
-              workspaceRoot={workspaceRoot}
-              tree={fileTree}
-              activeFilePath={activeFilePath}
-              webPageUrl={webPageUrl}
-              recentWebUrls={recentWebUrls}
-              onOpenFolder={onOpenFolder}
-              onOpenWebDoc={onOpenWebDoc}
-              onRescanWorkspace={onRescanWorkspace}
-              isRescanning={isRescanningWorkspace}
-              onSelectFile={onSelectFile}
-              onHideSidebar={onHideSidebar}
-              treeActions={treeActions}
-              readOnly={readOnly}
-              onOpenFile={onOpenFile}
-              onQuickOpen={onQuickOpen}
-              onNewWindow={onNewWindow}
-              onSave={onSave}
-              onSaveAs={onSaveAs}
-              onExportHtml={onExportHtml}
-              onExportPdf={onExportPdf}
-              onOpenSettings={onOpenSettings}
-              onOpenErrorLog={onOpenErrorLog}
-              onOpenDevTools={onOpenDevTools}
-              onAbout={onAbout}
-              onQuit={onQuit}
-            />
-          </div>
-          <DocumentOutline
-            headings={headings}
-            collapsed
-            activeHeadingId={activeHeadingId}
-            onToggle={onOutlineToggle}
-            onSelectHeading={onSelectHeading}
-          />
+          {fileTreeExpanded ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {renderFileExplorer(false)}
+            </div>
+          ) : (
+            renderFileExplorer(true)
+          )}
+
+          {renderWebDoc()}
+
+          {outlineExpanded ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {renderOutline(false)}
+            </div>
+          ) : (
+            renderOutline(true)
+          )}
         </>
       )}
     </div>
