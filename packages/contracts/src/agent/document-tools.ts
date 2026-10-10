@@ -59,6 +59,41 @@ export interface SlideViewContext {
   selectionSlide: number | null
 }
 
+export interface SlideChartSeries { id: string; name: string; values: number[]; color: string }
+export interface SlideChart {
+  partId: string
+  type: 'bar' | 'line' | 'pie'
+  direction: 'column' | 'bar'
+  title: string
+  categories: string[]
+  series: SlideChartSeries[]
+  legendVisible: boolean
+  editable: boolean
+  unsupported: string[]
+  affectedSlides?: number[]
+}
+export interface SlideTransition {
+  effect: 'none' | 'fade' | 'push'
+  direction?: 'left' | 'right' | 'up' | 'down'
+  durationMs: number
+  advanceOnClick: boolean
+  advanceAfterMs?: number
+}
+export interface SlideAnimationEffect {
+  id?: string
+  elementId: string
+  effect: 'appear' | 'fade'
+  trigger: 'onClick' | 'withPrevious' | 'afterPrevious'
+  durationMs: number
+  delayMs: number
+}
+export interface SlideAnimation {
+  transition: SlideTransition
+  effects: SlideAnimationEffect[]
+  editable: boolean
+  unsupported: string[]
+}
+
 export type DocumentSelection = TableSelection | SlideSelection
 
 export interface TableTarget {

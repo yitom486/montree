@@ -134,6 +134,12 @@
 | `formula-evaluator` / `.test.ts` | Excel 公式求值引擎（算术、统计、逻辑与文本函数、级联依赖与循环引用防护） |
 | `presentation-document` / `.test.ts` | PPTX 原始元素 ID 查询/删改、关系排序、引用保护、撤销与保留未修改部件 |
 | `presentation-preview` | PPTX 段落默认样式、文字块覆盖、换行、形状外观及原稿背景/主题颜色解析 |
+| `presentation-xml` | PPT XML 严格解析、关系寻址、递归元素与原子批次参数校验 |
+| `presentation-chart` | 二维基础图表读取与定点编辑，缓存和内嵌 XLSX 同步，复杂图表只读 |
+| `presentation-design` | 现有母版/版式清单、影响范围核验、默认样式及元素文字编辑、应用现有版式 |
+| `presentation-animation` | 基础出现/淡入动画时间线、触发关系与转场读写，复杂效果保留 |
+| `presentation-advanced.test` | 真实嵌套组合/图表/内嵌工作簿/母版/动画的保存重开、保留部件及原子拒绝回归 |
+| `presentation-test-fixture` | 仅供测试的真实 PPTX 图表/内嵌工作簿/母版/嵌套组合生成器，模型与 E2E 共用 |
 | `presentation-text-edit` / `.test.ts` | PPT 段落/片段/UTF-16 范围原子编辑，原文/数量/重叠/字段校验，保留范围外样式 |
 | `xml-test-dom` | Office 单元测试的标准 XML DOM 适配（只被测试引用） |
 

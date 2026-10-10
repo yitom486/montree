@@ -49,7 +49,7 @@ export function PptxViewer({ filePath, className }: { filePath: string; classNam
   }, [finishPresentation])
   const update = useCallback(() => {
     const doc = model.current
-    if (doc?.selection) commitDocumentSelection(doc.selection, `幻灯片 ${doc.selection.slide} 元素 ${doc.selection.elementIds.join(', ')}\n${doc.elements(doc.selection.slide).filter((item) => doc.selection!.elementIds.includes(item.id)).map((item) => item.text).join('\n')}`)
+    if (doc?.selection) commitDocumentSelection(doc.selection, `幻灯片 ${doc.selection.slide} 元素 ${doc.selection.elementIds.join(', ')}\n${doc.allElements(doc.selection.slide).filter((item) => doc.selection!.elementIds.includes(item.id)).map((item) => item.text).join('\n')}`)
     else clearReaderSelection()
     refresh((n) => n + 1); notifyDocumentTools()
   }, [])
@@ -91,7 +91,7 @@ export function PptxViewer({ filePath, className }: { filePath: string; classNam
   }, [filePath, edit, save, update])
   const unitText = (slide: number): string => {
     const doc = model.current!
-    return `幻灯片 ${slide}；revision=${doc.revision}\n${doc.elements(slide).map((element) => `[${element.id} ${element.type} ${element.name}] ${element.text}`).join('\n')}\n[元素位置和属性请用 montree_ppt_read 查询。预览未完整呈现母版、图表、组合和动画。]`
+    return `幻灯片 ${slide}；revision=${doc.revision}\n${doc.allElements(slide).map((element) => `[${element.id} ${element.type} ${element.name}] ${element.text}`).join('\n')}\n[元素、图表、母版和动画属性请用 montree_ppt_read 查询能力范围。]`
   }
   useDocumentReader({ filePath, root: () => model.current ? root.current : null, selectionManaged: true,
     text: () => { if (!model.current) throw new Error('PPT 正在加载'); return unitText(model.current.activeSlide) },
@@ -142,10 +142,10 @@ export function PptxViewer({ filePath, className }: { filePath: string; classNam
     if (!doc) return
     const ids = additive && doc.selection?.slide === slide ? Array.from(new Set([...doc.selection.elementIds, id])) : [id]
     const target = doc.select(slide, ids, ids.length === 1 ? focus : undefined)
-    commitDocumentSelection(target, `幻灯片 ${slide} 元素 ${ids.join(', ')}\n${doc.elements(slide).filter((element) => ids.includes(element.id)).map((element) => element.text).join('\n')}`)
+    commitDocumentSelection(target, `幻灯片 ${slide} 元素 ${ids.join(', ')}\n${doc.allElements(slide).filter((element) => ids.includes(element.id)).map((element) => element.text).join('\n')}`)
     refresh((n) => n + 1)
   }
-  const selectedElement = doc?.selection && doc.elements(doc.selection.slide).find((element) => element.id === doc.selection!.elementIds[0])
+  const selectedElement = doc?.selection && doc.allElements(doc.selection.slide).find((element) => element.id === doc.selection!.elementIds[0])
   return <div ref={root} data-reader-viewport className={cn('flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background', className)}>
     {presenting && doc ? <PresentationSlideshow doc={doc} fullscreen={fullscreen} navigate={navigateTo} exit={exitPresentation} /> : <>
     <div className="flex flex-wrap items-center gap-2 border-b p-2 text-xs">
@@ -164,7 +164,7 @@ export function PptxViewer({ filePath, className }: { filePath: string; classNam
     {error ? <p className="p-4 text-destructive">{error}</p> : !doc ? <p className="p-4">正在读取幻灯片…</p> : <div className="flex min-h-0 flex-1">
       <aside className="w-40 shrink-0 overflow-auto border-r p-2">{doc.slidePaths.map((_, i) => <Button key={i} size="xs" variant={doc.activeSlide === i + 1 ? 'secondary' : 'ghost'} className="mb-1 w-full justify-start" onClick={() => navigateTo(i + 1)}>第 {i + 1} 页</Button>)}</aside>
       <div ref={viewport} data-ppt-viewport className="min-w-0 flex-1 overflow-auto bg-muted/30 p-4">
-        <p className="mb-3 text-xs text-muted-foreground">点击元素可加入 AI 选区，Ctrl 多选。当前为静态预览；母版、图表、组合和动画未完整呈现。</p>
+        <p className="mb-3 text-xs text-muted-foreground">点击元素可加入 AI 选区，Ctrl 多选。支持组合与基础图表预览，基础动画在放映时播放；复杂效果暂未完整呈现。</p>
         {doc.slidePaths.map((_, i) => i + 1).filter((number) => !single || number === doc.activeSlide).map((number) => <section key={`${number}:${doc.revision}`} data-slide={number} className="mb-5">
           <h3 className="mb-2 text-sm">幻灯片 {number}</h3>
           <PresentationSlide doc={doc} slide={number} zoom={zoom} select={select} />

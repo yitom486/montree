@@ -34,7 +34,7 @@ function properties(node: Element, name: string): Element {
   if (!props) { props = node.ownerDocument.createElementNS(A, `a:${name}`); if (name === 'defRPr') orderedInsert(node, props, paragraphOrder); else node.prepend(props) }
   return props
 }
-function applyFont(props: Element, patch: SlideTextPatch): void {
+export function applyPresentationFont(props: Element, patch: SlideTextPatch): void {
   if (patch.fontSize !== undefined) props.setAttribute('sz', String(Math.round(patch.fontSize * 100)))
   if (patch.bold !== undefined) props.setAttribute('b', patch.bold ? '1' : '0')
   if (patch.italic !== undefined) props.setAttribute('i', patch.italic ? '1' : '0')
@@ -120,7 +120,7 @@ export function editPresentationText(doc: Document, shapes: Element[], values: u
     const makeRun = (source: Element | undefined, content: string, style?: SlideTextPatch): Element => {
       const run = doc.createElementNS(A, 'a:r'); const original = source && child(source, 'rPr')
       if (original) run.append(original.cloneNode(true))
-      if (style && Object.keys(style).some((key) => ['fontSize', 'color', 'bold', 'italic', 'underline', 'fontFamily'].includes(key))) applyFont(properties(run, 'rPr'), style)
+      if (style && Object.keys(style).some((key) => ['fontSize', 'color', 'bold', 'italic', 'underline', 'fontFamily'].includes(key))) applyPresentationFont(properties(run, 'rPr'), style)
       const node = doc.createElementNS(A, 'a:t'); node.setAttributeNS(XML, 'xml:space', 'preserve'); node.textContent = content; run.append(node)
       return run
     }
@@ -154,7 +154,7 @@ export function editPresentationText(doc: Document, shapes: Element[], values: u
     const endProps = child(paragraph, 'endParaRPr')
     output.forEach((node) => paragraph.insertBefore(node, endProps ?? null))
     applyParagraph(paragraph, patch)
-    if (plan.full && Object.keys(patch).some((key) => ['fontSize', 'color', 'bold', 'italic', 'underline', 'fontFamily'].includes(key))) applyFont(properties(properties(paragraph, 'pPr'), 'defRPr'), patch)
+    if (plan.full && Object.keys(patch).some((key) => ['fontSize', 'color', 'bold', 'italic', 'underline', 'fontFamily'].includes(key))) applyPresentationFont(properties(properties(paragraph, 'pPr'), 'defRPr'), patch)
   }
   return Array.from(new Set(plans.map((plan) => plan.edit.elementId)))
 }

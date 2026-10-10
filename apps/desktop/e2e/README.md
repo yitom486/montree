@@ -18,6 +18,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开 |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
 | `ppt-tools-integration.spec.ts` | mock 模型工具调用输出 → 真实 HTTP MCP → IPC → PPT 模型/预览/磁盘保存与重开；局部样式保留、拒绝原子性、外部冲突、可见页/选区页和按需检查器，附前后截图与工具记录 |
+| `ppt-advanced-tools.spec.ts` | mock 工具输出经真实 MCP 编辑嵌套组合、图表及内嵌工作簿、现有母版/版式、基础动画；预览/放映/定时翻页/退出清理/撤销/保存重开与拒绝原子性，附截图及调用记录 |
 | `ppt-slideshow.spec.ts` | 真实全屏单页放映、键盘/鼠标翻页、退出按钮/Esc/系统退出、AI 当前页同步、阅读模式与缩放恢复及全屏拒绝回退和宽高适配 |
 | `reader-foliate.spec.ts` | foliate 统一阅读器：EPUB/MOBI 章节可读（`E2E_FOLIATE_READER` 门控测试钩子） |
 | `reader-foliate-marks.spec.ts` | foliate 标注链路：划重点/批注/检查器/删除（EPUB+MOBI） |
@@ -59,3 +60,4 @@ apps/desktop/e2e/fixtures/ocr/
 | `helpers/launch-app.ts` | 启动已构建应用 |
 | `helpers/web-doc-fixture.ts` | fixture 目录与测试 URL 常量 |
 | `helpers/ebook-fixture.ts` | 自研最小 PDF / EPUB / Markdown 生成器（无新依赖） |
+| `../src/lib/data/presentation-test-fixture.ts` | 模型与 Electron 测试共用的真实 PPTX 图表/内嵌工作簿/母版/嵌套组合 fixture |
