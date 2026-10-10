@@ -31,7 +31,12 @@ export interface WebDocTocEntry {
 
 export interface WebDocDiscoverTocResult {
   siteId: WebDocSiteId
+  /** 默认目录（优先当前板块局部侧栏，其次全站大纲） */
   entries: WebDocTocEntry[]
+  /** 当前板块/局部侧栏目录（若存在） */
+  sectionEntries?: WebDocTocEntry[]
+  /** 站点级/全站大纲目录（如从 llms.txt 解析，若存在） */
+  siteEntries?: WebDocTocEntry[]
 }
 
 /** 渲染端净化后的单页阅读内容 */

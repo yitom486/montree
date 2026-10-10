@@ -71,6 +71,42 @@ describe('web-doc-service', () => {
     expect(parseWebDocUrlInput('  ').ok).toBe(false)
   })
 
+  it('同时存在局部侧栏与站点 llms.txt 时支持双轨且优先局部侧栏', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const u = String(input)
+        if (u === 'https://dual.example/docs') {
+          const html = `<!DOCTYPE html><html><head>
+            <link rel="alternate" type="text/markdown" href="/llms.txt">
+          </head><body>
+            <nav class="sidebar">
+              <a href="/docs/intro">Intro</a>
+              <a href="/docs/guide">Guide</a>
+            </nav>
+            <article><h1>Doc</h1></article>
+          </body></html>`
+          return new Response(html, { status: 200, headers: { 'content-type': 'text/html' } })
+        }
+        if (u === 'https://dual.example/llms.txt') {
+          const txt = `# Site\n- [All Docs](https://dual.example/all)\n- [Full 1](https://dual.example/1)\n- [Full 2](https://dual.example/2)\n- [Full 3](https://dual.example/3)`
+          return new Response(txt, { status: 200, headers: { 'content-type': 'text/plain' } })
+        }
+        return new Response('', { status: 404 })
+      }),
+    )
+
+    const result = await discoverWebDocToc({ url: 'https://dual.example/docs' })
+    expect(isOk(result)).toBe(true)
+    if (!isOk(result)) return
+    // 优先局部侧栏
+    expect(result.value.entries.length).toBe(2)
+    expect(result.value.entries[0]?.label).toBe('Intro')
+    // 附带双轨数据
+    expect(result.value.sectionEntries?.length).toBe(2)
+    expect(result.value.siteEntries?.length).toBe(4)
+  })
+
   describe('重定向链 SSRF 防护', () => {
     beforeEach(() => {
       vi.stubGlobal(

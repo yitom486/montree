@@ -8,7 +8,13 @@ import {
 } from '@/lib/reader/reader-unit-tree'
 import { cn } from '@/lib/utils'
 
-interface ReaderUnitOutlineProps {
+export interface TocViewOption {
+  id: string
+  label: string
+  count: number
+}
+
+export interface ReaderUnitOutlineProps {
   units: ReaderUnit[]
   currentUnitId?: string
   collapsed?: boolean
@@ -16,6 +22,9 @@ interface ReaderUnitOutlineProps {
   onSelectUnit: (unit: ReaderUnit) => void
   onEditToc?: () => void
   outlineNotice?: string
+  tocViews?: TocViewOption[]
+  activeTocView?: string
+  onSelectTocView?: (viewId: string) => void
 }
 
 function OutlineTreeNode({
@@ -88,6 +97,9 @@ export function ReaderUnitOutline({
   onSelectUnit,
   onEditToc,
   outlineNotice,
+  tocViews,
+  activeTocView,
+  onSelectTocView,
 }: ReaderUnitOutlineProps) {
   const tree = useMemo(() => buildReaderUnitTree(units), [units])
 
@@ -113,7 +125,30 @@ export function ReaderUnitOutline({
           <ListTree className="size-3.5 shrink-0" />
           目录
         </button>
-        {units.length > 0 && (
+        {tocViews && tocViews.length > 1 ? (
+          <div className="flex shrink-0 items-center rounded-md border border-border/50 bg-muted/40 p-0.5 text-[10px]">
+            {tocViews.map((view) => {
+              const active = view.id === activeTocView
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  className={cn(
+                    'rounded px-1.5 py-0.5 font-medium transition-colors',
+                    active
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => onSelectTocView?.(view.id)}
+                  title={`${view.label}（共 ${view.count} 项）`}
+                >
+                  {view.label}
+                  <span className="ml-0.5 opacity-70">({view.count})</span>
+                </button>
+              )
+            })}
+          </div>
+        ) : units.length > 0 ? (
           <span className="flex shrink-0 items-center gap-1 text-[10px] font-normal normal-case text-muted-foreground/80">
             {onEditToc ? (
               <button
@@ -128,7 +163,7 @@ export function ReaderUnitOutline({
             ) : null}
             {units.length}
           </span>
-        )}
+        ) : null}
       </div>
 
       {!collapsed && (

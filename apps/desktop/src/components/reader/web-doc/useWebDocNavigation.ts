@@ -62,10 +62,43 @@ export function useWebDocNavigation({
     [pageUrl, siteId],
   )
   const { data: tocData } = useWebDocToc(tocDiscoveryUrl)
-  const units = useMemo(
-    () => webDocTocEntriesToReaderUnits(tocData?.entries ?? []),
-    [tocData?.entries],
+  const [tocMode, setTocMode] = useState<'section' | 'site'>('section')
+
+  useEffect(() => {
+    setTocMode('section')
+  }, [documentId])
+
+  const sectionUnits = useMemo(
+    () => webDocTocEntriesToReaderUnits(tocData?.sectionEntries ?? tocData?.entries ?? []),
+    [tocData?.entries, tocData?.sectionEntries],
   )
+  const siteUnits = useMemo(
+    () => (tocData?.siteEntries ? webDocTocEntriesToReaderUnits(tocData.siteEntries) : []),
+    [tocData?.siteEntries],
+  )
+
+  const hasDualTracks = Boolean(
+    tocData?.sectionEntries &&
+      tocData?.siteEntries &&
+      tocData.sectionEntries.length > 0 &&
+      tocData.siteEntries.length > 0,
+  )
+
+  const units = useMemo(() => {
+    if (hasDualTracks && tocMode === 'site') {
+      return siteUnits
+    }
+    return sectionUnits
+  }, [hasDualTracks, siteUnits, sectionUnits, tocMode])
+
+  const tocViews = useMemo(() => {
+    if (!hasDualTracks) return undefined
+    return [
+      { id: 'section', label: '当前板块', count: sectionUnits.length },
+      { id: 'site', label: '全站大纲', count: siteUnits.length },
+    ]
+  }, [hasDualTracks, sectionUnits.length, siteUnits.length])
+
   const unitsRef = useRef(units)
   unitsRef.current = units
 
@@ -241,5 +274,8 @@ export function useWebDocNavigation({
     goNext,
     persistScrollProgress,
     restoreScrollProgress,
+    tocViews,
+    activeTocView: tocMode,
+    onSelectTocView: (mode: string) => setTocMode(mode === 'site' ? 'site' : 'section'),
   }
 }

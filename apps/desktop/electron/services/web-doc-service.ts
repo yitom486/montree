@@ -6,6 +6,7 @@ import type {
   WebDocDiscoverTocResult,
   WebDocFetchPayload,
   WebDocFetchResult,
+  WebDocTocEntry,
 } from '@montree/contracts'
 import {
   extractGenericWebDocToc,
@@ -200,9 +201,19 @@ export async function discoverWebDocToc(
   try {
     const pageUrl = new URL(fetchResult.value.url)
     const siteId = resolveWebDocSiteId(pageUrl)
-    let entries = extractGenericWebDocToc(fetchResult.value.html, fetchResult.value.url)
+    let sectionEntries = extractGenericWebDocToc(fetchResult.value.html, fetchResult.value.url)
 
-    // 站点级索引（llms.txt 等）：不绑域名，补全各页侧栏 SSR 缺失
+    // 人民日报：通用密集列表若未命中，再回退纸媒版面列表（版面 DOM 特殊）
+    if (sectionEntries.length === 0 && siteId === 'people-daily-paper') {
+      sectionEntries = extractPeopleDailyToc(fetchResult.value.html, fetchResult.value.url)
+    }
+
+    if (sectionEntries.length === 0 && siteId !== 'people-daily-paper') {
+      sectionEntries = extractSameOriginDocLinks(fetchResult.value.html, fetchResult.value.url)
+    }
+
+    // 站点级全站索引（如 llms.txt 等）：支持双轨并行
+    let siteEntries: WebDocTocEntry[] | undefined
     if (looksLikeDocsIndexCandidate(fetchResult.value.html)) {
       const llmsUrl = resolveLlmsTxtUrl(fetchResult.value.url, fetchResult.value.html)
       if (llmsUrl) {
@@ -210,24 +221,32 @@ export async function discoverWebDocToc(
         if (llmsResult.ok) {
           const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
           if (fromLlms.length >= 3) {
-            entries = fromLlms
+            siteEntries = fromLlms
           }
         }
       }
     }
 
-    // 人民日报：通用密集列表若未命中，再回退纸媒版面列表（版面 DOM 特殊）
-    if (entries.length === 0 && siteId === 'people-daily-paper') {
-      entries = extractPeopleDailyToc(fetchResult.value.html, fetchResult.value.url)
+    const hasSection = sectionEntries.length > 0
+    const hasSite = Boolean(siteEntries && siteEntries.length > 0)
+
+    // 双轨均存在且不相等时：默认优先展示当前局部板块，同时挂载双轨数据供用户切换
+    if (
+      hasSection &&
+      hasSite &&
+      (sectionEntries.length !== siteEntries!.length ||
+        sectionEntries[0]?.href !== siteEntries![0]?.href)
+    ) {
+      return ok({
+        siteId,
+        entries: sectionEntries,
+        sectionEntries,
+        siteEntries,
+      })
     }
 
-    const resolvedEntries =
-      entries.length > 0
-        ? entries
-        : siteId === 'people-daily-paper'
-          ? []
-          : extractSameOriginDocLinks(fetchResult.value.html, fetchResult.value.url)
-
+    // 仅存在单轨（或两者完全一致）时返回单轨
+    const resolvedEntries = hasSection ? sectionEntries : (siteEntries ?? [])
     return ok({
       siteId,
       entries: resolvedEntries,

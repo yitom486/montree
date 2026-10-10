@@ -88,6 +88,9 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       persistScrollProgress,
       restoreScrollProgress,
       syncActiveHeadingFromScroll,
+      tocViews,
+      activeTocView,
+      onSelectTocView,
     } = nav
 
     useImperativeHandle(ref, () => ({ selectHeading }), [selectHeading])
@@ -339,6 +342,9 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             currentUnitId={currentUnitId}
             onCloseToc={closeToc}
             onSelectUnit={(unit) => navigateToUrl(unit.href)}
+            tocViews={tocViews}
+            activeTocView={activeTocView}
+            onSelectTocView={onSelectTocView}
           >
             {readerHost}
           </ReaderContentShell>

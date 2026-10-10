@@ -54,6 +54,9 @@ interface ReaderContentShellProps {
   onSelectUnit: (unit: ReaderUnit) => void
   onEditToc?: () => void
   outlineNotice?: string
+  tocViews?: Array<{ id: string; label: string; count: number }>
+  activeTocView?: string
+  onSelectTocView?: (viewId: string) => void
   tocAside?: ReactNode
   children: ReactNode
   /** 卡片悬停时透出原文 excerpt（EPUB 用 CSS 高亮 API 照亮正文，PDF 画布暂不支持） */
@@ -84,6 +87,9 @@ export function ReaderContentShell({
   onSelectUnit,
   onEditToc,
   outlineNotice,
+  tocViews,
+  activeTocView,
+  onSelectTocView,
   tocAside,
   children,
   onHoverExcerpt,
@@ -388,6 +394,9 @@ export function ReaderContentShell({
             onSelectUnit={onSelectUnit}
             onEditToc={onEditToc}
             outlineNotice={outlineNotice}
+            tocViews={tocViews}
+            activeTocView={activeTocView}
+            onSelectTocView={onSelectTocView}
           />
         </aside>
       ) : null}
