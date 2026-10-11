@@ -78,6 +78,18 @@ describe('AgentActivityGroup 工作记录（U2）', () => {
     expect(container.querySelector('[aria-expanded="false"]')).not.toBeNull()
   })
 
+  it('运行摘要显示进度与最近事件，附呼吸微光条', () => {
+    const running = toolMsg({ id: 't-r', toolCallId: 'tc-r', toolStatus: 'in_progress', streaming: true, toolTitle: 'read_text_file' })
+    const done = toolMsg({ id: 't-d', toolCallId: 'tc-d', toolStatus: 'completed', streaming: false, toolTitle: 'search' })
+    render(workLogOf([running, done]))
+    // 进度 1/2（运行中不计入 done），最近事件是落定的搜索
+    expect(container.textContent).toContain('1/2')
+    expect(container.textContent).toContain('✓')
+    expect(container.textContent).toContain('搜索文档')
+    // 运行中的呼吸条存在（aria-hidden 装饰），落定组没有
+    expect(container.querySelector('button > span[aria-hidden="true"]')).not.toBeNull()
+  })
+
   it('用户打开后，落定/后续 chunk 不覆盖选择', () => {
     const running = toolMsg({ id: 't-run', toolCallId: 'tc-run', toolStatus: 'in_progress', streaming: true })
     const group = workLogOf([running])

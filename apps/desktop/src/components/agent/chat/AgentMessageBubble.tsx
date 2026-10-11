@@ -1,5 +1,5 @@
 import { ArrowRight, Layers } from 'lucide-react'
-import { Suspense, useMemo } from 'react'
+import { Suspense, useDeferredValue, useMemo } from 'react'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import {
   AgentChatItem,
@@ -19,6 +19,7 @@ import {
 import { ProposeMarkBlockList, ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
 import type { ResolveMarkProposal } from '@/components/agent/tools/AgentBlockRenderer'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
+import { useRevealText } from '@/hooks/agent/useRevealText'
 import { AgentMarkdownFallback, AgentMarkdownLazy } from '@/components/markdown/AgentMarkdown.lazy'
 import { cn } from '@/lib/utils'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
@@ -44,7 +45,18 @@ export function AgentMessageBubble({
     if (status === 'adopted' || status === 'dismissed') dismissProposedMark()
   }
   const active = Boolean(message.streaming)
-  const renderText = message.text
+  // 流式平滑：chunk 进缓冲，rAF 匀速揭示；重解析再 defer 让路滚动/输入。
+  // 只切片原文，下游单 Streamdown 实例与安全语义不变。
+  const renderText = useDeferredValue(useRevealText(message.text, Boolean(message.streaming)))
+  const markdownClassName = useMemo(
+    () =>
+      cn(
+        'markdown-preview agent-md min-w-0 max-w-full break-words text-[12px] [overflow-wrap:anywhere]',
+        '[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
+        '[&_.mermaid]:my-2 [&_.mermaid]:overflow-x-auto [&_.mermaid]:rounded-md [&_.mermaid]:bg-muted/40 [&_.mermaid]:p-2',
+      ),
+    [],
+  )
 
   if (message.role === 'system') {
     return (
@@ -100,7 +112,9 @@ export function AgentMessageBubble({
       <Reasoning defaultOpen={false} isStreaming={Boolean(message.streaming)} data-acp-probe="thought" className="mb-0 min-w-0">
         <ReasoningTrigger className="min-h-11 text-xs focus-visible:ring-2 focus-visible:ring-ring" getThinkingMessage={() => collapsedLabel} />
         <ReasoningContent className="min-w-0 pb-2 text-xs text-muted-foreground">
-          <AssistantMarkdownText text={message.text} streaming={Boolean(message.streaming)} />
+          <Suspense fallback={<AgentMarkdownFallback text={message.text} />}>
+            <AgentMarkdownLazy text={renderText} streaming={Boolean(message.streaming)} className={markdownClassName} />
+          </Suspense>
         </ReasoningContent>
       </Reasoning>
     )
@@ -110,15 +124,6 @@ export function AgentMessageBubble({
   const showEmptyStreaming = !isUser && message.streaming && !message.text.trim()
   // 排空期间保持流式外衣，避免闪烁切换
   const showStreaming = active && !isUser
-  const markdownClassName = useMemo(
-    () =>
-      cn(
-        'markdown-preview agent-md min-w-0 max-w-full break-words text-[12px] [overflow-wrap:anywhere]',
-        '[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
-        '[&_.mermaid]:my-2 [&_.mermaid]:overflow-x-auto [&_.mermaid]:rounded-md [&_.mermaid]:bg-muted/40 [&_.mermaid]:p-2',
-      ),
-    [],
-  )
 
   return (
     <AgentChatItem
@@ -172,9 +177,13 @@ export function AgentMessageBubble({
           <span>正在思考…</span>
         </div>
       ) : (
-        <div className="relative min-w-0">
-          <AssistantMarkdownText text={renderText} streaming={showStreaming} />
-        </div>
+        <Suspense
+          fallback={
+            <AgentMarkdownFallback text={renderText} className={markdownClassName} />
+          }
+        >
+          <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />
+        </Suspense>
       )}
       {(message.steps?.length ?? 0) > 0 ? (
         <div className="mt-3 space-y-2 pt-2 border-t border-border/40 font-serif">

@@ -28,6 +28,10 @@ export type ChatTimelineItem =
       /** 整回合普通工具调用数（含窗口外未加载；详情只放可见） */
       toolCallCount: number
       hiddenToolCallCount: number
+      /** 已落定（completed）的普通调用数，用于运行进度 done/total */
+      completedCount: number
+      /** 整回合最后一个落定（completed/failed/cancelled）的普通调用 */
+      lastEvent: { title: string; ok: boolean } | null
       thoughtCount: number
       planCount: number
       failedCount: number
@@ -155,6 +159,22 @@ export function groupChatTimeline(
     const ordinaryVisible = ordinaryAll.filter(isVisible)
     const toolCallCount = ordinaryAll.filter((m) => m.role === 'tool').length
     const visibleToolCount = ordinaryVisible.filter((m) => m.role === 'tool').length
+    const completedCount = ordinaryAll.filter(
+      (m) => m.role === 'tool' && m.toolStatus === 'completed',
+    ).length
+    // 最近事件：整回合最后一个落定的普通调用（只报真实终态，不含运行中）
+    let lastEvent: { title: string; ok: boolean } | null = null
+    for (let i = ordinaryAll.length - 1; i >= 0; i -= 1) {
+      const m = ordinaryAll[i]!
+      if (m.role !== 'tool') continue
+      if (m.toolStatus === 'completed' || m.toolStatus === 'failed' || m.toolStatus === 'cancelled') {
+        lastEvent = {
+          title: readableToolTitle(m.toolTitle),
+          ok: m.toolStatus === 'completed',
+        }
+        break
+      }
+    }
 
     const failedAll = turn.all.filter((m) => m.role === 'tool' && m.toolStatus === 'failed')
     const cancelledCount = turn.all.filter(
@@ -200,6 +220,8 @@ export function groupChatTimeline(
         messages: ordinaryVisible,
         toolCallCount,
         hiddenToolCallCount: toolCallCount - visibleToolCount,
+        completedCount,
+        lastEvent,
         thoughtCount: ordinaryAll.filter((m) => m.role === 'thought').length,
         planCount: ordinaryAll.filter((m) => m.role === 'plan').length,
         failedCount: failedAll.length,

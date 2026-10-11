@@ -25,11 +25,11 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 | 文件 | 功能 |
 |------|------|
 | `AgentMessageList` | 消息列表容器（`lib/agent/chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新） |
-| `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条，运行中默认收起；整回合计数+取消/未知/未加载注记；详情为轻量工具行，按需展开单个调用；用户选择跨 chunk/落定保留） |
+| `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条，运行中默认收起；运行摘要含 done/total 进度与最近落定事件 + 呼吸微光条；整回合计数+取消/未知/未加载注记；详情为轻量工具行，按需展开单个调用；用户选择跨 chunk/落定保留） |
 | `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（默认收起、选择保持、单次渲染、失败摘要、审批外置） |
 | `AgentResultEntry` | 富业务结果独立入口（紧凑过程行 + 独立业务卡，单次调用只渲染一处，`probe="result"`） |
 | `AgentChatItem` | AI Elements Message 的产品布局/探针桥接（卡片与系统提示共用约束） |
-| `AgentMessageBubble` | 用户/助手气泡（Markdown、tool 卡/结果入口、提议块挂接；助手正文无 AGENT 冗余头，流式由外圈状态表达） |
+| `AgentMessageBubble` | 用户/助手气泡（Markdown、tool 卡/结果入口、提议块挂接；助手正文无 AGENT 冗余头，流式由外圈状态表达；正文经打字机揭示 + deferred 让路滚动/输入） |
 
 ## tools/ 工具调用展示
 

@@ -365,4 +365,39 @@ describe('groupChatTimeline 回合归属（U1）', () => {
     expect(group.hasTrustedTime).toBe(false)
     expect(group.durationLabel).toBe('')
   })
+
+  it('运行进度与最近事件只报真实终态（U6 平滑/反馈）', () => {
+    const running = msg({
+      id: 'r1', role: 'tool', toolCallId: 'r1', toolTitle: 'read_text_file',
+      toolStatus: 'in_progress', streaming: true, createdAt: 1000,
+    })
+    const done = msg({
+      id: 'd1', role: 'tool', toolCallId: 'd1', toolTitle: 'search',
+      toolStatus: 'completed', streaming: false, createdAt: 1100, updatedAt: 1500,
+    })
+    const failedLate = msg({
+      id: 'f1', role: 'tool', toolCallId: 'f1', toolTitle: 'edit',
+      toolStatus: 'failed', streaming: false, createdAt: 1200, updatedAt: 1600,
+    })
+    const timeline = groupChatTimeline(
+      [msg({ id: 'u1', role: 'user', text: '查' }), running, done],
+      { nowMs: 9000 },
+    )
+    const group = timeline.find((i) => i.kind === 'work-log')
+    if (group?.kind !== 'work-log') expect.unreachable('应为工作记录组')
+    // 运行中不计入 done；最近事件是最后落定的 done（失败单条不进组但计数）
+    expect(group.toolCallCount).toBe(2)
+    expect(group.completedCount).toBe(1)
+    expect(group.lastEvent).toEqual({ title: '搜索文档', ok: true })
+    // 失败工具提升为单条，不进组 details，但失败计数保留
+    const withFailed = groupChatTimeline(
+      [msg({ id: 'u2', role: 'user', text: '查' }), running, done, failedLate],
+      { nowMs: 9000 },
+    )
+    const group2 = withFailed.find((i) => i.kind === 'work-log')
+    if (group2?.kind !== 'work-log') expect.unreachable('应为工作记录组')
+    expect(group2.failedCount).toBe(1)
+    expect(group2.lastEvent).toEqual({ title: '搜索文档', ok: true })
+    expect(group2.messages.map((m) => m.id)).not.toContain('f1')
+  })
 })

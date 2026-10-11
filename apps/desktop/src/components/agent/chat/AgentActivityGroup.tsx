@@ -83,10 +83,12 @@ function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
 export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivityGroupProps) {
   const [open, setOpen] = useState(false)
 
+  const doneCount =
+    group.completedCount + group.failedCount + group.cancelledCount
   const summary = group.isActive
     ? group.hasAwaitingApproval
       ? `等待批准${group.hasTrustedTime ? ` · 历时 ${group.durationLabel}` : ''}`
-      : `${group.currentAction ?? '工作中'}${group.hasTrustedTime ? ` · 历时 ${group.durationLabel}` : ''}`
+      : `${group.currentAction ?? '工作中'}${group.toolCallCount > 0 ? ` · ${doneCount}/${group.toolCallCount}` : ''}${group.hasTrustedTime ? ` · 历时 ${group.durationLabel}` : ''}`
     : `工作记录 · 工具调用 ${group.toolCallCount}${group.hasTrustedTime ? ` · 历时 ${group.durationLabel}` : ''}`
 
   const sub = [
@@ -112,7 +114,8 @@ export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivity
       <button
         type="button"
         aria-expanded={open}
-        className="flex min-h-[44px] w-full min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring"
+        title={group.lastEvent ? `${summary}（最近：${group.lastEvent.title}${group.lastEvent.ok ? '完成' : '未成功'}）` : summary}
+        className="relative flex min-h-[44px] w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-xl px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring"
         onClick={() => setOpen((v) => !v)}
       >
         {group.isActive ? (
@@ -124,8 +127,21 @@ export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivity
         )}
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">
           {summary}
+          {group.isActive && group.lastEvent ? (
+            <span className="ml-1.5 font-normal opacity-90">
+              · {group.lastEvent.ok ? '✓' : '✗'} {group.lastEvent.title}
+            </span>
+          ) : null}
           {sub ? <span className="ml-1.5 font-normal opacity-80">（{sub}）</span> : null}
         </span>
+        {group.isActive ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-2.5 bottom-1 h-0.5 overflow-hidden rounded-full bg-muted"
+          >
+            <span className="block h-full w-full animate-pulse rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none" />
+          </span>
+        ) : null}
       </button>
 
       {open ? (
