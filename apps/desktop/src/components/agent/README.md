@@ -24,8 +24,8 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 
 | 文件 | 功能 |
 |------|------|
-| `AgentMessageList` | 消息列表容器（时间线分组、贴底滚动、孤案权限卡兜底；memo 隔离流式刷新） |
-| `AgentActivityGroup` | 活动 grouping（同类消息聚合 + 计时） |
+| `AgentMessageList` | 消息列表容器（`lib/agent/chat-timeline` 时间线分组、贴底滚动、可见窗口内孤立审批兜底；memo 隔离流式刷新） |
+| `AgentActivityGroup` | 工作记录折叠组（工具调用条数 + 历时摘要；待审批/失败工具由分组提升，不进组） |
 | `AgentChatItem` | 消息行通用骨架（列宽、可展开体、聊天打开态） |
 | `AgentMessageBubble` | 用户/助手气泡（Markdown、tool 卡、提议块挂接） |
 | `AgentScrollToBottomButton` | 「回到底部」浮动按钮 |
@@ -34,7 +34,8 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 
 | 文件 | 功能 |
 |------|------|
-| `AgentToolCallCard` | 工具调用卡（含权限子卡、图表卡、跨章实体卡、内容审计探针与导读建议挂接） |
+| `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；成功默认收起、用户未选择时随完成自动收起、失败展开一次；审批经 `ToolApprovalSlot` 外挂且唯一；富业务结果分发给 `ToolBusinessResult`） |
+| `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议卡 + 知识卡片沉淀/原文定位；`buildNoteFromDiagram` 已迁至此） |
 | `DiagramViewerCard` | 交互式双模图表卡（时序步骤流 / 实体概览 / Mermaid 原生出图 / 正文穿透 / 钉入） |
 | `CrossReferenceCard` | 跨章节实体概念流转轨迹卡（章节分布热力权重条 / 证据折叠 / 跨章定位） |
 | `ContentAuditCard` | 深度内容审计探针卡（命中条目来源标识 / 原文取证高亮 / 一键正文穿透定位） |
@@ -55,7 +56,8 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 
 | 文件 | 功能 |
 |------|------|
-| `AgentPermissionCard` | 工具权限请求卡（聊天内联审批按钮） |
+| `AgentPermissionCard` | 工具权限请求卡（聊天内联审批按钮；同步领取当前请求实现跨卡幂等，旧请求/重复点击不再发送） |
+| `ToolApprovalSlot` | 工具审批槽（命中当前 pending 才渲染；通用工具卡与批注提议分支统一经此挂载，调用方置于折叠容器外） |
 
 > 订阅接线已在 `hooks/agent/useAcpPermissionIngest` / `useMontreeSnapshotHost`（原 `AgentPermissionHost` / `AgentSnapshotHost` 假组件已删，App 根直接调 Hook）。
 

@@ -102,7 +102,7 @@
 | `acp-composer` | 输入框附件、工作区路径拖入 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
 | `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
-| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示 |
+| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出） |
 | `acp-plan` | 计划条目解析与进度摘要 |
 | `acp-config-preferences` | Mode/Model 等配置记忆 |
 | `acp-config-menu` | Agent 配置项下拉分类与 primary/secondary 切分（含 boolean 开关直通 secondary；fast 类 boolean 由 `findFastToggle` 单列 `fastToggle` 并从 secondary 摘出，`selectFastDefaultOffTarget` 给首次连接默认关一次） |
@@ -121,6 +121,8 @@
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
 | `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议） |
 | `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文） |
+| `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标） |
+| `chat-timeline` / `.test.ts` | 聊天时间线纯分组：工作记录聚合（当前操作只选仍在运行的工具，多并行表达数量）、富卡片/失败/待审批提升、稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组） |
 | `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote |
 | `mark-proposal-failure` | 提议/采用失败分类与「打开该章 / 去划词」引导 |
 

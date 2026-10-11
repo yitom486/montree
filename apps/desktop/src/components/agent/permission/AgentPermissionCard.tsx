@@ -1,4 +1,5 @@
 import { ShieldAlert } from 'lucide-react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { acpApi } from '@/api/acp-api'
 import {
@@ -30,8 +31,23 @@ export function AgentPermissionCard({
   className,
 }: AgentPermissionCardProps) {
   const clearPendingPermission = useAcpUiStore((s) => s.clearPendingPermission)
+  // 同卡防重：同一次挂载只允许抢占一次（React 状态异步到达前连点也只认第一次）
+  const claimedRef = useRef(false)
 
   const respond = (option: AcpPermissionOptionView | null) => {
+    if (claimedRef.current) return
+    claimedRef.current = true
+    // 跨卡共享幂等：以 store 当前请求为准领取；已被处理、被替换或归属不一致直接拒绝。
+    // 双面板镜像同一 store，先抢到者发送，后到者（旧 props/重复点击）不再发送。
+    const current = useAcpUiStore.getState().pendingPermission
+    if (!current || current.requestId !== pending.requestId) return
+    if (
+      current.sessionId != null &&
+      pending.sessionId != null &&
+      current.sessionId !== pending.sessionId
+    ) {
+      return
+    }
     clearPendingPermission(pending.requestId)
     acpApi.respondPermission({
       requestId: pending.requestId,

@@ -7,10 +7,11 @@ import {
   useAcpPendingPermission,
   useAcpUiStore,
 } from '@/stores/acp-ui-store'
-import { AgentActivityGroup, groupAgentMessages } from '@/components/agent/chat/AgentActivityGroup'
+import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
+import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
 import { AgentPermissionCard } from '@/components/agent/permission/AgentPermissionCard'
-import { shouldShowOrphanPermissionCard } from '@/lib/agent/acp-permission-ui'
+import { timelineRendersInlineApproval } from '@/lib/agent/acp-permission-ui'
 import { logAcpLayoutProbe } from '@/lib/agent/acp-layout-probe'
 import { useStickToBottomScroll } from '@/hooks/agent/useStickToBottomScroll'
 import {
@@ -132,7 +133,14 @@ export const AgentMessageList = memo(function AgentMessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowKey])
 
-  const timeline = useMemo(() => groupAgentMessages(visibleMessages), [visibleMessages])
+  const timeline = useMemo(
+    () =>
+      groupChatTimeline(visibleMessages, {
+        pendingToolCallId: pendingPermission?.toolCallId,
+        nowMs,
+      }),
+    [visibleMessages, pendingPermission?.toolCallId, nowMs],
+  )
 
   // 切线程重置窗口（回到底部看末 5 条）。
   useEffect(() => {
@@ -171,7 +179,11 @@ export const AgentMessageList = memo(function AgentMessageList({
     return () => viewport.removeEventListener('scroll', onScroll)
   }, [messagesRef])
 
-  const pendingOrphan = shouldShowOrphanPermissionCard(pendingPermission, messages)
+  // 孤立审批兜底按实际渲染结果决定：可见分组里已有审批槽（工具卡/提议分支外挂）
+  // 即隐藏；被分组跳过、晚到、缺 ID、裁剪掉时才浮出。两者互斥，同一时间线只有一份。
+  const pendingOrphan =
+    pendingPermission != null &&
+    !timelineRendersInlineApproval(timeline, pendingPermission.toolCallId)
 
   useEffect(() => {
     if (!prompting) return
@@ -249,16 +261,15 @@ export const AgentMessageList = memo(function AgentMessageList({
           </div>
         ) : null}
         {timeline.map((item) =>
-          item.type === 'activity' ? (
+          item.kind === 'work-log' ? (
             <AgentActivityGroup
-              key={item.messages.map((m) => m.id).join('-')}
-              messages={item.messages}
-              nowMs={nowMs}
+              key={item.key}
+              group={item}
               onChapterPlanSelect={onChapterPlanSelect}
             />
           ) : (
             <AgentMessageBubble
-              key={item.message.id}
+              key={item.key}
               message={item.message}
               onChapterPlanSelect={onChapterPlanSelect}
             />

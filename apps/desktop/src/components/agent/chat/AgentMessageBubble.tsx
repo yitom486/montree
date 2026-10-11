@@ -7,6 +7,7 @@ import {
   useAgentChatOpen,
 } from '@/components/agent/chat/AgentChatItem'
 import { AgentToolCallCard } from '@/components/agent/tools/AgentToolCallCard'
+import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
 import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
 import {
   ChapterMarkPlanCard,
@@ -80,12 +81,16 @@ export function AgentMessageBubble({
 
   if (message.role === 'tool') {
     if (message.markProposal && message.markProposalStatus !== 'dismissed') {
+      // 批注提议分支同样外挂审批槽：命中 pending 的工具不能因为不走工具卡就丢审批
       return (
-        <ProposeMarkChatBlock
-          proposal={message.markProposal}
-          status={message.markProposalStatus ?? 'pending'}
-          onResolved={(status) => handleResolved(message.markProposal!.id, status)}
-        />
+        <>
+          <ProposeMarkChatBlock
+            proposal={message.markProposal}
+            status={message.markProposalStatus ?? 'pending'}
+            onResolved={(status) => handleResolved(message.markProposal!.id, status)}
+          />
+          <ToolApprovalSlot message={message} />
+        </>
       )
     }
     return (

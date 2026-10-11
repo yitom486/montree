@@ -6,7 +6,7 @@ import {
   DiagramViewerCard,
   type DiagramPayload,
 } from './DiagramViewerCard'
-import { buildNoteFromDiagram } from './AgentToolCallCard'
+import { buildNoteFromDiagram } from './ToolBusinessResult'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 

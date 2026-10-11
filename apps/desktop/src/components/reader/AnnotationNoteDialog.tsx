@@ -21,7 +21,7 @@ import {
   useAnnotationAgentStore,
 } from '@/stores/annotation-agent-store'
 import { ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
-import { groupAgentMessages } from '@/components/agent/chat/AgentActivityGroup'
+import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
 import { AgentScrollToBottomButton } from '@/components/agent/chat/AgentScrollToBottomButton'
 import { useStickToBottomScroll } from '@/hooks/agent/useStickToBottomScroll'
@@ -361,10 +361,10 @@ export function AnnotationNoteDialog({
                   先聊聊这段话。想留批注时点「写成批注」或说「写批注」即可生成到上方。
                 </p>
               ) : (
-                groupAgentMessages(messages).map((item) =>
-                  item.type === 'activity' ? (
+                groupChatTimeline(messages).map((item) =>
+                  item.kind === 'work-log' ? (
                     <div
-                      key={item.messages.map((m) => m.id).join('-')}
+                      key={item.key}
                       className="space-y-1 opacity-80"
                     >
                       {item.messages.map((message) => (
