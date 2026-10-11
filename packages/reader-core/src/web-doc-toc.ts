@@ -46,6 +46,33 @@ export function findWebDocFlatIndex(units: ReaderUnit[], pageUrl: string): numbe
       bestLevel = unit.level
     }
   }
+  if (bestIndex >= 0) return bestIndex
+
+  // 回退匹配：处理同源文档站内的路由别名 / 重定向映射（如 /docs/codex-sdk 与 /codex/codex-sdk）
+  try {
+    const targetUrl = new URL(target)
+    const targetSegments = targetUrl.pathname.split('/').filter(Boolean)
+    const targetSlug = targetSegments[targetSegments.length - 1]?.toLowerCase()
+    if (!targetSlug) return -1
+
+    for (let index = 0; index < units.length; index++) {
+      const unit = units[index]!
+      const unitUrl = new URL(unit.href, target)
+      if (unitUrl.origin !== targetUrl.origin) continue
+
+      const unitSegments = unitUrl.pathname.split('/').filter(Boolean)
+      const unitSlug = unitSegments[unitSegments.length - 1]?.toLowerCase()
+      if (!unitSlug || unitSlug !== targetSlug) continue
+
+      if (unit.level >= bestLevel) {
+        bestIndex = index
+        bestLevel = unit.level
+      }
+    }
+  } catch {
+    // 忽略 URL 解析异常
+  }
+
   return bestIndex
 }
 

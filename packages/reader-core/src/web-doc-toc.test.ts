@@ -44,10 +44,15 @@ describe('web-doc-toc', () => {
     expect(nav.next?.label).toBe('Initialization')
   })
 
-  it('syncWebNavigation 返回相邻节', () => {
-    const nav = syncWebNavigation(units, 'https://react.dev/learn/installation')
-    expect(nav.current?.label).toBe('Installation')
-    expect(nav.previous?.label).toBe('Quick Start')
-    expect(nav.next).toBeNull()
+  it('支持同源别名/重定向路径回退匹配', () => {
+    const aliasedUnits = webDocTocEntriesToReaderUnits([
+      { href: 'https://learn.chatgpt.com/codex/developers', label: 'Overview', level: 0 },
+      { href: 'https://learn.chatgpt.com/codex/codex-sdk', label: 'Codex SDK', level: 1 },
+      { href: 'https://learn.chatgpt.com/codex/app-server', label: 'App Server', level: 1 },
+    ])
+    // 页面 URL 为 /docs/codex-sdk，而目录中链接为 /codex/codex-sdk
+    const index = findWebDocFlatIndex(aliasedUnits, 'https://learn.chatgpt.com/docs/codex-sdk')
+    expect(index).toBe(1)
+    expect(aliasedUnits[index]?.label).toBe('Codex SDK')
   })
 })

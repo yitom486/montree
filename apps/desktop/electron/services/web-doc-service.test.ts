@@ -107,6 +107,41 @@ describe('web-doc-service', () => {
     expect(result.value.siteEntries?.length).toBe(4)
   })
 
+  it('当独立子页面自身无侧栏时回退到根路径发现通用目录', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const u = String(input)
+        if (u === 'https://react.dev/docs/isolated-page') {
+          // 独立页面，只有正文，没有 nav 或侧栏
+          return new Response(
+            `<!DOCTYPE html><html><body><article><h1>Isolated</h1><p>content</p></article></body></html>`,
+            { status: 200, headers: { 'content-type': 'text/html' } },
+          )
+        }
+        if (u === 'https://react.dev/docs/') {
+          // 站点根目录，有完整的 nav 侧栏
+          return new Response(
+            `<!DOCTYPE html><html><body>
+              <nav class="sidebar">
+                <a href="/docs/intro">Intro</a>
+                <a href="/docs/installation">Install</a>
+              </nav>
+            </body></html>`,
+            { status: 200, headers: { 'content-type': 'text/html' } },
+          )
+        }
+        return new Response('', { status: 404 })
+      }),
+    )
+
+    const result = await discoverWebDocToc({ url: 'https://react.dev/docs/isolated-page' })
+    expect(isOk(result)).toBe(true)
+    if (!isOk(result)) return
+    expect(result.value.entries.length).toBe(2)
+    expect(result.value.entries[0]?.label).toBe('Intro')
+  })
+
   describe('重定向链 SSRF 防护', () => {
     beforeEach(() => {
       vi.stubGlobal(

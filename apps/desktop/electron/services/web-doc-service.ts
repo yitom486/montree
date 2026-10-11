@@ -11,6 +11,7 @@ import type {
 import {
   extractGenericWebDocToc,
   extractSameOriginDocLinks,
+  resolveWebDocTocDiscoveryUrl,
 } from '@montree/web-doc'
 import {
   extractLlmsTxtToc,
@@ -214,7 +215,37 @@ export async function discoverWebDocToc(
 
     // 站点级全站索引（如 llms.txt 等）：支持双轨并行
     let siteEntries: WebDocTocEntry[] | undefined
-    if (looksLikeDocsIndexCandidate(fetchResult.value.html)) {
+
+    // 若当前页面是无侧栏的独立内页（sectionEntries 仍为空），尝试回退到站点根入口拉取通用目录
+    if (sectionEntries.length === 0 && siteId !== 'people-daily-paper') {
+      const fallbackUrl = resolveWebDocTocDiscoveryUrl(fetchResult.value.url, siteId)
+      if (fallbackUrl !== fetchResult.value.url) {
+        const rootFetch = await fetchWebDocPage({ url: fallbackUrl })
+        if (rootFetch.ok) {
+          const fromRoot = extractGenericWebDocToc(rootFetch.value.html, rootFetch.value.url)
+          if (fromRoot.length > 0) {
+            sectionEntries = fromRoot
+          } else {
+            sectionEntries = extractSameOriginDocLinks(rootFetch.value.html, rootFetch.value.url)
+          }
+          if (looksLikeDocsIndexCandidate(rootFetch.value.html)) {
+            const llmsUrl = resolveLlmsTxtUrl(rootFetch.value.url, rootFetch.value.html)
+            if (llmsUrl) {
+              const llmsResult = await fetchWebDocPlainText(llmsUrl)
+              if (llmsResult.ok) {
+                const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
+                if (fromLlms.length >= 3) {
+                  siteEntries = fromLlms
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 站点级全站索引（如 llms.txt 等）：支持双轨并行
+    if (!siteEntries && looksLikeDocsIndexCandidate(fetchResult.value.html)) {
       const llmsUrl = resolveLlmsTxtUrl(fetchResult.value.url, fetchResult.value.html)
       if (llmsUrl) {
         const llmsResult = await fetchWebDocPlainText(llmsUrl)

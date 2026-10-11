@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { webDocApi } from '@/api/web-doc-api'
 import { queryKeys } from '@/api/query-keys'
 import { isOk } from '@montree/contracts'
@@ -20,6 +20,7 @@ export function useWebDocToc(discoveryUrl: string | null | undefined) {
     queryKey: queryKeys.webDocToc(safeUrl ?? ''),
     enabled: Boolean(safeUrl),
     queryFn: () => fetchWebDocToc(safeUrl!),
+    placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,
   })
 }

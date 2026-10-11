@@ -57,10 +57,20 @@ export function useWebDocNavigation({
   const normalizedPageUrl = useMemo(() => normalizeWebDocNavUrl(pageUrl), [pageUrl])
   const fileFingerprint = useMemo(() => buildWebDocFileFingerprint(documentId), [documentId])
 
-  const tocDiscoveryUrl = useMemo(
-    () => resolveWebDocTocDiscoveryUrl(pageUrl, siteId),
-    [pageUrl, siteId],
-  )
+  const [activeSectionUrl, setActiveSectionUrl] = useState<string>(documentUrl)
+
+  // 当跨站点或书级 documentId 切换时，重置当前板块发现入口
+  useEffect(() => {
+    setActiveSectionUrl(documentUrl)
+  }, [documentId])
+
+  const tocDiscoveryUrl = useMemo(() => {
+    if (siteId === 'people-daily-paper') {
+      return resolveWebDocTocDiscoveryUrl(pageUrl, siteId)
+    }
+    return activeSectionUrl
+  }, [activeSectionUrl, pageUrl, siteId])
+
   const { data: tocData } = useWebDocToc(tocDiscoveryUrl)
   const [tocMode, setTocMode] = useState<'section' | 'site'>('section')
 
@@ -76,6 +86,22 @@ export function useWebDocNavigation({
     () => (tocData?.siteEntries ? webDocTocEntriesToReaderUnits(tocData.siteEntries) : []),
     [tocData?.siteEntries],
   )
+
+  // 跨板块检测：若当前页面不在当前板块大纲中，自动切换发现入口拉取新板块；
+  // 若当前页面已经在当前板块中，则保持现状避免同板块内翻页抖动或重复拉取
+  useEffect(() => {
+    if (siteId === 'people-daily-paper') return
+    if (sectionUnits.length === 0) {
+      if (activeSectionUrl !== documentUrl) {
+        setActiveSectionUrl(documentUrl)
+      }
+      return
+    }
+    const existsInCurrentSection = findWebDocFlatIndex(sectionUnits, pageUrl) >= 0
+    if (!existsInCurrentSection && activeSectionUrl !== documentUrl) {
+      setActiveSectionUrl(documentUrl)
+    }
+  }, [pageUrl, documentUrl, sectionUnits, siteId, activeSectionUrl])
 
   const hasDualTracks = Boolean(
     tocData?.sectionEntries &&
