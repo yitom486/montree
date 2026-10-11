@@ -71,7 +71,9 @@ export function enrichToolMessageWithChapterPlan<
   },
 >(message: T, isActiveStatus: (status: string | undefined) => boolean): T {
   if (message.role !== 'tool' || message.chapterMarkPlan?.length) return message
-  if (message.streaming || isActiveStatus(message.toolStatus)) return message
+  // 同提议解析：回合收尾后落定内容可解析，不因非终态跳过
+  const turnEnded = (message as { turnEnded?: boolean }).turnEnded === true
+  if ((message.streaming || isActiveStatus(message.toolStatus)) && !turnEnded) return message
 
   const entries = parseChapterMarkPlanFromTool(
     message.toolTitle,

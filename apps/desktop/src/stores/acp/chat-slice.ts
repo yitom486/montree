@@ -69,6 +69,11 @@ export interface ChatSlice {
   clearMessages: () => void
   finishStreaming: () => void
   freezeSettledStreaming: () => void
+  /**
+   * 用户/服务端确认取消后调用：把仍在进行的工具调用显式标 cancelled。
+   * 与收尾冻结配合——取消走 cancelled，未获知结果的残留走展示层“状态未知”。
+   */
+  cancelActiveTools: () => void
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
@@ -82,7 +87,9 @@ export interface ChatSlice {
 
 /**
  * 回合收尾冻结（finishStreaming / freezeSettledStreaming 共用）：
- * 残留 streaming 消息一律 streaming=false + updatedAt=now（进行中工具调用同步落盘），
+ * 残留 streaming 消息一律 streaming=false + updatedAt=now；工具调用只收敛
+ * streaming，不推断执行结果——pending（未执行）随回合取消，in_progress /
+ * 未知状态保留原值由展示层标“状态未知”，绝不补成 completed。
  * 随后走常规 finalize + 中间态 agent 气泡规整。
  */
 function freezeSettledTurn(t: AcpChatThread): AcpChatThread {
@@ -94,7 +101,9 @@ function freezeSettledTurn(t: AcpChatThread): AcpChatThread {
         ...m,
         streaming: false,
         updatedAt: now,
-        toolStatus: m.toolStatus === 'pending' ? 'cancelled' : 'completed',
+        toolStatus: m.toolStatus === 'pending' ? 'cancelled' : m.toolStatus,
+        // 回合收尾标记：内容已落定可解析，但执行结果仍未知（展示不进成功）
+        turnEnded: true,
       }
     }
     return { ...m, streaming: false, updatedAt: now }
@@ -265,6 +274,22 @@ export const createChatSlice: StateCreator<
   // 定居收尾：复用 finishStreaming 的冻结语义，但不碰 prompting。
   // load 恢复时 prompting 本就 false（断言式保持：prompt 回合的收尾仍走 finishStreaming）。
   freezeSettledStreaming: () => set((s) => ({ ...patchActiveThread(s, freezeSettledTurn) })),
+
+  cancelActiveTools: () =>
+    set((s) =>
+      patchActiveThread(s, (t) => {
+        const now = Date.now()
+        let changed = false
+        const messages = t.messages.map((m) => {
+          if (m.role === 'tool' && m.streaming && isToolActiveStatus(m.toolStatus)) {
+            changed = true
+            return { ...m, toolStatus: 'cancelled' as const, updatedAt: now }
+          }
+          return m
+        })
+        return changed ? { ...t, messages, updatedAt: now } : t
+      }),
+    ),
 
   attachMarkProposalsFromSnapshot: (content) =>
     set((s) => {
@@ -551,7 +576,9 @@ export const createChatSlice: StateCreator<
               ...prev,
               toolContentText: merged,
               text: merged,
-              streaming: isToolActiveStatus(prev.toolStatus),
+              // 回合已收尾标记的工具：迟到内容落定合入，不再点亮流式
+              // （解析经 turnEnded 放行，结果状态仍由展示层如实表达）
+              streaming: prev.turnEnded === true ? false : isToolActiveStatus(prev.toolStatus),
               updatedAt: Date.now(),
               toolStatus: prev.toolStatus ?? 'in_progress',
             }

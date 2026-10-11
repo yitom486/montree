@@ -133,6 +133,11 @@ export interface AcpUiStore {
    * load 恢复回放场景 prompting 本就 false，prompt 回合仍走 finishStreaming。
    */
   freezeSettledStreaming: () => void
+  /**
+   * 用户/服务端确认取消后调用：把仍在进行的工具调用显式标 cancelled。
+   * 与收尾冻结配合——取消走 cancelled，未获知结果的残留走展示层“状态未知”。
+   */
+  cancelActiveTools: () => void
   /** MCP 结果不会回传到 ACP session/update 时，由快照响应直接补到对应工具消息。 */
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void

@@ -36,6 +36,12 @@ export interface AcpChatMessage {
   toolContentText?: string
   toolDiffs?: AcpToolDiff[]
   toolLocations?: Array<{ path: string; line?: number }>
+  /**
+   * 回合已收尾但工具未获明确终态（结果不可知，状态保留原值）。
+   * 内容解析（提议/章计划）可据此解析已落定内容；展示层仍按
+   * streaming/终态判定，不把该标记当成功。
+   */
+  turnEnded?: boolean
   /** plan 卡片 */
   planEntries?: AcpPlanEntry[]
   /** montree_propose_* 工具结果（promote 前） */

@@ -138,7 +138,11 @@ export function enrichToolMessageWithMarkProposal<
   if (message.role !== 'tool' || message.markProposal || message.markProposals?.length) {
     return message
   }
-  if (message.streaming || isActiveStatus(message.toolStatus)) return message
+  // 流式未完成且回合未收尾时跳过：半截 JSON 不解析。
+  // 回合已收尾（turnEnded）的内容视为落定，即使状态仍非终态也解析，
+  // 迟到的内容块仍能挂出提议；执行结果是否成功与此无关。
+  const turnEnded = (message as { turnEnded?: boolean }).turnEnded === true
+  if ((message.streaming || isActiveStatus(message.toolStatus)) && !turnEnded) return message
 
   const proposals = parseMarkProposalsFromTool(
     message.toolTitle,

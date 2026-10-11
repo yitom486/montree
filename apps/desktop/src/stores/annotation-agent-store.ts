@@ -325,7 +325,10 @@ export const useAnnotationAgentStore = create<AnnotationAgentStore>()(
                   ...m,
                   streaming: false,
                   updatedAt: now,
-                  toolStatus: m.toolStatus === 'pending' ? 'cancelled' : 'completed',
+                  // 与主时间线同语义：pending 随回合取消，其余保留原状态
+                  // 由展示层标“状态未知”，绝不补成 completed
+                  toolStatus: m.toolStatus === 'pending' ? 'cancelled' : m.toolStatus,
+                  turnEnded: true,
                 })
               }
               return { ...m, streaming: false, updatedAt: now }

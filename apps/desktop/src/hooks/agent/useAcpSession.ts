@@ -636,6 +636,10 @@ export function useAcpSession(workspaceRoot?: string) {
         markSessionBootstrapSent(sid)
       }
       flushBufferedChunks()
+      // 服务端 stopReason=cancelled 视为确认取消：先标残留工具再收尾
+      if (isOk(result) && result.value.stopReason === 'cancelled') {
+        useAcpUiStore.getState().cancelActiveTools()
+      }
       finishStreaming()
       if (!isOk(result)) {
         reportAppError(result.error)
@@ -672,6 +676,8 @@ export function useAcpSession(workspaceRoot?: string) {
       return
     }
     useAcpUiStore.getState().clearPendingPermission()
+    // 服务端已确认取消：残留工具标 cancelled，再收尾（结果未知的残留走“状态未知”）
+    useAcpUiStore.getState().cancelActiveTools()
     flushBufferedChunks()
     finishStreaming()
   }, [finishStreaming, flushBufferedChunks])

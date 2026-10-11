@@ -432,7 +432,9 @@ describe('load 定居收尾（freezeSettledStreaming + 空线程例外）', () =
       const messages = activeMessages()
       // user 等非流式消息本就没有 streaming 字段（undefined），只断言无残留 true
       expect(messages.every((m) => !m.streaming)).toBe(true)
-      expect(messages.find((m) => m.role === 'tool')?.toolStatus).toBe('completed')
+      // 收尾只冻结 streaming，不推断执行结果：残留 in_progress 保留原状态，
+      // 由展示层标“状态未知”，绝不补成 completed
+      expect(messages.find((m) => m.role === 'tool')?.toolStatus).toBe('in_progress')
       expect(useAcpUiStore.getState().prompting).toBe(prompting)
       // 回合收尾语义：prompting 由调用方（prompt 流程）负责，定居收尾不断言
       useAcpUiStore.getState().clearMessages()
@@ -452,6 +454,49 @@ describe('load 定居收尾（freezeSettledStreaming + 空线程例外）', () =
     expect(messages).toHaveLength(before)
     expect(messages.every((m) => !m.streaming)).toBe(true)
     expect(useAcpUiStore.getState().prompting).toBe(false)
+  })
+
+  it('收尾保留明确终态：completed/failed/cancelled 不动，pending 随回合取消', () => {
+    const store = useAcpUiStore.getState()
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-ok', title: 'ok', status: 'completed' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-bad', title: 'bad', status: 'failed' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-can', title: 'can', status: 'cancelled' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-wait', title: 'wait', status: 'pending' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-run', title: 'run', status: 'in_progress' })
+    store.finishStreaming()
+    const byId = new Map(activeMessages().map((m) => [m.toolCallId, m]))
+    expect(byId.get('tc-ok')?.toolStatus).toBe('completed')
+    expect(byId.get('tc-bad')?.toolStatus).toBe('failed')
+    expect(byId.get('tc-can')?.toolStatus).toBe('cancelled')
+    expect(byId.get('tc-wait')?.toolStatus).toBe('cancelled')
+    // in_progress 残留不断言成功：保留原状态，展示层标“状态未知”
+    expect(byId.get('tc-run')?.toolStatus).toBe('in_progress')
+    expect(byId.get('tc-run')?.streaming).toBe(false)
+  })
+
+  it('cancelActiveTools 只标仍在进行的调用，已落定不动', () => {
+    const store = useAcpUiStore.getState()
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-live', title: 'live', status: 'in_progress' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'tc-done', title: 'done', status: 'completed' })
+    store.cancelActiveTools()
+    const byId = new Map(activeMessages().map((m) => [m.toolCallId, m]))
+    expect(byId.get('tc-live')?.toolStatus).toBe('cancelled')
+    expect(byId.get('tc-done')?.toolStatus).toBe('completed')
+  })
+
+  it('同运行时切线程保留 pending（会话级审批仍需响应）', () => {
+    const store = useAcpUiStore.getState()
+    const first = store.activeThreadId
+    store.setPendingPermission({
+      requestId: 9,
+      summary: '删文件',
+      options: [{ optionId: 'allow', name: '允许', kind: 'allow_once' }],
+      toolCallId: 'tc-old',
+    })
+    const second = store.createThread()
+    expect(second).not.toBe(first)
+    store.switchThread(second)
+    expect(useAcpUiStore.getState().pendingPermission?.requestId).toBe(9)
   })
 
   it('空线程回放重建时间线：chunks 合并为 streaming 消息，收尾一次冻结', () => {
