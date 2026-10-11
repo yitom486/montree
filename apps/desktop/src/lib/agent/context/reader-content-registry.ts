@@ -20,6 +20,8 @@ export interface ReaderUnitText {
 }
 
 export interface ReaderContentProvider {
+  /** Optional document navigation; text documents use their editor/preview unit bridge. */
+  navigateToFlatIndex?: (flatIndex: number, excerpt?: string) => Promise<boolean>
   getUnits?: () => Array<{ label: string; level?: number }>
   getCurrentUnitIndex?: () => number
   /** 图片地址只是引用；像素由截图工具按需读取。 */

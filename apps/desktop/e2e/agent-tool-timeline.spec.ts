@@ -154,6 +154,23 @@ async function expectSeededTimeline(
   info: TestInfo,
   tag: string,
 ) {
+  // 高度基线（U5：默认态过程+结果入口整体高度；改造前后同种子对比）。
+  const measureTimeline = () =>
+    panel.evaluate((el) => {
+      const items = [...el.querySelectorAll('[data-acp-probe="activity"],[data-acp-probe="tool"],[data-acp-probe="result"]')]
+      const rows = items.map((node) => ({
+        probe: node.getAttribute('data-acp-probe'),
+        height: Math.round((node as HTMLElement).getBoundingClientRect().height),
+      }))
+      return {
+        listScrollHeight: (el as HTMLElement).scrollHeight,
+        entryHeightSum: rows.reduce((sum, r) => sum + r.height, 0),
+        workLogCount: rows.filter((r) => r.probe === 'activity').length,
+        toolCount: rows.filter((r) => r.probe === 'tool').length,
+        resultCount: rows.filter((r) => r.probe === 'result').length,
+        rows,
+      }
+    })
   // 历史窗口初始只看末尾 N 条：先加载更多，再做完整断言（同时覆盖历史加载回归）。
   // 列表顶部按钮可能被粘性头遮挡命中检测，用 DOM 点击。
   const loadMore = panel.getByTestId('chat-load-more')
@@ -165,8 +182,9 @@ async function expectSeededTimeline(
   // 工作记录：工具调用计数可见，不用消息数冒充步骤数；默认收起。
   // 旧文案「工作了 Xs · N 步」必须消失（精确匹配旧格式，避免误伤「步骤」等词）。
   // 注：种子含两个工具调用 2 的组，首组用于下述展开断言。
-  const workLog = panel.getByText(/工作记录 · 工具调用 2/).first()
+  const workLog = panel.getByText(/工作记录 · 工具调用 4/).first()
   await expect(workLog).toBeVisible()
+  await expect(panel.getByText(/工作记录 · 工具调用 2/)).toHaveCount(0)
   await expect(panel.getByText(/工作了 .* · \d+ 步/)).toHaveCount(0)
   await expect(panel.getByText('第一章第一段正文摘要')).toHaveCount(0)
 
@@ -174,15 +192,30 @@ async function expectSeededTimeline(
   await expect(panel.getByText('失败').first()).toBeVisible()
   await expect(panel.getByText('阅读上下文未就绪')).toBeVisible()
 
-  // 富图表卡直接呈现在主流（含 Mermaid 出图与知识卡片入口）
-  await expect(panel.getByRole('button', { name: /图表推演/ })).toBeVisible()
-  await expect(panel.getByTestId('diagram-viewer-card')).toBeVisible()
+  // 默认态测量（任何展开点击之前）：U5 40% 对比的起点
+  const defaultMeasure = await measureTimeline()
+  await info.attach('timeline-measure-default', {
+    body: JSON.stringify(defaultMeasure, null, 2),
+    contentType: 'application/json',
+  })
+  // eslint-disable-next-line no-console
+  console.log(`TIMELINE_DEFAULT=${JSON.stringify(defaultMeasure)}`)
 
-  // 展开工作记录后可见组内工具头；已完成工具本身默认收起，再点其工具头才见详情
+  // 富图表走独立结果入口：紧凑过程行 + 紧凑卡（默认不渲染 Mermaid 画布）
+  await expect(panel.getByTestId('diagram-viewer-card')).toBeVisible()
+  await expect(panel.getByRole('button', { name: /查看完整图表/ })).toBeVisible()
+  await expect(panel.locator('[data-testid="diagram-viewer-card"] .mermaid')).toHaveCount(0)
+
+  // 完整入口可达：展开后见复制入口与知识卡片操作
+  await panel.getByRole('button', { name: /查看完整图表/ }).click()
+  await expect(panel.getByRole('button', { name: /复制代码/ })).toBeVisible()
+  await expect(panel.getByText('存为知识卡片')).toBeVisible()
+
+  // 展开工作记录后见轻量工具行；点击一次直接见详情。
   await workLog.click()
-  const readTool = panel.getByRole('button', { name: /读取文档/ }).first()
-  await expect(readTool).toBeVisible()
-  await readTool.click()
+  const readRow = panel.getByRole('button', { name: /读取文档/ }).first()
+  await expect(readRow).toBeVisible()
+  await readRow.click()
   await expect(panel.getByText('第一章第一段正文摘要')).toBeVisible()
 
   // 长内容不撑开面板
@@ -196,6 +229,12 @@ async function expectSeededTimeline(
   const path = await info.outputPath(`timeline-${tag}.png`)
   await panel.screenshot({ path })
   await info.attach(`timeline-${tag}`, { path, contentType: 'image/png' })
+  await info.attach(`timeline-measure-${tag}`, {
+    body: JSON.stringify(await measureTimeline(), null, 2),
+    contentType: 'application/json',
+  })
+  // eslint-disable-next-line no-console
+  console.log(`TIMELINE_MEASURE_${tag}=${JSON.stringify(await measureTimeline())}`)
 }
 
 test.describe('聊天展示层 R2', () => {
@@ -373,7 +412,7 @@ test.describe('聊天展示层 R2', () => {
       const failedHeader = panel.getByRole('button', { name: /读取文档/ }).last()
       await failedHeader.click()
       await expect(panel.getByText('阅读上下文未就绪')).toBeVisible()
-      const lastGroup = panel.getByText(/工作记录 · 工具调用 2/).last()
+      const lastGroup = panel.getByText(/工作记录 · 工具调用 4/).last()
       await lastGroup.click()
       await panel.getByRole('button', { name: /fetch_remote/ }).click()
       const pre = panel.locator('pre', { hasText: '证据行-0' }).first()
@@ -402,6 +441,282 @@ test.describe('聊天展示层 R2', () => {
         body: JSON.stringify({ w390, w480, w320 }),
         contentType: 'application/json',
       })
+    } finally {
+      await app.close()
+    }
+  })
+
+  test('收敛基线：10 次普通调用只占一条工作记录，2 个结果仅 2 个入口', async ({}, info) => {
+    const app = await launchBuiltApp()
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      await window.setViewportSize({ width: 1600, height: 900 })
+      await window.evaluate(() => {
+        const base = Date.now()
+        const messages: Array<Record<string, unknown>> = [
+          { id: 'u-10', role: 'user', text: '批量梳理十节', createdAt: base },
+        ]
+        for (let i = 0; i < 10; i += 1) {
+          messages.push({
+            id: `tc-10-${i}`,
+            role: 'tool',
+            text: `第 ${i + 1} 节摘要正文`,
+            createdAt: base + i,
+            updatedAt: base + 100 + i,
+            streaming: false,
+            toolCallId: `tc-10-${i}`,
+            toolKind: 'read',
+            toolTitle: 'read_text_file',
+            toolStatus: 'completed',
+            toolContentText: `第 ${i + 1} 节摘要正文`,
+          })
+        }
+        const diagram = JSON.stringify({
+          diagramId: 'diag-10',
+          diagramType: 'flowchart',
+          title: '十节总览',
+          summary: '十节流转摘要',
+          mermaidCode: 'graph TD; A-->B',
+        })
+        messages.push({
+          id: 'tc-10-diagram',
+          role: 'tool',
+          text: diagram,
+          createdAt: base + 50,
+          updatedAt: base + 150,
+          streaming: false,
+          toolCallId: 'tc-10-diagram',
+          toolKind: 'other',
+          toolTitle: 'montree_generate_diagram',
+          toolStatus: 'completed',
+          toolContentText: diagram,
+        })
+        messages.push({
+          id: 'tc-10-artifact',
+          role: 'tool',
+          text: JSON.stringify({ schemaVersion: 1, kind: 'html-artifact', id: 'present-html-artifact-10', title: '小结页', html: '<p>十节小结</p>' }),
+          createdAt: base + 60,
+          updatedAt: base + 160,
+          streaming: false,
+          toolCallId: 'tc-10-artifact',
+          toolKind: 'other',
+          toolTitle: 'montree_present',
+          toolStatus: 'completed',
+          toolContentText: JSON.stringify({ schemaVersion: 1, kind: 'html-artifact', id: 'present-html-artifact-10', title: '小结页', html: '<p>十节小结</p>' }),
+        })
+        messages.push({ id: 'a-10', role: 'agent', text: '十节已梳理完毕。', createdAt: base + 70, updatedAt: base + 170, streaming: false })
+        localStorage.setItem(
+          'montree-acp-ui',
+          JSON.stringify({
+            version: 0,
+            state: {
+              panelOpen: true,
+              hudDisplayMode: 'docked',
+              selectedRuntimeId: 'codex-acp',
+              activeThreadId: 'thread-converge',
+              threads: [{ id: 'thread-converge', title: '收敛基线', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', agentSessionIds: {}, messages }],
+            },
+          }),
+        )
+      })
+      await window.evaluate(() => {
+        localStorage.setItem(
+          'montree-reader-hud-ui',
+          JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
+        )
+      })
+      await window.reload()
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      const panel = await openPanel(window)
+
+      // 默认态：一条工作记录（10 次调用）+ 2 个结果入口，不多占
+      await expect(panel.getByText(/工作记录 · 工具调用 10/)).toBeVisible({ timeout: 10_000 })
+      await expect(panel.locator('[data-acp-probe="activity"]')).toHaveCount(1)
+      await expect(panel.locator('[data-acp-probe="result"]')).toHaveCount(2)
+      await expect(panel.getByTestId('diagram-viewer-card')).toHaveCount(1)
+      await expect(panel.getByTestId('html-artifact-card')).toHaveCount(1)
+      // 详情默认收起：10 份输出正文都不在 DOM 可见文本里
+      await expect(panel.getByText('第 5 节摘要正文')).toHaveCount(0)
+
+      const measured = await panel.evaluate((el) => {
+        const items = [...el.querySelectorAll('[data-acp-probe="activity"],[data-acp-probe="tool"],[data-acp-probe="result"]')]
+        return {
+          listScrollHeight: (el as HTMLElement).scrollHeight,
+          entryHeightSum: items.reduce((sum, node) => sum + Math.round((node as HTMLElement).getBoundingClientRect().height), 0),
+        }
+      })
+      await info.attach('converge-measure', { body: JSON.stringify(measured), contentType: 'application/json' })
+      // eslint-disable-next-line no-console
+      console.log(`CONVERGE_MEASURE=${JSON.stringify(measured)}`)
+      await panel.screenshot({ path: info.outputPath('converge.png') })
+      await info.attach('converge', { path: info.outputPath('converge.png'), contentType: 'image/png' })
+    } finally {
+      await app.close()
+    }
+  })
+
+  test('流式工作记录：运行默认收起，手动展开后落定不收起', async ({}, info) => {    const app = await launchBuiltApp({
+      E2E_ACP_WINDOW_TEST: '1',
+      E2E_ACP_COMMAND: process.execPath,
+      E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
+    })
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      const panel = await openPanel(window)
+      const connected = await window.evaluate(() =>
+        (window as any).electronAPI.acpConnect({ runtimeId: 'mock-window' }),
+      )
+      expect(connected.ok, JSON.stringify(connected)).toBe(true)
+      const sessionId = connected.value.sessionId as string
+      const prompt = (text: string) =>
+        window.evaluate(
+          ({ sessionId, text }) => {
+            void (window as any).electronAPI.acpPrompt({
+              sessionId,
+              prompt: [{ type: 'text', text }],
+            })
+          },
+          { sessionId, text },
+        )
+
+      await prompt('worklog')
+      // 运行中（mock 不主动结束回合，工具保持流式）：一条工作记录，
+      // 默认收起，只见真实当前操作（2 个并行，不伪造串行）
+      const workLog = panel.getByText(/2 个工具并行执行/).first()
+      await expect(workLog).toBeVisible({ timeout: 15_000 })
+      await expect(panel.locator('[data-acp-probe="activity"]')).toHaveCount(1)
+      const expanded = await panel
+        .locator('[data-acp-probe="activity"] button[aria-expanded]')
+        .first()
+        .getAttribute('aria-expanded')
+      expect(expanded).toBe('false')
+
+      // 手动展开后落定：保持展开，行内工具可见
+      await panel.locator('[data-acp-probe="activity"] button[aria-expanded]').first().click()
+      await expect(panel.getByRole('button', { name: /读取文件/ }).first()).toBeVisible()
+      await prompt('worklog-done')
+      await expect(panel.getByText(/WORKLOG:.*done/)).toBeVisible({ timeout: 15_000 })
+      expect(
+        await panel
+          .locator('[data-acp-probe="activity"] button[aria-expanded]')
+          .first()
+          .getAttribute('aria-expanded'),
+      ).toBe('true')
+      await expect(panel.getByText(/工作记录 · 工具调用 2/)).toBeVisible()
+      await panel.screenshot({ path: info.outputPath('worklog-stream.png') })
+      await info.attach('worklog-stream', { path: info.outputPath('worklog-stream.png'), contentType: 'image/png' })
+    } finally {
+      await app.close()
+    }
+  })
+  test('社区滚动与历史恢复：离底浮现回到底部，重载后窗口与状态恢复', async ({}, info) => {
+    const app = await launchBuiltApp()
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      await window.setViewportSize({ width: 1600, height: 900 })
+      await window.evaluate(() => {
+        const base = Date.now()
+        const messages: Array<Record<string, unknown>> = []
+        for (let turn = 0; turn < 12; turn += 1) {
+          messages.push({ id: 'u-scroll-' + turn, role: 'user', text: '第' + (turn + 1) + '问', createdAt: base + turn * 10 })
+          messages.push({
+            id: 'tc-scroll-' + turn,
+            role: 'tool',
+            text: '第' + (turn + 1) + '节摘要',
+            createdAt: base + turn * 10 + 1,
+            updatedAt: base + turn * 10 + 2,
+            streaming: false,
+            toolCallId: 'tc-scroll-' + turn,
+            toolKind: 'read',
+            toolTitle: 'read_text_file',
+            toolStatus: 'completed',
+            toolContentText: '第' + (turn + 1) + '节摘要',
+          })
+          messages.push({ id: 'a-scroll-' + turn, role: 'agent', text: '第' + (turn + 1) + '答：已梳理。', createdAt: base + turn * 10 + 3, updatedAt: base + turn * 10 + 4, streaming: false })
+        }
+        localStorage.setItem(
+          'montree-acp-ui',
+          JSON.stringify({
+            version: 0,
+            state: {
+              panelOpen: true,
+              hudDisplayMode: 'docked',
+              selectedRuntimeId: 'codex-acp',
+              activeThreadId: 'thread-scroll',
+              threads: [{ id: 'thread-scroll', title: '滚动恢复', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', agentSessionIds: {}, messages }],
+            },
+          }),
+        )
+      })
+      await window.evaluate(() => {
+        localStorage.setItem(
+          'montree-reader-hud-ui',
+          JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
+        )
+      })
+      await window.reload()
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      const panel = await openPanel(window)
+      const loadMore = panel.getByTestId('chat-load-more')
+      // 前补到全量（按钮消失）：后续计数完全确定，不受顶部自动补漂移影响
+      for (let i = 0; i < 8; i += 1) {
+        if ((await loadMore.count()) === 0) break
+        await loadMore.first().dispatchEvent('click')
+        await window.waitForTimeout(400)
+      }
+      await expect(loadMore).toHaveCount(0)
+      const countBefore = await panel.locator('[data-acp-probe]').count()
+      expect(countBefore).toBeGreaterThan(30)
+
+      // 离底：滚轮上滑后回到底部浮现，点击回到贴底
+      await panel.hover()
+      await window.mouse.wheel(0, -600)
+      const toBottom = panel.getByRole('button', { name: '回到底部' })
+      await expect(toBottom).toBeVisible({ timeout: 10_000 })
+      await toBottom.click()
+      await expect(toBottom).toBeHidden({ timeout: 10_000 })
+
+      // 再次离底后重载：离底状态恢复（新加载默认贴底、无按钮；恢复后按钮在）。
+      // persist 节流 1500ms：轮询确认离底快照落盘后再重载，不靠固定等待碰运气。
+      await panel.hover()
+      await window.mouse.wheel(0, -600)
+      await expect(panel.getByRole('button', { name: '回到底部' })).toBeVisible({ timeout: 10_000 })
+      await expect
+        .poll(
+          async () =>
+            window.evaluate(() => {
+              const raw = JSON.parse(localStorage.getItem('montree-acp-ui') ?? '{}')
+              return raw?.state?.chatScrollByThread?.['thread-scroll'] ?? null
+            }),
+          { timeout: 15_000 },
+        ).toMatchObject({ pinned: false })
+      await window.reload()
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      const panel2 = await openPanel(window)
+      // 全量窗口恢复：条数与离底前一致（重置则只剩末 5 条）；按钮在（仍离底）
+      expect(await panel2.locator('[data-acp-probe]').count()).toBe(countBefore)
+      await expect(panel2.getByTestId('chat-load-more')).toHaveCount(0)
+      await expect(panel2.getByRole('button', { name: '回到底部' })).toBeVisible({ timeout: 10_000 })
+      await panel2.screenshot({ path: info.outputPath('scroll-restore.png') })
+      await info.attach('scroll-restore', { path: info.outputPath('scroll-restore.png'), contentType: 'image/png' })
     } finally {
       await app.close()
     }

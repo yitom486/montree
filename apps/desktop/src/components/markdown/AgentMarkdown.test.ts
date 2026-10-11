@@ -1,0 +1,272 @@
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AgentMarkdown } from './AgentMarkdown'
+
+
+// happy-dom has no layout/visibility; only the observer is supplied. The actual plugin renders in Electron tests.
+vi.stubGlobal('IntersectionObserver', class {
+  constructor(private callback: IntersectionObserverCallback) {}
+  observe(target: Element) { this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver) }
+  disconnect() {}
+  unobserve() {}
+  takeRecords() { return [] }
+})
+vi.mock('@streamdown/mermaid', () => ({ createMermaidPlugin: () => ({
+  name: 'mermaid', type: 'diagram', language: 'mermaid',
+  getMermaid: () => ({ initialize() {}, render: async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>A to B</text></svg>' }) }),
+}) }))
+
+;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+
+async function render(text: string, streaming = false): Promise<HTMLElement> {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  act(() => {
+    root.render(createElement(AgentMarkdown, { text, streaming }))
+  })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)) })
+  const html = container.innerHTML
+  act(() => {
+    root.unmount()
+  })
+  container.remove()
+  const probe = document.createElement('div')
+  probe.innerHTML = html
+  return probe
+}
+
+describe('AgentMarkdown（Streamdown 接入）', () => {
+  it('渲染中文加粗、表格、任务列表与单换行', async () => {
+    const el = await render('这是**加粗**的中文\n第二行\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] 完成\n- [ ] 待办')
+    expect(el.querySelector('strong')?.textContent).toBe('加粗')
+    expect(el.querySelector('table')).not.toBeNull()
+    expect(el.querySelectorAll('table td')[1]?.textContent).toBe('2')
+    const checkbox = el.querySelector('input[type="checkbox"]')
+    expect(checkbox).not.toBeNull()
+    expect(el.querySelector('p')?.innerHTML).toContain('<br>')
+  })
+
+  it('裸链接可点击，javascript: 被拦截且点击无导航', async () => {
+    const el = await render('[文档](https://example.com/a) 与裸链接 https://example.com/b\n\n[点我](javascript:alert(1))')
+    const links = [...el.querySelectorAll('a')]
+    expect(links[0]?.getAttribute('href')).toBe('https://example.com/a')
+    expect(links[1]?.textContent).toContain('https://example.com/b')
+    const evil = links.find((a) => a.textContent === '点我')
+    // 消毒剥 href 或策略落到 '#'：两种形态都不得出现 javascript:
+    expect(evil?.getAttribute('href') ?? '').not.toContain('javascript:')
+  })
+
+  it('xss 载荷不执行：img onerror 转义为文本', async () => {
+    const el = await render('<img src="x" onerror="alert(2)" />')
+    expect(el.querySelector('img')).toBeNull()
+    expect(el.textContent).toContain('<img')
+  })
+
+  it('details 与裸 HTML 转义为文本（与 strictSafe 同语义）', async () => {
+    const el = await render('<details><summary>展开</summary>内容</details>')
+    expect(el.querySelector('details')).toBeNull()
+    expect(el.textContent).toContain('<details>')
+  })
+
+  it('社区代码块包含工具栏、复制入口与原文', async () => {
+    const el = await render('```ts\nconst answer = 42\n```')
+    expect(el.querySelector('[data-streamdown=code-block-header]')?.textContent).toBe('ts')
+    expect(el.querySelector('button[data-streamdown=code-block-copy-button]')).not.toBeNull()
+    expect(el.querySelector('[data-streamdown=code-block] code')?.textContent).toContain('const answer = 42')
+    expect(el.querySelector('[data-streamdown=code-block] pre')?.textContent).toContain('const answer = 42')
+  })
+
+  it('未闭合围栏直接成块，不吞内容', async () => {
+    const el = await render('```ts\nconst x = 1', true)
+    expect(el.querySelector('[data-streamdown=code-block]')).not.toBeNull()
+    expect(el.textContent).toContain('const x = 1')
+  })
+
+  it('公式：行内单美元、块公式与括号形式均渲染，货币保持原文', async () => {
+    const el = await render('行内 $E=mc^2$ 与块 $$\\frac{a}{b}$$ 与括号 \\(x+1\\)')
+    expect(el.querySelectorAll('.katex')).toHaveLength(3)
+    const currency = await render('价格 $100 和 $200')
+    expect(currency.querySelector('.katex')).toBeNull()
+    expect(currency.textContent).toContain('$100')
+  })
+
+  it('数字开头的括号公式同样渲染（非仅 $100 差异）', async () => {
+    const el = await render('计算 \\(2+2\\)')
+    expect(el.querySelectorAll('.katex')).toHaveLength(1)
+    const spaced = await render('计算 \\(A + B\\)')
+    expect(spaced.querySelectorAll('.katex')).toHaveLength(1)
+  })
+
+  it('无语言围栏保留多行块与复制按钮（text 回退）', async () => {
+    const el = await render('```\nfirst line\nsecond line\n```')
+    const code = el.querySelector('pre code')
+    expect(code).not.toBeNull()
+    expect(code?.textContent).toContain('first line')
+    expect(code?.textContent).toContain('second line')
+    expect(el.querySelector('[data-streamdown=code-block-copy-button]')).not.toBeNull()
+    expect(el.querySelector('[data-streamdown=code-block-header]')?.textContent).toBe('text')
+  })
+
+  it('行内代码保持裸 code（非块）', async () => {
+    const el = await render('这是 `inline` 代码')
+    expect(el.querySelector('code')?.textContent).toBe('inline')
+    expect(el.querySelector('[data-streamdown=code-block]')).toBeNull()
+  })
+
+  it('未闭合代码不调用高亮（门控在分支内）', async () => {
+    const highlighter = await import('@/lib/editor/code-highlight')
+    const spy = vi.spyOn(highlighter, 'highlightCode')
+    try {
+      await render('```ts\nconst answer =', true)
+      expect(spy).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('未闭合公式流式可读呈现，闭合后恢复', async () => {
+    const open = await render('$$\\frac{a}{b', true)
+    expect(open.querySelector('.katex-error')).not.toBeNull()
+    expect(open.textContent).toContain('\\frac{a}{b')
+    const closed = await render('$$\\frac{a}{b}$$', false)
+    expect(closed.querySelector('.katex-display, .katex')).not.toBeNull()
+  })
+
+  it('mark/sub/sup 与 alert 渲染', async () => {
+    const el = await render('这是==高亮==和~下标~与^上标^\n\n> [!NOTE]\n> 提示内容')
+    expect(el.querySelector('mark')?.textContent).toBe('高亮')
+    expect(el.querySelector('sub')?.textContent).toBe('下标')
+    expect(el.querySelector('sup')?.textContent).toBe('上标')
+    expect(el.querySelector('.markdown-alert.markdown-alert-note')).not.toBeNull()
+  })
+
+  it('tel 链接与 data 图片按既有策略放行', async () => {
+    const el = await render('[拨打](tel:123)\n\n![图](data:image/png;base64,iVBORw0KGgo=)')
+    expect(el.querySelector('a[href="tel:123"]')).not.toBeNull()
+    expect(el.querySelector('img')?.getAttribute('src')).toContain('data:image/png')
+  })
+
+  it('脚注引用与定义成对渲染（引用为行内链接形态）', async () => {
+    const el = await render('正文[^1]\n\n[^1]: 脚注内容')
+    expect(el.textContent).toContain('脚注内容')
+    expect(el.querySelector('sup a[href^="#"]')).not.toBeNull()
+    expect(el.querySelector('section.footnotes')).not.toBeNull()
+  })
+
+  it('社区 Mermaid 未闭合不出图、闭合后挂载', async () => {
+    const open = await render('```mermaid\ngraph TD; A-->', true)
+    expect(open.querySelector('[data-streamdown=mermaid] svg')).toBeNull()
+    expect(open.querySelector('[data-streamdown=mermaid] svg')).toBeNull()
+    const closed = await render('```mermaid\ngraph TD; A-->B\n```', true)
+    expect(closed.querySelector('[data-streamdown="mermaid-block"]')).not.toBeNull()
+  })
+
+  it('标题链接对应消息内唯一锚点', async () => {
+    const el = await render('# 标题一\n\n[回到标题](#标题一)\n\n# 标题一')
+    expect(el.querySelector('h1')?.textContent).toBe('标题一')
+    const headings = [...el.querySelectorAll('h1')]
+    expect(headings[0]!.id).toBeTruthy()
+    expect(headings[0]!.id).not.toBe(headings[1]!.id)
+    expect(el.querySelector('a')?.getAttribute('href')).toBe(`#${headings[0]!.id}`)
+  })
+
+  it('数字公式跨 chunk 恢复解析，货币与显式转义保持文本', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      act(() => root.render(createElement(AgentMarkdown, { text: '结果 $2x+', streaming: true })))
+      act(() => root.render(createElement(AgentMarkdown, { text: String.raw`结果 $2x+1$，价格 $100 和 $200，显式 \$300`, streaming: false })))
+      expect(container.querySelectorAll('.katex')).toHaveLength(1)
+      expect(container.textContent).toContain('价格 $100 和 $200')
+      expect(container.textContent).toContain('显式 $300')
+    } finally { act(() => root.unmount()); container.remove() }
+  })
+
+  it('两个消息的同号脚注隔离，引用和返回点击到实际目标并保持 ID', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const text = '正文[^1]\n\n另一段再次引用[^1]\n\n[^1]: 脚注内容'
+    const draw = (tail: string) => act(() => root.render(createElement('div', {},
+      createElement('article', { key: 'a' }, createElement(AgentMarkdown, { text: text + tail, streaming: false })),
+      createElement('article', { key: 'b' }, createElement(AgentMarkdown, { text, streaming: false })),
+    )))
+    try {
+      draw('')
+      const ids = [...container.querySelectorAll('[id]')].map((node) => node.id)
+      expect(new Set(ids).size).toBe(ids.length)
+      for (const article of container.querySelectorAll('article')) {
+        for (const anchor of article.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')) {
+          const target = document.getElementById(anchor.hash.slice(1))!
+          expect(article.contains(target)).toBe(true)
+          act(() => anchor.click())
+          expect(document.activeElement).toBe(target)
+        }
+      }
+      draw('\n\n后续文字')
+      expect([...container.querySelectorAll('[id]')].map((node) => node.id)).toEqual(ids)
+    } finally { act(() => root.unmount()); container.remove() }
+  })
+
+  it('复制按钮文本来自代码原文（含高亮 span 也不丢字）', async () => {
+    const el = await render('```ts\nconst answer = 42\n```')
+    const code = el.querySelector('[data-streamdown=code-block] code')
+    expect(code?.textContent).toContain('const answer = 42')
+  })
+
+  it('社区复制按钮实际点击写入代码原文', async () => {
+    const written: string[] = []
+    const original = navigator.clipboard
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text: string) => { written.push(text); return Promise.resolve() } },
+    })
+    try {
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      await act(async () => {
+        root.render(createElement(AgentMarkdown, { text: '```ts\nconst answer = 42\n```', streaming: false }))
+      })
+      const button = container.querySelector('[data-streamdown=code-block-copy-button]') as HTMLButtonElement
+      expect(button).not.toBeNull()
+      await act(async () => button.click())
+      expect(written).toEqual(['const answer = 42\n'])
+      act(() => {
+        root.unmount()
+      })
+      container.remove()
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: original })
+    }
+  })
+
+  it('社区 Mermaid 跨 chunk 保持挂载点', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const renderText = async (text: string) => {
+      await act(async () => root.render(createElement(AgentMarkdown, { text, streaming: true })))
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)) })
+    }
+    await renderText('```mermaid\ngraph TD; A-->')
+    expect(container.querySelector('[data-streamdown=mermaid] svg')).toBeNull()
+    expect(container.querySelector('[data-streamdown=mermaid] svg')).toBeNull()
+    await renderText('```mermaid\ngraph TD; A-->B\n```\n\n后续正文')
+    const first = container.querySelector('[data-streamdown="mermaid-block"]')
+    expect(first).not.toBeNull()
+    await renderText('```mermaid\ngraph TD; A-->B\n```\n\n后续正文再追加一段')
+    // 同一挂载点：已完成图表不因后续文字重建
+    expect(container.querySelector('[data-streamdown="mermaid-block"]')).toBe(first)
+    expect(container.textContent).toContain('后续正文再追加一段')
+    act(() => {
+      root.unmount()
+    })
+    container.remove()
+  })
+})
+

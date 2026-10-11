@@ -1,5 +1,18 @@
 @import 'katex/dist/katex.min.css';
 
+/* Community controls keep a usable hit area in the narrow Agent column. */
+.agent-md [data-streamdown] button { min-height: 44px; min-width: 44px; }
+.agent-md [data-streamdown=code-block-header],
+.agent-md [data-streamdown=mermaid-block] > div:first-child { min-height: 48px; }
+[data-streamdown=mermaid-fullscreen] button { min-height: 44px; min-width: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  .agent-md *, .agent-md *::before, .agent-md *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+  }
+}
+
 .markdown-preview h1,
 .markdown-preview h2,
 .markdown-preview h3,

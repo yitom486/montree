@@ -380,7 +380,7 @@ export const FloatingAIHud = memo(function FloatingAIHud({
               <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
             </>
           ) : isConnecting ? (
-            <span className="size-2 animate-pulse rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
+            <span className="size-2 animate-pulse motion-reduce:animate-none rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
           ) : (
             <span className="size-1.5 rounded-full bg-muted-foreground/40" />
           )}
@@ -661,7 +661,7 @@ export const FloatingAIHud = memo(function FloatingAIHud({
                 onClick={handleRunProbe}
                 disabled={isProbing}
               >
-                <RefreshCw className={cn('size-3 text-primary', isProbing && 'animate-spin')} />
+                <RefreshCw className={cn('size-3 text-primary', isProbing && 'animate-spin motion-reduce:animate-none')} />
                 <span>{isProbing ? '探查中...' : '重新探针'}</span>
               </Button>
             </div>

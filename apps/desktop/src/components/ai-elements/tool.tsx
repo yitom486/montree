@@ -1,9 +1,8 @@
 /**
  * 社区组件接入（R2）：AI Elements `Tool` 的折叠组合与状态徽标。
  *
- * 来源：Vercel AI Elements（MIT License），文档与组合结构见
- * https://elements.ai-sdk.dev/components/tool ，经 `npx ai-elements@latest add tool`
- * 的 registry 源码手动接入（本仓库只用 Bun，不跑该安装器改写 `ui/`）。
+ * 来源：Vercel AI Elements（Apache-2.0，当前上游 LICENSE），文档与组合结构见
+ * https://elements.ai-sdk.dev/components/tool ，本文件按文档组合手动适配（本仓库只用 Bun，不跑该安装器改写 `ui/`）。
  *
  * 与上游的差异（展示边界适配，有意为之）：
  * - 不依赖 AI SDK `ToolUIPart` / `useChat` / Next.js 网关；状态由
@@ -11,10 +10,10 @@
  * - 上游只有 input-streaming / input-available / output-available / output-error
  *   等 AI SDK 状态；Montree 扩展 `awaiting-approval` / `cancelled` / `unknown`
  *   三态并给出中文徽标。取消与未知绝不映射成成功。
- * - 默认展开由调用方按“成功收起 / 失败展开”显式控制，不照搬示例的完成即展开。
+ * - 默认展开由调用方按“过程收起、审批外置、选择保留”显式控制，不照搬示例的完成即展开。
  *
  * 依赖：已有 `radix-ui`（Collapsible）、`lucide-react`、`@/lib/utils`；
- * 本轮未新增任何依赖。
+ * 此文件不引入额外依赖。
  */
 import * as React from 'react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
@@ -84,7 +83,7 @@ export function ToolStateIcon({ state }: { state: AiToolState }) {
     case 'pending':
       return <Clock className={cn(className, 'text-muted-foreground')} />
     case 'running':
-      return <Loader2 className={cn(className, 'animate-spin text-sky-600 dark:text-sky-400')} />
+      return <Loader2 className={cn(className, 'animate-spin motion-reduce:animate-none text-sky-600 dark:text-sky-400')} />
     case 'completed':
       return <Check className={cn(className, 'text-emerald-600 dark:text-emerald-400')} />
     case 'error':
@@ -152,7 +151,6 @@ export function ToolHeader({ title, target, state, summary, kindIcon, className,
       )}
       {...props}
     >
-      <ToolStateIcon state={state} />
       {kindIcon}
       <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground/90">
         {title}

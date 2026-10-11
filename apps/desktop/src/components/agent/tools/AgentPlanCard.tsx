@@ -1,12 +1,11 @@
+import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import {
   Check,
-  ChevronDown,
-  ChevronRight,
   Circle,
   ListTodo,
   Loader2,
 } from 'lucide-react'
-import { AgentChatItem, AgentChatItemBody, useAgentChatOpen } from '@/components/agent/chat/AgentChatItem'
+import { AgentChatItem, AgentChatItemBody } from '@/components/agent/chat/AgentChatItem'
 import { cn } from '@/lib/utils'
 import { summarizePlanProgress } from '@/lib/agent/acp-plan'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
@@ -20,7 +19,7 @@ function StatusIcon({ status }: { status?: string }) {
     return <Check className="size-3.5 shrink-0 text-emerald-500" />
   }
   if (status === 'in_progress') {
-    return <Loader2 className="size-3.5 shrink-0 animate-spin text-amber-500" />
+    return <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none text-amber-500" />
   }
   if (status === 'cancelled') {
     return <Circle className="size-3.5 shrink-0 text-muted-foreground/50" />
@@ -32,7 +31,6 @@ export function AgentPlanCard({ message }: AgentPlanCardProps) {
   const entries = message.planEntries ?? []
   const summary = summarizePlanProgress(entries)
   const active = Boolean(message.streaming) || summary.active
-  const [open, setOpen] = useAgentChatOpen(active)
 
   const title = active
     ? `计划 · ${summary.completed}/${summary.total}`
@@ -47,25 +45,18 @@ export function AgentPlanCard({ message }: AgentPlanCardProps) {
       messageId={message.id}
       role="plan"
     >
-      <button
+      <Reasoning defaultOpen={false} isStreaming={active} className="mb-0">
+      <ReasoningTrigger
         type="button"
-        className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left"
-        onClick={() => setOpen((v) => !v)}
+        className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 min-h-11 text-left focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {active ? (
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-sky-500" />
-        ) : open ? (
-          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-        )}
-        <ListTodo className="size-3.5 shrink-0 text-sky-500/80" />
+        <ListTodo className="size-3.5 shrink-0 text-sky-500" />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground/90">
           {title}
         </span>
-      </button>
+      </ReasoningTrigger>
 
-      {open ? (
+      <ReasoningContent>
         <AgentChatItemBody className="space-y-1">
           <ul className="space-y-1">
             {entries.map((entry, index) => (
@@ -94,7 +85,8 @@ export function AgentPlanCard({ message }: AgentPlanCardProps) {
             ) : null}
           </ul>
         </AgentChatItemBody>
-      ) : null}
+      </ReasoningContent>
+      </Reasoning>
     </AgentChatItem>
   )
 }

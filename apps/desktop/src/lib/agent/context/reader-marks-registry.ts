@@ -18,7 +18,7 @@ export interface ReaderMarksProvider {
   /** 按摘录在章/视口 DOM 内定位并创建标记（无 fresh 选区） */
   createMarkAt: (params: CreateMarkAtParams) => Promise<import('@montree/contracts').ReadingMark>
   /** 跳到目录 flatIndex（失败引导「打开该章」） */
-  navigateToFlatIndex?: (flatIndex: number) => void | Promise<void>
+  navigateToFlatIndex?: (flatIndex: number) => Promise<boolean>
 }
 
 let current: ReaderMarksProvider | null = null

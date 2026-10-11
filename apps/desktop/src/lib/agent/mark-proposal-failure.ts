@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { getReaderMarksProvider } from '@/lib/agent/context/reader-marks-registry'
+import { getReaderContentProvider } from '@/lib/agent/context/reader-content-registry'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 
@@ -64,7 +65,7 @@ export function classifyMarkProposalFailure(
   }
 }
 
-export async function openChapterForMarkRecovery(flatIndex?: number): Promise<boolean> {
+export async function openChapterForMarkRecovery(flatIndex?: number, excerpt?: string): Promise<boolean> {
   const index =
     typeof flatIndex === 'number' && Number.isFinite(flatIndex)
       ? flatIndex
@@ -75,13 +76,33 @@ export async function openChapterForMarkRecovery(flatIndex?: number): Promise<bo
   }
   const provider = getReaderMarksProvider()
   if (provider?.navigateToFlatIndex) {
-    await provider.navigateToFlatIndex(index)
+    let navigated = false
+    try {
+      navigated = await provider.navigateToFlatIndex(index)
+    } catch {
+      navigated = false
+    }
+    if (!navigated || getReaderMarksProvider() !== provider) {
+      toast.message('未能打开对应章节或文档已切换，请在当前阅读器中重试')
+      return false
+    }
     toast.message('已打开对应章节，可划选原文后再采用')
     return true
   }
-  useReaderNavigationStore.getState().syncFlatIndex(index)
-  toast.message('已尝试跳转章节；若未跳转请手动打开该章后再划词')
-  return true
+  const content = getReaderContentProvider()
+  if (content?.navigateToFlatIndex) {
+    try {
+      const ok = await content.navigateToFlatIndex(index, excerpt)
+      if (ok && getReaderContentProvider() === content) {
+        toast.message('已定位原文章节')
+        return true
+      }
+    } catch { /* Navigation failures use the same recovery guide. */ }
+    toast.message('未能定位原文或文档已切换，请在当前文档中重试')
+    return false
+  }
+  toast.message('当前文档尚不支持自动章节定位，请手动打开对应章节后再划词')
+  return false
 }
 
 export function promptSelectTextForMarkRecovery(): void {

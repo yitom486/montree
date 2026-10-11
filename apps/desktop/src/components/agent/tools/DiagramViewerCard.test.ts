@@ -111,4 +111,69 @@ describe('DiagramViewerCard', () => {
     expect(onSave).toHaveBeenCalledWith(samplePayload)
     expect(container.textContent).toContain('已存为卡片')
   })
+
+  it('点击流转步骤透传原文定位（anchorExcerpt 优先步骤级）', async () => {
+    const onHighlight = vi.fn()
+    await act(async () => {
+      root.render(
+        createElement(DiagramViewerCard, {
+          payload: samplePayload,
+          onHighlightAnchor: onHighlight,
+        }),
+      )
+    })
+    const step = Array.from(container.querySelectorAll('div.cursor-pointer')).find((d) =>
+      d.textContent?.includes('传统史学视角'),
+    ) as HTMLElement
+    expect(step).toBeTruthy()
+    await act(async () => {
+      step.click()
+    })
+    expect(onHighlight).toHaveBeenCalledWith('传统评价习惯')
+  })
+
+  it('固定至正文透传完整 payload（剪贴板写入由调用方完成）', async () => {
+    const onPin = vi.fn()
+    await act(async () => {
+      root.render(
+        createElement(DiagramViewerCard, {
+          payload: samplePayload,
+          onPinToDoc: onPin,
+        }),
+      )
+    })
+    const pinBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('固定至正文'),
+    ) as HTMLElement
+    expect(pinBtn).toBeTruthy()
+    await act(async () => {
+      pinBtn.click()
+    })
+    expect(onPin).toHaveBeenCalledWith(samplePayload)
+  })
+
+  it('Mermaid 视图复制按钮写入源码原文', async () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    await act(async () => {
+      root.render(createElement(DiagramViewerCard, { payload: samplePayload }))
+    })
+    const mermaidTab = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Mermaid 图'),
+    ) as HTMLElement
+    await act(async () => {
+      mermaidTab.click()
+    })
+    const copyBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('复制代码'),
+    ) as HTMLElement
+    expect(copyBtn).toBeTruthy()
+    await act(async () => {
+      copyBtn.click()
+    })
+    expect(writeText).toHaveBeenCalledWith(samplePayload.mermaidCode)
+  })
 })

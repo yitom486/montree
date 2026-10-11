@@ -26,7 +26,7 @@ async function openSectionsBook(window: Page): Promise<void> {
 }
 
 test.describe('foliate 大部头分片', () => {
-  test('点目录章落到节内锚点且滚动跟随小节', async () => {
+  test('点目录章落到节内锚点且滚动跟随小节', async ({}, info) => {
     const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-foliate-sections-'))
     await writeFoliateSectionsWorkspace(workspace)
     const app = await launchBuiltApp({
@@ -53,6 +53,16 @@ test.describe('foliate 大部头分片', () => {
       // 跳转后细化同步上报实际所见章节（应为 Chapter 2 而非 Part One）
       const host = window.locator('#main').locator('.foliate-reader-host')
       await expect(host).toHaveAttribute('data-e2e-flat-index', '2', { timeout: 15_000 })
+      await expect.poll(() => window.evaluate(() => {
+        const view = document.querySelector('#main foliate-view') as any
+        const item = view?.renderer.getContents()[0]
+        const heading = item?.doc.getElementById('chap2')
+        if (!heading) return false
+        const top = item.doc.defaultView.frameElement.getBoundingClientRect().top + heading.getBoundingClientRect().top
+        const bounds = view.getBoundingClientRect()
+        return top >= bounds.top - 2 && top < bounds.bottom
+      })).toBe(true)
+      await window.screenshot({ path: info.outputPath('sections-position.png') })
     } finally {
       await app.close()
     }

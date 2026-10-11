@@ -10,8 +10,12 @@ MCP 工具表与传输纯逻辑已独立至 `@yitom/acp-client`；快照/虚拟�
 
 增删或改名后，更新 `apps/desktop/src/lib/README.md`。
 
+`reader-marks-registry.ts` 的章节导航返回 `Promise<boolean>`，仅在实际加载/定位完成时成功；等待期间 provider 被替换则拒绝旧结果。Foliate 目录与 ready 同步到导航 store，分片导航按宿主视口验位；未提供导航的格式明确引导手动打开，不广播伪定位成功。
+
 `document-tool-registry.ts` 连接当前表格/PPT 内存模型和 MCP 读写，同时供文件操作读取 dirty 状态、撤销和保存。坐标选区契约见 `packages/contracts/src/agent/document-tools.ts`；空白单元格同样有效。`useDocumentReader` 将 HTML、JSON、LOG、DOCX、表格和 PPT 接入正文/搜索/目录工具。
 
 PPT 的 `montree_ppt_edit_text` 使用读取结果中的段落/片段编号及 UTF-16 范围进行局部修改；替换文字必须核对 expectedText，整批核对 expectedCount 和 revision。读取结果的 context 分别返回可见页、导航页及选区页，不以滚动位置猜测选中目标。
 
 高级 PPT 工具沿用同一内存模型与快照链路：`montree_ppt_read` 的 charts/design/animation 查询先返回能力、稳定 ID 与影响范围，再由 `montree_ppt_chart_edit`、`montree_ppt_design_edit`、`montree_ppt_animation_edit` 定点修改。图表缓存与内嵌 XLSX 原子同步，共享部件须核对 expectedSlides，动画全量列表须核对 expectedEffectIds；复杂类型保留并拒绝覆盖。组合内部沿用原元素删改工具与局部坐标，继承装饰通过 sourcePart 对应设计工具修改。静态 Skill 与工具概览同步这些限制。
+
+`montree_present` 只做展示声明（章节比较/HTML 小应用版本化信封），经 `present` 快照资源由 `present-result-builder.ts` 校验组装（章节必须对应目录、摘录逐章验证、资源上限双端一致），不写文件、不改文档。契约与稳定 ID 见 `packages/contracts/src/agent/present-result.ts`。

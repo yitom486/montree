@@ -79,7 +79,8 @@ export function scrollFoliateSectionToFragment(doc: Document, fragment: string |
       }
       if (scrollable) {
         try {
-          const top = (target as HTMLElement).getBoundingClientRect().top
+          const top = (target as HTMLElement).getBoundingClientRect().top +
+            (iframe?.getBoundingClientRect().top ?? 0) - scroller.getBoundingClientRect().top
           scroller.scrollTop += top - 120
         } catch {
           // 忽略，继续上找
@@ -94,7 +95,23 @@ export function scrollFoliateSectionToFragment(doc: Document, fragment: string |
 
 function isNearViewportTop(element: HTMLElement): boolean {
   try {
-    const top = element.getBoundingClientRect().top
+    let top = element.getBoundingClientRect().top
+    const frame = element.ownerDocument.defaultView?.frameElement
+    if (frame) {
+      top += frame.getBoundingClientRect().top
+      let node: Node | null = frame
+      for (let depth = 0; depth < 12 && node; depth++) {
+        const parent: Node | null = node.parentNode ?? (node as ShadowRoot).host ?? null
+        if (parent?.nodeType === 1) {
+          const host = parent as HTMLElement
+          if (host.scrollHeight > host.clientHeight + 8) {
+            top -= host.getBoundingClientRect().top
+            break
+          }
+        }
+        node = parent
+      }
+    }
     return top >= -40 && top <= 240
   } catch {
     return false

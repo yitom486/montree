@@ -51,6 +51,11 @@ function resolveSourceBadge(source: ContentAuditHit['source']): { label: string;
         label: '电子书分卷',
         className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
       }
+    case 'web-doc':
+      return {
+        label: '网页文档',
+        className: 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20',
+      }
     default:
       return {
         label: '文档索引',
@@ -64,6 +69,15 @@ function formatLocator(hit: ContentAuditHit): string {
   if (!loc) return ''
   if (loc.pageNumber != null) return `第 ${loc.pageNumber} 页`
   if (loc.chapterTitle) return loc.chapterTitle
+  if (loc.url) {
+    try {
+      const parsed = new URL(loc.url)
+      const pathname = parsed.pathname.replace(/\/$/, '')
+      return parsed.hostname + (pathname ? pathname : '')
+    } catch {
+      return loc.url.replace(/^https?:\/\//, '')
+    }
+  }
   if (loc.filePath) {
     const parts = loc.filePath.replace(/\\/g, '/').split('/')
     const base = parts[parts.length - 1] || loc.filePath
@@ -91,10 +105,13 @@ export function ContentAuditCard({
     if (onNavigateHit) {
       onNavigateHit(hit)
     }
-    if (onHighlightAnchor) {
-      onHighlightAnchor(hit.text)
-    } else {
-      emitAnchorHighlight(hit.text)
+    const targetText = hit.text?.trim()
+    if (targetText) {
+      if (onHighlightAnchor) {
+        onHighlightAnchor(targetText)
+      } else {
+        emitAnchorHighlight(targetText)
+      }
     }
   }
 
@@ -122,7 +139,7 @@ export function ContentAuditCard({
               </span>
             </div>
             <p className="truncate text-[10px] text-muted-foreground">
-              命中 <span className="font-semibold text-foreground">{payload.total}</span> 处原句
+              命中 <span className="font-semibold text-foreground">{payload.total ?? hits.length}</span> 处原句
               {payload.truncated ? ` · 显示前 ${hits.length} 条` : ''}
             </p>
           </div>
@@ -145,6 +162,7 @@ export function ContentAuditCard({
             const isExpanded = expandedIndices.includes(idx)
             const badge = resolveSourceBadge(hit.source)
             const locText = formatLocator(hit)
+            const displayText = hit.text?.trim() || '(无提取到上下文正文)'
 
             return (
               <div
@@ -194,13 +212,13 @@ export function ContentAuditCard({
 
                 {isExpanded ? (
                   <div className="pl-5 pt-0.5 space-y-1">
-                    <p className="text-[11px] leading-relaxed text-foreground/90 italic font-serif bg-muted/20 p-2 rounded-md border-l-2 border-primary/40">
-                      "{hit.text}"
+                    <p className="text-[11px] leading-relaxed text-foreground/90 italic font-serif bg-muted/20 p-2 rounded-md border-l-2 border-primary/40 break-words">
+                      "{displayText}"
                     </p>
                   </div>
                 ) : (
                   <p className="pl-5 text-[10.5px] text-muted-foreground truncate italic">
-                    "{hit.text}"
+                    "{displayText}"
                   </p>
                 )}
               </div>

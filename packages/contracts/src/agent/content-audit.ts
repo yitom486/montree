@@ -12,6 +12,7 @@ export type ContentAuditSource =
   | 'editor-buffer'
   | 'workspace-file'
   | 'ebook-section'
+  | 'web-doc'
 
 export type ContentAuditMatchPosition = 'start' | 'end' | 'middle' | 'multiple'
 
@@ -31,6 +32,10 @@ export interface ContentAuditHit {
     filePath?: string
     /** editor-buffer / ebook-section：命中所在行（1-based） */
     lineStart?: number
+    /** 在线网页文档 URL */
+    url?: string
+    /** 网页文档内标题锚点 */
+    headingId?: string
   }
   text: string
   textTruncated: boolean

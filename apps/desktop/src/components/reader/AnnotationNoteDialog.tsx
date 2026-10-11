@@ -23,7 +23,7 @@ import {
 import { ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
 import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
-import { AgentScrollToBottomButton } from '@/components/agent/chat/AgentScrollToBottomButton'
+import { Conversation, ConversationScrollButton } from '@/components/ai-elements/conversation'
 import { useStickToBottomScroll } from '@/hooks/agent/useStickToBottomScroll'
 import { toProposedMark } from '@montree/annotations'
 import { toast } from 'sonner'
@@ -75,21 +75,9 @@ export function AnnotationNoteDialog({
 
   const hasDraft = Boolean(assist.pendingDraft)
   const canPolish = aiAssist && note.trim().length > 0
-  const streamingAny =
-    messages.some((m) => m.streaming) || assist.busy || assist.phase === 'generating'
-  const stickToBottomState = useMemo(
-    () => ({
-      messageCount: messages.length,
-      lastMessageId: messages.at(-1)?.id,
-      lastMessageStreaming: Boolean(messages.at(-1)?.streaming),
-      prompting: assist.busy,
-    }),
-    [messages.length, messages.at(-1)?.id, messages.at(-1)?.streaming, assist.busy],
-  )
-  const { pinned, scrollToBottom } = useStickToBottomScroll({
+  const { pinned, instance } = useStickToBottomScroll({
     contentRef: aiMessagesRef,
-    messageState: stickToBottomState,
-    streaming: streamingAny,
+    enabled: Boolean(open && showAi && aiAssist),
   })
 
   useEffect(() => {
@@ -390,10 +378,9 @@ export function AnnotationNoteDialog({
                 </div>
               </div>
               {!pinned && messages.length > 0 ? (
-                <AgentScrollToBottomButton
+                <Conversation instance={instance} initial={false}><ConversationScrollButton aria-label="回到底部"
                   className="absolute bottom-2 left-1/2 z-10 h-7 -translate-x-1/2 gap-1 rounded-full border border-border/60 bg-background/95 px-3 text-[11px] shadow-md backdrop-blur-sm"
-                  onClick={scrollToBottom}
-                />
+                /></Conversation>
               ) : null}
             </div>
 

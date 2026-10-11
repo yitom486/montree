@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/query-keys'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
+import { useWebDocStore } from '@/stores/web-doc-store'
+import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { toast } from 'sonner'
 import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import {
@@ -21,8 +23,16 @@ import {
   ChapterSuggestionCard,
   type SuggestChaptersPayload,
 } from '@/components/agent/tools/ChapterSuggestionCard'
+import {
+  ChapterComparisonCard,
+} from '@/components/agent/tools/ChapterComparisonCard'
+import {
+  HtmlArtifactCard,
+} from '@/components/agent/tools/HtmlArtifactCard'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
+import { checkPresentDocument } from '@/lib/agent/present-locate'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
+import { parsePresentResult, type MontreePresentResult } from '@montree/contracts'
 import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
 import { normalizeLoadKey } from '@montree/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
@@ -94,13 +104,76 @@ function parseCrossReferencePayload(text?: string, title?: string): CrossReferen
 }
 
 function parseContentAuditPayload(text?: string, title?: string): ContentAuditPayload | null {
-  if (!text || (!text.includes('"hits"') && !title?.includes('montree_inspect_content'))) {
+  if (!text) return null
+  const isExplicitTool = Boolean(title?.includes('montree_inspect_content'))
+  if (!isExplicitTool && !text.includes('"hits"')) {
     return null
   }
   try {
     const obj = JSON.parse(text)
-    if (obj && typeof obj === 'object' && Array.isArray(obj.hits) && typeof obj.query === 'string') {
-      return obj as ContentAuditPayload
+    if (obj && typeof obj === 'object' && Array.isArray(obj.hits)) {
+      // 避免普通 execute 终端脚本输出未知带 hits 的 JSON 时误解析为空白卡片：
+      // 如果不是显式的 montree_inspect_content，必须有 query 字符串，
+      // 且 hits 为空或者至少有一个命中项具有可读正文字段
+      const hasMeaningfulText =
+        obj.hits.length === 0 ||
+        obj.hits.some(
+          (h: any) =>
+            h &&
+            typeof h === 'object' &&
+            Boolean(
+              (typeof h.text === 'string' && h.text.trim()) ||
+              (typeof h.content === 'string' && h.content.trim()) ||
+              (typeof h.snippet === 'string' && h.snippet.trim()) ||
+              (typeof h.match === 'string' && h.match.trim()) ||
+              (typeof h.excerpt === 'string' && h.excerpt.trim()),
+            ),
+        )
+
+      if (typeof obj.query === 'string' && (isExplicitTool || hasMeaningfulText)) {
+        const normalizedHits = obj.hits.map((h: any) => {
+          if (!h || typeof h !== 'object') {
+            return {
+              source: 'book-index' as const,
+              locator: {},
+              text: String(h || ''),
+              textTruncated: false,
+              matchPosition: 'start' as const,
+            }
+          }
+          const rawText = h.text ?? h.content ?? h.snippet ?? h.match ?? h.excerpt ?? ''
+          const source =
+            h.source ||
+            (h.url || h.locator?.url
+              ? 'web-doc'
+              : h.locator?.filePath || h.filePath
+                ? 'workspace-file'
+                : 'book-index')
+
+          const locator = {
+            ...(h.locator || {}),
+            ...(h.url && !h.locator?.url ? { url: h.url } : {}),
+            ...(h.filePath && !h.locator?.filePath ? { filePath: h.filePath } : {}),
+            ...(h.line && !h.locator?.lineStart ? { lineStart: h.line } : {}),
+          }
+
+          return {
+            source,
+            locator,
+            text: String(rawText),
+            textTruncated: Boolean(h.textTruncated),
+            matchPosition: h.matchPosition || 'start',
+          }
+        })
+
+        return {
+          query: obj.query,
+          total: typeof obj.total === 'number' ? obj.total : normalizedHits.length,
+          truncated: Boolean(obj.truncated),
+          limit: typeof obj.limit === 'number' ? obj.limit : undefined,
+          hits: normalizedHits,
+        }
+      }
     }
   } catch {
     return null
@@ -123,6 +196,24 @@ function parseSuggestChaptersPayload(text?: string, title?: string): SuggestChap
   return null
 }
 
+function parsePresentPayload(
+  detail?: string,
+  title?: string,
+  enriched?: MontreePresentResult,
+): MontreePresentResult | null {
+  if (enriched && (enriched.kind === 'chapter-comparison' || enriched.kind === 'html-artifact')) {
+    return enriched
+  }
+  if (!detail || (!detail.includes('chapter-comparison') && !detail.includes('html-artifact') && !title?.includes('montree_present'))) {
+    return null
+  }
+  try {
+    return parsePresentResult(detail)
+  } catch {
+    return null
+  }
+}
+
 /**
  * 富业务结果是否真实可渲染（至少一种 payload 解析成功）。
  * 分类启发式（标题/关键字）命中但 JSON 解析失败时返回 false，
@@ -133,8 +224,16 @@ export function hasBusinessResult(detail?: string, title?: string): boolean {
     parseDiagramPayload(detail, title) != null ||
     parseCrossReferencePayload(detail, title) != null ||
     parseContentAuditPayload(detail, title) != null ||
-    parseSuggestChaptersPayload(detail, title) != null
+    parseSuggestChaptersPayload(detail, title) != null ||
+    parsePresentPayload(detail, title) != null
   )
+}
+
+/** montree_present 标题命中但解析失败时，是否应显示可读失败而非空区 */
+export function isUnparsablePresentResult(detail?: string, title?: string): boolean {
+  if (!title?.includes('montree_present')) return false
+  if (!detail) return false
+  return parsePresentPayload(detail, title) == null
 }
 
 function buildFallbackAnchor(
@@ -156,10 +255,11 @@ function buildFallbackAnchor(
 }
 
 /**
- * 阅读业务结果分发（R2）：图表 / 跨章互引 / 内容审计 / 章节建议。
- * 只负责“富结果是什么、怎么交互”；通用折叠外壳与审批在 `AgentToolCallCard`。
+ * 阅读业务结果分发（R2/U3）：图表 / 跨章互引 / 内容审计 / 章节建议。
+ * 只负责“富结果是什么、怎么交互”；通用折叠外壳与审批在调用方。
+ * compactResults：结果入口使用，图表默认紧凑预览（完整功能经入口进入）。
  */
-export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
+export function ToolBusinessResult({ message, compactResults }: { message: AcpChatMessage; compactResults?: boolean }) {
   const detail = message.toolContentText || message.text
   const diagramPayload = useMemo(
     () => parseDiagramPayload(detail, message.toolTitle),
@@ -175,6 +275,14 @@ export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
   )
   const suggestionPayload = useMemo(
     () => parseSuggestChaptersPayload(detail, message.toolTitle),
+    [detail, message.toolTitle],
+  )
+  const presentPayload = useMemo(
+    () => parsePresentPayload(detail, message.toolTitle, message.presentResult),
+    [detail, message.toolTitle, message.presentResult],
+  )
+  const presentUnparsable = useMemo(
+    () => isUnparsablePresentResult(detail, message.toolTitle),
     [detail, message.toolTitle],
   )
   const queryClient = useQueryClient()
@@ -237,7 +345,7 @@ export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
     return true
   }
 
-  if (!diagramPayload && !crossRefPayload && !auditPayload && !suggestionPayload) {
+  if (!diagramPayload && !crossRefPayload && !auditPayload && !suggestionPayload && !presentPayload && !presentUnparsable) {
     return null
   }
 
@@ -247,6 +355,7 @@ export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
         <div className="mt-1">
           <DiagramViewerCard
             payload={diagramPayload}
+            defaultCompact={compactResults}
             isSavedAsCard={savedDiagramIds.has(diagramPayload.diagramId)}
             onSaveAsKnowledgeCard={handleSaveAsKnowledgeCard}
             onHighlightAnchor={(anchor: string) => {
@@ -282,8 +391,27 @@ export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
           <ContentAuditCard
             payload={auditPayload}
             onHighlightAnchor={(anchor: string) => {
-              toast.message(`正在定位原句：「${anchor.slice(0, 24)}...」`)
-              emitAnchorHighlight(anchor)
+              if (anchor) {
+                toast.message(`正在定位原句：「${anchor.slice(0, 24)}...」`)
+                emitAnchorHighlight(anchor)
+              }
+            }}
+            onNavigateHit={(hit) => {
+              if (hit.locator?.url) {
+                const targetUrl = hit.locator.url
+                const curWebUrl = useWebDocStore.getState().pageUrl
+                if (curWebUrl !== targetUrl) {
+                  useWebDocStore.getState().openPage(targetUrl)
+                  useAppSettingsStore.getState().setLastWebDocUrl(targetUrl)
+                  useActiveDocumentStore.getState().setActiveFilePath(null)
+                }
+              } else if (hit.locator?.filePath) {
+                const curPath = useActiveDocumentStore.getState().filePath
+                if (curPath !== hit.locator.filePath) {
+                  useActiveDocumentStore.getState().setActiveFilePath(hit.locator.filePath)
+                  useAppSettingsStore.getState().setLastOpenedFilePath(hit.locator.filePath)
+                }
+              }
             }}
           />
         </div>
@@ -298,6 +426,61 @@ export function ToolBusinessResult({ message }: { message: AcpChatMessage }) {
               }
             }}
           />
+        </div>
+      ) : null}
+      {presentPayload?.kind === 'chapter-comparison' ? (
+        <div className="mt-1">
+          <ChapterComparisonCard
+            key={presentPayload.id}
+            result={presentPayload}
+            onLocateChapter={(flatIndex, excerpt) => {
+              // 先校验来源文档归属：跨文档/无文档时禁止导航并引导；
+              // 导航成功且内容就绪后再广播高亮（await，非 fire-and-forget）。
+              // P1：等待期间可能切换文档，await 后复核归属，过期不广播，
+              // 避免 A 的摘录高亮到 B；导航异常直接引导，不产生未处理拒绝。
+              void (async () => {
+                const verdict = checkPresentDocument(
+                  presentPayload,
+                  useActiveDocumentStore.getState().filePath,
+                )
+                if (!verdict.ok) {
+                  toast.message(verdict.message)
+                  return
+                }
+                let navigated = false
+                try {
+                  navigated = await openChapterForMarkRecovery(flatIndex, excerpt)
+                } catch (error) {
+                  toast.message(error instanceof Error ? error.message : '打开章节失败，请重试')
+                  return
+                }
+                const after = checkPresentDocument(
+                  presentPayload,
+                  useActiveDocumentStore.getState().filePath,
+                )
+                if (!after.ok) {
+                  toast.message(after.message)
+                  return
+                }
+                if (navigated && excerpt) {
+                  emitAnchorHighlight(excerpt)
+                }
+              })()
+            }}
+          />
+        </div>
+      ) : null}
+      {presentPayload?.kind === 'html-artifact' ? (
+        <div className="mt-1">
+          <HtmlArtifactCard key={presentPayload.id} result={presentPayload} />
+        </div>
+      ) : null}
+      {presentPayload == null && presentUnparsable ? (
+        <div className="mt-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-2">
+          <p className="text-[11px] font-medium text-foreground/90">呈现结果无法解析</p>
+          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+            工具返回了 montree_present 结果，但版本或字段校验未通过（需要 schemaVersion 1 与合法种类）。原始内容保留在上方文本区，可换种问法重试。
+          </p>
         </div>
       ) : null}
     </>

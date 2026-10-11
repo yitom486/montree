@@ -91,7 +91,7 @@ export function AgentAuthDialog({
             disabled={busy || !selected}
             onClick={() => onSelect(selected)}
           >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+            {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> : null}
             继续
           </Button>
         </DialogFooter>

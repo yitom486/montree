@@ -202,7 +202,7 @@ export function AgentProviderDialog({ open, onOpenChange, onChanged }: AgentProv
               disabled={!canSave}
               onClick={() => void handleSave()}
             >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+              {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> : null}
               保存
             </Button>
           </div>

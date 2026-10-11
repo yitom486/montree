@@ -25,4 +25,35 @@ describe('hasBusinessResult', () => {
     expect(hasBusinessResult('const x = 1', 'Read: /a.ts')).toBe(false)
     expect(hasBusinessResult('', '工具调用')).toBe(false)
   })
+
+  it('普通 execute 脚本返回不含有效文本的 hits 时不被误判为内容审计卡片', () => {
+    // 之前引发空白卡片的场景：execute 输出带 hits 但无 text/content
+    expect(
+      hasBusinessResult(
+        JSON.stringify({ query: 'app-server', hits: [{}, {}] }),
+        'execute',
+      ),
+    ).toBe(false)
+  })
+
+  it('含有内容文本的 hits 正确识别并解析为业务卡片', () => {
+    expect(
+      hasBusinessResult(
+        JSON.stringify({
+          query: 'app-server',
+          hits: [{ text: 'const server = createAppServer()' }],
+        }),
+        'execute',
+      ),
+    ).toBe(true)
+    expect(
+      hasBusinessResult(
+        JSON.stringify({
+          query: 'app-server',
+          hits: [{ snippet: 'const server = createAppServer()' }],
+        }),
+        'montree_inspect_content',
+      ),
+    ).toBe(true)
+  })
 })

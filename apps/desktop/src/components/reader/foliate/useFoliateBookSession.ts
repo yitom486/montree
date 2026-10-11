@@ -8,6 +8,7 @@ import {
 import { findMarkByOverlayerKey, overlayerKeyForMark } from '@/lib/reader/marks/mark-linkage'
 import {
   isSameSpineBase,
+  findFlatIndexFromViewport,
   normalizeLoadKey,
   pickInitialChapter,
   scrollFoliateSectionToFragment,
@@ -25,6 +26,7 @@ import { searchReaderContent } from '@/lib/agent/context/search-reader-content'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
 import { collectDomImages } from '@/lib/agent/context/reader-visual-context'
 import { registerReaderMarks } from '@/lib/agent/context/reader-marks-registry'
+import { waitForDom } from '@/lib/reader/wait-for-dom'
 import { commitReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-agent-composer'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
@@ -198,6 +200,7 @@ export function useFoliateBookSession({
   kindRef.current = documentKind
   const filePathRef = useRef(filePath)
   filePathRef.current = filePath
+  const bookSessionRef = useRef<object | null>(null)
 
   const getRenderedDocs = useCallback((): Array<{ doc: Document; index: number }> => {
     try {
@@ -214,7 +217,9 @@ export function useFoliateBookSession({
   useEffect(() => {
     useReaderNavigationStore.getState().beginSession(filePath, 'epub')
     return () => {
-      useReaderNavigationStore.getState().beginSession('', 'epub')
+      if (useReaderNavigationStore.getState().filePath === filePath) {
+        useReaderNavigationStore.getState().beginSession('', 'epub')
+      }
     }
   }, [filePath])
 
@@ -292,9 +297,13 @@ export function useFoliateBookSession({
     }
   }, [containerRef])
 
-  const goToChapter = useCallback((chapter: EpubChapter | null, flatIndex?: number) => {
+  const goToChapter = useCallback(async (chapter: EpubChapter | null, flatIndex?: number): Promise<boolean> => {
     const view = viewRef.current
-    if (!chapter || !view) return
+    const owner = bookSessionRef.current
+    const source = filePathRef.current
+    const isCurrent = () => viewRef.current === view && bookSessionRef.current === owner && filePathRef.current === source
+    const navigation = useReaderNavigationStore.getState()
+    if (!chapter || !view || !owner || !navigation.ready || navigation.filePath !== source) return false
     let sectionIndex: number | null = null
     if (typeof flatIndex === 'number' && flatIndex >= 0) {
       sectionIndex = chapterSectionsRef.current[flatIndex] ?? null
@@ -302,7 +311,7 @@ export function useFoliateBookSession({
     if (sectionIndex === null || sectionIndex < 0) {
       sectionIndex = adapterRef.current?.resolveHref(chapter.href) ?? null
     }
-    if ((sectionIndex === null || sectionIndex < 0) && !chapter.href) return
+    if ((sectionIndex === null || sectionIndex < 0) && !chapter.href) return false
     const targetSection = sectionIndex ?? 0
     const resolvedFlat =
       typeof flatIndex === 'number' && flatIndex >= 0
@@ -320,33 +329,45 @@ export function useFoliateBookSession({
       !chapter.href.startsWith('section:') &&
       (fragment !== null || isSpecialHref || sectionIndex === null)
 
-    void (async () => {
-      if (needsFullHref) {
-        try {
-          await view.goTo(chapter.href)
-        } catch {
-          if (sectionIndex !== null && sectionIndex >= 0) {
-            try {
-              await view.goTo(targetSection)
-            } catch {}
-          }
-        }
-      } else {
-        try {
-          await view.goTo(targetSection)
-        } catch {
-          return
+    try {
+      try {
+        await view.goTo(needsFullHref ? chapter.href : targetSection)
+      } catch {
+        if (!isCurrent() || !needsFullHref || sectionIndex === null || sectionIndex < 0) return false
+        await view.goTo(targetSection)
+      }
+      if (!isCurrent()) return false
+      const target = await waitForDom(() => {
+        if (!isCurrent()) return null
+        const content = view.renderer?.getContents().find((item) => item.index === targetSection)
+        return content?.doc.body ? content : null
+      })
+      if (!target || !isCurrent()) return false
+      if (!fragment) return true
+      // 章节 iframe 在 scrolled 模式下是整节高度；须验宿主视口坐标，
+      // 不能仅凭 iframe 文档内锚点的 top 判断跳转失败。
+      const arrived = Boolean(await waitForDom(() => {
+        if (!isCurrent()) return null
+        const anchor = target.doc.getElementById(fragment)
+        const frame = target.doc.defaultView?.frameElement
+        if (!anchor || !frame) return null
+        const bounds = view.getBoundingClientRect()
+        const top = frame.getBoundingClientRect().top + anchor.getBoundingClientRect().top
+        if (top >= bounds.top - 40 && top < bounds.bottom) return true
+        return scrollFoliateSectionToFragment(target.doc, fragment) || null
+      }))
+      if (arrived && isCurrent() && resolvedFlat >= 0) {
+        // 手动纠正滚动可能不再触发 Foliate relocate；验位成功后同步实际章节。
+        useReaderNavigationStore.getState().syncFlatIndex(resolvedFlat)
+        if (appApi.isE2EFoliateReader() && containerRef.current) {
+          containerRef.current.dataset.e2eFlatIndex = String(resolvedFlat)
         }
       }
-      if (!fragment) return
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
-      const target = viewRef.current?.renderer
-        ?.getContents()
-        .find((item) => item.index === targetSection)
-      if (!target) return
-      scrollFoliateSectionToFragment(target.doc, fragment)
-    })().catch(() => undefined)
-  }, [])
+      return arrived && isCurrent()
+    } catch {
+      return false
+    }
+  }, [containerRef])
 
   const handleJumpToLabel = useCallback(
     (label: string) => {
@@ -505,6 +526,10 @@ export function useFoliateBookSession({
     const container = containerRef.current
     if (!data || !container) return
 
+    const owner = {}
+    bookSessionRef.current = owner
+    const ownsNavigation = () => bookSessionRef.current === owner && useReaderNavigationStore.getState().filePath === filePath
+    if (ownsNavigation()) useReaderNavigationStore.getState().setReady(false)
     container.innerHTML = ''
     setReady(false)
     setChapters([])
@@ -548,9 +573,23 @@ export function useFoliateBookSession({
         callbacksRef.current.syncMarkFlags?.()
       }
       const tocHref = detail.tocItem?.href
-      if (tocHref) {
-        const flat = chaptersRef.current.findIndex(
-          (unit) => unit.href.toLowerCase() === tocHref.toLowerCase(),
+      const content = view?.renderer?.getContents().find((item) => item.index === sectionIndex)
+      const frame = content?.doc.defaultView?.frameElement
+      const bounds = view?.getBoundingClientRect()
+      // Foliate 的 tocItem 可能仍指向 spine 父章；用宿主视口细化实际可见小节。
+      const visibleFlat = content && frame && bounds ? findFlatIndexFromViewport(
+        content.doc,
+        chaptersRef.current.map((unit, index) => ({
+          flatIndex: index, label: unit.label,
+          loadKey: `section:${chapterSectionsRef.current[index]}`,
+          fragment: splitChapterFragment(unit.href).fragment ?? undefined,
+        })),
+        `section:${sectionIndex}`,
+        { scrollTop: Math.max(0, bounds.top - frame.getBoundingClientRect().top), height: bounds.height },
+      ) : -1
+      if (tocHref || visibleFlat >= 0) {
+        const flat = visibleFlat >= 0 ? visibleFlat : chaptersRef.current.findIndex(
+          (unit) => unit.href.toLowerCase() === tocHref?.toLowerCase(),
         )
         if (
           typeof window !== 'undefined' &&
@@ -665,7 +704,7 @@ export function useFoliateBookSession({
         chaptersRef.current = flatChapters
         chapterSectionsRef.current = sectionIndices
         setChapters(flatChapters)
-        useReaderNavigationStore.getState().setUnits(flatChapters)
+        if (ownsNavigation()) useReaderNavigationStore.getState().setUnits(flatChapters)
 
         await import('@foliate/view.js')
         if (cancelled) return
@@ -733,8 +772,10 @@ export function useFoliateBookSession({
 
         if (cancelled) return
         setReady(true)
+        if (ownsNavigation()) useReaderNavigationStore.getState().setReady(true)
       } catch (err: unknown) {
         if (cancelled) return
+        if (ownsNavigation()) useReaderNavigationStore.getState().setReady(false)
         reportRuntimeError(err instanceof Error ? err : new Error(String(err)), {
           source: 'reader',
           op: 'openFoliateBook',
@@ -745,6 +786,8 @@ export function useFoliateBookSession({
 
     return () => {
       cancelled = true
+      if (ownsNavigation()) useReaderNavigationStore.getState().setReady(false)
+      if (bookSessionRef.current === owner) bookSessionRef.current = null
       if (saveProgressTimerRef.current !== null) {
         window.clearTimeout(saveProgressTimerRef.current)
         saveProgressTimerRef.current = null
@@ -757,8 +800,10 @@ export function useFoliateBookSession({
       if (view?.parentElement) {
         view.parentElement.removeChild(view)
       }
-      viewRef.current = null
-      adapterRef.current = null
+      if (viewRef.current === view) {
+        viewRef.current = null
+        adapterRef.current = null
+      }
     }
   }, [
     bindRailFollow,
@@ -850,8 +895,9 @@ export function useFoliateBookSession({
       createNoteFromSelection: (note) => callbacksRef.current.createNoteFromSelection?.(note) ?? Promise.reject(new Error('not ready')),
       createMarkAt: (params) => callbacksRef.current.handleCreateMarkAt?.(params) ?? Promise.reject(new Error('not ready')),
       navigateToFlatIndex: (index) => {
+        if (filePathRef.current !== filePath) return Promise.resolve(false)
         const chapter = chaptersRef.current[index]
-        if (chapter) goToChapter(chapter, index)
+        return chapter ? goToChapter(chapter, index) : Promise.resolve(false)
       },
     })
   }, [filePath, goToChapter])

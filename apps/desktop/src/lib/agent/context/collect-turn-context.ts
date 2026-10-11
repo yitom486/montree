@@ -2,6 +2,8 @@ import { getDocumentKind } from '@montree/contracts'
 import { resolveWebDocDocumentId, resolveWebDocSiteId } from '@montree/web-doc'
 import type { ReaderFormat } from '@montree/reader-core'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
+import { useAppSettingsStore } from '@/stores/app-settings-store'
+import { useWebDocStore } from '@/stores/web-doc-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
 import { getDocumentTools } from './document-tool-registry'
@@ -61,7 +63,19 @@ function activeDocumentDisplayName(path: string, kind: MontreeActiveDocument['ki
 
 export function collectActiveDocument(): MontreeActiveDocument | null {
   const rawPath = useActiveDocumentStore.getState().filePath?.trim()
-  if (!rawPath) return null
+  if (!rawPath) {
+    const isWebSurface = useAppSettingsStore.getState().lastActiveSurface === 'web-doc'
+    const webUrl = useWebDocStore.getState().pageUrl?.trim()
+    if (isWebSurface && webUrl) {
+      const path = resolveWebDocDocumentId(webUrl, resolveWebDocSiteId(webUrl))
+      return {
+        path,
+        kind: 'web',
+        name: activeDocumentDisplayName(webUrl, 'web'),
+      }
+    }
+    return null
+  }
   const kind = getDocumentKind(rawPath)
   const path =
     kind === 'web' ? resolveWebDocDocumentId(rawPath, resolveWebDocSiteId(rawPath)) : rawPath

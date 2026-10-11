@@ -87,4 +87,47 @@ describe('ContentAuditCard', () => {
 
     expect(onHighlightAnchor).toHaveBeenCalledWith('Handshake protocol requirements.')
   })
+
+  it('renders web-doc source badge, url locator and triggers onNavigateHit', async () => {
+    const onNavigateHit = vi.fn()
+    const onHighlightAnchor = vi.fn()
+    const hit = {
+      source: 'web-doc' as const,
+      locator: { url: 'https://developer.mozilla.org/en-US/docs/Web/API' },
+      text: 'Web API interfaces for documents.',
+      textTruncated: false,
+      matchPosition: 'start' as const,
+    }
+    const payload: ContentAuditPayload = {
+      query: 'interfaces',
+      total: 1,
+      hits: [hit],
+    }
+
+    await act(async () => {
+      root.render(
+        createElement(ContentAuditCard, {
+          payload,
+          onNavigateHit,
+          onHighlightAnchor,
+        }),
+      )
+    })
+
+    expect(container.textContent).toContain('网页文档')
+    expect(container.textContent).toContain('developer.mozilla.org/en-US/docs/Web/API')
+    expect(container.textContent).toContain('Web API interfaces for documents.')
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const locate = buttons.find((b) => b.textContent?.includes('定位'))
+    expect(locate).toBeDefined()
+
+    await act(async () => {
+      locate?.click()
+    })
+
+    expect(onNavigateHit).toHaveBeenCalledWith(hit)
+    expect(onHighlightAnchor).toHaveBeenCalledWith('Web API interfaces for documents.')
+  })
 })
+

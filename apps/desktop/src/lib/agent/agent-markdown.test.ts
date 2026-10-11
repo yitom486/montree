@@ -2,7 +2,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   renderAgentMarkdown,
-  renderAgentMarkdownStreaming,
   splitAgentMarkdownParts,
 } from './agent-markdown'
 

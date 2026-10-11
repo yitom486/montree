@@ -69,7 +69,7 @@ export function AgentAgyInstallBanner({ onInstalled }: AgentAgyInstallBannerProp
         >
           {installing ? (
             <>
-              <Loader2 className="mr-1 size-3 animate-spin" />
+              <Loader2 className="mr-1 size-3 animate-spin motion-reduce:animate-none" />
               正在安装 agy 并配置环境变量…
             </>
           ) : (

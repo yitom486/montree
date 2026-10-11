@@ -12,6 +12,7 @@ import {
   getReaderContentProvider,
 } from './reader-content-registry'
 import { readChapterByRef } from './read-chapter-by-ref'
+import { buildPresentResult } from './present-result-builder'
 import { getReaderViewportRect, readReaderVisualContext } from './reader-visual-context'
 import {
   createBookmarkForAgent,
@@ -296,6 +297,9 @@ export async function resolveMontreeSnapshot(
     }
     case 'toc-draft-read': {
       return JSON.stringify(readTocDraft() ?? { fingerprint: '', entries: [] }, null, 2)
+    }
+    case 'present': {
+      return buildPresentResult((args ?? {}) as Record<string, unknown>)
     }
     case 'toc-draft-write': {
       return JSON.stringify(applyTocDraftWrite(args), null, 2)

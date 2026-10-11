@@ -24,7 +24,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| `EditorWorkspaceMain` | Markdown 编辑 + 预览分栏（含 `ViewModeToggle`、欢迎页回落） |
+| `EditorWorkspaceMain` | Markdown 编辑 + 预览分栏（含 `ViewModeToggle`、欢迎页回落）；可等待的章节/摘录定位、原文选区、切档与版本过期保护 |
 | `ReaderWorkspaceMain` | 电子书阅读主区入口 |
 | `WelcomePage` | 无打开文件时的欢迎页（含在线文档 URL 入口，复用 `web-doc/WebDocUrlField`） |
 | `ViewModeToggle` | 编辑/预览/分屏切换 |

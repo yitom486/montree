@@ -1,10 +1,10 @@
 import {
   useEffect,
   useRef,
-  useState,
   type ReactNode,
   type RefObject,
 } from 'react'
+import { Message, MessageContent } from '@/components/ai-elements/message'
 import { logAcpLayoutProbe } from '@/lib/agent/acp-layout-probe'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
  * 聊天条目统一壳：宽度 / 换行 / 对齐只在这里定义。
  * 流式与终态共用同一 DOM 壳；内容插槽可换，壳不换。
  *
- * 仅本面板用的 UI 状态（折叠等）用 useAgentChatOpen，不要进 Zustand。
+ * 折叠状态由 AI Elements / Radix 管理，不要进 Zustand。
  * Zustand 只放会话消息、连接、权限等跨层数据。
  */
 
@@ -108,17 +108,6 @@ function useLayoutProbe(
   }, [rootRef, meta.messageId, meta.probe, meta.role, meta.streaming])
 }
 
-/**
- * 跟随 active 的折叠状态（仅聊天框本地 UI，不进 store）。
- * active 变 true 时强制展开；变 false 时收起（用户仍可手动点开）。
- */
-export function useAgentChatOpen(active: boolean) {
-  const [open, setOpen] = useState(active)
-  useEffect(() => {
-    setOpen(active)
-  }, [active])
-  return [open, setOpen] as const
-}
 
 export function AgentChatItemBody({
   className,
@@ -163,28 +152,24 @@ export function AgentChatItem({
   if (variant === 'bubble') {
     const isUser = tone === 'user'
     return (
-      <div
+      <Message
         ref={rootRef}
+        from={isUser ? 'user' : 'assistant'}
         data-acp-probe={probe ?? (isUser ? 'user' : 'agent')}
-        className={cn(
-          'group flex flex-col gap-1',
-          AGENT_CHAT_COL_CLASS,
-          align === 'end' || isUser ? 'items-end' : 'items-start',
-        )}
+        className={cn(AGENT_CHAT_COL_CLASS, 'max-w-full animate-fade-slide-in', align === 'end' && 'items-end')}
       >
-        <div
+        <MessageContent
           className={cn(
-            'min-w-0 max-w-[95%] overflow-x-hidden rounded-2xl px-3 py-2 text-[12px] leading-relaxed shadow-sm',
+            'text-[13px] leading-relaxed',
             isUser
-              ? 'rounded-br-md bg-primary text-primary-foreground'
-              : 'w-full rounded-bl-md border border-border/60 bg-card text-card-foreground',
-            streaming && !isUser && 'ring-1 ring-emerald-500/20',
+              ? 'max-w-[85%] rounded-2xl rounded-tr-xs border border-border/70 bg-secondary px-3.5 py-2.5 text-secondary-foreground shadow-xs group-[.is-user]:bg-secondary group-[.is-user]:text-secondary-foreground'
+              : 'w-full px-1 py-1 text-foreground',
             className,
           )}
         >
           {children}
-        </div>
-      </div>
+        </MessageContent>
+      </Message>
     )
   }
 

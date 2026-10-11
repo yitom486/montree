@@ -443,6 +443,8 @@ function App() {
       getUnits: () => textDocument?.units() ?? [],
       getCurrentUnitIndex: () => textDocument?.currentIndex() ?? 0,
       getUnitByIndex: (index) => textDocument?.unit(index) ?? null,
+      navigateToFlatIndex: async (index, excerpt) =>
+        await editorMainRef.current?.navigateToUnit(index, excerpt) ?? false,
       getViewportText: () => {
         const result = textDocument?.read({ target: 'viewport' })
         return result && 'text' in result ? result.text : ''

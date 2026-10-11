@@ -46,6 +46,8 @@ import {
 export interface ChatScrollState {
   scrollTop: number
   pinned: boolean
+  windowStart?: number | null
+  windowCount?: number
 }
 
 export interface ChatSlice {

@@ -309,14 +309,15 @@ export function findFlatIndexFromViewport(
   document: Document,
   entries: ViewportNavEntry[],
   loadKey: string,
+  viewport?: { scrollTop: number; height: number },
 ): number {
   const scoped = filterEntriesForLoadKey(entries, loadKey)
   if (scoped.length === 0) return -1
 
   const scrollRoot = resolveScrollRoot(document)
-  const viewportHeight = scrollRoot.clientHeight || document.documentElement.clientHeight
+  const viewportHeight = viewport?.height ?? (scrollRoot.clientHeight || document.documentElement.clientHeight)
   const activationLine = Math.min(160, viewportHeight * 0.2)
-  const scrollTop = scrollRoot.scrollTop
+  const scrollTop = viewport?.scrollTop ?? scrollRoot.scrollTop
   const activationY = scrollTop + activationLine
 
   const withAnchor = scoped.filter((entry) => findViewportEntryAnchor(document, entry) !== null)

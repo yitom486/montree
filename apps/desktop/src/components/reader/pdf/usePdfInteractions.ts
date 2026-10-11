@@ -70,6 +70,7 @@ export function usePdfInteractions({
   pageAnchorRefs,
   marks,
   marksToc,
+  outlineUnits,
   inspector,
   createMark,
   updateMark,
@@ -328,9 +329,21 @@ export function usePdfInteractions({
       createBookmark: () => addPageBookmark(),
       createNoteFromSelection: (note) => handleSaveAnnotation(note),
       createMarkAt: (params) => handleCreateMarkAt(params),
-      navigateToFlatIndex: (index) => goToFlatIndex(index),
+      navigateToFlatIndex: async (index) => {
+        const unit = outlineUnits[index]
+        const page = unit ? Number.parseInt(unit.href, 10) : NaN
+        const document = pdfDocRef.current
+        if (!document || !Number.isFinite(page) || page < 1 || page > numPages) return false
+        goToFlatIndex(index)
+        const target = await waitForDom(() => {
+          if (pdfDocRef.current !== document || pageNumRef.current !== page) return null
+          const element = pageAnchorRefs.current.get(page)
+          return element?.isConnected ? element : null
+        })
+        return Boolean(target) && pdfDocRef.current === document && pageNumRef.current === page
+      },
     })
-  }, [addPageBookmark, filePath, goToFlatIndex, handleCreateMarkAt, handleSaveAnnotation])
+  }, [addPageBookmark, filePath, goToFlatIndex, handleCreateMarkAt, handleSaveAnnotation, outlineUnits, numPages, pdfDocRef, pageNumRef, pageAnchorRefs])
 
   const handleSelectMark = useCallback(
     (mark: ReadingMark) => {

@@ -7,6 +7,7 @@ import { APP_TITLE } from '@montree/contracts'
 import { resolveAppIconPath } from '../services/app-paths'
 import { shouldLogRendererConsole } from '../services/runtime-state'
 import { createWindowCloseController } from './window-close'
+import { createArtifactFrameGuard } from './artifact-navigation-guard'
 import { resolveWindowShortcut } from './window-shortcuts'
 import {
   getWindowSessionByWebContents,
@@ -210,6 +211,58 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     void shell.openExternal(url).catch((cause) => {
       console.error('[open-external-failed]', url, cause)
     })
+  })
+  // Artifact 预览框自身导航拦截（P1）：不信任运行时可改的 frame.name，
+  // 以 frame-created 时登记的不可变 frameTreeNodeId 判定归属（改名不解除限制）。
+  // 除初始 about:srcdoc/about:blank 提交外一律阻止（脚本/链接/meta refresh 自导航）。
+  // will-navigate 不覆盖子 frame；主框架与阅读器子 frame 不受影响。
+  // NOTE: 名称前缀（渲染端 name=`montree-artifact-*`）仅作登记时识别与极早期回退，
+  // 拦截以登记身份为准，见 artifact-navigation-guard.ts。
+  // 存活枚举用于已销毁帧清理（活帧永不淘汰）；枚举失败只增不减，不影响拦截。
+  const artifactGuard = createArtifactFrameGuard({
+    listLiveFrameTreeNodeIds: () => {
+      try {
+        return window.webContents.mainFrame.framesInSubtree.map((frame) => frame.frameTreeNodeId)
+      } catch {
+        return []
+      }
+    },
+  })
+  window.webContents.on('frame-created', (_event, { frame }) => {
+    try {
+      if (!frame) return
+      artifactGuard.handleFrameCreated({
+        name: frame.name ?? '',
+        url: frame.url ?? '',
+        frameTreeNodeId: frame.frameTreeNodeId,
+        detached: frame.detached,
+      })
+    } catch {
+      // 登记失败不阻断页面加载；拦截退化为名称回退（等价旧行为）
+    }
+  })
+  window.webContents.on('will-frame-navigate', (details) => {
+    if (details.isMainFrame) return
+    const navigated = details.frame
+    try {
+      if (
+        artifactGuard.shouldBlockSubframeNavigation(
+          navigated
+            ? {
+                name: navigated.name ?? '',
+                url: navigated.url ?? '',
+                frameTreeNodeId: navigated.frameTreeNodeId,
+                detached: navigated.detached,
+              }
+            : null,
+          details.url,
+        )
+      ) {
+        details.preventDefault()
+      }
+    } catch {
+      // 判定异常时 fail-open，避免误伤阅读器正常导航
+    }
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isAppNavigation(url)) {

@@ -53,6 +53,12 @@ export interface DiagramViewerCardProps {
   isSavedAsCard?: boolean
   isPinned?: boolean
   className?: string
+  /**
+   * U3 紧凑入口：主流默认只呈标题+短摘要+至多 3 步预览，
+   * 完整流程/Mermaid/概览与保存/固定/定位经“查看完整图表”进入。
+   * 内部展开态与 key 稳定，chunk/主题更新不重置。
+   */
+  defaultCompact?: boolean
 }
 
 export function DiagramViewerCard({
@@ -62,17 +68,19 @@ export function DiagramViewerCard({
   onSaveAsKnowledgeCard,
   isSavedAsCard = false,
   isPinned = false,
+  defaultCompact = false,
   className,
 }: DiagramViewerCardProps) {
   const hasSteps = (payload.visualSteps?.length ?? 0) > 0
   const [viewMode, setViewMode] = useState<'visual' | 'graph' | 'mermaid'>(
     hasSteps ? 'visual' : 'mermaid',
   )
-  const [copied, setCopied] = useState(false)
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(0)
   const [expandedPayloadIndex, setExpandedPayloadIndex] = useState<number | null>(null)
   const [isSavingCard, setIsSavingCard] = useState(false)
   const [savedLocally, setSavedLocally] = useState(isSavedAsCard)
+  const [copied, setCopied] = useState(false)
+  const [expanded, setExpanded] = useState(!defaultCompact)
 
   const handleSaveCard = async () => {
     if (!onSaveAsKnowledgeCard || isSavingCard || savedLocally) return
@@ -134,7 +142,8 @@ export function DiagramViewerCard({
           </div>
         </div>
 
-        {/* Tab 切换 */}
+        {/* Tab 切换：紧凑态隐藏（入口展开后才可切换，避免无效控件） */}
+        {expanded ? (
         <div className="flex items-center gap-0.5 rounded-lg border border-border/60 bg-background/80 p-0.5 text-xs">
           {hasSteps ? (
             <button
@@ -178,10 +187,13 @@ export function DiagramViewerCard({
             <span>概览</span>
           </button>
         </div>
+        ) : null}
       </div>
 
-      {/* 主画布内容 */}
-      <div className="p-3">
+      {/* 主画布内容：紧凑态只呈摘要与至多 3 步，完整功能经入口进入 */}
+      {expanded ? (
+        <>
+          <div className="p-3">
         {viewMode === 'visual' && hasSteps ? (
           <div className="space-y-2.5">
             {/* 角色速览 */}
@@ -402,6 +414,61 @@ export function DiagramViewerCard({
           ) : null}
         </div>
       </div>
+        </>
+      ) : (
+        <div className="min-w-0 px-3 py-2">
+          {payload.summary ? (
+            <p className="line-clamp-2 min-w-0 text-[11px] leading-relaxed text-muted-foreground">
+              {payload.summary}
+            </p>
+          ) : null}
+          {hasSteps ? (
+            <ul className="mt-1.5 min-w-0 space-y-1">
+              {payload.visualSteps!.slice(0, 3).map((step, idx) => (
+                <li
+                  key={idx}
+                  className="flex min-w-0 items-center gap-1.5 text-[11px] text-foreground/90"
+                >
+                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-muted-foreground">
+                    {idx + 1}
+                  </span>
+                  <span className="min-w-0 truncate">
+                    {step.action}
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      {step.from} → {step.to}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(true)}
+            className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 text-[11px] font-medium text-foreground outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            查看完整图表
+            {hasSteps ? (
+              <span className="font-normal text-muted-foreground">
+               （共 {payload.visualSteps!.length} 步）
+              </span>
+            ) : null}
+            <ArrowRight className="size-3.5" />
+          </button>
+        </div>
+      )}
+      {expanded && defaultCompact ? (
+        <div className="border-t border-border/60 px-3 py-1.5">
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="flex min-h-[32px] w-full items-center justify-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground outline-none transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            收起完整图表
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

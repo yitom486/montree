@@ -55,6 +55,8 @@ export interface AcpChatMessage {
   }>
   /** montree_suggest_chapters 章级建议（promote 前在 tool，promote 后在 agent） */
   chapterMarkPlan?: ChapterMarkPlanEntry[]
+  /** montree_present 呈现结果（enrich 挂载，卡片分发） */
+  presentResult?: import('@montree/contracts').MontreePresentResult
   /** 交互经纬流转分步卡片（带对应章句穿透定位） */
   steps?: Array<{
     num: number

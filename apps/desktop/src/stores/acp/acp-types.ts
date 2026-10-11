@@ -10,6 +10,7 @@ import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import type { AcpPreferredConfigMap } from '@/lib/agent/acp-config-preferences'
 import type { MarkProposalStatus } from '@montree/annotations'
+import type { ChatScrollState } from './chat-slice'
 
 export type AcpHudDisplayMode = 'docked' | 'floating' | 'capsule'
 
@@ -64,7 +65,7 @@ export interface AcpUiStore {
   activeThreadId: string
   historyOpen: boolean
   /** 各线程聊天滚动记忆（scrollTop + 是否贴底），悬浮/侧栏共用（persist） */
-  chatScrollByThread: Record<string, { scrollTop: number; pinned: boolean }>
+  chatScrollByThread: Record<string, ChatScrollState>
   /**
    * 各运行时下用户选过的 Mode / Model 等（persist）。
    * 连接后写回 Agent，避免每次重开都回到默认。
@@ -146,7 +147,7 @@ export interface AcpUiStore {
   switchThread: (threadId: string) => void
   deleteThread: (threadId: string) => void
   renameThread: (threadId: string, title: string) => void
-  setChatScroll: (threadId: string, scroll: { scrollTop: number; pinned: boolean }) => void
+  setChatScroll: (threadId: string, scroll: ChatScrollState) => void
 }
 
 /**

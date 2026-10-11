@@ -1,6 +1,7 @@
 import { readFile, writeFile, rename, unlink } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { err, ok, toAppError, type AppError, type Result, type SaveBinaryDocumentPayload, type SaveBinaryDocumentResult } from '@montree/contracts'
 
 export function documentHash(data: Uint8Array): string {
@@ -24,8 +25,18 @@ export async function saveBinaryDocument(payload: SaveBinaryDocumentPayload): Pr
     const original = await readFile(payload.filePath)
     if (documentHash(original) !== payload.expectedHash) return err({ code: 'INVALID_STATE', message: '磁盘文件已被其他程序修改，请重新打开后再保存' })
     await writeFile(temporary, payload.data, { flag: 'wx' })
-    if (documentHash(await readFile(payload.filePath)) !== payload.expectedHash) return err({ code: 'INVALID_STATE', message: '保存期间磁盘文件发生变化，未覆盖文件' })
-    await rename(temporary, payload.filePath)
+    // Windows 上索引器/杀毒软件可能短暂占用目标；每次重试仍校验外部修改。
+    for (let attempt = 0; ; attempt++) {
+      if (documentHash(await readFile(payload.filePath)) !== payload.expectedHash) return err({ code: 'INVALID_STATE', message: '保存期间磁盘文件发生变化，未覆盖文件' })
+      try {
+        await rename(temporary, payload.filePath)
+        break
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (attempt >= 3 || (code !== 'EPERM' && code !== 'EBUSY')) throw error
+        await delay(50 * (attempt + 1))
+      }
+    }
     return ok({ filePath: payload.filePath, hash: documentHash(payload.data) })
   } catch (error) {
     return err(toAppError(error, '保存 Office 文档失败'))

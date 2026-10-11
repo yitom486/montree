@@ -74,12 +74,19 @@ describe('AgentToolCallCard（社区 Tool 外壳）', () => {
     expect(container.textContent).not.toContain('const x = 1')
   })
 
-  it('失败摘要在标题行可见，详情默认展开', () => {
+  it('失败摘要在标题行可见，详情默认收起、展开后见全文', () => {
     render(
       tool({ toolStatus: 'failed', toolContentText: '未知工具 xxx', streaming: false }),
     )
     expect(container.textContent).toContain('失败')
     expect(container.textContent).toContain('工具不可用')
+    // 全文默认收起（不默认长 pre），点开头后可见
+    expect(container.textContent).not.toContain('当前版本不支持')
+    expect(headerExpanded()).toBe(false)
+    act(() => {
+      ;(container.querySelector('[data-slot="ai-tool-header"]') as HTMLElement).click()
+    })
+    expect(headerExpanded()).toBe(true)
     expect(container.textContent).toContain('当前版本不支持')
   })
 
@@ -135,10 +142,10 @@ describe('AgentToolCallCard（社区 Tool 外壳）', () => {
     expect(container.textContent).toContain('执行删除')
   })
 
-  it('执行中展开的普通工具完成后自动收起（用户未主动选择时）', () => {
+  it('普通工具运行到完成均默认收起，不占用正文', () => {
     const running = tool({ toolStatus: 'in_progress', streaming: true })
     render(running)
-    expect(headerExpanded()).toBe(true)
+    expect(headerExpanded()).toBe(false)
     render({ ...running, toolStatus: 'completed', streaming: false })
     expect(headerExpanded()).toBe(false)
     expect(container.textContent).not.toContain('const x = 1')
@@ -147,12 +154,8 @@ describe('AgentToolCallCard（社区 Tool 外壳）', () => {
   it('用户主动展开后，完成时保持展开（不覆盖用户选择）', () => {
     const running = tool({ toolStatus: 'in_progress', streaming: true })
     render(running)
-    // running 默认已展开：先手动收起再展开，标记一次主动选择
+    // 运行默认收起，一次点击即可展开。
     const header = container.querySelector<HTMLElement>('[data-slot="ai-tool-header"]')!
-    act(() => {
-      header.click()
-    })
-    expect(headerExpanded()).toBe(false)
     act(() => {
       header.click()
     })

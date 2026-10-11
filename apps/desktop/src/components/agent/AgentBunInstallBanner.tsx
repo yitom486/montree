@@ -45,7 +45,7 @@ export function AgentBunInstallBanner({ onInstalled }: AgentBunInstallBannerProp
         <Button type="button" size="xs" disabled={installing} onClick={() => void handleInstall()}>
           {installing ? (
             <>
-              <Loader2 className="mr-1 size-3 animate-spin" />
+              <Loader2 className="mr-1 size-3 animate-spin motion-reduce:animate-none" />
               安装中…
             </>
           ) : (

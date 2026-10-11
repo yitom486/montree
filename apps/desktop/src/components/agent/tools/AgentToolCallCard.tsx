@@ -16,7 +16,7 @@ import {
 } from '@/components/agent/chat/AgentChatItem'
 import { AgentDiffPreview } from '@/components/agent/tools/AgentDiffPreview'
 import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
-import { ToolBusinessResult, hasBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
 import {
   Tool,
   ToolContent,
@@ -90,9 +90,18 @@ function toAiToolState(state: ToolDisplayState): AiToolState {
 
 interface AgentToolCallCardProps {
   message: AcpChatMessage
+  /**
+   * 结果入口外壳使用：只渲染紧凑过程行与详情，不内嵌业务结果卡
+   * （业务卡由结果入口独立渲染，单次调用只出现一处）。
+   */
+  suppressBusinessResult?: boolean
+  /** 结果入口使用：跳过外层卡片壳，由入口提供唯一外壳，避免双层描边。 */
+  bare?: boolean
+  /** 工作记录已提供展开按钮，直接显示详情，不再叠第二层工具头。 */
+  detailsOnly?: boolean
 }
 
-export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
+export function AgentToolCallCard({ message, suppressBusinessResult, bare, detailsOnly }: AgentToolCallCardProps) {
   const pendingPermission = useAcpPendingPermission()
   const needsApproval = toolMessageNeedsApproval(message, pendingPermission)
   const display = toToolDisplayModel(message, { needsApproval })
@@ -101,40 +110,30 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
   // 不再用 toolStatus 兜底：落定的未知残留不再顶着进行中样式。
   const streaming = Boolean(message.streaming) || needsApproval
 
-  // 展开规则：成功默认收起；失败默认展开一次；流式进行中默认展开；
-  // 富业务结果（图表/互引/审计/建议）默认展开，直接呈现在主流中。
-  // 用户手动切换后不再被流式更新重置：记录用户是否主动选择过，
-  // 未主动选择时随 completed/cancelled/unknown 落定自动收起（富结果除外）；
-  // 失败到达后补开一次。流式 chunk 本身不碰 open。
+  // 展开规则：成功/失败默认收起（失败摘要与恢复操作在行外常驻）；
+  // 流式进行中也默认收起。富业务结果不再强制展开——结果入口自带独立呈现，
+  // 此处只留紧凑过程行。用户手动切换后不再被流式更新重置；
+  // 未主动选择时随 completed/cancelled/unknown 落定自动收起；
+  // 流式 chunk 本身不碰 open。
   const diffs = message.toolDiffs ?? []
   const detail = message.toolContentText || message.text
   const locations = message.toolLocations ?? []
-  const hasRichResult = hasBusinessResult(detail, message.toolTitle)
-  const [open, setOpen] = useState(
-    () => display.state === 'failed' || streaming || hasRichResult,
-  )
+  const [open, setOpen] = useState(false)
   const userTouchedRef = useRef(false)
   const handleOpenChange = useCallback((next: boolean) => {
     userTouchedRef.current = true
     setOpen(next)
   }, [])
-  const openedForFailureRef = useRef(display.state === 'failed')
   useEffect(() => {
-    if (display.state === 'failed' && !openedForFailureRef.current) {
-      openedForFailureRef.current = true
-      setOpen(true)
-      return
-    }
     if (
       (display.state === 'completed' ||
         display.state === 'cancelled' ||
         display.state === 'unknown') &&
-      !userTouchedRef.current &&
-      !hasRichResult
+      !userTouchedRef.current
     ) {
       setOpen(false)
     }
-  }, [display.state, hasRichResult])
+  }, [display.state])
 
   const failed = display.state === 'failed'
   const proposeFailed =
@@ -147,17 +146,56 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
   // 失败时用业务说明，不再把原始报错塞进 pre
   const hasTextDetail =
     Boolean(detail && detail !== message.toolTitle && diffs.length === 0) && !failed
+  // 失败恢复操作（打开该章/去划词）在折叠外常驻：收起也能恢复，不依赖详情展开
+  const recoveryActions = failureGuide ? (
+    <div className="flex flex-wrap gap-1.5 px-2.5 pb-2">
+      {failureGuide.canOpenChapter ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 px-2.5 text-[11px]"
+          onClick={() => {
+            void openChapterForMarkRecovery(failureGuide.flatIndex)
+          }}
+        >
+          打开该章
+        </Button>
+      ) : null}
+      {failureGuide.canSelectText ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2.5 text-[11px]"
+          onClick={() => promptSelectTextForMarkRecovery()}
+        >
+          去划词
+        </Button>
+      ) : null}
+    </div>
+  ) : null
 
-  return (
-    <AgentChatItem
-      variant="card"
-      tone={needsApproval ? 'tool-pending' : 'tool'}
-      streaming={streaming}
-      probe="tool"
-      messageId={message.id}
-      role="tool"
-    >
-      {!display.hasBodyDetails ? (
+  const details = (
+    <>
+      {locations.length > 0 && diffs.length === 0 ? (
+        <ul className="min-w-0 space-y-0.5">
+          {locations.map((loc: AcpToolLocation) => (
+            <li key={`${loc.path}:${loc.line ?? ''}`} className="truncate font-mono text-[10px] text-muted-foreground" title={loc.path}>
+              {loc.path.split(/[\\/]/).pop() || loc.path}{loc.line != null ? `:${loc.line}` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {diffs.length > 0 ? <AgentDiffPreview diffs={diffs} /> : null}
+      {display.errorBody ? <ToolOutput errorText={display.errorBody} /> : null}
+      {suppressBusinessResult ? null : <ToolBusinessResult message={message} />}
+      {hasTextDetail ? <pre className={AGENT_CHAT_PRE_CLASS}>{detail}</pre> : null}
+    </>
+  )
+  const body = (
+    <>
+      {detailsOnly ? details : !display.hasBodyDetails ? (
         <div className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5">
           <ToolStateIcon state={aiState} />
           {kindIcon(message.toolKind)}
@@ -181,59 +219,11 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
             kindIcon={kindIcon(message.toolKind)}
           />
           <ToolContent>
-            {locations.length > 0 && diffs.length === 0 ? (
-              <ul className="min-w-0 space-y-0.5">
-                {locations.map((loc: AcpToolLocation) => (
-                  <li
-                    key={`${loc.path}:${loc.line ?? ''}`}
-                    className="truncate font-mono text-[10px] text-muted-foreground"
-                    title={loc.path}
-                  >
-                    {loc.path.split(/[\\/]/).pop() || loc.path}
-                    {loc.line != null ? `:${loc.line}` : ''}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {diffs.length > 0 ? <AgentDiffPreview diffs={diffs} /> : null}
-            {display.errorBody ? (
-              <ToolOutput errorText={display.errorBody} />
-            ) : null}
-            <ToolBusinessResult message={message} />
-            {hasRichResult || !hasTextDetail ? null : (
-              <pre className={AGENT_CHAT_PRE_CLASS}>{detail}</pre>
-            )}
-            {failureGuide ? (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {failureGuide.canOpenChapter ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2.5 text-[11px]"
-                    onClick={() => {
-                      void openChapterForMarkRecovery(failureGuide.flatIndex)
-                    }}
-                  >
-                    打开该章
-                  </Button>
-                ) : null}
-                {failureGuide.canSelectText ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2.5 text-[11px]"
-                    onClick={() => promptSelectTextForMarkRecovery()}
-                  >
-                    去划词
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
+            {details}
           </ToolContent>
         </Tool>
       )}
+      {recoveryActions}
       {/* 审批操作在折叠容器外：收起工具详情不影响批准/拒绝，且全时间线只有这一份；
           无正文的静态行同样外挂，保证待审批工具永远有一份可见操作 */}
       {needsApproval ? (
@@ -241,6 +231,20 @@ export function AgentToolCallCard({ message }: AgentToolCallCardProps) {
           <ToolApprovalSlot message={message} />
         </div>
       ) : null}
+    </>
+  )
+
+  if (bare) return body
+  return (
+    <AgentChatItem
+      variant="card"
+      tone={needsApproval ? 'tool-pending' : 'tool'}
+      streaming={streaming}
+      probe="tool"
+      messageId={message.id}
+      role="tool"
+    >
+      {body}
     </AgentChatItem>
   )
 }

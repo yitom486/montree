@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import {
   classifyToolResultKind,
+  isPromotedToolResultKind,
   readableToolTitle,
   summarizeToolTarget,
   toToolDisplayModel,
@@ -96,6 +97,10 @@ describe('readableToolTitle', () => {
     expect(readableToolTitle('')).toBe('工具调用')
     expect(readableToolTitle(undefined)).toBe('工具调用')
   })
+
+  it('montree_present 映射中文标题并分类提升', () => {
+    expect(readableToolTitle('mcp.montree.montree_present')).toBe('展示呈现')
+  })
 })
 
 describe('summarizeToolTarget', () => {
@@ -125,6 +130,29 @@ describe('classifyToolResultKind', () => {
       ),
     ).toBe('text')
     expect(classifyToolResultKind(tool({ toolTitle: 'Read', text: 'Read' }))).toBe('none')
+  })
+
+  it('present 结果优先 enrich 挂载，其次标题门限，并提升', () => {
+    expect(
+      classifyToolResultKind(
+        tool({
+          toolTitle: 'montree_present',
+          toolContentText: '{"kind":"chapter-comparison","schemaVersion":1}',
+          text: '{"kind":"chapter-comparison","schemaVersion":1}',
+        }),
+      ),
+    ).toBe('chapter-comparison')
+    expect(
+      classifyToolResultKind(
+        tool({
+          toolTitle: 'montree_present',
+          toolContentText: '{"kind":"html-artifact","schemaVersion":1}',
+          text: '{"kind":"html-artifact","schemaVersion":1}',
+        }),
+      ),
+    ).toBe('html-artifact')
+    expect(isPromotedToolResultKind('chapter-comparison')).toBe(true)
+    expect(isPromotedToolResultKind('html-artifact')).toBe(true)
   })
 })
 

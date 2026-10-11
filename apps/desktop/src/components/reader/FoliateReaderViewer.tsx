@@ -190,7 +190,7 @@ export function FoliateReaderViewer({
     <div className="flex h-full min-h-0 flex-col">
       <ReaderToolbarShell
         ready={session.ready}
-        tocDisabled={session.chapters.length === 0}
+        tocDisabled={!session.ready || session.chapters.length === 0}
         cardCount={marks.length}
         onTocToggle={toggleToc}
         onMarksToggle={toggleMarks}

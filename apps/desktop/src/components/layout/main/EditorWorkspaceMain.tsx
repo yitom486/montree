@@ -31,6 +31,8 @@ import {
 import { useScrollSync } from '@/hooks/editor/useScrollSync'
 import type { TextDocument } from '@/lib/editor/text-document'
 import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
+import { EditorView } from '@codemirror/view'
+import { findExcerptOffsets, findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 
 function TextDataReaderContext({ filePath, content, kind, root }: { filePath: string; content: string; kind: string; root: () => HTMLElement | null }) {
   useDocumentReader({ filePath, root, text: () => content,
@@ -78,6 +80,7 @@ const HtmlViewer = lazy(() =>
 )
 
 export interface EditorWorkspaceMainHandle {
+  navigateToUnit: (index: number, excerpt?: string) => Promise<boolean>
   selectHeading: (heading: MarkdownHeading) => void
   openFind: () => void
   openReplace: () => void
@@ -132,6 +135,8 @@ export const EditorWorkspaceMain = forwardRef<
   ref,
 ) {
   const editorRef = useRef<MarkdownEditorHandle>(null)
+  const documentRef = useRef(textDocument)
+  documentRef.current = textDocument
   const previewRef = useRef<PreviewPaneHandle>(null)
   const fileState = useFileUiState(filePath)
   const setViewMode = useEditorUiStore((state) => state.setViewMode)
@@ -251,11 +256,57 @@ export const EditorWorkspaceMain = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      navigateToUnit: async (index, excerpt) => {
+        const doc = textDocument
+        const unit = doc?.units()[index]
+        if (!doc || !unit || documentRef.current !== doc) return false
+        const revision = doc.revision
+        const heading = headings.find((item) => doc.state.doc.line(item.line + 1).from === unit.from)
+        if (heading) handleSelectHeading(heading)
+        else {
+          editorRef.current?.scrollToLine(doc.state.doc.lineAt(unit.from).number)
+          previewRef.current?.setScrollRatio(0)
+        }
+        if (viewMode !== 'preview') {
+          const view = editorRef.current?.getView()
+          if (!view) return false
+          const source = doc.text.slice(unit.from, unit.to)
+          const matched = excerpt ? findExcerptOffsets(source, excerpt) : null
+          if (excerpt && !matched) return false
+          const from = unit.from + (matched?.from ?? 0)
+          const to = unit.from + (matched?.to ?? 0)
+          view.dispatch({ selection: { anchor: from, head: to }, effects: EditorView.scrollIntoView(from, { y: 'center' }) })
+        }
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+        if (documentRef.current !== doc || doc.revision !== revision) return false
+        if (viewMode === 'preview' && excerpt) {
+          const root = previewRef.current?.getScrollElement()
+          if (!root) return false
+          const start = heading ? root.querySelector<HTMLElement>(`#${CSS.escape(heading.id)}`) : root.firstElementChild
+          let target: Element | null = start
+          let range: Range | null = null
+          while (target) {
+            if (target !== start && /^H[1-6]$/.test(target.tagName) && Number(target.tagName[1]) <= unit.level) break
+            range = findTextRangeInRoot(target as HTMLElement, excerpt)
+            if (range) break
+            target = target.nextElementSibling
+          }
+          if (!range) return false
+          const selection = root.ownerDocument.getSelection()
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+          const block = range.startContainer.parentElement
+          if (block) {
+            root.scrollTop += block.getBoundingClientRect().top - root.getBoundingClientRect().top - root.clientHeight / 3
+          }
+        }
+        return true
+      },
       selectHeading: handleSelectHeading,
       openFind: () => setFindReplace({ open: true, mode: 'find' }),
       openReplace: () => setFindReplace({ open: true, mode: 'replace' }),
     }),
-    [handleSelectHeading],
+    [handleSelectHeading, textDocument, headings, viewMode],
   )
 
   useEffect(() => {

@@ -10,6 +10,24 @@ export function collapseInlineWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+/** Preserve original UTF-16 offsets when a verified quote collapses source whitespace. */
+export function findExcerptOffsets(text: string, excerpt: string): { from: number; to: number } | null {
+  const needle = collapseInlineWhitespace(excerpt)
+  if (!needle) return null
+  let normalized = ''
+  const offsets: Array<{ from: number; to: number }> = []
+  for (let from = 0; from < text.length;) {
+    let to = from + 1
+    const whitespace = /\s/.test(text[from])
+    if (whitespace) while (to < text.length && /\s/.test(text[to])) to++
+    normalized += whitespace ? ' ' : text[from]
+    offsets.push({ from, to })
+    from = to
+  }
+  const index = normalized.indexOf(needle)
+  return index < 0 ? null : { from: offsets[index].from, to: offsets[index + needle.length - 1].to }
+}
+
 export function excerptSearchCandidates(searchText: string): string[] {
   const trimmed = searchText.trim()
   if (!trimmed) return []

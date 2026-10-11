@@ -40,6 +40,7 @@ import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import { appApi } from '@/api/app-api'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
+import { waitForDom } from '@/lib/reader/wait-for-dom'
 import { toast } from 'sonner'
 import { applyCopyButtonFeedback, getCodeBlockTextFromCopyButton } from '@/lib/preview/code-block-copy'
 import { activateWebDocCodeTab } from '@/lib/reader/web-doc/web-doc-code-blocks'
@@ -143,6 +144,9 @@ export function useWebDocSession({
   themeRef.current = theme
   const pageUrlRef = useRef(pageUrl)
   pageUrlRef.current = pageUrl
+  const loadedPageRef = useRef<{ url: string; doc: Document } | null>(null)
+  const marksActionsRef = useRef({ addPageBookmark, handleSaveAnnotation, handleCreateMarkAt, navigateToUrl, scrollToWebDocFragment })
+  marksActionsRef.current = { addPageBookmark, handleSaveAnnotation, handleCreateMarkAt, navigateToUrl, scrollToWebDocFragment }
 
   const readerFontSize = useAppSettingsStore((state) => state.readerFontSize)
   const readerLineHeight = useAppSettingsStore((state) => state.readerLineHeight)
@@ -460,6 +464,7 @@ export function useWebDocSession({
   // Manage iframe loading & escapes
   useEffect(() => {
     setIframeReady(false)
+    loadedPageRef.current = null
     const iframe = iframeRef.current
     if (!iframe) return
 
@@ -505,6 +510,7 @@ export function useWebDocSession({
         bodyTextLen: iframe.contentDocument?.body?.textContent?.trim().length ?? 0,
       })
       setIframeReady(true)
+      if (iframe.contentDocument) loadedPageRef.current = { url: pageUrl, doc: iframe.contentDocument }
       bindIframeFrameRef.current(iframe)
 
       const fragment = resolveWebDocFragment(pageUrl, documentUrl)
@@ -577,22 +583,30 @@ export function useWebDocSession({
 
   // Agent marks registry
   useEffect(() => {
-    return registerReaderMarks({
+    let alive = true
+    const unregister = registerReaderMarks({
       filePath: documentId,
-      createBookmark: () => addPageBookmark(),
-      createNoteFromSelection: (note) => handleSaveAnnotation(note),
-      createMarkAt: (params) => handleCreateMarkAt(params),
-      navigateToFlatIndex: (index) => {
+      createBookmark: () => marksActionsRef.current.addPageBookmark(),
+      createNoteFromSelection: (note) => marksActionsRef.current.handleSaveAnnotation(note),
+      createMarkAt: (params) => marksActionsRef.current.handleCreateMarkAt(params),
+      navigateToFlatIndex: async (index) => {
         const unit = unitsRef.current[index]
-        if (unit?.href) navigateToUrl(unit.href, index)
+        if (!alive || !unit?.href) return false
+        const href = unit.href
+        marksActionsRef.current.navigateToUrl(href, index)
+        const doc = await waitForDom(() => {
+          const loaded = loadedPageRef.current
+          return alive && loaded?.url.split('#')[0] === href.split('#')[0] && loaded.doc === iframeRef.current?.contentDocument ? loaded.doc : null
+        }, { attempts: 100 })
+        if (!alive || !doc || doc !== iframeRef.current?.contentDocument) return false
+        const fragment = new URL(href).hash.slice(1)
+        return !fragment || marksActionsRef.current.scrollToWebDocFragment(decodeURIComponent(fragment))
       },
     })
+    return () => { alive = false; unregister() }
   }, [
-    addPageBookmark,
     documentId,
-    handleCreateMarkAt,
-    handleSaveAnnotation,
-    navigateToUrl,
+    iframeRef,
     unitsRef,
   ])
 

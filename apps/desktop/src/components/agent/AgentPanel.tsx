@@ -435,7 +435,7 @@ export const AgentPanel = memo(function AgentPanel({
               )}
             >
               {view.status === 'connecting' ? (
-                <Loader2 className="size-2.5 animate-spin" />
+                <Loader2 className="size-2.5 animate-spin motion-reduce:animate-none" />
               ) : (
                 <span
                   className={cn(
@@ -483,7 +483,7 @@ export const AgentPanel = memo(function AgentPanel({
               onClick={() => void connect()}
             >
               {view.status === 'connecting' ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
               ) : (
                 <Wifi className="size-3.5" />
               )}

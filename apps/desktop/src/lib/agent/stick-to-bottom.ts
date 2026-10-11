@@ -1,69 +1,21 @@
-export const DEFAULT_STICK_TO_BOTTOM_THRESHOLD_PX = 96
-
-export type StickToBottomViewport = Pick<
-  HTMLElement,
-  'scrollTop' | 'scrollHeight' | 'clientHeight'
->
-
-export function isNearBottom(
-  viewport: StickToBottomViewport,
-  threshold = DEFAULT_STICK_TO_BOTTOM_THRESHOLD_PX,
-): boolean {
-  const distance = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
-  return distance <= threshold
-}
-
-export type MessagePinState = {
-  messageCount: number
-  lastMessageId?: string
-  lastMessageStreaming?: boolean
-  prompting?: boolean
-}
-
-/** 新消息、新回复开始流式、用户刚发送 prompt 时重新贴底。历史懒加载向前补（条数涨但末条不变）不贴底。 */
-export function shouldRePinOnMessageChange(
-  prev: MessagePinState,
-  next: MessagePinState,
-): boolean {
-  if (next.messageCount > prev.messageCount) {
-    // 条数涨 + 末条变 = 末尾追加 → 贴底；条数涨 + 末条不变 = 历史前补 → 不贴
-    return next.lastMessageId !== prev.lastMessageId
-  }
-  if (next.lastMessageId !== prev.lastMessageId) return true
-  if (next.lastMessageStreaming && !prev.lastMessageStreaming) return true
-  if (next.prompting && !prev.prompting) return true
-  return false
-}
-
 export function resolveScrollViewport(
   contentEl: HTMLElement | null | undefined,
 ): HTMLElement | null {
   if (!contentEl) return null
-  const viewport = contentEl.closest('[data-slot=scroll-area-viewport]')
-  if (viewport instanceof HTMLElement) return viewport
+  // 旧 Radix 结构：最近的命名 viewport。
+  const legacy = contentEl.closest('[data-slot=scroll-area-viewport]')
+  if (legacy instanceof HTMLElement) return legacy
+  // 社区 Conversation 结构：向上找到最近的纵向滚动祖先
+  //（StickToBottom 内容区经 scrollClassName 得 overflow-y-auto）。
+  let ancestor = contentEl.parentElement
+  while (ancestor) {
+    const style = getComputedStyle(ancestor)
+    if (/(auto|scroll)/.test(style.overflowY)) return ancestor
+    ancestor = ancestor.parentElement
+  }
+  // 无排版环境（happy-dom 单测手动给几何量）回落到直接父级，保持旧语义。
   const parent = contentEl.parentElement
-  if (parent instanceof HTMLElement) {
-    const style = getComputedStyle(parent)
-    if (/(auto|scroll)/.test(style.overflowY)) return parent
-  }
   return parent instanceof HTMLElement ? parent : null
-}
-
-export function scrollViewportToBottom(viewport: HTMLElement): void {
-  viewport.scrollTop = viewport.scrollHeight - viewport.clientHeight
-}
-
-/** 将高频回调合并到下一帧，避免 ResizeObserver 在流式输出时过度触发滚动。 */
-export function rafCoalesce(callback: () => void): () => void {
-  let scheduled = false
-  return () => {
-    if (scheduled) return
-    scheduled = true
-    requestAnimationFrame(() => {
-      scheduled = false
-      callback()
-    })
-  }
 }
 
 /** 历史分页：初次只看末尾，向上滚动 5 条 5 条向前补。 */

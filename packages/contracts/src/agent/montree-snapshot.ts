@@ -26,6 +26,7 @@ export type MontreeSnapshotResource =
   | 'table-read'
   | 'text-read'
   | 'text-edit'
+  | 'present'
   | 'table-edit'
   | 'slide-read'
   | 'slide-edit'

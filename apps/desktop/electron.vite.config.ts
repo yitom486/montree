@@ -110,11 +110,12 @@ export default defineConfig({
       },
     },
     resolve: {
-      alias: {
-        '@': resolve(appDir, 'src'),
-        ...foliateAlias,
-        ...workspaceAlias,
-      },
+      alias: [
+        // Official web bundle retains common programming languages without shipping every grammar.
+        { find: /^shiki$/, replacement: 'shiki/bundle/web' },
+        ...Object.entries({ '@': resolve(appDir, 'src'), ...foliateAlias, ...workspaceAlias })
+          .map(([find, replacement]) => ({ find, replacement })),
+      ],
     },
     plugins: [
       react(),

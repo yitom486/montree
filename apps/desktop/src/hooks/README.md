@@ -84,8 +84,7 @@
 | `useDocumentReader` | 新格式统一正文/单元读取、搜索、图片与 DOM 选区；表格/PPT 使用结构化选区 |
 | `useAcpStreamHost` | App 根 ACP 流式推送宿主（生命周期跟应用走，不跟面板挂载走；双面板曾致复读） |
 | `useAnnotationAgentAssist` | 批注对话框：独立 ACP session；意图/写成批注 → 不进右侧时间线 |
-| `useStickToBottomScroll` | Agent 消息列表贴底滚动；`streaming` 时 rAF 合并 ResizeObserver；返回 `pinned` / `scrollToBottom` |
-| `useSmoothStreamingText` | 流式匀速揭示（常驻 rAF + 自适应消费 + 完成排空）+ `useThrottledValue` 低频重解析 |
+| `useStickToBottomScroll` | use-stick-to-bottom 的 viewport/线程滚动记忆薄适配；不维护滚动算法；含批注面板延迟挂载绑定 |
 
 ---
 

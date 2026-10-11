@@ -216,3 +216,153 @@ describe('groupChatTimeline', () => {
     expect(groupChatTimeline([], { nowMs: 1 })).toEqual([])
   })
 })
+
+describe('groupChatTimeline 回合归属（U1）', () => {
+  function tool(id: string, title: string, status: 'completed' = 'completed') {
+    return msg({ id, role: 'tool', toolTitle: title, toolStatus: status, toolCallId: id })
+  }
+
+  it('穿插多条 assistant 文本仍汇总为一条工作记录，文本顺序保留', () => {
+    const user = msg({ id: 'u1', role: 'user', text: '查' })
+    const t1 = tool('t1', 'read_text_file')
+    const mid = msg({ id: 'a1', role: 'agent', text: '先读了正文' })
+    const t2 = tool('t2', 'search')
+    const fin = msg({ id: 'a2', role: 'agent', text: '结论' })
+    const timeline = groupChatTimeline([user, t1, mid, t2, fin], { nowMs: 9000 })
+    expect(timeline.map((i) => i.kind)).toEqual(['message', 'work-log', 'message', 'message'])
+    const group = timeline[1]!
+    expect(group.kind).toBe('work-log')
+    if (group.kind === 'work-log') {
+      expect(group.toolCallCount).toBe(2)
+      expect(group.messages.map((m) => m.id)).toEqual(['t1', 't2'])
+    }
+    // 文本不丢失不拼接
+    expect((timeline[2] as { message: AcpChatMessage }).message.text).toBe('先读了正文')
+    expect((timeline[3] as { message: AcpChatMessage }).message.text).toBe('结论')
+  })
+
+  it('两个用户回合各一条工作记录，不跨边界合并', () => {
+    const timeline = groupChatTimeline(
+      [
+        msg({ id: 'u1', role: 'user', text: '一' }),
+        tool('t1', 'read_text_file'),
+        msg({ id: 'u2', role: 'user', text: '二' }),
+        tool('t2', 'search'),
+      ],
+      { nowMs: 9000 },
+    )
+    expect(timeline.map((i) => i.kind)).toEqual(['message', 'work-log', 'message', 'work-log'])
+    expect(timeline[1]?.key).not.toBe(timeline[3]?.key)
+  })
+
+  it('无 user 历史前缀自成独立片段', () => {
+    const timeline = groupChatTimeline([tool('t1', 'read_text_file')], { nowMs: 9000 })
+    expect(timeline.map((i) => i.kind)).toEqual(['work-log'])
+    expect(timeline[0]?.key).toBe('work-log:prefix:default')
+  })
+
+  it('切线程不串 key（scopeKey 隔离）', () => {
+    const msgs = [msg({ id: 'u1', role: 'user', text: 'x' }), tool('t1', 'read_text_file')]
+    const a = groupChatTimeline(msgs, { scopeKey: 'thread-a', nowMs: 1 })
+    const b = groupChatTimeline(msgs, { scopeKey: 'thread-b', nowMs: 1 })
+    expect(a[1]?.key).not.toBe(b[1]?.key)
+  })
+
+  it('迟到结果不重复、位置跟随消息', () => {
+    const user = msg({ id: 'u1', role: 'user', text: '查' })
+    const t1 = tool('t1', 'read_text_file')
+    const first = groupChatTimeline([user, t1], { nowMs: 9000 })
+    // 迟到富结果追加到末尾：只出现一次，位置在末尾
+    const late = msg({
+      id: 'late-1',
+      role: 'tool',
+      toolTitle: 'montree_generate_diagram',
+      toolStatus: 'completed',
+      toolCallId: 'late-1',
+      toolContentText: JSON.stringify({ diagramId: 'd', mermaidCode: 'graph TD; A-->B' }),
+    })
+    const second = groupChatTimeline([user, t1, late], { nowMs: 9000 })
+    expect(first[1]?.key).toBe(second[1]?.key)
+    const ids = second.flatMap((i) => (i.kind === 'work-log' ? i.messages : [i.message])).map((m) => m.id)
+    expect(ids.filter((id) => id === 'late-1')).toHaveLength(1)
+    expect(second.at(-1)).toMatchObject({ kind: 'message' })
+  })
+
+  it('同 result.id 不同调用各渲染一条（U1 结果身份）', () => {
+    const same = JSON.stringify({ diagramId: 'same', mermaidCode: 'graph TD; A-->B' })
+    const timeline = groupChatTimeline(
+      [
+        msg({ id: 'u1', role: 'user', text: '查' }),
+        msg({ id: 'r1', role: 'tool', toolTitle: 'montree_generate_diagram', toolStatus: 'completed', toolCallId: 'r1', toolContentText: same }),
+        msg({ id: 'r2', role: 'tool', toolTitle: 'montree_generate_diagram', toolStatus: 'completed', toolCallId: 'r2', toolContentText: same }),
+      ],
+      { nowMs: 9000 },
+    )
+    expect(timeline.map((i) => i.kind)).toEqual(['message', 'message', 'message'])
+    expect(timeline[1]?.key).toBe('msg:r1')
+    expect(timeline[2]?.key).toBe('msg:r2')
+  })
+
+  it('窗口裁剪：计数用完整派生并注明未加载，可见只放窗口内', () => {
+    const user = msg({ id: 'u1', role: 'user', text: '查' })
+    const t1 = tool('t1', 'read_text_file')
+    const t2 = tool('t2', 'search')
+    const t3 = tool('t3', 'read_text_file')
+    const all = [user, t1, t2, t3]
+    const timeline = groupChatTimeline(all, {
+      nowMs: 9000,
+      visibleIds: new Set(['u1', 't3']),
+    })
+    expect(timeline.map((i) => i.kind)).toEqual(['message', 'work-log'])
+    const group = timeline[1]!
+    if (group.kind !== 'work-log') expect.unreachable('应为工作记录组')
+    // 跨窗口调用不算成可见调用：详情只有 t3，但计数是整回合 3 并注明
+    expect(group.messages.map((m) => m.id)).toEqual(['t3'])
+    expect(group.toolCallCount).toBe(3)
+    expect(group.hiddenToolCallCount).toBe(2)
+  })
+
+  it('前补不改变既有回合 key（U1 稳定）', () => {
+    const user = msg({ id: 'u1', role: 'user', text: '查' })
+    const t1 = tool('t1', 'read_text_file')
+    const before = groupChatTimeline([user, t1], { nowMs: 1 })
+    const older = msg({ id: 'u0', role: 'user', text: '旧' })
+    const after = groupChatTimeline([older, user, t1], { nowMs: 1 })
+    const keysBefore = before.map((i) => i.key)
+    const keysAfter = after.map((i) => i.key)
+    for (const key of keysBefore) {
+      expect(keysAfter).toContain(key)
+    }
+  })
+
+  it('取消/未知计入状态计数，不判成功', () => {
+    const timeline = groupChatTimeline(
+      [
+        msg({ id: 'u1', role: 'user', text: '查' }),
+        tool('ok', 'read_text_file', 'completed'),
+        msg({ id: 'c1', role: 'tool', toolTitle: 'edit', toolStatus: 'cancelled', toolCallId: 'c1' }),
+        msg({ id: 'x1', role: 'tool', toolTitle: 'mystery', toolCallId: 'x1' }),
+      ],
+      { nowMs: 9000 },
+    )
+    const group = timeline.find((i) => i.kind === 'work-log')
+    expect(group?.kind).toBe('work-log')
+    if (group?.kind === 'work-log') {
+      expect(group.toolCallCount).toBe(3)
+      expect(group.cancelledCount).toBe(1)
+      expect(group.unknownCount).toBe(1)
+      expect(group.hasFailure).toBe(false)
+    }
+  })
+
+  it('无可信时间省略历时', () => {
+    const t = msg({ role: 'tool', toolTitle: 'A', toolStatus: 'completed' })
+    // createdAt 缺失（msg() 默认有，用 delete 去掉）
+    delete (t as { createdAt?: number }).createdAt
+    const timeline = groupChatTimeline([t], { nowMs: 9000 })
+    const group = timeline[0]!
+    if (group.kind !== 'work-log') expect.unreachable('应为工作记录组')
+    expect(group.hasTrustedTime).toBe(false)
+    expect(group.durationLabel).toBe('')
+  })
+})

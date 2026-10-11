@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
+  findExcerptOffsets,
   collapseInlineWhitespace,
   excerptAppearsIn,
   excerptSearchCandidates,
@@ -65,5 +66,17 @@ describe('excerpt-text-match', () => {
     expect(range?.toString()).toBe('hello world')
 
     root.remove()
+  })
+})
+
+describe('findExcerptOffsets', () => {
+  it('maps collapsed whitespace back to source offsets without losing UTF-16 characters', () => {
+    const source = '引言 😀 alpha\n\n  beta 尾声'
+    const range = findExcerptOffsets(source, '😀 alpha beta')!
+    expect(source.slice(range.from, range.to)).toBe('😀 alpha\n\n  beta')
+  })
+  it('rejects missing and empty quotes', () => {
+    expect(findExcerptOffsets('original', 'missing')).toBeNull()
+    expect(findExcerptOffsets('original', ' ')).toBeNull()
   })
 })

@@ -1,11 +1,11 @@
-import { ArrowUp, FileIcon, ImageIcon, Square, X } from 'lucide-react'
+import { PromptInput, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputAttachmentBridge, PromptInputAttachments, PromptInputAttachment } from '@/components/ai-elements/prompt-input'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { fileApi } from '@/api/file-api'
-import { Button } from '@/components/ui/button'
 import { extractClipboardImage } from '@/lib/editor/codemirror-paste-image'
 import {
   ACP_MAX_IMAGE_BYTES,
+  toFileUri,
   attachmentToMessageMeta,
   blobToBase64,
   buildAcpPromptBlocks,
@@ -310,9 +310,9 @@ export function AgentComposer({
   const canSend = !disabled && !prompting && canSendComposer(draft, attachments)
 
   return (
-    <div
+    <PromptInput onSubmit={() => submit()}
       className={cn(
-        'relative rounded-2xl border border-border/70 bg-background shadow-sm focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30',
+        'relative [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-background',
         dragOver && 'border-emerald-500/60 ring-2 ring-emerald-500/20',
       )}
       onDragEnter={(e) => {
@@ -356,41 +356,16 @@ export function AgentComposer({
         </div>
       ) : null}
 
-      {attachments.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 border-b border-border/40 px-2.5 pt-2.5 pb-2">
-          {attachments.map((att) => (
-            <div
-              key={att.id}
-              className="group inline-flex max-w-[11rem] items-center gap-1 rounded-md border border-sky-500/25 bg-sky-500/10 py-0.5 pr-0.5 pl-1.5 text-[10px] text-sky-800 dark:text-sky-200"
-            >
-              {att.kind === 'image' && att.previewUrl ? (
-                <img
-                  src={att.previewUrl}
-                  alt=""
-                  className="size-5 shrink-0 rounded object-cover"
-                />
-              ) : att.kind === 'image' ? (
-                <ImageIcon className="size-3 shrink-0 opacity-80" />
-              ) : (
-                <FileIcon className="size-3 shrink-0 opacity-80" />
-              )}
-              <span className="min-w-0 truncate font-medium" title={att.absolutePath ?? att.name}>
-                {att.name}
-              </span>
-              <button
-                type="button"
-                className="inline-flex size-5 shrink-0 items-center justify-center rounded text-sky-700/70 hover:bg-sky-500/15 hover:text-sky-900 dark:text-sky-200/70 dark:hover:text-sky-100"
-                title="移除"
-                onClick={() => removeAttachment(att.id)}
-              >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <textarea
+      <PromptInputAttachmentBridge
+        files={attachments.map(att => ({ id: att.id, type: 'file' as const, filename: att.name, mediaType: att.mimeType, url: att.previewUrl ?? (att.absolutePath ? toFileUri(att.absolutePath) : '') }))}
+        add={files => { void ingestDroppedFiles(Array.from(files)) }}
+        remove={removeAttachment}
+        clear={() => attachments.forEach(att => removeAttachment(att.id))}
+      >
+        <PromptInputAttachments className="gap-1.5 px-2 py-1">
+          {att => <PromptInputAttachment data={att} className="max-w-full" />}
+        </PromptInputAttachments>
+      <PromptInputTextarea
         ref={textareaRef}
         className="min-h-[72px] w-full resize-none bg-transparent px-3 py-2.5 text-xs leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-50"
         placeholder={
@@ -411,40 +386,21 @@ export function AgentComposer({
             focusComposerEnd()
           })
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            submit()
-          }
-        }}
       />
 
-      <div className="flex items-center gap-0.5 border-t border-border/40 px-1.5 py-1">
+      <PromptInputFooter className="min-h-11 border-t border-border/40 px-1.5 py-1">
         {toolbarStart}
-        {prompting ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-7 shrink-0 rounded-full"
-            title="停止"
-            onClick={onCancel}
-          >
-            <Square className="size-3" />
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            size="icon"
-            className="size-7 shrink-0 rounded-full"
-            title="发送"
-            disabled={!canSend}
-            onClick={submit}
-          >
-            <ArrowUp className="size-3.5" />
-          </Button>
-        )}
-      </div>
-    </div>
+        <PromptInputSubmit
+          type={prompting ? 'button' : 'submit'}
+          status={prompting ? 'streaming' : 'ready'}
+          aria-label={prompting ? '停止' : '发送'}
+          title={prompting ? '停止' : '发送'}
+          className="size-11 shrink-0 rounded-full"
+          disabled={!prompting && !canSend}
+          onClick={prompting ? onCancel : undefined}
+        />
+      </PromptInputFooter>
+      </PromptInputAttachmentBridge>
+    </PromptInput>
   )
 }

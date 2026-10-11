@@ -21,6 +21,8 @@ export type ToolResultKind =
   | 'cross-reference'
   | 'content-audit'
   | 'chapter-suggestion'
+  | 'chapter-comparison'
+  | 'html-artifact'
   | 'diff'
   | 'text'
   | 'none'
@@ -85,6 +87,7 @@ const TITLE_RULES: Array<{ test: RegExp; title: string }> = [
   { test: /montree_inspect_content/i, title: '内容审计' },
   { test: /montree_suggest_chapters/i, title: '章节建议' },
   { test: /montree_propose_mark|propose.?mark/i, title: '批注提议' },
+  { test: /montree_present/i, title: '展示呈现' },
   { test: /montree_read|mcp\.montree\.montree_read/i, title: '读取文档' },
   { test: /montree_get_selection/i, title: '读取选区' },
   { test: /montree_capture_viewport/i, title: '读取当前页' },
@@ -120,13 +123,15 @@ export function summarizeToolTarget(
   return null
 }
 
-/** 富业务结果分类：与展示提升共用同一判定（不解析 JSON，只做字符串门限）。 */
+/** 富业务结果分类：与展示提升共用同一判定（present 优先用 enrich 结果，其余不解析 JSON，只做字符串门限）。 */
 export function classifyToolResultKind(
-  message: Pick<AcpChatMessage, 'role' | 'toolTitle' | 'toolContentText' | 'text' | 'toolDiffs'>,
+  message: Pick<AcpChatMessage, 'role' | 'toolTitle' | 'toolContentText' | 'text' | 'toolDiffs' | 'presentResult'>,
 ): ToolResultKind {
   if (message.role !== 'tool') return 'none'
   const title = message.toolTitle || ''
   const detail = message.toolContentText || message.text || ''
+  if (message.presentResult?.kind === 'chapter-comparison') return 'chapter-comparison'
+  if (message.presentResult?.kind === 'html-artifact') return 'html-artifact'
   if (title.includes('montree_generate_diagram') || detail.includes('mermaidCode')) {
     return 'diagram'
   }
@@ -139,6 +144,12 @@ export function classifyToolResultKind(
   if (title.includes('montree_suggest_chapters') || detail.includes('"chapters"')) {
     return 'chapter-suggestion'
   }
+  if (title.includes('montree_present') && detail.includes('chapter-comparison')) {
+    return 'chapter-comparison'
+  }
+  if (title.includes('montree_present') && detail.includes('html-artifact')) {
+    return 'html-artifact'
+  }
   if ((message.toolDiffs ?? []).length > 0) return 'diff'
   if (detail && detail !== title) return 'text'
   return 'none'
@@ -150,7 +161,9 @@ export function isPromotedToolResultKind(kind: ToolResultKind): boolean {
     kind === 'diagram' ||
     kind === 'cross-reference' ||
     kind === 'content-audit' ||
-    kind === 'chapter-suggestion'
+    kind === 'chapter-suggestion' ||
+    kind === 'chapter-comparison' ||
+    kind === 'html-artifact'
   )
 }
 

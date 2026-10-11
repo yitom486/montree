@@ -37,6 +37,8 @@ export interface InspectIndexedContentDeps {
   getBufferText?: () => Promise<string | null>
   /** P3.1 无指纹 EPUB/MOBI 章节迭代器；不适用返回 null（调用方继续分支） */
   getEbookUnits?: () => AsyncIterable<ReaderUnitText> | null
+  /** 在线网页文档正文；非 web 或无 provider 返回 null */
+  getWebText?: () => Promise<string | null>
   /** P2.2 工作区根（文件树状态）；无文件夹返回 '' 则只做内存 */
   getWorkspaceRoot?: () => string
   /** P2.2 工作区检索；失败由调用方降级为纯内存结果 */
@@ -77,6 +79,12 @@ function defaultDeps(): Required<InspectIndexedContentDeps> {
       if (typeof provider.iterateUnits !== 'function') return null
       // 生成器惰性：调用本身不执行章节加载，迭代时才逐节读取
       return provider.iterateUnits()
+    },
+    getWebText: async () => {
+      const provider = getReaderContentProvider()
+      const active = collectActiveDocument()
+      if (!provider || !active || active.kind !== 'web') return null
+      return (await provider.getCurrentText()) ?? ''
     },
     getWorkspaceRoot: () => useAppSettingsStore.getState().lastWorkspaceRoot ?? '',
     searchWorkspace: (root, query, excludePath) =>
@@ -121,9 +129,33 @@ export async function inspectIndexedContentForAgent(
   if (ebookUnits) {
     return JSON.stringify(await inspectEbookSections(ebookUnits, validQuery, validLimit), null, 2)
   }
+  // P3.2：在线网页文档 → 网页正文内存取证
+  const webText = await resolved.getWebText?.()
+  if (webText !== null && webText !== undefined) {
+    const bufferResult = inspectEditorBufferText(webText, validQuery, validLimit)
+    const webHits: ContentAuditHit[] = bufferResult.hits.map((hit) => ({
+      ...hit,
+      source: 'web-doc' as const,
+      locator: {
+        url: activePath,
+        lineStart: hit.locator.lineStart,
+      },
+    }))
+    return JSON.stringify(
+      {
+        query: validQuery,
+        total: bufferResult.total,
+        truncated: bufferResult.truncated,
+        limit: validLimit,
+        hits: webHits,
+      },
+      null,
+      2,
+    )
+  }
   // P2.1：无指纹 + markdown 活动文档 → 检索编辑器内存
   const text = await resolved.getBufferText()
-  if (text === null) throw new Error('当前文档不支持内容审计（仅已入库 PDF、当前 Markdown 或当前 EPUB/MOBI）')
+  if (text === null) throw new Error('当前文档不支持内容审计（仅已入库 PDF、当前 Markdown、当前 EPUB/MOBI 或在线网页文档）')
   const bufferResult = inspectEditorBufferText(text, validQuery, validLimit)
   // P2.2：有工作区根则合并其他已保存 markdown（buffer 在前，workspace 在后）；
   // 无根或检索失败都降级为纯内存结果，永不整次失败
