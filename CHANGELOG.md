@@ -16,6 +16,10 @@
   - **当前板块局部优先与全站大纲无缝共存**：重构 `discoverWebDocToc` 目录发现管线，解决传统文档站（如 Astro、Starlight、Docusaurus 等）因页面携带 `llms.txt` 全量地图而无条件覆盖当前子模块侧边栏的问题；默认 100% 优先展示对齐真实浏览器 DOM 的高精度局部板块侧栏（如精准聚焦当前开发子板块），同时完整保留站点级 `llms.txt` 全局大纲。
   - **精致目录胶囊切换器与单轨自适应**：在目录大纲面板顶部引入双轨切换胶囊按钮（`[当前板块 (N)] ⇄ [全站大纲 (M)]`），支持一键秒级切换整树视图与高亮位置，底栏翻页与快捷寻路随轨自适应；仅有单轨时自动隐退切换器并保持原生条目角标，兼顾聚焦深度与整站全景通读。
   - **修复当前板块误截断至首页概览与同源别名高亮匹配**：彻底修复多板块复合文档站（如 ChatGPT/Codex Docs）因目录发现入口过早截断至根路径 `/docs/` 导致将首页 Overview 概览侧栏误当作当前板块的缺陷；以当前页作为发现基准，在独立无侧栏内页时自动回退根路径，并增强 `findWebDocFlatIndex` 别名容错匹配（如 `/docs/codex-sdk` 映射 `/codex/codex-sdk`），确保当前章节 100% 精准高亮与上下翻页联动。
+- ### Agent 聊天视口与正文渲染全面现代化（assistant-ui 视口 + Streamdown 渲染 + 历史切片底锚修复）
+  - **聊天视口与批注助手统一至 assistant-ui**：主聊天视口（`AgentMessageList`）与阅读器批注辅助对话框（`AnnotationNoteDialog`）全面接入 `@assistant-ui/react` 的 `ThreadPrimitive.Viewport`，获得原生 AI 流式平滑跟滚、悬浮回到底部与滚动状态恢复能力。
+  - **底锚与分页切片截断根因修复**：恢复底部锚定机制（`effectiveStart`），保证在贴底或流式生成时消息不被分页窗口截断；精确判定用户上滑意图，在发送新提问或点击「回到底部」时无条件复位底锚，彻底修复消息卡住、回复看不见或新消息被吞的问题。
+  - **全面清除废弃旧逻辑与冗余依赖**：移除已废弃的旧 `conversation.tsx`、`useStickToBottomScroll` 及 `AssistantMarkdownText`，从工程依赖中安全剔除 `use-stick-to-bottom` 与 `@assistant-ui/react-markdown`，精简包体积与运行时开销；正文由 `Streamdown` 统一承载高质感 Markdown 与数学公式/Mermaid 图表渲染。
 - ### NSIS 安装向导精简与 VS Code 级静默自动更新
   - **更新静默安装与自动重启一条龙**：`installAppUpdate` 调用 `quitAndInstall(true, true)` 开启完全静默升级模式（`/S` 参数），退出前安全放行所有窗口；更新直接基于注册表记忆的当前安装目录原地覆盖并自动拉起新版本，绝不强制改写至 C 盘，杜绝弹出冗余安装向导。
   - **全自动后台静默下载与就绪提示**：开启 `autoDownload`，检测到新版本时在后台静默完成下载；下载就绪后仅显示轻量一键重启提示，彻底消除干扰性加载弹窗，并在应用退出时自动安装（`autoInstallOnAppQuit`）。
