@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.10] - 2026-10-13
+
 - ### View Transitions 浏览器原生硬件加速主题平滑切换
   - **GPU 贴图合成与零卡顿过渡**：彻底抛弃给每个 DOM 元素挂载 `transition: ...` 引发主线程逐帧重算与掉帧的传统做法，接入浏览器原生 View Transitions API。切换主题时由 GPU 将新旧快照做 180ms 交叉淡化（Cross-fade），不论代码编辑器、PDF 渲染、终端或高亮块多么复杂，开销恒定且 100% 步调一致。
   - **过渡屏蔽层与双重帧保护**：在切换期间自动注入 `.theme-transitioning` 屏蔽所有局部元素的次生 transition，并在过渡完成后的双重 `requestAnimationFrame` 延迟卸载，杜绝动画叠加撕裂与二次抖动；对开启 `prefers-reduced-motion` 的系统平滑降级为即时切换。
@@ -31,7 +35,13 @@
   - **会话与目录生命周期绑定**：解决 Agent 对话跨项目串线与残留痛点；Store 引入 `currentWorkspaceRoot` 与 `switchWorkspace` 状态机，切换目录或打开新文件夹时自动激活属于该目录的历史会话；全新目录自动创建专属空白线程。
   - **无缝重连与精准 Resume**：在线切换工作区时自动断开旧会话并重连新目录，连接时携带目标工作区最近活跃会话的 `sessionId` 发起精确 **resume**（新目录走 `session/new`，杜绝把旧目录会话错配给新目录）；离线切换工作区零网络开销，本地活跃线程平滑对齐。
   - **历史对话双维隔离**：对话历史抽屉（`AgentHistoryMenu`）接入 `selectThreadsForWorkspaceAndRuntime`，顶部展示当前项目名并仅列出属于当前工作区的会话；新建对话自动打上当前工作区戳记。
-  - **WSL 路径等价性与全链路集成测试**：实现 `isSameWorkspace` 自动抹平 WSL UNC 别名（`//wsl$` 与 `//wsl.localhost`）与 Windows 盘符大小写差异，避免冗余空会话；构建全链路集成测试（`acp-workspace-integration.test.ts`），5 组高覆盖率端到端用例 100% 绿灯保障质量。
+  - **WSL 路径等价性与全链路集成测试**：实现 `isSameWorkspace` 自动抹平 WSL UNC 别名（`//wsl# 更新日志
+
+记录 [Montree](README.md) 各版本**主要功能更新**。版本号与 Git tag 对齐。
+
+**发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
+
+ 与 `//wsl.localhost`）与 Windows 盘符大小写差异，避免冗余空会话；构建全链路集成测试（`acp-workspace-integration.test.ts`），5 组高覆盖率端到端用例 100% 绿灯保障质量。
 - ### 布局与左侧活动栏语义净化
   - **左侧活动栏按键重构**：移除左侧活动栏底部别扭且多余的 Agent 面板开关按钮，替换为符合主流编辑器直觉的「设置（Settings）」齿轮入口；左侧活动栏纯粹服务于左侧内容（资源管理器、书库、札记）与全局设置。
   - **就近控制原则**：右侧 Agent 面板专职由顶栏右上角带状态指示灯的 AI 伴读按钮、快捷键 `Ctrl+Shift+A` 以及面板自身收起按钮控制，消除横跨屏幕的视觉与交互割裂。
@@ -474,7 +484,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.9...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.10...HEAD
+[0.4.10]: https://github.com/yitom486/montree/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/yitom486/montree/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/yitom486/montree/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/yitom486/montree/compare/v0.4.6...v0.4.7
