@@ -323,9 +323,9 @@ export function useFileOperations(onError?: (error: AppError) => void) {
 
   const openFolder = useCallback(() => openFolderMutation.mutateAsync(), [openFolderMutation])
 
-  const rescanWorkspace = useCallback(async () => {
+  const rescanWorkspace = useCallback(async (targetRootPath?: string) => {
     const rootPath =
-      workspace?.rootPath ?? useAppSettingsStore.getState().lastWorkspaceRoot ?? undefined
+      targetRootPath ?? workspace?.rootPath ?? useAppSettingsStore.getState().lastWorkspaceRoot ?? undefined
     if (!rootPath) return
     await rescanWorkspaceMutation.mutateAsync(rootPath)
   }, [rescanWorkspaceMutation, workspace?.rootPath])

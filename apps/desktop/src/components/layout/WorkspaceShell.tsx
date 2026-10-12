@@ -3,6 +3,7 @@ import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
 import { AppTitleBar } from '@/components/layout/AppTitleBar'
+import { StatusBar } from '@/components/layout/StatusBar'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { AgentPanel, useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
 import { FloatingAIHud } from '@/components/agent/FloatingAIHud'
@@ -44,6 +45,7 @@ export interface WorkspaceShellProps {
   readOnly?: boolean
   onOpenFile: () => void
   onOpenFolder: () => void
+  onOpenWorkspacePath?: (path: string) => void
   onQuickOpen?: () => void
   onOpenWebDoc?: (url: string) => void
   onRescanWorkspace?: () => void
@@ -85,6 +87,7 @@ export function WorkspaceShell({
   readOnly = false,
   onOpenFile,
   onOpenFolder,
+  onOpenWorkspacePath,
   onQuickOpen,
   onOpenWebDoc,
   onRescanWorkspace,
@@ -198,11 +201,10 @@ export function WorkspaceShell({
         {!zenMode && (
           <ActivityBar
             sidebarVisible={sidebarVisible}
-            agentPanelOpen={agentPanelOpen}
             onToggleSidebar={handleToggleSidebar}
-            onToggleAgentPanel={handleToggleAgentPanel}
             onOpenLibrary={() => setIsLibraryOpen(true)}
             onOpenNotes={() => setIsNotesDrawerOpen(true)}
+            onOpenSettings={onOpenSettings}
           />
         )}
 
@@ -283,6 +285,14 @@ export function WorkspaceShell({
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      {!zenMode && (
+        <StatusBar
+          workspaceRoot={workspaceRoot}
+          activeFilePath={activeFilePath}
+          onOpenWorkspacePath={onOpenWorkspacePath}
+        />
+      )}
 
       {!zenMode && (
         <FloatingAIHud workspaceRoot={workspaceRoot} activeFilePath={activeFilePath} />

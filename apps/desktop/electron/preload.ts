@@ -352,6 +352,15 @@ const electronAPI: ElectronAPI = {
   getTtsBatchJob: (name, apiKey) => ipcRenderer.invoke(IPC.TTS_GET_BATCH_JOB, name, apiKey),
   cancelTtsBatchJob: (name, apiKey) =>
     ipcRenderer.invoke(IPC.TTS_CANCEL_BATCH_JOB, name, apiKey),
+  /* ===== Git 版本控制 ===== */
+  gitStatus: (cwd) => ipcRenderer.invoke(IPC.GIT_STATUS, cwd),
+  gitPush: (payload) => ipcRenderer.invoke(IPC.GIT_PUSH, payload),
+  gitCommit: (payload) => ipcRenderer.invoke(IPC.GIT_COMMIT, payload),
+  /* ===== 远程与 WSL 环境 ===== */
+  remoteListWslDistros: () => ipcRenderer.invoke(IPC.REMOTE_LIST_WSL_DISTROS),
+  remoteGetWslHome: (distro) => ipcRenderer.invoke(IPC.REMOTE_GET_WSL_HOME, distro),
+  remoteBrowseWsl: (payload) => ipcRenderer.invoke(IPC.REMOTE_BROWSE_WSL, payload),
+  remoteListSshConfigHosts: () => ipcRenderer.invoke(IPC.REMOTE_LIST_SSH_CONFIG_HOSTS),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

@@ -1,5 +1,5 @@
 import type { AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+import { err, ok, type Result, isWslPath, windowsToLinuxPath } from '@montree/contracts'
 import type {
   AcpContentBlock,
   AcpPromptResult,
@@ -125,11 +125,12 @@ export async function createAcpSession(
         : acpState.montreeMcp
           ? mcpServerEntry(acpState.montreeMcp, 'montree')
           : []
+    const sessionCwd = isWslPath(resolvedCwd) ? windowsToLinuxPath(resolvedCwd) : resolvedCwd
     const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
       a.value,
       methods.agent.session.new,
       {
-        cwd: resolvedCwd,
+        cwd: sessionCwd,
         mcpServers,
       },
     )

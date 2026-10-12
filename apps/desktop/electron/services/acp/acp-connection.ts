@@ -3,6 +3,8 @@ import { bindAcpContext, currentAcpContext } from './acp-context'
 import {
   APP_TITLE,
   findBuiltinAcpRuntime,
+  isWslPath,
+  windowsToLinuxPath,
 } from '@montree/contracts'
 import type { AppError } from '@montree/contracts'
 import { err, ok, type Result } from '@montree/contracts'
@@ -170,9 +172,10 @@ async function openSessionAfterAuth(
   const resumeId = acpState.pendingResumeSessionId?.trim() || null
 
   try {
+    const sessionCwd = isWslPath(cwd) ? windowsToLinuxPath(cwd) : cwd
     const opened = await restoreOrCreateAcpSession({
       request: (method, params) => sdkRequest<unknown, unknown>(a.value, method, params),
-      cwd,
+      cwd: sessionCwd,
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,

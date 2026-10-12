@@ -20,6 +20,10 @@ export type AppErrorCode =
   | 'FORBIDDEN'
   | 'NETWORK_ERROR'
   | 'SYNC_ERROR'
+  | 'GIT_ERROR'
+  | 'GIT_PUSH_FAILED'
+  | 'GIT_COMMIT_FAILED'
+  | 'GIT_ADD_FAILED'
   | 'UNKNOWN'
 
 export interface AppError {

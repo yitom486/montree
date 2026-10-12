@@ -344,6 +344,28 @@ export const IPC = {
   TTS_GET_BATCH_JOB: 'tts:get-batch-job',
   /** invoke：取消异步批量任务 */
   TTS_CANCEL_BATCH_JOB: 'tts:cancel-batch-job',
+
+  /* ================================================================
+   * Git 版本控制（git:*）：支持本地 Windows 与 WSL 自动穿透
+   * ================================================================ */
+  /** invoke：查询指定目录 Git 仓库状态（分支、修改文件、ahead/behind） */
+  GIT_STATUS: 'git:status',
+  /** invoke：推送到远程仓库（自动复用 WSL 或本机的 SSH/凭据） */
+  GIT_PUSH: 'git:push',
+  /** invoke：提交修改 */
+  GIT_COMMIT: 'git:commit',
+
+  /* ================================================================
+   * 远程环境（remote:*）：动态探测 WSL 发行版、浏览 Linux 目录、SSH 探测
+   * ================================================================ */
+  /** invoke：列出系统动态探测到的 WSL 分发版 */
+  REMOTE_LIST_WSL_DISTROS: 'remote:list-wsl-distros',
+  /** invoke：获取 WSL 指定分发版的 Linux 用户家目录（$HOME） */
+  REMOTE_GET_WSL_HOME: 'remote:get-wsl-home',
+  /** invoke：应用内浏览 WSL Linux 目录下的子文件夹 */
+  REMOTE_BROWSE_WSL: 'remote:browse-wsl',
+  /** invoke：解析本机 ~/.ssh/config 里的 Host 主机列表 */
+  REMOTE_LIST_SSH_CONFIG_HOSTS: 'remote:list-ssh-config-hosts',
 } as const
 
 /** `IPC` 全部通道字符串的联合类型，用于约束 handle/on/invoke 的 channel 参数 */

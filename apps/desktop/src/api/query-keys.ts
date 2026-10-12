@@ -23,4 +23,6 @@ export const queryKeys = {
   /** TTS 语音配置与缓存统计 */
   ttsConfig: ['tts', 'config'] as const,
   ttsCacheStats: ['tts', 'cache-stats'] as const,
+  /** Git 仓库状态（按 cwd 缓存） */
+  gitStatus: (cwd: string) => ['git-status', cwd] as const,
 }

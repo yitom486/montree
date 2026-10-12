@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
-import type { AcpRuntimeInfo } from '@montree/contracts'
+import { isWslPath, parseWslPath, type AcpRuntimeInfo } from '@montree/contracts'
 import { bindAcpContext, currentAcpContext } from './acp-context'
 
 export interface SpawnedAcpProcess {
@@ -57,12 +57,49 @@ function killProcessTree(pid: number): void {
     // taskkill 失败时上层仍有 child.kill() 兜底
   }
 }
-function resolveCommand(runtime: AcpRuntimeInfo): { file: string; shell: boolean } {
+
+export interface ResolvedAcpExecution {
+  file: string
+  args: string[]
+  cwd?: string
+  shell: boolean
+}
+
+/**
+ * 解析 ACP 运行命令与执行环境。
+ * 当工作区为 WSL 路径时，穿透进入 WSL Linux 命名空间内执行，共享 Linux 凭证与工具链。
+ */
+export function resolveAcpExecution(runtime: AcpRuntimeInfo, cwd?: string): ResolvedAcpExecution {
+  if (process.platform === 'win32' && cwd && isWslPath(cwd)) {
+    const parsed = parseWslPath(cwd)
+    if (parsed.isWsl && parsed.distro) {
+      const linuxCwd = parsed.linuxPath || '~'
+      // 在 WSL 内部利用 bash -lic 执行以加载用户完整的 PATH (bun, npx, node)，并通过 exec 替换 shell 进程
+      const cmdStr = `exec ${[runtime.command, ...runtime.args].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`
+      return {
+        file: 'wsl.exe',
+        args: ['-d', parsed.distro, '--cd', linuxCwd, 'bash', '-lic', cmdStr],
+        shell: false,
+      }
+    }
+  }
+
   // Windows 上 bunx 常为 .cmd，需 shell
   if (process.platform === 'win32') {
-    return { file: runtime.command, shell: !/\.(?:exe|com)$/i.test(runtime.command) }
+    return {
+      file: runtime.command,
+      args: runtime.args,
+      cwd,
+      shell: !/\.(?:exe|com)$/i.test(runtime.command),
+    }
   }
-  return { file: runtime.command, shell: false }
+
+  return {
+    file: runtime.command,
+    args: runtime.args,
+    cwd,
+    shell: false,
+  }
 }
 
 /**
@@ -83,7 +120,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
     existing.kill()
   }
 
-  const { file, shell } = resolveCommand(options.runtime)
+  const execution = resolveAcpExecution(options.runtime, options.cwd)
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...options.env,
@@ -110,11 +147,11 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
     delete env.NO_BROWSER
   }
 
-  const child = spawn(file, options.runtime.args, {
-    cwd: options.cwd,
+  const child = spawn(execution.file, execution.args, {
+    cwd: execution.cwd,
     env,
     stdio: ['pipe', 'pipe', 'pipe'],
-    shell,
+    shell: execution.shell,
     windowsHide: true,
   }) as ChildProcessWithoutNullStreams
 

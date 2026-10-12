@@ -1,29 +1,26 @@
-import { BookOpen, BookmarkCheck, Files } from 'lucide-react'
-import { AgentMark } from '@/components/agent/AgentMark'
+import { BookOpen, BookmarkCheck, Files, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface ActivityBarProps {
   sidebarVisible: boolean
-  agentPanelOpen?: boolean
   onToggleSidebar: () => void
-  onToggleAgentPanel?: () => void
   onOpenLibrary?: () => void
   onOpenNotes?: () => void
+  onOpenSettings?: () => void
 }
 
-/** 左侧活动栏：资源管理器 + 书库 + 札记 + Agent */
+/** 左侧活动栏：资源管理器 + 书库 + 札记 + 设置 */
 export function ActivityBar({
   sidebarVisible,
-  agentPanelOpen = false,
   onToggleSidebar,
-  onToggleAgentPanel,
   onOpenLibrary,
   onOpenNotes,
+  onOpenSettings,
 }: ActivityBarProps) {
   return (
     <aside
-      className="flex h-full w-12 shrink-0 flex-col items-center border-r border-border/60 bg-sidebar pt-1"
+      className="flex h-full w-12 shrink-0 flex-col items-center border-r border-border/60 bg-sidebar pt-1 pb-2"
       aria-label="活动栏"
     >
       <Button
@@ -69,23 +66,21 @@ export function ActivityBar({
           <BookmarkCheck className="size-5" />
         </Button>
       ) : null}
-      {onToggleAgentPanel ? (
+
+      {onOpenSettings ? (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(
-            'mt-auto mb-2 size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-            agentPanelOpen && 'border-primary bg-accent/40 text-foreground',
-          )}
-          aria-label={agentPanelOpen ? '关闭 Agent 面板' : '打开 Agent 面板'}
-          aria-pressed={agentPanelOpen}
-          title={agentPanelOpen ? '关闭 Agent (Ctrl+Shift+A)' : '打开 Agent (Ctrl+Shift+A)'}
-          onClick={onToggleAgentPanel}
+          className="mt-auto size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          aria-label="应用设置"
+          title="应用设置 (Ctrl+,)"
+          onClick={onOpenSettings}
         >
-          <AgentMark className="size-5" />
+          <Settings className="size-5" />
         </Button>
       ) : null}
     </aside>
   )
 }
+

@@ -16,6 +16,18 @@
 | `reader-screenshot-service.ts` / `.test.ts` | Agent 按需截图 owner 窗口的阅读区，返回内存 PNG；裁剪与无文档保护 |
 | `binary-document-service.ts` / `.test.ts` | XLSX/PPTX 保存：摘要冲突检测、同目录临时文件替换，避免覆盖外部修改 |
 
+## Git 版本控制
+
+| 文件 / 目录 | 功能 |
+|------|------|
+| `git/` (`git/git-service.ts` / `.test.ts`) | Git 状态查询、提交与推送服务；自动识别 Windows 与 WSL 路径，通过原生 `git` 或 `wsl.exe` 穿透执行 |
+
+## 远程与 WSL（remote）
+
+| 文件 | 功能 |
+|------|------|
+| `remote/remote-service.ts` / `.test.ts` | WSL 发行版动态探测（零硬编码）、Linux 家目录探测、目录应用内直接浏览、~/.ssh/config 解析 |
+
 ## PDF 解析（pdf-inspector）
 
 | 文件 | 功能 |

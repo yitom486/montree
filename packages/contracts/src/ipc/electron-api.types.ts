@@ -22,6 +22,7 @@ import type {
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
 } from '../types/file'
+import type { RemoteBrowseResult, SshConfigHost, WslDistroInfo } from '../types/remote'
 import type { AppError } from '../core/errors'
 import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '../agent/document-tools'
 import type { RendererErrorPayload } from '../types/error-log'
@@ -120,6 +121,13 @@ import type {
   TtsStreamEndPayload,
   TtsStreamErrorPayload,
 } from '../types/tts'
+import type {
+  GitCommitOptions,
+  GitCommitResult,
+  GitPushOptions,
+  GitPushResult,
+  GitStatusResult,
+} from '../types/git'
 import type {
   RosettaActiveImport,
   RosettaBodyWatermarkApplyPayload,
@@ -516,4 +524,26 @@ export interface ElectronAPI {
     name: string,
     apiKey?: string,
   ) => Promise<Result<{ name: string; cancelled: boolean }, AppError>>
+
+  /* ================================================================
+   * Git 版本控制（git:*）：支持本地 Windows 与 WSL 自动穿透
+   * ================================================================ */
+  /** 查询指定目录 Git 仓库状态（支持 Windows 与 WSL 自动穿透） */
+  gitStatus: (cwd: string) => Promise<Result<GitStatusResult, AppError>>
+  /** 推送到远程仓库（自动复用 WSL 或本机的 SSH/凭据） */
+  gitPush: (payload: { cwd: string } & GitPushOptions) => Promise<Result<GitPushResult, AppError>>
+  /** 提交当前修改 */
+  gitCommit: (payload: { cwd: string } & GitCommitOptions) => Promise<Result<GitCommitResult, AppError>>
+
+  /* ================================================================
+   * 远程环境（remote:*）：WSL 发行版动态探测、Linux 目录浏览、SSH 探测
+   * ================================================================ */
+  /** 动态获取系统检测到的 WSL 分发版列表 */
+  remoteListWslDistros: () => Promise<Result<WslDistroInfo[], AppError>>
+  /** 获取 WSL 指定分发版的 Linux 用户家目录（$HOME） */
+  remoteGetWslHome: (distro: string) => Promise<Result<string, AppError>>
+  /** 应用内浏览 WSL Linux 目录下的子文件与目录（不弹系统对话框） */
+  remoteBrowseWsl: (payload: { distro: string; dirPath?: string }) => Promise<Result<RemoteBrowseResult, AppError>>
+  /** 读取本机 ~/.ssh/config 里的 Host 主机列表 */
+  remoteListSshConfigHosts: () => Promise<Result<SshConfigHost[], AppError>>
 }

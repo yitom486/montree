@@ -62,3 +62,46 @@ describe('连接失败自诊断（stderr 尾部拼进连接失败错误，去窗
     expect(detail).not.toContain('line-0')
   })
 })
+
+describe('resolveAcpExecution', () => {
+  it('WSL 路径自动切换为 wsl.exe 并穿透进入 Linux 命名空间', async () => {
+    const { resolveAcpExecution } = await import('./process-manager')
+    const runtime = {
+      id: 'codex-acp',
+      name: 'Codex ACP',
+      description: 'Codex ACP Runtime',
+      command: 'bunx',
+      args: ['@yitom/codex-acp@latest'],
+      requiredEnvKeys: [],
+    }
+
+    const execution = resolveAcpExecution(runtime, '\\\\wsl.localhost\\Ubuntu\\home\\tomy\\blog')
+    if (process.platform === 'win32') {
+      expect(execution.file).toBe('wsl.exe')
+      expect(execution.shell).toBe(false)
+      expect(execution.args).toContain('-d')
+      expect(execution.args).toContain('Ubuntu')
+      expect(execution.args).toContain('--cd')
+      expect(execution.args).toContain('/home/tomy/blog')
+      expect(execution.args[execution.args.length - 1]).toContain('bunx')
+    }
+  })
+
+  it('普通路径保持原生命令', async () => {
+    const { resolveAcpExecution } = await import('./process-manager')
+    const runtime = {
+      id: 'codex-acp',
+      name: 'Codex ACP',
+      description: 'Codex ACP Runtime',
+      command: 'bunx',
+      args: ['@yitom/codex-acp@latest'],
+      requiredEnvKeys: [],
+    }
+
+    const execution = resolveAcpExecution(runtime, 'D:\\notes')
+    expect(execution.file).toBe('bunx')
+    expect(execution.args).toEqual(['@yitom/codex-acp@latest'])
+    expect(execution.cwd).toBe('D:\\notes')
+  })
+})
+

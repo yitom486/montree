@@ -73,6 +73,7 @@
 | `useFileTreeActions` | 文件树新建、重命名、删除、复制粘贴、导出 |
 | `useSidebarPanelSync` | 布尔可见性 ↔ `react-resizable-panels` 折叠（`useCollapsiblePanelSync`） |
 | `useGlobalErrorHandlers` | 捕获未处理 Promise / `window.error`，并同步 verbose 日志开关 |
+| `useGitStatus` | 工作区 Git 状态、领先/落后 commit、分支名与一键 Push / Commit 操作（TanStack Query 自动缓存与刷新） |
 
 ## agent/
 

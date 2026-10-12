@@ -1,6 +1,6 @@
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { IPC } from '@montree/contracts'
+import { IPC, ok, err } from '@montree/contracts'
 import type {
   ExportDocumentPayload,
   ExportMarkdownPayload,
@@ -53,8 +53,15 @@ import {
   classifyPdfDocument,
   extractPdfBookMarkdown,
 } from '../services/pdf-inspector-service'
-import { ok, err } from '@montree/contracts'
 import type { SyncConfig } from '@montree/contracts'
+import type { GitCommitOptions, GitPushOptions } from '@montree/contracts'
+import { getGitStatus, gitPush, gitCommit } from '../services/git/git-service'
+import {
+  listWslDistros,
+  getWslHome,
+  browseWslDirectory,
+  listSshConfigHosts,
+} from '../services/remote/remote-service'
 import { syncManager } from '../services/sync/sync-manager'
 import { readSyncConfig, writeSyncConfig } from '../services/sync/sync-config-service'
 import { writeLocalProgress } from '../services/sync/reading-progress-sync'
@@ -814,4 +821,42 @@ export function registerIpcHandlers(): void {
     async (_event, name: string, apiKey?: string) =>
       cancelTtsBatchJob(name, apiKey),
   )
+
+  /* ----------------------------------------------------------------
+   * Git 版本控制（git:*）
+   * ---------------------------------------------------------------- */
+  ipcMain.handle(IPC.GIT_STATUS, async (_event, cwd: string) => {
+    try {
+      const res = await getGitStatus(cwd)
+      return ok(res)
+    } catch (e) {
+      return err({ code: 'GIT_ERROR', message: e instanceof Error ? e.message : String(e) })
+    }
+  })
+  ipcMain.handle(IPC.GIT_PUSH, async (_event, payload: { cwd: string } & GitPushOptions) => {
+    try {
+      return await gitPush(payload.cwd, payload)
+    } catch (e) {
+      return err({ code: 'GIT_PUSH_FAILED', message: e instanceof Error ? e.message : String(e) })
+    }
+  })
+  ipcMain.handle(IPC.GIT_COMMIT, async (_event, payload: { cwd: string } & GitCommitOptions) => {
+    try {
+      return await gitCommit(payload.cwd, payload)
+    } catch (e) {
+      return err({ code: 'GIT_COMMIT_FAILED', message: e instanceof Error ? e.message : String(e) })
+    }
+  })
+
+  /* ----------------------------------------------------------------
+   * 远程与 WSL 环境（remote:*）
+   * ---------------------------------------------------------------- */
+  ipcMain.handle(IPC.REMOTE_LIST_WSL_DISTROS, async () => listWslDistros())
+  ipcMain.handle(IPC.REMOTE_GET_WSL_HOME, async (_event, distro: string) => getWslHome(distro))
+  ipcMain.handle(
+    IPC.REMOTE_BROWSE_WSL,
+    async (_event, payload: { distro: string; dirPath?: string }) =>
+      browseWslDirectory(payload.distro, payload.dirPath),
+  )
+  ipcMain.handle(IPC.REMOTE_LIST_SSH_CONFIG_HOSTS, async () => listSshConfigHosts())
 }

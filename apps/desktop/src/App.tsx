@@ -500,6 +500,7 @@ function App() {
         readOnly={isReader || isWebDoc}
         onOpenFile={() => void openFile()}
         onOpenFolder={() => void openFolder()}
+        onOpenWorkspacePath={(path) => void rescanWorkspace(path)}
         onQuickOpen={handleToggleQuickOpen}
         onOpenWebDoc={handleOpenWebDoc}
         onRescanWorkspace={() => void rescanWorkspace()}

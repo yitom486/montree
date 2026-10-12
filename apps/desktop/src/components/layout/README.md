@@ -8,9 +8,11 @@
 |------|------|
 | `AppTitleBar` | VS Code 风格统一自绘顶栏（无边框窗口融合、主题对齐、Command Center 居中胶囊标题、窗口控制三键与快捷工具） |
 | `WorkspaceShell` | ActivityBar + 可折叠侧栏 + 主区 + Agent 面板 + AppTitleBar 顶栏 |
-| `ActivityBar` | 左侧活动条 |
+| `ActivityBar` | 左侧活动条（资源管理器、书库、札记与底部全局设置） |
 | `Sidebar` | 侧栏（装配 panels/ 的手风琴内容面板，支持资源管理器、在线文档与大纲的折叠与拖拽分栏） |
 | `SplitPane` | 通用分栏容器 |
+| `StatusBar` | 底部状态栏（WSL 环境提示、Git 分支/变更计数/待推提交与一键推送、文档格式编码） |
+| `RemoteConnectModal` | 远程环境连接器（VS Code 风格，应用内直达 WSL 分发版与 Linux 目录浏览、SSH 探测，规避系统对话框） |
 
 ## panels/ 侧栏内容面板
 
