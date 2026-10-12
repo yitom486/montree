@@ -29,6 +29,11 @@ export function useAppUpdate() {
   }, [])
 
   const install = useCallback(async () => {
+    setStatus((prev) => ({
+      ...prev,
+      phase: 'installing',
+      message: '正在准备静默安装，即将重启启动新版本…',
+    }))
     await appApi.installAppUpdate()
   }, [])
 

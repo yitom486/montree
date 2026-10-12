@@ -8,7 +8,7 @@
 |------|------|
 | `button` / `dialog` / `alert-dialog` / `input` / `textarea` / `input-group` | 按钮与表单对话框 |
 | `dropdown-menu` / `menubar` | 菜单 |
-| `breadcrumb` / `separator` / `scroll-area` | 导航与布局装饰 |
+| `breadcrumb` / `separator` / `scroll-area` / `progress` | 导航、进度与布局装饰 |
 | `resizable` | `react-resizable-panels` 封装 |
 | `sonner` | Toast |
 | `tooltip` / `hover-card` | 悬停提示与附件预览 |

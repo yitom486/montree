@@ -1,4 +1,13 @@
-import { ExternalLink, Loader2 } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Rocket,
+  Sparkles,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -7,36 +16,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { APP_GITHUB_REPO, APP_TAGLINE, APP_TITLE } from '@montree/contracts'
 import { useAppUpdate } from '@/hooks/workspace/useAppUpdate'
 import { appApi } from '@/api/app-api'
-import { cn } from '@/lib/utils'
+import { cn, formatBytes } from '@/lib/utils'
 
 interface AboutDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   version: string
   platform: string
-}
-
-function updateStatusLabel(phase: string, message?: string): string {
-  if (message) return message
-  switch (phase) {
-    case 'checking':
-      return '正在检查更新…'
-    case 'available':
-      return '发现新版本'
-    case 'not-available':
-      return '当前已是最新版本'
-    case 'downloading':
-      return '正在下载更新…'
-    case 'downloaded':
-      return '更新已下载，可重启安装'
-    case 'error':
-      return '检查更新失败'
-    default:
-      return '尚未检查更新'
-  }
 }
 
 export function AboutDialog({
@@ -46,7 +36,7 @@ export function AboutDialog({
   platform,
 }: AboutDialogProps) {
   const { status, check, download, install } = useAppUpdate()
-  const busy = status.phase === 'checking' || status.phase === 'downloading'
+  const isBusy = status.phase === 'checking' || status.phase === 'downloading' || status.phase === 'installing'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,37 +65,158 @@ export function AboutDialog({
             <p className="mt-1 capitalize">{platform}</p>
           </div>
 
-          <div className="space-y-2 rounded-md border border-border/60 p-3">
-            <p className="text-xs font-medium text-foreground">软件更新</p>
-            <p className={cn('text-xs', status.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
-              {busy ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="size-3 animate-spin" />
-                  {updateStatusLabel(status.phase, status.message)}
-                  {status.percent != null ? `（${status.percent}%）` : null}
+          {/* 软件更新面板：支持平滑进度条、下载/安装/就绪多态切换 */}
+          <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-foreground">软件更新</p>
+              {status.version && status.phase !== 'idle' && status.phase !== 'not-available' ? (
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  新版 v{status.version}
                 </span>
-              ) : (
-                updateStatusLabel(status.phase, status.message)
-              )}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => void check()}>
-                检查更新
-              </Button>
-              {status.phase === 'available' ? (
-                <Button type="button" size="xs" disabled={busy} onClick={() => void download()}>
-                  下载更新
-                </Button>
-              ) : null}
-              {status.phase === 'downloaded' ? (
-                <Button type="button" size="xs" onClick={() => void install()}>
-                  重启并安装
-                </Button>
               ) : null}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              打包版本会在启动时自动检查 GitHub Release；也可在此手动检查。
-            </p>
+
+            {/* 状态 1：正在下载中 */}
+            {status.phase === 'downloading' ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <ArrowDownToLine className="size-3.5 text-primary animate-pulse" />
+                    正在下载更新…
+                  </span>
+                  <span className="font-mono text-xs font-semibold text-foreground tabular-nums">
+                    {status.percent ?? 0}%
+                  </span>
+                </div>
+                <Progress
+                  value={status.percent}
+                  className="h-2 bg-secondary/80"
+                  indicatorClassName="bg-gradient-to-r from-primary/80 to-primary shadow-[0_0_8px_rgba(var(--primary),0.3)]"
+                />
+                <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground tabular-nums">
+                  <span>
+                    {status.transferred != null && status.total != null
+                      ? `${formatBytes(status.transferred)} / ${formatBytes(status.total)}`
+                      : `${status.percent ?? 0}% 已下载`}
+                  </span>
+                  <span>{status.bytesPerSecond ? `${formatBytes(status.bytesPerSecond)}/s` : ''}</span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 状态 2：正在静默安装中 */}
+            {status.phase === 'installing' ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                  正在准备静默安装并启动新版本…
+                </div>
+                <Progress
+                  value={100}
+                  className="h-2 bg-secondary/80"
+                  indicatorClassName="bg-primary animate-pulse"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  安装包正在后台原地就绪，即将自动重启启动，全程无需任何手动操作。
+                </p>
+              </div>
+            ) : null}
+
+            {/* 状态 3：下载完成，提醒用户可以启动 */}
+            {status.phase === 'downloaded' ? (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="size-4 shrink-0" />
+                  新版本安装包已就绪！
+                </div>
+                <Progress
+                  value={100}
+                  className="h-1.5 bg-emerald-500/20"
+                  indicatorClassName="bg-emerald-500"
+                />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  全程已全自动下载并完成就绪，点击下方按钮立即原地重启启动新版本。
+                </p>
+                <div className="pt-0.5">
+                  <Button
+                    type="button"
+                    size="xs"
+                    className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                    onClick={() => void install()}
+                  >
+                    <Rocket className="size-3.5" />
+                    立即重启并启动新版
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 状态 4：发现新版本（等待下载） */}
+            {status.phase === 'available' ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  发现新版本 <span className="font-medium text-foreground">v{status.version}</span>，可立即下载。
+                </p>
+                <div>
+                  <Button
+                    type="button"
+                    size="xs"
+                    disabled={isBusy}
+                    onClick={() => void download()}
+                    className="gap-1.5"
+                  >
+                    <ArrowDownToLine className="size-3.5" />
+                    下载更新
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 状态 5：检查中 */}
+            {status.phase === 'checking' ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+                正在检查 GitHub Release 最新版本…
+              </div>
+            ) : null}
+
+            {/* 状态 6：已是最新版本 / 初始未检查 */}
+            {status.phase === 'not-available' || status.phase === 'idle' ? (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{status.phase === 'not-available' ? '当前已是最新版本' : '点击检查最新版本'}</span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={isBusy}
+                  onClick={() => void check()}
+                  className="gap-1"
+                >
+                  <RefreshCw className="size-3" />
+                  检查更新
+                </Button>
+              </div>
+            ) : null}
+
+            {/* 状态 7：错误 */}
+            {status.phase === 'error' ? (
+              <div className="space-y-2">
+                <p className="flex items-center gap-1.5 text-xs text-destructive">
+                  <AlertCircle className="size-3.5 shrink-0" />
+                  {status.message || '检查更新失败'}
+                </p>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void check()}
+                  className="gap-1"
+                >
+                  <RefreshCw className="size-3" />
+                  重试
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -129,3 +240,4 @@ export function AboutDialog({
     </Dialog>
   )
 }
+

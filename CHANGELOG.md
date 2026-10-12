@@ -35,13 +35,11 @@
   - **会话与目录生命周期绑定**：解决 Agent 对话跨项目串线与残留痛点；Store 引入 `currentWorkspaceRoot` 与 `switchWorkspace` 状态机，切换目录或打开新文件夹时自动激活属于该目录的历史会话；全新目录自动创建专属空白线程。
   - **无缝重连与精准 Resume**：在线切换工作区时自动断开旧会话并重连新目录，连接时携带目标工作区最近活跃会话的 `sessionId` 发起精确 **resume**（新目录走 `session/new`，杜绝把旧目录会话错配给新目录）；离线切换工作区零网络开销，本地活跃线程平滑对齐。
   - **历史对话双维隔离**：对话历史抽屉（`AgentHistoryMenu`）接入 `selectThreadsForWorkspaceAndRuntime`，顶部展示当前项目名并仅列出属于当前工作区的会话；新建对话自动打上当前工作区戳记。
-  - **WSL 路径等价性与全链路集成测试**：实现 `isSameWorkspace` 自动抹平 WSL UNC 别名（`//wsl# 更新日志
-
-记录 [Montree](README.md) 各版本**主要功能更新**。版本号与 Git tag 对齐。
-
-**发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
-
- 与 `//wsl.localhost`）与 Windows 盘符大小写差异，避免冗余空会话；构建全链路集成测试（`acp-workspace-integration.test.ts`），5 组高覆盖率端到端用例 100% 绿灯保障质量。
+  - **WSL 路径等价性与全链路集成测试**：实现 `isSameWorkspace` 自动抹平 WSL UNC 别名（`//wsl$` 与 `//wsl.localhost`）与 Windows 盘符大小写差异，避免冗余空会话；构建全链路集成测试（`acp-workspace-integration.test.ts`），5 组高覆盖率端到端用例 100% 绿灯保障质量。
+- ### 全自动无感静默原地更新与多态微晶进度条（Auto-Update UX）
+  - **安装向导彻底静默与原地无感覆写**：针对 Windows NSIS 安装包体系，在 `installer.nsh` 中引入 `${if} ${isUpdated} SetSilent silent ${endif}` 升级自适应逻辑。首次全新安装时保留安装向导供用户自由选择安装盘符与路径；后续版本自动升级时，在后台以完全静默模式就地覆写更新，杜绝弹出任何繁琐的安装向导页面，达成「除重启生效外 0 手动操作」的现代化桌面更新标准。
+  - **全状态平滑微晶进度条（Progress Card）**：替换原有的生硬纯文本数字跳变，接入硬件加速的平滑 Radix/Shadcn 进度条组件（`Progress`）；在主进程广播层透传已下载字节数（`transferred`）、安装包总大小（`total`）与实时下载速率（`bytesPerSecond`），呈现 `38.2 MB / 85.0 MB (4.5 MB/s)` 详实传输指标。
+  - **下载中/安装中/就绪启动三态流转**：分步清晰指示「正在下载更新」→「正在准备静默安装」→「新版本安装包已就绪（点击立即重启并启动新版）」，搭配全局轻量 Toast 提示与优雅的火箭启动动作按钮，全面对齐现代桌面标杆体验。
 - ### 布局与左侧活动栏语义净化
   - **左侧活动栏按键重构**：移除左侧活动栏底部别扭且多余的 Agent 面板开关按钮，替换为符合主流编辑器直觉的「设置（Settings）」齿轮入口；左侧活动栏纯粹服务于左侧内容（资源管理器、书库、札记）与全局设置。
   - **就近控制原则**：右侧 Agent 面板专职由顶栏右上角带状态指示灯的 AI 伴读按钮、快捷键 `Ctrl+Shift+A` 以及面板自身收起按钮控制，消除横跨屏幕的视觉与交互割裂。

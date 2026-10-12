@@ -6,6 +6,7 @@ export type AppUpdatePhase =
   | 'not-available'
   | 'downloading'
   | 'downloaded'
+  | 'installing'
   | 'error'
 
 export interface AppUpdateStatus {
@@ -17,5 +18,11 @@ export interface AppUpdateStatus {
   releaseNotes?: string
   /** 下载进度 0–100 */
   percent?: number
+  /** 已下载字节数 */
+  transferred?: number
+  /** 安装包总字节数 */
+  total?: number
+  /** 即时下载速度 (bytes/s) */
+  bytesPerSecond?: number
   message?: string
 }

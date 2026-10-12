@@ -137,6 +137,14 @@ export function installAppUpdate(): void {
   const updater = resolveAutoUpdater()
   if (!updater) return
 
+  broadcastStatus({
+    phase: 'installing',
+    currentVersion: app.getVersion(),
+    version: lastStatus.version,
+    percent: 100,
+    message: '正在准备静默安装，即将重启启动新版本…',
+  })
+
   // 释放所有窗口的 close 监听，确保应用退出流程不被阻塞
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
@@ -194,6 +202,9 @@ export function initAppUpdater(): void {
       currentVersion: app.getVersion(),
       version: lastStatus.version,
       percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+      bytesPerSecond: progress.bytesPerSecond,
       message: `正在下载更新… ${Math.round(progress.percent)}%`,
     })
   })
@@ -203,7 +214,10 @@ export function initAppUpdater(): void {
       phase: 'downloaded',
       currentVersion: app.getVersion(),
       version: info.version,
-      message: `v${info.version} 已下载，重启后即可安装`,
+      percent: 100,
+      transferred: lastStatus.total,
+      total: lastStatus.total,
+      message: `v${info.version} 安装包已就绪，重启后即可启动新版本`,
     })
   })
 
