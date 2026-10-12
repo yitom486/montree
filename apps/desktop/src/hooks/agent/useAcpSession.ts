@@ -14,6 +14,7 @@ import {
   shouldSendSessionBootstrap,
 } from '@/lib/agent/context/session-bootstrap'
 import { resetTurnContextTracker } from '@/lib/agent/context/should-attach-turn-context'
+import { resetRenderHintRefresh } from '@/lib/agent/context/render-hint-refresh'
 import { listPreferredConfigPatches } from '@/lib/agent/acp-config-preferences'
 import { selectFastDefaultOffTarget } from '@/lib/agent/acp-config-menu'
 import {
@@ -667,9 +668,10 @@ export function useAcpSession(workspaceRoot?: string) {
     ],
   )
 
-  /** 清空时间线等于重新开场：turn-context 计数一并归零 */
+  /** 清空时间线等于重新开场：turn-context 与渲染速览计数一并归零 */
   const clearMessages = useCallback(() => {
     resetTurnContextTracker(useAcpUiStore.getState().activeThreadId)
+    resetRenderHintRefresh(useAcpUiStore.getState().activeThreadId)
     clearMessagesInStore()
   }, [clearMessagesInStore])
 

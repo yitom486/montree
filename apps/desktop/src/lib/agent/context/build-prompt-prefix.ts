@@ -3,9 +3,11 @@ import { collectActiveDocument, collectReaderLocationKey, collectReadingState, c
 import {
   MONTREE_BOOTSTRAP_CLOSE_TAG,
   MONTREE_BOOTSTRAP_OPEN_TAG,
+  MONTREE_RENDER_HINT_REFRESH,
   MONTREE_STATIC_SKILL,
   MONTREE_TOOL_OVERVIEW,
 } from './montree-static-skill'
+import { shouldRefreshRenderHint } from './render-hint-refresh'
 import { beginPromptSelectionCycle } from './reader-selection-registry'
 import { takeTurnContextDecision } from './should-attach-turn-context'
 import { documentKey, formatTurnContextBlock } from './turn-context'
@@ -33,6 +35,15 @@ export function buildMontreePromptPrefix(
     type: 'text',
     text: `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_TOOL_OVERVIEW}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`,
   })
+
+  // 长会话渲染速览：每隔 N 轮重贴一次（回放清洗据外层标记剥离，不污染时间线）。
+  // 与 turn-context 相互独立；计数按线程，见 render-hint-refresh。
+  if (shouldRefreshRenderHint(threadId)) {
+    blocks.push({
+      type: 'text',
+      text: `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_RENDER_HINT_REFRESH}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`,
+    })
+  }
 
   // 选区只「通知一轮」：本轮若刚划选则 hasSelection；否则清掉上一轮 sticky
   const hasSelection = beginPromptSelectionCycle()

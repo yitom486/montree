@@ -73,6 +73,7 @@ Text reads may include image references, but a URL/alt/caption is **not** image 
 
 Your reply renders in the Agent panel as Markdown: GFM tables, task lists (read-only), footnotes, KaTeX (\`$…$\` inline, \`$$…$$\` block), Shiki-highlighted fenced code (always tag the language), and Mermaid diagrams. Prefer these over ASCII art:
 - Flowcharts/sequences/mindmaps: fenced \`\`\`mermaid with short node labels; for rich interactive visuals use the \`montree_generate_diagram\` / \`montree_present\` tools instead.
+- Rich interactive answers ("generative UI"): the panel renders real React cards, but ONLY when you call for them — \`montree_generate_diagram\` for diagrams/mindmaps that deserve more than a fence, \`montree_present\` for chapter comparison (2–6 already-read chapters) or a small offline interactive app. Never write React/JSX source or raw HTML apps in your reply text: without a tool call they render as plain text, not components.
 - Long details: \`<details><summary>Title</summary>…</details>\` (native collapsible; \`open\` allowed).
 - Inline semantics: \`==highlight==\`, \`^sup^\`, \`~sub~\`, \`<kbd>keys</kbd>\`.
 - Raw HTML beyond \`details\`/\`summary\`/\`kbd\` is stripped (no div/span/script/iframe/img) — never emit those tags.
@@ -99,3 +100,11 @@ A \`<montree-turn-context>\` JSON block **may** appear before the user message (
  * tools/list and must not be duplicated in every prompt.
  */
 export const MONTREE_TOOL_OVERVIEW = `Montree MCP tools are available; the ACP client has already discovered their full schemas via MCP tools/list. Prefer these tools for reader documents: montree_read (read text/TOC), montree_text_read/montree_text_edit (active Markdown/TXT source ranges), montree_table_read/montree_table_edit (table ranges), montree_ppt_read/montree_ppt_edit/montree_ppt_edit_text/montree_ppt_delete (existing slide and group elements), montree_ppt_chart_edit (basic charts and embedded data), montree_ppt_design_edit (existing masters/layouts), montree_ppt_animation_edit (basic entrances/transitions), montree_document_undo/montree_document_save (undo and persist edits), montree_list_images (image references/links), montree_capture_viewport (actual PNG of visible reading area), montree_get_selection (fresh selection), montree_list_marks (marks), montree_inspect_content (read-only audit), montree_suggest_chapters (chapter suggestions), montree_create_bookmark (current position), montree_propose_mark (user-approved highlight/note proposals with category & title), montree_generate_diagram (visual diagrams/mindmaps), montree_cross_reference (entity tracking), and montree_present (present a chapter-comparison card or an offline html-artifact from already-read content; read-only declaration, no file writes). Follow each tool's description for parameters and limits.`
+
+/**
+ * 长会话渲染速览：每隔 `RENDER_HINT_REFRESH_INTERVAL` 轮重贴一次（见
+ * `render-hint-refresh`），防上下文压缩丢掉渲染习惯。保持极短（~100 tokens）：
+ * 只讲“调工具才有真卡、手写 React 只会成纯文本”，参数 schema 一律不复述。
+ * 发送时套 bootstrap 外层标记，回放清洗据标记剥离（见 strip-replay-scaffolding）。
+ */
+export const MONTREE_RENDER_HINT_REFRESH = `Reply rendering refresher — rich interactive answers ("generative UI") need tool calls: \`montree_generate_diagram\` / \`montree_present\` render real React cards; React/JSX source or raw HTML apps in reply text render as plain text. Mermaid fences, \`<details>\`, \`==highlight==\`, KaTeX render natively. Never emit div/span/script/iframe/img tags.`
