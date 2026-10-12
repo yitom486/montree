@@ -68,6 +68,9 @@ const ThreadMessageList = memo(function ThreadMessageList({
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight
     const near = distance <= 96
     isNearBottomRef.current = near
+    if (near) {
+      userScrolledUpRef.current = false
+    }
     // 滚动快照即落盘：离底/贴底翻转不依赖后续 scroll 事件
     //（无位移滚轮、程序化滚动可能无事件，导致历史恢复读不到）。
     // set 高频但无订阅者重渲染，落盘由 persist 节流合并。
@@ -75,7 +78,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
     store.setChatScroll(store.activeThreadId, {
       scrollTop: el.scrollTop,
       pinned: near,
-      windowStart: windowRef.current.start,
+      windowStart: near ? null : windowRef.current.start,
       windowCount: windowRef.current.count,
     })
   }, [])
@@ -100,20 +103,27 @@ const ThreadMessageList = memo(function ThreadMessageList({
     [messages],
   )
   const prevUserMsgIdRef = useRef(lastUserMsgId)
-  // 本次观看中的用户上滑意图（可信滚轮/触摸）：有 fresh 意图时新回合不抢跟随；
-  // 恢复的离底态是 stale 的，新回合默认跟随。回到底部点击复位。
+  // 本次观看中的用户上滑意图（可信滚轮/触摸）：仅真向上滚轮时标记；
+  // 用户发新消息、回到底部或向下滚到底时复位为 false，确保新回合必定平滑跟滚。
   const userScrolledUpRef = useRef(false)
   useEffect(() => {
     const el = viewportRef.current
     if (!el) return
-    const mark = () => {
-      userScrolledUpRef.current = true
+    const mark = (e: Event) => {
+      if ('deltaY' in e && typeof (e as WheelEvent).deltaY === 'number') {
+        const wheel = e as WheelEvent
+        if (wheel.deltaY < 0) {
+          // 明确向上滚轮：标记用户上翻看历史意图
+          userScrolledUpRef.current = true
+        } else if (wheel.deltaY > 0 && isNearBottomRef.current) {
+          // 向下滚到底部：清除上滑意图
+          userScrolledUpRef.current = false
+        }
+      } else {
+        // 触控滑动
+        userScrolledUpRef.current = true
+      }
     }
-    // 非被动监听拿不到 isTrusted？scroll 事件无 isTrusted 区分需求：
-    // 程序化 scrollTop 赋值同样触发 scroll，但滚轮/触摸是唯一日常来源；
-    // 用 wheel/touchmove（均为可信用户手势）标记意图，避开程序化干扰。
-    // wheel 取捕获阶段：正文内 mermaid 滚轮门会在 markdown 根捕获期截停
-    // （防社区 PanZoom 劫持滚动），捕获标记先于截停，不丢上滑意图。
     el.addEventListener('wheel', mark, { passive: true, capture: true })
     el.addEventListener('touchmove', mark, { passive: true })
     return () => {
@@ -123,17 +133,17 @@ const ThreadMessageList = memo(function ThreadMessageList({
   }, [])
   useEffect(() => {
     if (lastUserMsgId && lastUserMsgId !== prevUserMsgIdRef.current) {
-      // 新回合：无本次上滑意图则跟随（平滑推到底）；有则留在历史位置。
-      if (!userScrolledUpRef.current) {
-        isNearBottomRef.current = true
-        const el = viewportRef.current
-        if (el) {
-          const reduceMotion =
-            typeof window !== 'undefined' &&
-            typeof window.matchMedia === 'function' &&
-            window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? 'instant' : 'smooth' })
-        }
+      // 新回合：用户发送新提问，无条件复位上滑意图与底锚，平滑滚到底部
+      userScrolledUpRef.current = false
+      isNearBottomRef.current = true
+      setChatWindow((prev) => (prev.start !== null ? { ...prev, start: null } : prev))
+      const el = viewportRef.current
+      if (el) {
+        const reduceMotion =
+          typeof window !== 'undefined' &&
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? 'instant' : 'smooth' })
       }
     }
     prevUserMsgIdRef.current = lastUserMsgId
@@ -170,6 +180,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   const handleScrollToBottom = useCallback(() => {
     isNearBottomRef.current = true
     userScrolledUpRef.current = false
+    setChatWindow((prev) => (prev.start !== null ? { ...prev, start: null } : prev))
     const el = viewportRef.current
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
@@ -210,8 +221,13 @@ const ThreadMessageList = memo(function ThreadMessageList({
   })
 
   const visibleMessages = useMemo(() => {
-    return sliceChatWindow(messages, chatWindow.start, chatWindow.count)
-  }, [messages, chatWindow])
+    // 核心底锚守护：贴底时（或正在提示/流式生成时）恒为底锚（start=null），
+    // 取末尾最新 count 条，确保新提问与新回答绝不被固定的历史头部切片挡住；
+    // 仅当用户离开底部浏览历史时才使用冻结 start。
+    const isPinned = isNearBottomRef.current || prompting || streamingAny
+    const effectiveStart = isPinned ? null : chatWindow.start
+    return sliceChatWindow(messages, effectiveStart, chatWindow.count)
+  }, [messages, chatWindow, prompting, streamingAny])
   const remainingOlder = messages.length - visibleMessages.length
 
   const preserveRef = useRef<{ height: number; top: number } | null>(null)

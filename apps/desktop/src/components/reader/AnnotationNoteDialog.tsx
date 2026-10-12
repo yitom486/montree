@@ -23,8 +23,11 @@ import {
 import { ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
 import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
-import { Conversation, ConversationScrollButton } from '@/components/ai-elements/conversation'
-import { useStickToBottomScroll } from '@/hooks/agent/useStickToBottomScroll'
+import {
+  AssistantRuntimeProvider,
+  ThreadPrimitive,
+  useExternalStoreRuntime,
+} from '@assistant-ui/react'
 import { toProposedMark } from '@montree/annotations'
 import { toast } from 'sonner'
 
@@ -75,9 +78,21 @@ export function AnnotationNoteDialog({
 
   const hasDraft = Boolean(assist.pendingDraft)
   const canPolish = aiAssist && note.trim().length > 0
-  const { pinned, instance } = useStickToBottomScroll({
-    contentRef: aiMessagesRef,
-    enabled: Boolean(open && showAi && aiAssist),
+
+  const convertedMessages = useMemo(() => {
+    return messages.map((m) => ({
+      id: m.id,
+      role: m.role === 'user' ? ('user' as const) : m.role === 'system' ? ('system' as const) : ('assistant' as const),
+      content: [{ type: 'text' as const, text: m.text || '' }],
+    }))
+  }, [messages])
+
+  const runtime = useExternalStoreRuntime({
+    messages: convertedMessages,
+    convertMessage: (m) => m,
+    isRunning: assist.busy,
+    onNew: async () => {},
+    onCancel: async () => {},
   })
 
   useEffect(() => {
@@ -342,46 +357,48 @@ export function AnnotationNoteDialog({
             ) : null}
 
             <div className="relative min-h-0 flex-1">
-              <div className="min-h-0 h-full space-y-2 overflow-y-auto rounded-md border border-border/60 p-2">
-                <div ref={aiMessagesRef} className="space-y-2">
-              {messages.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  先聊聊这段话。想留批注时点「写成批注」或说「写批注」即可生成到上方。
-                </p>
-              ) : (
-                groupChatTimeline(messages).map((item) =>
-                  item.kind === 'work-log' ? (
-                    <div
-                      key={item.key}
-                      className="space-y-1 opacity-80"
-                    >
-                      {item.messages.map((message) => (
-                        <AgentMessageBubble
-                          key={message.id}
-                          message={message}
-                          resolveMarkProposal={resolveMarkProposal}
-                        />
-                      ))}
+              <AssistantRuntimeProvider runtime={runtime}>
+                <ThreadPrimitive.Root className="flex-1 flex flex-col min-h-0 h-full">
+                  <ThreadPrimitive.Viewport
+                    autoScroll
+                    className="min-h-0 h-full space-y-2 overflow-y-auto rounded-md border border-border/60 p-2"
+                  >
+                    <div ref={aiMessagesRef} className="space-y-2">
+                      {messages.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          先聊聊这段话。想留批注时点「写成批注」或说「写批注」即可生成到上方。
+                        </p>
+                      ) : (
+                        groupChatTimeline(messages).map((item) =>
+                          item.kind === 'work-log' ? (
+                            <div
+                              key={item.key}
+                              className="space-y-1 opacity-80"
+                            >
+                              {item.messages.map((message) => (
+                                <AgentMessageBubble
+                                  key={message.id}
+                                  message={message}
+                                  resolveMarkProposal={resolveMarkProposal}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <AgentMessageBubble
+                              key={item.message.id}
+                              message={item.message}
+                              resolveMarkProposal={resolveMarkProposal}
+                            />
+                          ),
+                        )
+                      )}
+                      {assist.phase === 'generating' && !polishPreview ? (
+                        <p className="text-xs text-muted-foreground">正在整理…</p>
+                      ) : null}
                     </div>
-                  ) : (
-                    <AgentMessageBubble
-                      key={item.message.id}
-                      message={item.message}
-                      resolveMarkProposal={resolveMarkProposal}
-                    />
-                  ),
-                )
-              )}
-              {assist.phase === 'generating' && !polishPreview ? (
-                <p className="text-xs text-muted-foreground">正在整理…</p>
-              ) : null}
-                </div>
-              </div>
-              {!pinned && messages.length > 0 ? (
-                <Conversation instance={instance} initial={false}><ConversationScrollButton aria-label="回到底部"
-                  className="absolute bottom-2 left-1/2 z-10 h-7 -translate-x-1/2 gap-1 rounded-full border border-border/60 bg-background/95 px-3 text-[11px] shadow-md backdrop-blur-sm"
-                /></Conversation>
-              ) : null}
+                  </ThreadPrimitive.Viewport>
+                </ThreadPrimitive.Root>
+              </AssistantRuntimeProvider>
             </div>
 
             {!hasDraft ? (

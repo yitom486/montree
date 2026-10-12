@@ -2,18 +2,17 @@ export function resolveScrollViewport(
   contentEl: HTMLElement | null | undefined,
 ): HTMLElement | null {
   if (!contentEl) return null
-  // 旧 Radix 结构：最近的命名 viewport。
-  const legacy = contentEl.closest('[data-slot=scroll-area-viewport]')
-  if (legacy instanceof HTMLElement) return legacy
-  // 社区 Conversation 结构：向上找到最近的纵向滚动祖先
-  //（StickToBottom 内容区经 scrollClassName 得 overflow-y-auto）。
+  // assistant-ui ThreadPrimitive.Viewport 结构优先
+  const threadViewport = contentEl.closest('[data-assistant-ui-thread-viewport]')
+  if (threadViewport instanceof HTMLElement) return threadViewport
+  // 向上找到最近的纵向滚动祖先
   let ancestor = contentEl.parentElement
   while (ancestor) {
     const style = getComputedStyle(ancestor)
     if (/(auto|scroll)/.test(style.overflowY)) return ancestor
     ancestor = ancestor.parentElement
   }
-  // 无排版环境（happy-dom 单测手动给几何量）回落到直接父级，保持旧语义。
+  // 无排版环境（happy-dom 单测）回落到直接父级
   const parent = contentEl.parentElement
   return parent instanceof HTMLElement ? parent : null
 }

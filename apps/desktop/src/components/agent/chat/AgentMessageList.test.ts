@@ -160,4 +160,66 @@ describe('AgentMessageList 历史分页', () => {
     expect(text).toContain('正文m03')
     expect(text).not.toContain('正文m02')
   })
+
+  it('贴底状态下新增消息自然可见，绝不被历史切片截断', async () => {
+    seedThread('t1', makeMessages(12))
+    await renderList()
+    expect(container.textContent).toContain('正文m12')
+
+    // 追加 m13 与 m14
+    await act(async () => {
+      useAcpUiStore.setState((s) => ({
+        ...s,
+        threads: s.threads.map((t) =>
+          t.id === 't1'
+            ? {
+                ...t,
+                messages: [
+                  ...t.messages,
+                  { id: 'm13', role: 'user', text: '新问题m13', createdAt: 2000 } as AcpChatMessage,
+                  { id: 'm14', role: 'agent', text: '回答正文m14', createdAt: 2001 } as AcpChatMessage,
+                ],
+              }
+            : t,
+        ),
+      }))
+    })
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('新问题m13')
+    expect(text).toContain('回答正文m14')
+  })
+
+  it('发新提问时复位上滑意图，新消息始终可见', async () => {
+    seedThread('t1', makeMessages(12))
+    await renderList()
+
+    // 向上滑动滚轮，触发上滑标记
+    const el = container.querySelector('.flex-1.overflow-y-auto') ?? container
+    await act(async () => {
+      el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -100 }))
+    })
+
+    // 用户发出新提问
+    await act(async () => {
+      useAcpUiStore.setState((s) => ({
+        ...s,
+        threads: s.threads.map((t) =>
+          t.id === 't1'
+            ? {
+                ...t,
+                messages: [
+                  ...t.messages,
+                  { id: 'm13', role: 'user', text: '新用户问题m13', createdAt: 2000 } as AcpChatMessage,
+                ],
+              }
+            : t,
+        ),
+      }))
+    })
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('新用户问题m13')
+  })
 })
+
