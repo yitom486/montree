@@ -12,7 +12,7 @@ vi.mock('electron', async () => {
 vi.mock('../services/acp/acp-connection', () => ({ connectAcp: mocks.connect, disconnectAcp: vi.fn(async () => ok(undefined)), authenticateAcp: vi.fn() }))
 vi.mock('../services/reader-screenshot-service', () => ({ captureReaderViewport: vi.fn() }))
 import { ipcMain, type WebContents } from 'electron'
-import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
+import { registerAcpWindowHandlers, withAcpWindow, MAX_SNAPSHOT_IN_FLIGHT } from './acp-window-handlers'
 import { acpState, setStatus, getAcpState, claimAcpSession, ownsAcpSession } from '../services/acp/acp-state'
 import { handleSnapshotRequest, handlePermissionRequest, emitSessionUpdate } from '../services/acp/acp-bridges'
 import { currentAcpContext, getAcpContext, forgetAcpContext } from '../services/acp/acp-context'
@@ -68,6 +68,34 @@ describe('window-owned ACP IPC', () => {
     a.destroy()
     await rejected
     expect(b.sent).toHaveLength(1)
+  })
+
+  it('同窗口快照并发限流：超限排队，释放后放行且监听器归零', async () => {
+    const a = window()
+    withAcpWindow(a.webContents, () => {})
+    // 基线 = 每窗唯一的上下文销毁守卫；桥接监听器必须全部归零到它
+    const baseline = a.listenerCount('destroyed')
+    expect(baseline).toBe(1)
+    const pendings = Array.from({ length: MAX_SNAPSHOT_IN_FLIGHT + 2 }, () =>
+      withAcpWindow(a.webContents, () => handleSnapshotRequest('viewport.txt')),
+    )
+    const sentOf = () => a.sent.filter((s) => s.channel === IPC.ACP_SNAPSHOT_REQUEST)
+    const respond = (requestId: number, content: string) => {
+      ipcMain.emit(IPC.ACP_SNAPSHOT_RESPONSE, { sender: a.webContents }, { requestId, ok: true, content })
+    }
+    // 前 4 个同步发出（无竞争快路径），第 5、6 个排队
+    expect(sentOf()).toHaveLength(MAX_SNAPSHOT_IN_FLIGHT)
+    const results: string[] = []
+    pendings.forEach((p, i) => void p.then((v) => { results[i] = v as string }))
+    // 回前 4 个：第 5、6 个依次放行发出
+    for (const s of sentOf()) respond(s.payload.requestId, `c-${s.payload.requestId}`)
+    await expect.poll(() => sentOf().length).toBe(MAX_SNAPSHOT_IN_FLIGHT + 2)
+    // 回剩下 2 个：6 个全决议，destroyed 监听器回到基线（无堆积）
+    for (const s of sentOf().slice(MAX_SNAPSHOT_IN_FLIGHT)) respond(s.payload.requestId, `c-${s.payload.requestId}`)
+    await expect.poll(() => results.filter(Boolean)).toHaveLength(MAX_SNAPSHOT_IN_FLIGHT + 2)
+    expect(results.every((v) => typeof v === 'string')).toBe(true)
+    expect(a.listenerCount('destroyed')).toBe(baseline)
+    await Promise.all(pendings)
   })
 
   it('permission IDs cannot approve another window; closure cancels pending approval', async () => {

@@ -13,6 +13,41 @@ import { captureReaderViewport } from '../services/reader-screenshot-service'
 
 const registered = new WeakSet<AcpContext>()
 
+/**
+ * 同窗口快照并发门：agent 并行十几路 read 时，在途快照曾在 sender 上堆出
+ * 十几个 destroyed 监听（MaxListeners 警告）。超限 FIFO 排队；计时器在
+ * 拿到槽位后起算，排队不吃超时；窗口销毁时占槽者经 destroyed 收尾放行，
+ * 排队者随后取槽即见 closed 而直接拒绝，不悬挂。
+ * 无竞争时全同步（不改变既有调用时序），仅超限排队走异步。
+ */
+export const MAX_SNAPSHOT_IN_FLIGHT = 4
+
+function createSnapshotGate(maxInflight: number) {
+  let active = 0
+  const waiters: Array<() => void> = []
+  return {
+    /** 有槽位立刻返回释放函数（同步）；满时返回 null，调用方排队等放行。 */
+    tryAcquire(): (() => void) | null {
+      if (active >= maxInflight) return null
+      active += 1
+      let released = false
+      return () => {
+        if (released) return
+        released = true
+        active -= 1
+        waiters.shift()?.()
+      }
+    },
+    /** 排队等放行。被唤醒后仍需 tryAcquire（槽位可能被新到请求先拿走，
+     * 此时重新排队；active 只增不超，无超发、无丢失唤醒）。 */
+    waitForSlot(): Promise<void> {
+      return new Promise<void>((resolve) => {
+        waiters.push(resolve)
+      })
+    },
+  }
+}
+
 /** Trusted IPC sender chooses the scope; renderer-supplied IDs never choose another window. */
 export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
   const context = getAcpContext(`window-${sender.id}`)
@@ -24,6 +59,7 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
       }
       onAcpSessionUpdate((event) => send(IPC.ACP_SESSION_UPDATE, event))
       onAcpStatusChanged((event) => send(IPC.ACP_STATUS_CHANGED, event))
+      const snapshotGate = createSnapshotGate(MAX_SNAPSHOT_IN_FLIGHT)
       setAcpPermissionBridge(({ requestId, sessionId, params }) => new Promise((resolve) => {
         if (sender.isDestroyed() || context.closed) { resolve({ outcome: 'cancelled' }); return }
         let settled = false
@@ -48,13 +84,20 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
         send(IPC.ACP_PERMISSION_REQUEST, { requestId, sessionId, toolCall, options: params.options, rawParams: params, summary: toolCall?.title ?? '工具调用' })
       }))
       setAcpSnapshotBridge(async ({ requestId, resource, args }) => {
-        if (sender.isDestroyed() || context.closed) throw new Error('Agent 所属窗口已关闭')
+        // 先取槽位再计时：排队等待不消耗快照超时
+        let release = snapshotGate.tryAcquire()
+        while (!release) {
+          await snapshotGate.waitForSlot()
+          release = snapshotGate.tryAcquire()
+        }
+        if (sender.isDestroyed() || context.closed) { release(); throw new Error('Agent 所属窗口已关闭') }
         const content = await new Promise<string>((resolve, reject) => {
           let settled = false
           const timer = setTimeout(() => finish(new Error(`Montree 快照请求超时：${resource}`)), resolveSnapshotTimeoutMs(resource))
           const finish = (error?: Error, text?: string) => {
             if (settled) return
             settled = true
+            release()
             clearTimeout(timer)
             ipcMain.removeListener(IPC.ACP_SNAPSHOT_RESPONSE, handler)
             sender.removeListener('destroyed', destroyed)
