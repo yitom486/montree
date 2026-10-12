@@ -190,7 +190,7 @@ describe('AgentMessageList 历史分页', () => {
     expect(text).toContain('回答正文m14')
   })
 
-  it('发新提问时复位上滑意图，新消息始终可见', async () => {
+  it('上滑看历史后点击回到底部可恢复贴底，新消息可见', async () => {
     seedThread('t1', makeMessages(12))
     await renderList()
 
@@ -217,6 +217,14 @@ describe('AgentMessageList 历史分页', () => {
         ),
       }))
     })
+
+    // 点击回到底部
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('回到底部'))
+    if (btn) {
+      await act(async () => {
+        btn.click()
+      })
+    }
 
     const text = container.textContent ?? ''
     expect(text).toContain('新用户问题m13')

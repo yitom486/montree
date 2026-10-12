@@ -133,17 +133,18 @@ const ThreadMessageList = memo(function ThreadMessageList({
   }, [])
   useEffect(() => {
     if (lastUserMsgId && lastUserMsgId !== prevUserMsgIdRef.current) {
-      // 新回合：用户发送新提问，无条件复位上滑意图与底锚，平滑滚到底部
-      userScrolledUpRef.current = false
-      isNearBottomRef.current = true
-      setChatWindow((prev) => (prev.start !== null ? { ...prev, start: null } : prev))
-      const el = viewportRef.current
-      if (el) {
-        const reduceMotion =
-          typeof window !== 'undefined' &&
-          typeof window.matchMedia === 'function' &&
-          window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? 'instant' : 'smooth' })
+      // 仅在用户未主动上翻看历史时，新消息到达才自动跟滚到底部
+      if (!userScrolledUpRef.current) {
+        isNearBottomRef.current = true
+        setChatWindow((prev) => (prev.start !== null ? { ...prev, start: null } : prev))
+        const el = viewportRef.current
+        if (el) {
+          const reduceMotion =
+            typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? 'instant' : 'smooth' })
+        }
       }
     }
     prevUserMsgIdRef.current = lastUserMsgId
