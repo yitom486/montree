@@ -18,6 +18,7 @@ export type WorkLogItem = Extract<ChatTimelineItem, { kind: 'work-log' }>
 interface AgentActivityGroupProps {
   group: WorkLogItem
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
+  onEditMessage?: (text: string) => void
 }
 
 /** 轻量工具行：标题+目标+状态，一行；按需展开单个调用的完整详情。 */
@@ -80,7 +81,7 @@ function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
  * 用户打开/关闭选择跨 chunk/落定保留（key 按回合归属稳定，不 remount）。
  * 摘要只说真实操作与状态计数；无可信时间省略历时，不估算耗时。
  */
-export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivityGroupProps) {
+export function AgentActivityGroup({ group, onChapterPlanSelect, onEditMessage }: AgentActivityGroupProps) {
   const [open, setOpen] = useState(false)
 
   const doneCount =
@@ -139,7 +140,7 @@ export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivity
             aria-hidden
             className="pointer-events-none absolute inset-x-2.5 bottom-1 h-0.5 overflow-hidden rounded-full bg-muted"
           >
-            <span className="block h-full w-full animate-pulse rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none" />
+            <span className="agent-stream-sweep block h-full w-full rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none" />
           </span>
         ) : null}
       </button>
@@ -154,6 +155,7 @@ export function AgentActivityGroup({ group, onChapterPlanSelect }: AgentActivity
                 key={msg.id}
                 message={msg}
                 onChapterPlanSelect={onChapterPlanSelect}
+                onEditMessage={onEditMessage}
               />
             ),
           )}

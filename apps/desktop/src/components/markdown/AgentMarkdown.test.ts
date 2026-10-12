@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AgentMarkdown } from './AgentMarkdown'
+import { AgentMarkdown, resolveMermaidTheme } from './AgentMarkdown'
 
 
 // happy-dom has no layout/visibility; only the observer is supplied. The actual plugin renders in Electron tests.
@@ -39,14 +39,44 @@ async function render(text: string, streaming = false): Promise<HTMLElement> {
 }
 
 describe('AgentMarkdown（Streamdown 接入）', () => {
-  it('渲染中文加粗、表格、任务列表与单换行', async () => {
-    const el = await render('这是**加粗**的中文\n第二行\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] 完成\n- [ ] 待办')
+  it('渲染中文加粗、表格、任务列表与单换行', async () => {    const el = await render('这是**加粗**的中文\n第二行\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] 完成\n- [ ] 待办')
     expect(el.querySelector('strong')?.textContent).toBe('加粗')
     expect(el.querySelector('table')).not.toBeNull()
     expect(el.querySelectorAll('table td')[1]?.textContent).toBe('2')
     const checkbox = el.querySelector('input[type="checkbox"]')
     expect(checkbox).not.toBeNull()
     expect(el.querySelector('p')?.innerHTML).toContain('<br>')
+  })
+
+  it('头尾分块不重复渲染：尾为空时只出头', async () => {
+    // 流式 chunk 常以空行结尾（tail 为空）：此前 tail 兜底渲染全文导致双份
+    const el = await render('# 标题\n\n首段正文。\n\n', true)
+    const hits = [...el.querySelectorAll('p')].filter((p) => p.textContent === '首段正文。')
+    expect(hits).toHaveLength(1)
+    expect(el.querySelectorAll('h1')).toHaveLength(1)
+  })
+
+  it('流式状态经 data-status 暴露（tip 光标的 CSS 开关）', async () => {    const running = await render('正在输出', true)
+    expect(running.querySelector('[data-status="running"]')).not.toBeNull()
+    const done = await render('正在输出', false)
+    expect(done.querySelector('[data-status="complete"]')).not.toBeNull()
+    expect(done.querySelector('[data-status="running"]')).toBeNull()
+  })
+
+  it('Mermaid 主题跟随 App 主题映射', () => {
+    expect(resolveMermaidTheme('dark')).toBe('dark')
+    expect(resolveMermaidTheme('light')).toBe('default')
+    expect(resolveMermaidTheme('sepia')).toBe('neutral')
+  })
+
+  it('流式中新块挂载带滑入类，落定态不带（旧块不重播）', async () => {
+    const running = await render('首段。\n\n次段。', true)
+    expect(running.querySelector('.agent-block-in')).not.toBeNull()
+    const done = await render('首段。\n\n次段。', false)
+    expect(done.querySelector('.agent-block-in')).toBeNull()
+    // 内容本身不受包装影响
+    expect(done.textContent).toContain('首段。')
+    expect(done.textContent).toContain('次段。')
   })
 
   it('裸链接可点击，javascript: 被拦截且点击无导航', async () => {
@@ -59,16 +89,17 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     expect(evil?.getAttribute('href') ?? '').not.toContain('javascript:')
   })
 
-  it('xss 载荷不执行：img onerror 转义为文本', async () => {
+  it('xss 载荷不执行：img 整体转义为文本，无事件属性落点', async () => {
     const el = await render('<img src="x" onerror="alert(2)" />')
     expect(el.querySelector('img')).toBeNull()
-    expect(el.textContent).toContain('<img')
+    expect(el.querySelector('[onerror]')).toBeNull()
+    expect(el.textContent).not.toContain('alert(2)')
   })
 
-  it('details 与裸 HTML 转义为文本（与 strictSafe 同语义）', async () => {
-    const el = await render('<details><summary>展开</summary>内容</details>')
-    expect(el.querySelector('details')).toBeNull()
-    expect(el.textContent).toContain('<details>')
+  it('裸 script/iframe 不执行：元素剥离', async () => {
+    const el = await render('<script>alert(1)</script><iframe src="https://example.com"></iframe>')
+    expect(el.querySelector('script')).toBeNull()
+    expect(el.querySelector('iframe')).toBeNull()
   })
 
   it('社区代码块包含工具栏、复制入口与原文', async () => {
@@ -141,6 +172,27 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     expect(el.querySelector('sub')?.textContent).toBe('下标')
     expect(el.querySelector('sup')?.textContent).toBe('上标')
     expect(el.querySelector('.markdown-alert.markdown-alert-note')).not.toBeNull()
+  })
+
+  it('原生折叠与按键帽：details/summary/kbd 成元素，open 透传', async () => {
+    const el = await render('<details><summary>点我展开</summary>里面是细节</details>\n\n按 <kbd>Ctrl</kbd>+<kbd>K</kbd>')
+    const details = el.querySelector('details')
+    expect(details).not.toBeNull()
+    expect(details?.querySelector('summary')?.textContent).toContain('点我展开')
+    expect(details?.textContent).toContain('里面是细节')
+    expect(el.querySelectorAll('kbd')).toHaveLength(2)
+    const opened = await render('<details open><summary>展</summary>内容</details>')
+    expect(opened.querySelector('details')?.hasAttribute('open')).toBe(true)
+  })
+
+  it('折叠内 XSS 同样中和：事件属性剥离、危险链接拦截', async () => {
+    const el = await render('<details onclick="alert(1)"><summary>展</summary><img src="x" onerror="alert(2)" />\n\n[点我](javascript:alert(3))</details>')
+    const details = el.querySelector('details')!
+    expect(details).not.toBeNull()
+    expect(details.hasAttribute('onclick')).toBe(false)
+    expect(el.querySelector('img')).toBeNull()
+    const evil = [...el.querySelectorAll('a')].find((a) => a.textContent === '点我')
+    expect(evil?.getAttribute('href') ?? '').not.toContain('javascript:')
   })
 
   it('tel 链接与 data 图片按既有策略放行', async () => {

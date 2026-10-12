@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentMessageBubble } from './AgentMessageBubble'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
@@ -46,8 +46,7 @@ describe('AgentMessageBubble', () => {
     expect(container.querySelector('strong')?.textContent).toBe('加粗')
   })
 
-  it('renders user attachments with names and image preview', () => {
-    const msg: AcpChatMessage = {
+  it('renders user attachments with names and image preview', () => {    const msg: AcpChatMessage = {
       id: 'user-att-1',
       role: 'user',
       text: '看这两份材料',
@@ -114,5 +113,72 @@ describe('AgentMessageBubble', () => {
     expect(container.textContent).toContain('Client 发送 initialize 请求')
     expect(container.textContent).toContain('能力协商')
     expect(container.textContent).toContain('对应章句')
+  })
+
+  it('用户消息可复制正文、无回调时不渲染编辑', async () => {
+    const msg: AcpChatMessage = {
+      id: 'user-act-1',
+      role: 'user',
+      text: '复制我这段话',
+      createdAt: Date.now(),
+    }
+    const written: string[] = []
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text: string) => { written.push(text); return Promise.resolve() } },
+    })
+    act(() => {
+      root.render(createElement(AgentMessageBubble, { message: msg }))
+    })
+    const copy = container.querySelector('button[aria-label="复制正文"]') as HTMLElement
+    expect(copy).not.toBeNull()
+    await act(async () => {
+      copy.click()
+    })
+    expect(written).toEqual(['复制我这段话'])
+    expect(container.querySelector('button[aria-label="编辑后继续"]')).toBeNull()
+  })
+
+  it('用户消息编辑回填原文（发送后为新回合，不改写历史）', () => {
+    const onEditMessage = vi.fn()
+    const msg: AcpChatMessage = {
+      id: 'user-act-2',
+      role: 'user',
+      text: '续改这句',
+      createdAt: Date.now(),
+    }
+    act(() => {
+      root.render(createElement(AgentMessageBubble, { message: msg, onEditMessage }))
+    })
+    const edit = container.querySelector('button[aria-label="编辑后继续"]') as HTMLElement
+    expect(edit).not.toBeNull()
+    expect(edit.getAttribute('title')).toContain('新回合')
+    act(() => {
+      edit.click()
+    })
+    expect(onEditMessage).toHaveBeenCalledWith('续改这句')
+  })
+
+  it('助手回答可复制 Markdown 原文', async () => {
+    const msg: AcpChatMessage = {
+      id: 'agent-act-1',
+      role: 'agent',
+      text: '普通文本回答',
+      createdAt: Date.now(),
+    }
+    const written: string[] = []
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text: string) => { written.push(text); return Promise.resolve() } },
+    })
+    act(() => {
+      root.render(createElement(AgentMessageBubble, { message: msg }))
+    })
+    const copy = container.querySelector('button[aria-label="复制回答原文"]') as HTMLElement
+    expect(copy).not.toBeNull()
+    await act(async () => {
+      copy.click()
+    })
+    expect(written).toEqual(['普通文本回答'])
   })
 })

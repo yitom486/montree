@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { fileApi } from '@/api/file-api'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { stripHostileHtmlHead } from '@/lib/agent/context/present-result-builder'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -227,20 +228,17 @@ export function HtmlArtifactCard({ result, className }: HtmlArtifactCardProps) {
 
   return (
     <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-border/80 bg-card/90 text-card-foreground shadow-sm backdrop-blur-sm transition-all',
-        className,
-      )}
+      className={resultCardClassName(className)}
       data-testid="html-artifact-card"
       data-present-id={result.id}
     >
-      <div className="flex min-w-0 items-center gap-2 border-b border-border/70 bg-muted/40 px-3 py-2">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+      <div className={cn('flex min-w-0 items-center gap-2', RESULT_CARD_HEADER)}>
+        <div className={RESULT_CARD_ICON}>
           <FileCode2 className="size-3.5" />
         </div>
         <div className="min-w-0 flex-1">
           <h4 className="truncate text-xs font-semibold tracking-tight text-foreground">{result.title}</h4>
-          <p className="truncate text-[10px] text-muted-foreground">
+          <p className={RESULT_CARD_SUMMARY}>
             {result.summary ?? '离线 HTML 小应用'}
           </p>
         </div>

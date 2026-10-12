@@ -9,6 +9,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import type { ContentAuditHit } from '@montree/contracts'
@@ -117,16 +118,13 @@ export function ContentAuditCard({
 
   return (
     <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-border/80 bg-card/90 shadow-sm backdrop-blur-sm transition-all text-card-foreground',
-        className,
-      )}
+      className={resultCardClassName(className)}
       data-testid="content-audit-card"
     >
       {/* 头部摘要 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-3 py-2">
+      <div className={cn('flex flex-wrap items-center justify-between gap-2', RESULT_CARD_HEADER)}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-foreground/80">
+          <div className={RESULT_CARD_ICON}>
             <FileSearch className="size-3.5" />
           </div>
           <div className="min-w-0">
@@ -138,7 +136,7 @@ export function ContentAuditCard({
                 "{payload.query}"
               </span>
             </div>
-            <p className="truncate text-[10px] text-muted-foreground">
+            <p className={RESULT_CARD_SUMMARY}>
               命中 <span className="font-semibold text-foreground">{payload.total ?? hits.length}</span> 处原句
               {payload.truncated ? ` · 显示前 ${hits.length} 条` : ''}
             </p>

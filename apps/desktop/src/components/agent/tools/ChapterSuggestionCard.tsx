@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 
@@ -48,31 +49,24 @@ export function ChapterSuggestionCard({
 
   return (
     <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-teal-500/30 bg-teal-50/30 dark:bg-teal-950/20 shadow-sm backdrop-blur-sm transition-all',
-        className,
-      )}
+      className={resultCardClassName(className)}
       data-testid="chapter-suggestion-card"
     >
       {/* 头部摘要 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-500/20 bg-teal-500/10 px-3 py-2">
+      <div className={cn('flex flex-wrap items-center justify-between gap-2', RESULT_CARD_HEADER)}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-teal-500/20 text-teal-700 dark:text-teal-300">
+          <div className={RESULT_CARD_ICON}>
             <Compass className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <h4 className="truncate text-xs font-semibold text-teal-800 dark:text-teal-200">
+            <h4 className="truncate text-xs font-semibold text-foreground">
               智能导读与续读推荐
             </h4>
-            <p className="truncate text-[10px] text-teal-700/80 dark:text-teal-300/80">
-              共推荐 <span className="font-semibold">{chapters.length}</span> 处研读章节
+            <p className={RESULT_CARD_SUMMARY}>
+              共推荐 <span className="font-semibold text-foreground">{chapters.length}</span> 处研读章节
             </p>
           </div>
         </div>
-
-        <span className="rounded bg-teal-500/15 px-1.5 py-0.5 text-[9.5px] font-mono font-medium text-teal-700 dark:text-teal-300">
-          montree_suggest_chapters
-        </span>
       </div>
 
       {/* 推荐章节清单 */}

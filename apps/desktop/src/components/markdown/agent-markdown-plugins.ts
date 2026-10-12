@@ -13,6 +13,9 @@ export const agentSanitizeSchema = {
     ...defaultSchema.attributes,
     mark: [],
     alert: [],
+    // details/summary/kbd 本体已在默认表；只补惰性布尔属性 open。
+    // on* / href / src 等一律不补，仍剥离。
+    details: ['open'],
   },
   protocols: {
     ...defaultSchema.protocols,

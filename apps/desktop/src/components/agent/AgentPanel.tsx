@@ -535,6 +535,7 @@ export const AgentPanel = memo(function AgentPanel({
         authHint={authHint}
         runtimeName={runtimeName}
         onChapterPlanSelect={handleChapterPlanSelect}
+        onEditMessage={(text) => setDraft(text)}
       />
 
       <div className="shrink-0 space-y-1.5 p-3 pt-2">

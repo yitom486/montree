@@ -19,7 +19,7 @@ export const MONTREE_CLIENT_CLOSE_TAG = '</montree-client>'
  * 必须保持 **完全静态**：任何动态内容（当前文件、进度、时间戳）都会破坏
  * 模型侧的 prompt 前缀缓存。动态状态一律走 turn-context 或 MCP 工具。
  *
- * 本文件只保留「环境身份 + 跨工具策略 + turn-context 语义」三类必须逐轮
+ * 本文件只保留「环境身份 + 跨工具策略 + turn-context 语义 + 回复渲染」四类必须逐轮
  * 存在的内容（ACP v1 无 system prompt 槽位，且防 agent 侧上下文压缩丢失）；
  * 各工具自身的用法/限制/报错行为一律写在 MCP schema description
  * （`packages/acp/src/mcp/montree-mcp-tools.ts`，tools/list 一次性注入），
@@ -68,6 +68,14 @@ Text reads may include image references, but a URL/alt/caption is **not** image 
 ## Chapter-level highlighting (user asks which chapters to mark)
 
 \`montree_read(scope=toc)\` → \`montree_suggest_chapters\` (2–5 chapters; do NOT propose marks yet) → user picks one → \`montree_read(scope=chapter)\` → \`montree_propose_mark(marks)\`, one batch ≤10. Details in the tools' descriptions.
+
+## Reply rendering
+
+Your reply renders in the Agent panel as Markdown: GFM tables, task lists (read-only), footnotes, KaTeX (\`$…$\` inline, \`$$…$$\` block), Shiki-highlighted fenced code (always tag the language), and Mermaid diagrams. Prefer these over ASCII art:
+- Flowcharts/sequences/mindmaps: fenced \`\`\`mermaid with short node labels; for rich interactive visuals use the \`montree_generate_diagram\` / \`montree_present\` tools instead.
+- Long details: \`<details><summary>Title</summary>…</details>\` (native collapsible; \`open\` allowed).
+- Inline semantics: \`==highlight==\`, \`^sup^\`, \`~sub~\`, \`<kbd>keys</kbd>\`.
+- Raw HTML beyond \`details\`/\`summary\`/\`kbd\` is stripped (no div/span/script/iframe/img) — never emit those tags.
 
 ## turn-context
 

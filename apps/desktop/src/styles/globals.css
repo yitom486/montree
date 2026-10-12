@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/*
+ * Streamdown 社区组件的 Tailwind 任意值类（token 高亮 --sdm-c/--shiki-dark、
+ * 代码/图表/表格 chrome）写在它的 dist JS 里；Tailwind v4 自动扫描不到
+ * node_modules，不进 @source 则构建产物缺失 → 代码高亮整块单色。
+ * 路径相对于本文件。dark: 走下方 @custom-variant（class 式），双主题正常。
+ */
+@source "../../../../node_modules/streamdown/dist/**/*.js";
+@source "../../../../node_modules/@streamdown/*/dist/**/*.js";
+
 @custom-variant dark (&:is(.dark *));
 @custom-variant sepia (&:is(.sepia *));
 
@@ -473,4 +482,50 @@
 
 .animate-fade-slide-in {
   animation: fade-slide-in 0.25s ease-out;
+}
+
+/*
+ * 流式顶栏扫光（替代生硬的 animate-pulse）：渐变带匀速扫过，
+ * 即 Telegram/Codex 式“进行中”呼吸感，而非整体闪烁。
+ */
+@keyframes agent-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.agent-stream-sweep {
+  background-size: 200% 100%;
+  animation: agent-sweep 1.4s linear infinite;
+}
+
+/*
+ * 富结果卡入场（挂载播一次）：淡入 + 6px 上滑 + 轻微 scale，
+ * expo-out 缓动即 Telegram 卡片“弹入”感。更新 props 不重挂载，
+ * 故流式中卡片内容到达不重播；只在结果落定挂载时迎一次。
+ */
+@keyframes result-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-result-card-in {
+  animation: result-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-slide-in,
+  .animate-result-card-in,
+  .agent-stream-sweep {
+    animation: none !important;
+  }
 }

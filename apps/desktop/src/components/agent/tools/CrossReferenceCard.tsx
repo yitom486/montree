@@ -10,6 +10,7 @@ import {
   Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 
 export interface CrossReferenceChapter {
@@ -48,16 +49,13 @@ export function CrossReferenceCard({
 
   return (
     <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-border/80 bg-card/90 shadow-sm backdrop-blur-sm transition-all text-card-foreground',
-        className,
-      )}
+      className={resultCardClassName(className)}
       data-testid="cross-reference-card"
     >
       {/* 头部摘要 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-3 py-2">
+      <div className={cn('flex flex-wrap items-center justify-between gap-2', RESULT_CARD_HEADER)}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-foreground/80">
+          <div className={RESULT_CARD_ICON}>
             <Compass className="size-3.5" />
           </div>
           <div className="min-w-0">
@@ -69,14 +67,10 @@ export function CrossReferenceCard({
                 "{payload.entity}"
               </span>
             </div>
-            <p className="truncate text-[10px] text-muted-foreground">
+            <p className={RESULT_CARD_SUMMARY}>
               共考得 <span className="font-semibold text-foreground">{payload.totalOccurrences}</span> 处引证 · 见于 <span className="font-semibold text-foreground">{payload.chapterDistribution.length}</span> 章节
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-          <span>水墨图谱</span>
         </div>
       </div>
 

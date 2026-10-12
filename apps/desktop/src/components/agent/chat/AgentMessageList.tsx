@@ -33,6 +33,7 @@ interface AgentMessageListProps {
   authHint: string | null
   runtimeName?: string
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
+  onEditMessage?: (text: string) => void
 }
 
 /**
@@ -50,6 +51,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   authHint,
   runtimeName,
   onChapterPlanSelect,
+  onEditMessage,
 }: AgentMessageListProps) {
   const messages = useAcpActiveMessages()
   const pendingPermission = useAcpPendingPermission()
@@ -98,11 +100,41 @@ const ThreadMessageList = memo(function ThreadMessageList({
     [messages],
   )
   const prevUserMsgIdRef = useRef(lastUserMsgId)
+  // 本次观看中的用户上滑意图（可信滚轮/触摸）：有 fresh 意图时新回合不抢跟随；
+  // 恢复的离底态是 stale 的，新回合默认跟随。回到底部点击复位。
+  const userScrolledUpRef = useRef(false)
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const mark = () => {
+      userScrolledUpRef.current = true
+    }
+    // 非被动监听拿不到 isTrusted？scroll 事件无 isTrusted 区分需求：
+    // 程序化 scrollTop 赋值同样触发 scroll，但滚轮/触摸是唯一日常来源；
+    // 用 wheel/touchmove（均为可信用户手势）标记意图，避开程序化干扰。
+    // wheel 取捕获阶段：正文内 mermaid 滚轮门会在 markdown 根捕获期截停
+    // （防社区 PanZoom 劫持滚动），捕获标记先于截停，不丢上滑意图。
+    el.addEventListener('wheel', mark, { passive: true, capture: true })
+    el.addEventListener('touchmove', mark, { passive: true })
+    return () => {
+      el.removeEventListener('wheel', mark, { capture: true })
+      el.removeEventListener('touchmove', mark)
+    }
+  }, [])
   useEffect(() => {
     if (lastUserMsgId && lastUserMsgId !== prevUserMsgIdRef.current) {
-      isNearBottomRef.current = true
-      const el = viewportRef.current
-      if (el) el.scrollTop = el.scrollHeight
+      // 新回合：无本次上滑意图则跟随（平滑推到底）；有则留在历史位置。
+      if (!userScrolledUpRef.current) {
+        isNearBottomRef.current = true
+        const el = viewportRef.current
+        if (el) {
+          const reduceMotion =
+            typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? 'instant' : 'smooth' })
+        }
+      }
     }
     prevUserMsgIdRef.current = lastUserMsgId
   }, [lastUserMsgId])
@@ -137,6 +169,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
 
   const handleScrollToBottom = useCallback(() => {
     isNearBottomRef.current = true
+    userScrolledUpRef.current = false
     const el = viewportRef.current
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
@@ -287,6 +320,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
             ref={viewportRef}
             autoScroll
             scrollToBottomOnInitialize={false}
+            scrollToBottomOnRunStart={false}
+            scrollToBottomOnThreadSwitch={false}
             onScroll={checkNearBottom}
             className="flex-1 overflow-y-auto overflow-x-hidden p-3"
           >
@@ -338,12 +373,14 @@ const ThreadMessageList = memo(function ThreadMessageList({
                     key={item.key}
                     group={item}
                     onChapterPlanSelect={onChapterPlanSelect}
+                    onEditMessage={onEditMessage}
                   />
                 ) : (
                   <AgentMessageBubble
                     key={item.key}
                     message={item.message}
                     onChapterPlanSelect={onChapterPlanSelect}
+                    onEditMessage={onEditMessage}
                   />
                 ),
               )}

@@ -85,7 +85,7 @@
 | `useAcpStreamHost` | App 根 ACP 流式推送宿主（生命周期跟应用走，不跟面板挂载走；双面板曾致复读） |
 | `useAnnotationAgentAssist` | 批注对话框：独立 ACP session；意图/写成批注 → 不进右侧时间线 |
 | `useStickToBottomScroll` | use-stick-to-bottom 的 viewport/线程滚动记忆薄适配；不维护滚动算法；含批注面板延迟挂载绑定 |
-| `useRevealText` / `.test.ts` | 流式打字机揭示：chunk 进缓冲、rAF 匀速吐字、backlog 加速、追上停调度；只切片原文，下游单 Streamdown 实例与安全语义不变；reduced-motion 直出 |
+| `useRevealText` / `.test.ts` | 流式打字机揭示：chunk 进缓冲、rAF 匀速吐字（动态封顶小步高频 + 32ms 提交）、backlog 加速、封顶帧丢结余防 burst、追上停调度；只切片原文，下游单 Streamdown 实例与安全语义不变；reduced-motion 直出 |
 
 ---
 

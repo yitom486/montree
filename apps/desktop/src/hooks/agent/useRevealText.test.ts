@@ -14,9 +14,14 @@ function Harness({ text, streaming }: { text: string; streaming: boolean }) {
 describe('useRevealText 打字机揭示', () => {
   let container: HTMLDivElement
   let root: Root
+  let now = 1000
+  let nowSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     vi.useFakeTimers()
+    // 时间算法依赖 performance.now：测试里手动推进，与 rAF 步调一致
+    now = 1000
+    nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now)
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -27,6 +32,7 @@ describe('useRevealText 打字机揭示', () => {
       root.unmount()
     })
     container.remove()
+    nowSpy.mockRestore()
     vi.useRealTimers()
   })
 
@@ -38,7 +44,12 @@ describe('useRevealText 打字机揭示', () => {
 
   function frames(n: number) {
     act(() => {
-      for (let i = 0; i < n; i += 1) vi.advanceTimersByTime(16)
+      for (let i = 0; i < n; i += 1) {
+        // 步进 17ms：rAF 周期约 16.67ms，用 16ms 步进会与其拍频、
+        // 每两步才触发一帧（旧参数恰好卡边通过）。17ms 还原真实帧节奏。
+        now += 17
+        vi.advanceTimersByTime(17)
+      }
     })
   }
 
@@ -56,19 +67,21 @@ describe('useRevealText 打字机揭示', () => {
     const first = container.textContent ?? ''
     expect(first.length).toBeGreaterThan(0)
     expect(first.length).toBeLessThan(full.length)
-    // 继续推进单调增长并收敛
+    // 继续推进单调增长并收敛（小步收尾：500 字约需 58 帧，预算 72 帧；
+    // 上限是“最终追上”，不是速度——拖尾由“大 backlog”用例锁定）
     frames(1)
     const second = container.textContent ?? ''
     expect(second.length).toBeGreaterThanOrEqual(first.length)
-    frames(50)
+    frames(70)
     expect(container.textContent).toBe(full)
   })
 
   it('大 backlog 加速追赶，不无限拖尾', () => {
-    const full = '乙'.repeat(5000)
+    // 动态封顶 40 字/帧：2400 字约 70 帧排空
+    const full = '乙'.repeat(2400)
     render('', true)
     render(full, true)
-    frames(30)
+    frames(130)
     expect(container.textContent).toBe(full)
   })
 

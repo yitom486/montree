@@ -281,6 +281,10 @@ export const FloatingAIHud = memo(function FloatingAIHud({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      if (e.isTrusted && e.buttons === 0) {
+        handleMouseUp()
+        return
+      }
       if (!isDragging || !dragRef.current) return
       const dx = e.clientX - dragRef.current.startX
       const dy = e.clientY - dragRef.current.startY
@@ -298,10 +302,12 @@ export const FloatingAIHud = memo(function FloatingAIHud({
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove, { passive: true })
       window.addEventListener('mouseup', handleMouseUp)
+      window.addEventListener('blur', handleMouseUp)
     }
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('blur', handleMouseUp)
       document.body.style.userSelect = ''
     }
   }, [isDragging, setFloatingPosition])
@@ -328,6 +334,10 @@ export const FloatingAIHud = memo(function FloatingAIHud({
   useEffect(() => {
     if (!isResizing) return
     const handleResizeMove = (e: MouseEvent) => {
+      if (e.isTrusted && e.buttons === 0) {
+        handleResizeEnd()
+        return
+      }
       if (!resizeRef.current) return
       const nextWidth = Math.max(
         320,
@@ -346,9 +356,11 @@ export const FloatingAIHud = memo(function FloatingAIHud({
     }
     window.addEventListener('mousemove', handleResizeMove, { passive: true })
     window.addEventListener('mouseup', handleResizeEnd)
+    window.addEventListener('blur', handleResizeEnd)
     return () => {
       window.removeEventListener('mousemove', handleResizeMove)
       window.removeEventListener('mouseup', handleResizeEnd)
+      window.removeEventListener('blur', handleResizeEnd)
       document.body.style.userSelect = ''
     }
   }, [isResizing, setFloatingSize])

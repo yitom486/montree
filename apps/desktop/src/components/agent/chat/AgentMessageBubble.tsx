@@ -1,5 +1,5 @@
-import { ArrowRight, Layers } from 'lucide-react'
-import { Suspense, useDeferredValue, useMemo } from 'react'
+import { ArrowRight, Check, Copy, Layers, Pencil } from 'lucide-react'
+import { Suspense, useDeferredValue, useMemo, useState } from 'react'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import {
   AgentChatItem,
@@ -29,16 +29,34 @@ interface AgentMessageBubbleProps {
   message: AcpChatMessage
   resolveMarkProposal?: ResolveMarkProposal
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
+  /**
+   * 用户消息“编辑后继续”：把原文回填输入框由用户续改后发新回合。
+   * 无分支重写语义；缺省时不渲染编辑按钮。
+   */
+  onEditMessage?: (text: string) => void
 }
 
 export function AgentMessageBubble({
   message,
   resolveMarkProposal,
   onChapterPlanSelect,
+  onEditMessage,
 }: AgentMessageBubbleProps) {
   const resolveFromStore = useAcpUiStore((s) => s.resolveMarkProposal)
   const resolve = resolveMarkProposal ?? resolveFromStore
   const pendingPermission = useAcpPendingPermission()
+  const [copied, setCopied] = useState(false)
+
+  const copyText = async (text: string) => {
+    if (!text || copied) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // 剪贴板异常静默（与图表复制一致）
+    }
+  }
 
   const handleResolved: ResolveMarkProposal = (proposalId, status) => {
     resolve(proposalId, status)
@@ -166,8 +184,30 @@ export function AgentMessageBubble({
             </div>
           ) : null}
           {message.createdAt ? (
-            <div className="flex items-center justify-end pt-0.5 select-none font-mono text-[10px] text-muted-foreground/60">
+            <div className="flex items-center justify-end gap-0.5 pt-0.5 select-none font-mono text-[10px] text-muted-foreground/60">
               {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <span className="ml-1 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
+                <button
+                  type="button"
+                  aria-label="复制正文"
+                  title="复制正文"
+                  onClick={() => void copyText(message.text)}
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                </button>
+                {onEditMessage && message.text.trim() ? (
+                  <button
+                    type="button"
+                    aria-label="编辑后继续"
+                    title="拿回输入框续改（发送后为新回合）"
+                    onClick={() => onEditMessage(message.text)}
+                    className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                ) : null}
+              </span>
             </div>
           ) : null}
         </div>
@@ -177,13 +217,34 @@ export function AgentMessageBubble({
           <span>正在思考…</span>
         </div>
       ) : (
-        <Suspense
-          fallback={
-            <AgentMarkdownFallback text={renderText} className={markdownClassName} />
-          }
-        >
-          <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />
-        </Suspense>
+        <>
+          {showStreaming ? (
+            <span
+              aria-hidden
+              className="agent-stream-sweep mb-1 block h-0.5 w-full rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none"
+            />
+          ) : null}
+          <Suspense
+            fallback={
+              <AgentMarkdownFallback text={renderText} className={markdownClassName} />
+            }
+          >
+            <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />
+          </Suspense>
+          {!showEmptyStreaming && message.text ? (
+            <div className="mt-1 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
+              <button
+                type="button"
+                aria-label="复制回答原文"
+                title="复制回答原文（Markdown）"
+                onClick={() => void copyText(message.text)}
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
       {(message.steps?.length ?? 0) > 0 ? (
         <div className="mt-3 space-y-2 pt-2 border-t border-border/40 font-serif">

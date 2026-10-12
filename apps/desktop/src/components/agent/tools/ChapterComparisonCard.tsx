@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Columns2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 import type { PresentChapterComparison } from '@montree/contracts'
 
@@ -33,22 +34,22 @@ export function ChapterComparisonCard({ result, onLocateChapter, className }: Ch
   return (
     <div
       className={cn(
-        '@container overflow-hidden rounded-xl border border-border/80 bg-card/90 text-card-foreground shadow-sm backdrop-blur-sm transition-all',
-        className,
+        '@container',
+        resultCardClassName(className),
       )}
       data-testid="chapter-comparison-card"
       data-present-id={result.id}
     >
-      <div className="border-b border-border/70 bg-muted/40 px-3 py-2">
+      <div className={RESULT_CARD_HEADER}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <div className={RESULT_CARD_ICON}>
             <Columns2 className="size-3.5" />
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="truncate text-xs font-semibold tracking-tight text-foreground">
               {result.title}
             </h4>
-            <p className="truncate text-[10px] text-muted-foreground">
+            <p className={RESULT_CARD_SUMMARY}>
               {result.chapters.length} 章 · {result.items.length} 条
               {result.summary ? ` · ${result.summary}` : ''}
             </p>
@@ -65,7 +66,7 @@ export function ChapterComparisonCard({ result, onLocateChapter, className }: Ch
                 onClick={() => toggleChapter(chapter.key)}
                 title={chapter.label}
                 className={cn(
-                  'max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors',
+                  'max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
                   active
                     ? 'border-primary/50 bg-primary/10 text-primary'
                     : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground',

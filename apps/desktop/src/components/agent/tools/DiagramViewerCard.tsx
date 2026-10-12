@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { MermaidBlock } from '@/components/markdown/MermaidBlock'
 import { Button } from '@/components/ui/button'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 
 export interface DiagramVisualStep {
@@ -116,15 +117,14 @@ export function DiagramViewerCard({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-border/80 bg-card/90 shadow-sm backdrop-blur-sm transition-all text-card-foreground',
-        className,
+        resultCardClassName(className),
       )}
       data-testid="diagram-viewer-card"
     >
       {/* 头部：标题与视图模式切换 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-3 py-2">
+      <div className={cn('flex flex-wrap items-center justify-between gap-2', RESULT_CARD_HEADER)}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <div className={RESULT_CARD_ICON}>
             <GitCommit className="size-3.5" />
           </div>
           <div className="min-w-0">
@@ -137,7 +137,7 @@ export function DiagramViewerCard({
               </span>
             </div>
             {payload.summary ? (
-              <p className="truncate text-[10px] text-muted-foreground">{payload.summary}</p>
+              <p className={RESULT_CARD_SUMMARY}>{payload.summary}</p>
             ) : null}
           </div>
         </div>

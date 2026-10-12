@@ -77,4 +77,27 @@ describe('DockedAgentPane', () => {
     dragHandleBy(-10000)
     expect(useReaderHudUiStore.getState().dockedAgentWidth).toBe(640)
   })
+
+  it('拖拽中挂载全屏遮罩，window blur 时安全退出拖拽态', async () => {
+    await renderPane()
+    const handle = container.querySelector(
+      '[data-testid="docked-agent-resize-handle"]',
+    ) as HTMLElement
+    expect(handle).not.toBeNull()
+
+    // 初始没有遮罩
+    expect(container.querySelector('[data-testid="docked-agent-resize-overlay"]')).toBeNull()
+
+    // 开始拖拽
+    act(() => {
+      handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 500, clientY: 0 }))
+    })
+    expect(container.querySelector('[data-testid="docked-agent-resize-overlay"]')).not.toBeNull()
+
+    // 窗口失焦，遮罩立即撤除
+    act(() => {
+      window.dispatchEvent(new Event('blur'))
+    })
+    expect(container.querySelector('[data-testid="docked-agent-resize-overlay"]')).toBeNull()
+  })
 })
