@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { findBuiltinAcpRuntime } from '@montree/contracts'
 import {
   useAcpUiStore,
-  selectThreadsForRuntime,
+  selectThreadsForWorkspaceAndRuntime,
   type AcpChatThread,
 } from '@/stores/acp-ui-store'
 
@@ -48,10 +48,14 @@ export function AgentHistoryMenu({
   const switchThread = useAcpUiStore((s) => s.switchThread)
   const deleteThread = useAcpUiStore((s) => s.deleteThread)
 
-  // 按 runtime 过滤已验证多线程分桶：threads.runtimeId + agentSessionIds 双维隔离，
-  // 切换运行时只列本 runtime 线程（见 selectThreadsForRuntime + session-slice 专属线程逻辑）。
-  const runtimeThreads = selectThreadsForRuntime(threads, selectedRuntimeId)
+  // 按 runtime 与工作区双维隔离：保证只列出当前工作区名下的对话历史
+  const runtimeThreads = selectThreadsForWorkspaceAndRuntime(
+    threads,
+    workspaceRoot,
+    selectedRuntimeId,
+  )
   const runtimeName = findBuiltinAcpRuntime(selectedRuntimeId)?.name ?? selectedRuntimeId
+  const folderName = workspaceRoot?.split(/[/\\]/).filter(Boolean).pop()
 
   return (
     <DropdownMenu>
@@ -69,10 +73,10 @@ export function AgentHistoryMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-          <span>
-            {runtimeName} 对话历史
+          <span className="truncate">
+            {folderName ? `${folderName} · ` : ''}{runtimeName} 对话历史
           </span>
-          <span className="font-normal">{runtimeThreads.length}</span>
+          <span className="font-normal shrink-0">{runtimeThreads.length}</span>
         </DropdownMenuLabel>
         <DropdownMenuItem
           className="gap-2 text-xs"

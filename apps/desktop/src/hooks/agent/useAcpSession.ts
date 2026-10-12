@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { findBuiltinAcpRuntime, isOk } from '@montree/contracts'
+import { findBuiltinAcpRuntime, isOk, isSameWorkspace } from '@montree/contracts'
 import type {
   AcpAuthMethod,
   AcpConfigOption,
@@ -581,7 +581,7 @@ export function useAcpSession(workspaceRoot?: string) {
     workspaceRoot,
   ])
 
-  /** 打开 / 关闭用户工作区时，已连接会话需换 cwd（沙箱 ↔ 本地目录） */
+  /** 打开 / 关闭或切换工作区时，对齐工作区会话并按需重连（沙箱 ↔ 本地目录 ↔ WSL） */
   const cwdKeyRef = useRef<string | undefined>(undefined)
   const cwdReadyRef = useRef(false)
   useEffect(() => {
@@ -589,19 +589,37 @@ export function useAcpSession(workspaceRoot?: string) {
     if (!cwdReadyRef.current) {
       cwdReadyRef.current = true
       cwdKeyRef.current = next
+      useAcpUiStore.getState().switchWorkspace(next)
       return
     }
-    if (cwdKeyRef.current === next) return
+    if (isSameWorkspace(cwdKeyRef.current, next)) return
     cwdKeyRef.current = next
-    if (useAcpUiStore.getState().status !== 'connected') return
-    if (useAcpUiStore.getState().prompting) return
-    appendSystemMessage(
-      next
-        ? '已打开本地工作区，正在将 Agent 切到该目录…'
-        : '本地工作区已关闭，正在切换为网页会话…',
-    )
-    void syncAgentSessionToActiveThread(true)
-  }, [appendSystemMessage, syncAgentSessionToActiveThread, workspaceRoot])
+
+    // 1. 切换 Store 状态至目标工作区（自动匹配历史会话或创建空白专属会话）
+    useAcpUiStore.getState().switchWorkspace(next)
+
+    // 2. 检查是否处于在线状态
+    const statusNow = useAcpUiStore.getState().status
+    const wasOnline =
+      statusNow === 'connected' ||
+      statusNow === 'connecting' ||
+      statusNow === 'awaiting_auth' ||
+      statusNow === 'error'
+
+    if (wasOnline) {
+      appendSystemMessage(
+        next
+          ? `已切换工作区目录至 ${next}，正在对齐 Agent 会话…`
+          : '工作区已关闭，正在切换为独立会话…',
+      )
+      // 强制重连：此时 activeThread 已经切换到目标工作区，
+      // syncAgentSessionToActiveThread 会读取目标工作区线程在当前运行时下的 sessionId 进行 resume，或发起 session/new！
+      void syncAgentSessionToActiveThread(true)
+    } else {
+      // 离线状态：Store 已就绪，清空旧 session 引用，等待后续连接
+      setSession(null)
+    }
+  }, [appendSystemMessage, setSession, syncAgentSessionToActiveThread, workspaceRoot])
 
   const sendPrompt = useCallback(
     async (payload: {

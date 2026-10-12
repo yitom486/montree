@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isSameWorkspace,
   isWslPath,
   linuxToWindowsPath,
+  normalizeWorkspaceRoot,
   parseWslPath,
   windowsToLinuxPath,
 } from './wsl-path'
+
 
 describe('wsl-path 工具库', () => {
   it('isWslPath 准确识别各类 WSL UNC 路径', () => {
@@ -71,4 +74,36 @@ describe('wsl-path 工具库', () => {
       '\\\\wsl.localhost\\Debian\\var\\log',
     )
   })
+
+  it('normalizeWorkspaceRoot 规范化工作区路径', () => {
+    expect(normalizeWorkspaceRoot(undefined)).toBeUndefined()
+    expect(normalizeWorkspaceRoot('')).toBeUndefined()
+    expect(normalizeWorkspaceRoot('   ')).toBeUndefined()
+    expect(normalizeWorkspaceRoot('D:\\project\\blog\\')).toBe('D:/project/blog')
+    expect(normalizeWorkspaceRoot('\\\\wsl.localhost\\Ubuntu\\home\\user\\blog\\')).toBe(
+      '//wsl.localhost/Ubuntu/home/user/blog',
+    )
+    expect(normalizeWorkspaceRoot('\\\\wsl$\\Ubuntu\\home\\user\\blog')).toBe(
+      '//wsl$/Ubuntu/home/user/blog',
+    )
+  })
+
+  it('isSameWorkspace 识别同一工作区（跨正反斜杠、大小写与 WSL UNC 别名）', () => {
+    expect(isSameWorkspace('D:\\project\\blog', 'd:/project/blog/')).toBe(true)
+    expect(isSameWorkspace(undefined, undefined)).toBe(true)
+    expect(isSameWorkspace('D:\\project\\blog', undefined)).toBe(false)
+    expect(
+      isSameWorkspace(
+        '\\\\wsl.localhost\\Ubuntu\\home\\user\\blog',
+        '\\\\wsl$\\Ubuntu\\home\\user\\blog\\',
+      ),
+    ).toBe(true)
+    expect(
+      isSameWorkspace(
+        '\\\\wsl.localhost\\Ubuntu\\home\\user\\blog',
+        '\\\\wsl.localhost\\Debian\\home\\user\\blog',
+      ),
+    ).toBe(false)
+  })
 })
+

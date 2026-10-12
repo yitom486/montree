@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID, isSameWorkspace } from '@montree/contracts'
 import type {
   AcpConfigOption,
   AcpConnectionStatus,
@@ -77,19 +77,21 @@ export const createSessionSlice: StateCreator<
     set((s) => {
       if (s.selectedRuntimeId === id) return s
 
-      // 寻找目标 Agent 下的已有线程列表
-      const targetThreads = s.threads.filter(
-        (t) => (t.runtimeId || DEFAULT_ACP_RUNTIME_ID) === id,
+      // 寻找目标 Agent 下的已有线程列表，同时保证工作区亲和性（优先匹配当前工作区）
+      const wsMatching = s.threads.filter(
+        (t) =>
+          (t.runtimeId || DEFAULT_ACP_RUNTIME_ID) === id &&
+          isSameWorkspace(t.workspaceRoot, s.currentWorkspaceRoot),
       )
       let threads = s.threads
       let activeThreadId = s.activeThreadId
 
-      if (targetThreads.length > 0) {
-        const sorted = [...targetThreads].sort((a, b) => b.updatedAt - a.updatedAt)
+      if (wsMatching.length > 0) {
+        const sorted = [...wsMatching].sort((a, b) => b.updatedAt - a.updatedAt)
         activeThreadId = sorted[0]!.id
       } else {
-        // 该 Agent 尚无历史线程，自动为其创建专属空白线程
-        const fresh = createEmptyThread(undefined, id)
+        // 该 Agent 在当前工作区下尚无历史线程，自动为其创建专属空白线程
+        const fresh = createEmptyThread(s.currentWorkspaceRoot, id)
         threads = [fresh, ...threads]
         activeThreadId = fresh.id
       }

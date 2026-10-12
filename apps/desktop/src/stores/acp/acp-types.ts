@@ -1,4 +1,4 @@
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID, isSameWorkspace } from '@montree/contracts'
 import type {
   AcpConfigOption,
   AcpConnectionStatus,
@@ -61,6 +61,8 @@ export interface AcpUiStore {
    * connect 成功写入，disconnect/切换清空。见 session-slice。
    */
   modelCatalogByRuntime: Record<string, string[]>
+  /** 当前绑定的工作区根目录（本地路径或 WSL UNC 路径） */
+  currentWorkspaceRoot?: string
   threads: AcpChatThread[]
   activeThreadId: string
   historyOpen: boolean
@@ -152,8 +154,10 @@ export interface AcpUiStore {
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
-  createThread: (workspaceRoot?: string, runtimeId?: string) => string
+  createThread: (workspaceRoot?: string | null, runtimeId?: string) => string
   switchThread: (threadId: string) => void
+  /** 切换活动工作区：对齐活跃线程至该工作区历史对话，无历史则自动创建专属空白线程 */
+  switchWorkspace: (workspaceRoot?: string) => string
   deleteThread: (threadId: string) => void
   renameThread: (threadId: string, title: string) => void
   setChatScroll: (threadId: string, scroll: ChatScrollState) => void
@@ -218,6 +222,25 @@ export function selectThreadsForRuntime(
     .filter((t) => (t.runtimeId || DEFAULT_ACP_RUNTIME_ID) === runtimeId)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
+
+/**
+ * 仅获取指定工作区与指定 Agent 运行时名下的会话线程列表（按更新时间降序）。
+ * 保证当前工作区对话隔离，避免跨项目对话污染。
+ */
+export function selectThreadsForWorkspaceAndRuntime(
+  threads: AcpChatThread[],
+  workspaceRoot: string | undefined,
+  runtimeId: string,
+): AcpChatThread[] {
+  return threads
+    .filter(
+      (t) =>
+        (t.runtimeId || DEFAULT_ACP_RUNTIME_ID) === runtimeId &&
+        isSameWorkspace(t.workspaceRoot, workspaceRoot),
+    )
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
 
 export type {
   AcpChatMessage,

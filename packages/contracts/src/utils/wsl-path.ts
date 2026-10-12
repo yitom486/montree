@@ -100,3 +100,51 @@ export function linuxToWindowsPath(linuxPath: string, distro = 'Ubuntu'): string
   const winSubPath = normalizedRest.replace(/\//g, '\\')
   return `\\\\wsl.localhost\\${distro}\\${winSubPath}`
 }
+
+/**
+ * 规范化工作区路径：去除首尾空格与多余尾部斜杠，统一正斜杠表示（支持本地盘符与 WSL UNC）。
+ */
+export function normalizeWorkspaceRoot(path?: string | null): string | undefined {
+  if (!path) return undefined
+  let trimmed = path.trim()
+  if (!trimmed) return undefined
+  // 剥离 Windows 扩展前缀 \\?\UNC\ 或 \\?\
+  trimmed = trimmed.replace(/^\\\\\?\\UNC\\/i, '//').replace(/^\\\\\?\\/i, '')
+  // 替换正反斜杠统一为正斜杠便于比较
+  trimmed = trimmed.replace(/\\/g, '/')
+  if (!trimmed.startsWith('//') && /^(?:wsl\.localhost|wsl\$)\//i.test(trimmed)) {
+    trimmed = `//${trimmed}`
+  }
+  // 去除末尾多余斜杠（除根路径外）
+  if (trimmed.length > 1) {
+    trimmed = trimmed.replace(/\/+$/, '')
+  }
+  return trimmed || undefined
+}
+
+/**
+ * 判断两个工作区路径是否代表同一工作区。
+ * - 兼顾本地 Windows 盘符大小写差异（如 C:/blog 与 c:\blog）
+ * - 兼顾 WSL UNC 路径的两种标准形式（//wsl.localhost/Ubuntu/blog 与 //wsl$/Ubuntu/blog）
+ */
+export function isSameWorkspace(a?: string | null, b?: string | null): boolean {
+  const normA = normalizeWorkspaceRoot(a)
+  const normB = normalizeWorkspaceRoot(b)
+  if (!normA && !normB) return true
+  if (!normA || !normB) return false
+  if (normA === normB) return true
+
+  // WSL 路径互认：//wsl.localhost/Ubuntu/xxx 与 //wsl$/Ubuntu/xxx
+  const wslA = parseWslPath(normA)
+  const wslB = parseWslPath(normB)
+  if (wslA.isWsl && wslB.isWsl) {
+    return (
+      (wslA.distro ?? '').toLowerCase() === (wslB.distro ?? '').toLowerCase() &&
+      wslA.linuxPath === wslB.linuxPath
+    )
+  }
+
+  // Windows 盘符路径不区分大小写
+  return normA.toLowerCase() === normB.toLowerCase()
+}
+

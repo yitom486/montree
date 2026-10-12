@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import {
   DEFAULT_ACP_RUNTIME_ID,
+  isSameWorkspace,
   MONTREE_SETTLE_COMPLETE_KIND,
 } from '@montree/contracts'
 import {
@@ -81,8 +82,9 @@ export interface ChatSlice {
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
-  createThread: (workspaceRoot?: string, runtimeId?: string) => string
+  createThread: (workspaceRoot?: string | null, runtimeId?: string) => string
   switchThread: (threadId: string) => void
+  switchWorkspace: (workspaceRoot?: string) => string
   deleteThread: (threadId: string) => void
   renameThread: (threadId: string, title: string) => void
   applySessionUpdate: (update: Record<string, unknown>) => void
@@ -185,6 +187,7 @@ export const createChatSlice: StateCreator<
 > = (set, get) => ({
   threads: [initialThread],
   activeThreadId: initialThread.id,
+  currentWorkspaceRoot: undefined,
   historyOpen: false,
   pendingMarkProposalSnapshotContents: [],
   pendingReplayUserText: null,
@@ -346,9 +349,15 @@ export const createChatSlice: StateCreator<
     ),
 
   createThread: (workspaceRoot, runtimeId) => {
+    const ws =
+      workspaceRoot === null
+        ? undefined
+        : workspaceRoot !== undefined
+          ? workspaceRoot
+          : get().currentWorkspaceRoot
     const rId = runtimeId ?? get().selectedRuntimeId
     const prevSelected = get().selectedRuntimeId
-    const thread = createEmptyThread(workspaceRoot, rId)
+    const thread = createEmptyThread(ws, rId)
     set((s) => {
       const frozen = s.threads.map((t) =>
         t.id === s.activeThreadId
@@ -363,6 +372,7 @@ export const createChatSlice: StateCreator<
       return {
         threads,
         activeThreadId: thread.id,
+        currentWorkspaceRoot: ws,
         ...(runtimeChanged ? { selectedRuntimeId: rId } : {}),
         prompting: false,
         turnSettled: false,
@@ -376,6 +386,67 @@ export const createChatSlice: StateCreator<
     })
     return thread.id
   },
+
+  switchWorkspace: (workspaceRoot) => {
+    const s = get()
+    const targetWs = workspaceRoot?.trim() || undefined
+    const currentThread = s.threads.find((t) => t.id === s.activeThreadId)
+
+    if (
+      isSameWorkspace(s.currentWorkspaceRoot, targetWs) &&
+      currentThread &&
+      isSameWorkspace(currentThread.workspaceRoot, targetWs)
+    ) {
+      return s.activeThreadId
+    }
+
+    const currentRuntimeId = s.selectedRuntimeId || DEFAULT_ACP_RUNTIME_ID
+
+    // 冻结当前正在进行的线程消息
+    const frozen = s.threads.map((t) =>
+      t.id === s.activeThreadId
+        ? { ...t, messages: freezeMessages(t.messages), updatedAt: Date.now() }
+        : t,
+    )
+
+    // 切走时清理空白草稿
+    const kept = pruneBlankThreads(frozen)
+
+    // 寻找目标工作区下属于当前 Agent 运行时的历史线程
+    const matching = kept.filter(
+      (t) =>
+        (t.runtimeId || DEFAULT_ACP_RUNTIME_ID) === currentRuntimeId &&
+        isSameWorkspace(t.workspaceRoot, targetWs),
+    )
+
+    let targetThreadId: string
+    let nextThreads = kept
+
+    if (matching.length > 0) {
+      const sorted = [...matching].sort((a, b) => b.updatedAt - a.updatedAt)
+      targetThreadId = sorted[0]!.id
+    } else {
+      // 目标工作区尚无会话：创建专属空白线程
+      const fresh = createEmptyThread(targetWs, currentRuntimeId)
+      nextThreads = [fresh, ...kept].slice(0, MAX_THREADS)
+      targetThreadId = fresh.id
+    }
+
+    set({
+      currentWorkspaceRoot: targetWs,
+      threads: nextThreads,
+      activeThreadId: targetThreadId,
+      prompting: false,
+      turnSettled: false,
+      historyOpen: false,
+      pendingMarkProposalSnapshotContents: [],
+      pendingReplayUserText: null,
+      pendingPermission: null,
+    })
+
+    return targetThreadId
+  },
+
 
   switchThread: (threadId) => {
     const s = get()

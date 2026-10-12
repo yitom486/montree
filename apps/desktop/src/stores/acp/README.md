@@ -6,7 +6,7 @@ ACP 智能体交互与次世代伴读 HUD 专职状态管理。由原 1182 行�
 | :--- | :--- |
 | `acp-types.ts` | 会话线程、权限审批卡与 HUD 模态通用数据类型定义与线程会话辅助 |
 | `session-slice.ts` | 协议连接状态（status）、运行时切换、会话 ID、模型与配置项偏好（preferredConfig） |
-| `chat-slice.ts` | 多会话线程（threads）、消息流式接收（streaming）、快照提议与计划提升 |
+| `chat-slice.ts` | 多会话线程（threads）、消息流式接收（streaming）、工作区切换（switchWorkspace）与跨工作区隔离、快照提议与计划提升 |
 | `chat-helpers.ts` | 线程草稿修剪、提议挂载与工具调用卡片解析纯逻辑辅助；线程↔运行时绑定防线（`ensureActiveThreadForRuntime` + `patchActiveThread` 错位纠偏） |
 | `permission-slice.ts` | 工具调用权限审批拦截（pendingPermission）与审批记录同步 |
 | `hud-slice.ts` | 伴读 HUD 面板开闭与输入框调度 |
