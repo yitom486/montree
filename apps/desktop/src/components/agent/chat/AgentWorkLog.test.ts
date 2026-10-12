@@ -78,7 +78,7 @@ describe('AgentActivityGroup 工作记录（U2）', () => {
     expect(container.querySelector('[aria-expanded="false"]')).not.toBeNull()
   })
 
-  it('运行摘要显示进度与最近事件，附呼吸微光条', () => {
+  it('运行摘要显示进度与最近事件，运行中整卡挂琥珀光环', () => {
     const running = toolMsg({ id: 't-r', toolCallId: 'tc-r', toolStatus: 'in_progress', streaming: true, toolTitle: 'read_text_file' })
     const done = toolMsg({ id: 't-d', toolCallId: 'tc-d', toolStatus: 'completed', streaming: false, toolTitle: 'search' })
     render(workLogOf([running, done]))
@@ -86,8 +86,11 @@ describe('AgentActivityGroup 工作记录（U2）', () => {
     expect(container.textContent).toContain('1/2')
     expect(container.textContent).toContain('✓')
     expect(container.textContent).toContain('搜索文档')
-    // 运行中的呼吸条存在（aria-hidden 装饰），落定组没有
-    expect(container.querySelector('button > span[aria-hidden="true"]')).not.toBeNull()
+    // 运行中整卡光环（落定即卸）；旧底栏扫光条已删除
+    expect(container.querySelector('.agent-beam-ring-amber')).not.toBeNull()
+    expect(container.querySelector('.agent-stream-sweep')).toBeNull()
+    render(workLogOf([{ ...running, streaming: false, toolStatus: 'completed' }, done]))
+    expect(container.querySelector('.agent-beam-ring-amber')).toBeNull()
   })
 
   it('用户打开后，落定/后续 chunk 不覆盖选择', () => {

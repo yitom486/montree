@@ -26,8 +26,13 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
       onAcpStatusChanged((event) => send(IPC.ACP_STATUS_CHANGED, event))
       setAcpPermissionBridge(({ requestId, sessionId, params }) => new Promise((resolve) => {
         if (sender.isDestroyed() || context.closed) { resolve({ outcome: 'cancelled' }); return }
+        let settled = false
         const timer = setTimeout(() => finish({ outcome: 'cancelled' }), 120_000)
         const finish = (outcome: AcpPermissionResponsePayload['outcome']) => {
+          // 响应与超时竞态只收一次：重复 finish 会重复 removeListener（无害）
+          // 但会掩盖“已收尾又来响应”的时序，标记后直接返回
+          if (settled) return
+          settled = true
           clearTimeout(timer)
           ipcMain.removeListener(IPC.ACP_PERMISSION_RESPONSE, handler)
           sender.removeListener('destroyed', destroyed)
@@ -45,8 +50,11 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
       setAcpSnapshotBridge(async ({ requestId, resource, args }) => {
         if (sender.isDestroyed() || context.closed) throw new Error('Agent 所属窗口已关闭')
         const content = await new Promise<string>((resolve, reject) => {
+          let settled = false
           const timer = setTimeout(() => finish(new Error(`Montree 快照请求超时：${resource}`)), resolveSnapshotTimeoutMs(resource))
           const finish = (error?: Error, text?: string) => {
+            if (settled) return
+            settled = true
             clearTimeout(timer)
             ipcMain.removeListener(IPC.ACP_SNAPSHOT_RESPONSE, handler)
             sender.removeListener('destroyed', destroyed)

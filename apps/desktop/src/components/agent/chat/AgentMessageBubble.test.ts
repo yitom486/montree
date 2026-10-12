@@ -46,6 +46,27 @@ describe('AgentMessageBubble', () => {
     expect(container.querySelector('strong')?.textContent).toBe('加粗')
   })
 
+  it('流式助手气泡挂光环、落定即卸（无布局占位的 ::after，不测像素）', () => {
+    const streaming: AcpChatMessage = {
+      id: 'beam-1',
+      role: 'agent',
+      text: '正在输出正文',
+      createdAt: Date.now(),
+      streaming: true,
+    }
+    act(() => {
+      root.render(createElement(AgentMessageBubble, { message: streaming }))
+    })
+    expect(container.querySelector('.agent-beam-ring-emerald')).not.toBeNull()
+    const done: AcpChatMessage = { ...streaming, id: 'beam-2', streaming: false }
+    act(() => {
+      root.render(createElement(AgentMessageBubble, { message: done }))
+    })
+    expect(container.querySelector('.agent-beam-ring-emerald')).toBeNull()
+    // 旧扫光条已删除，不再有脱节横线
+    expect(container.querySelector('.agent-stream-sweep')).toBeNull()
+  })
+
   it('renders user attachments with names and image preview', () => {    const msg: AcpChatMessage = {
       id: 'user-att-1',
       role: 'user',

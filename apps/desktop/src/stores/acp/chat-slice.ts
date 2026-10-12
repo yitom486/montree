@@ -61,6 +61,8 @@ export interface ChatSlice {
    * 与下一 user chunk 拼接后再洗；定居收尾 / 切线程 / 清空时落定或丢弃。
    */
   pendingReplayUserText: { threadId: string; raw: string } | null
+  /** 本轮内容是否已被收尾冻结（不持久化）：finishStreaming 置 true；新回合/线程/清空置 false。 */
+  turnSettled: boolean
   /** 各线程的聊天滚动记忆（scrollTop + 是否贴底），悬浮/侧栏共用，关闭重开原位恢复 */
   chatScrollByThread: Record<string, ChatScrollState>
 
@@ -187,6 +189,7 @@ export const createChatSlice: StateCreator<
   pendingMarkProposalSnapshotContents: [],
   pendingReplayUserText: null,
   chatScrollByThread: {},
+  turnSettled: false,
 
   setChatScroll: (threadId, scroll) =>
     set((s) => ({
@@ -233,8 +236,8 @@ export const createChatSlice: StateCreator<
     ),
 
   beginAgentReply: () =>
-    set((s) =>
-      patchActiveThread(s, (t) => {
+    set((s) => {
+      const patched = patchActiveThread(s, (t) => {
         const last = t.messages[t.messages.length - 1]
         if (last?.role === 'agent' && last.streaming) return t
         return {
@@ -252,13 +255,16 @@ export const createChatSlice: StateCreator<
           ],
           updatedAt: Date.now(),
         }
-      }),
-    ),
+      })
+      // 新回合开场：迟到标记清零，后续 chunk 正常点亮流式
+      return { ...patched, turnSettled: false }
+    }),
 
   clearMessages: () =>
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       pendingReplayUserText: null,
+      turnSettled: false,
       ...patchActiveThread(s, (t) => ({
         ...t,
         messages: [],
@@ -270,6 +276,7 @@ export const createChatSlice: StateCreator<
   finishStreaming: () =>
     set((s) => ({
       prompting: false,
+      turnSettled: true,
       ...patchActiveThread(s, freezeSettledTurn),
     })),
 
@@ -358,6 +365,7 @@ export const createChatSlice: StateCreator<
         activeThreadId: thread.id,
         ...(runtimeChanged ? { selectedRuntimeId: rId } : {}),
         prompting: false,
+        turnSettled: false,
         historyOpen: false,
         pendingMarkProposalSnapshotContents: [],
         pendingReplayUserText: null,
@@ -392,6 +400,7 @@ export const createChatSlice: StateCreator<
       activeThreadId: threadId,
       ...(runtimeChanged ? { selectedRuntimeId: targetRuntimeId } : {}),
       prompting: false,
+      turnSettled: false,
       historyOpen: false,
       threads,
       pendingMarkProposalSnapshotContents: [],
@@ -680,7 +689,10 @@ export const createChatSlice: StateCreator<
           text: effectiveText,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          streaming: true,
+          // 冻结后到达的迟到 chunk（prompt 结果先于文本通知的竞态）：
+          // 正文照常合入，但不再点亮 streaming——否则另起一条永不落定的
+          // 流式气泡。回放重建走通路（turnSettled 为 false）不受影响。
+          streaming: !s.turnSettled,
         }
 
         if (role === 'thought' && emptyAgentIdx >= 0) {

@@ -485,21 +485,54 @@
 }
 
 /*
- * 流式顶栏扫光（替代生硬的 animate-pulse）：渐变带匀速扫过，
- * 即 Telegram/Codex 式“进行中”呼吸感，而非整体闪烁。
+ * 进行中光环（替代与卡片脱节的扫光条）：沿卡片描边行走的光束。
+ * conic 角度经 @property 注册后可插值旋转；遮罩把填充压成 1.5px 边框带。
+ * 落定即卸类，光环消失；::after 绝对定位，无布局占位。
+ * 两色：emerald 给助手正文流式，amber 给工作记录运行中。
  */
-@keyframes agent-sweep {
-  from {
-    background-position: 200% 0;
-  }
+@property --agent-beam-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes agent-beam-spin {
   to {
-    background-position: -200% 0;
+    --agent-beam-angle: 360deg;
   }
 }
 
-.agent-stream-sweep {
-  background-size: 200% 100%;
-  animation: agent-sweep 1.4s linear infinite;
+.agent-beam-ring {
+  position: relative;
+}
+
+.agent-beam-ring::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--agent-beam-angle),
+    transparent 0deg,
+    transparent 290deg,
+    var(--agent-beam-color, rgb(16 185 129 / 0.9)) 330deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: agent-beam-spin 2.4s linear infinite;
+  pointer-events: none;
+}
+
+.agent-beam-ring-amber {
+  --agent-beam-color: rgb(245 158 11 / 0.9);
+}
+
+.agent-beam-ring-emerald {
+  --agent-beam-color: rgb(16 185 129 / 0.85);
 }
 
 /*
@@ -524,8 +557,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-slide-in,
-  .animate-result-card-in,
-  .agent-stream-sweep {
+  .animate-result-card-in {
     animation: none !important;
+  }
+  /* 光环静态下如一笔污渍，直接隐藏 */
+  .agent-beam-ring::after {
+    display: none !important;
   }
 }

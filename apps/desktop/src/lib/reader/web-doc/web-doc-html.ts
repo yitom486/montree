@@ -893,10 +893,20 @@ export function buildWebDocPlaygroundCss(theme: EpubThemeMode): string {
   `
 }
 
+/**
+ * 游乐场外层运行时脚本（iframe srcdoc 内执行）。
+ *
+ * ⚠️ 三层转义，缺一即整页 SyntaxError（曾致 about:srcdoc:1076 全页脚本死亡）：
+ *   文件反引号层 → 外层单引号 JS 字符串层 → runner 脚本层。
+ * 每向内一层多吃一层反斜杠：runner 要 2 字符的反斜杠加引号，文件须写 5 字符；
+ * runner 要 `\n` 转义文件须写 `\\\\n`；正则 `\s` 文件须写 `\\\\s`。
+ * `\'`、`\\n`、`\\"` 在文件里看起来“已经转了”，实际到 runner 全塌。
+ * 改动本函数后必跑单测「游乐场外层运行时脚本可解析 / 恶意代码…」（new Function 门）。
+ */
 export function buildWebDocPlaygroundRuntimeScript(): string {
   return `<script>(function(){
   function createRunnerDoc(code) {
-    var rawJson = JSON.stringify(code);
+    var rawJson = JSON.stringify(code).replace(/</g, '\\\\u003c');
     return '<!DOCTYPE html><html><head><meta charset="utf-8">' +
       '<meta name="viewport" content="width=device-width, initial-scale=1">' +
       '<style>' +
@@ -936,16 +946,16 @@ export function buildWebDocPlaygroundRuntimeScript(): string {
       'function showError(msg) { ' +
       '  var root = document.getElementById("root"); ' +
       '  if (root) { ' +
-      '    root.innerHTML = "<div style=\\"padding:1rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:0.5rem;font-size:0.85rem;line-height:1.4;\\">" + ' +
-      '      "<div style=\\"font-weight:600;margin-bottom:0.25rem;\\">⚠️ 运行提示</div>" + ' +
+      '    root.innerHTML = "<div style=\\\\\"padding:1rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:0.5rem;font-size:0.85rem;line-height:1.4;\\\\\">" + ' +
+      '      "<div style=\\\\\"font-weight:600;margin-bottom:0.25rem;\\\\\">⚠️ 运行提示</div>" + ' +
       '      "<div>" + (msg || "网络连接受阻，无法加载在线 React 运行时") + "</div>" + ' +
-      '      "<div style=\\"margin-top:0.5rem;\\"><button type=\\"button\\" onclick=\\"startLoading()\\" style=\\"padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;\\">重新尝试</button></div>" + ' +
+      '      "<div style=\\\\\"margin-top:0.5rem;\\\\\"><button type=\\\\\"button\\\\\" onclick=\\\\\"startLoading()\\\\\" style=\\\\\"padding:0.2rem 0.6rem;font-size:0.8rem;cursor:pointer;\\\\\">重新尝试</button></div>" + ' +
       '      "</div>"; ' +
       '  } ' +
       '} ' +
       'function renderComponent() { ' +
       '  try { ' +
-      '    var clean = rawSource.replace(/import\\\\s+[\\\\s\\\\S]*?\\\\s+from\\\\s+[\'"][^\'"]+[\'"];?/g, ""); ' +
+      '    var clean = rawSource.replace(/import\\\\s+[\\\\s\\\\S]*?\\\\s+from\\\\s+[\\\'\"][^\\\'\"]+[\\\'\"];?/g, ""); ' +
       '    var match = clean.match(/export\\\\s+default\\\\s+function\\\\s+([A-Za-z0-9_]+)/) || ' +
       '                clean.match(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/) || ' +
       '                clean.match(/export\\\\s+default\\\\s+([A-Za-z0-9_]+)/) || ' +
@@ -955,20 +965,20 @@ export function buildWebDocPlaygroundRuntimeScript(): string {
       '    clean = clean.replace(/export\\\\s+default\\\\s+class\\\\s+([A-Za-z0-9_]+)/g, "class $1"); ' +
       '    clean = clean.replace(/export\\\\s+default\\\\s+[A-Za-z0-9_]+;?/g, ""); ' +
       '    clean = clean.replace(/export\\\\s+/g, ""); ' +
-      '    var wrapped = "(function(){\\n" + ' +
-      '      "var useState = React.useState;\\n" + ' +
-      '      "var useEffect = React.useEffect;\\n" + ' +
-      '      "var useRef = React.useRef;\\n" + ' +
-      '      "var useMemo = React.useMemo;\\n" + ' +
-      '      "var useCallback = React.useCallback;\\n" + ' +
-      '      clean + "\\n" + ' +
-      '      "var __Target = typeof " + rootName + " !== \\"undefined\\" ? " + rootName + " : " + ' +
-      '      "(typeof MyApp !== \\"undefined\\" ? MyApp : (typeof App !== \\"undefined\\" ? App : (typeof Square !== \\"undefined\\" ? Square : null)));\\n" + ' +
-      '      "if (__Target) {\\n" + ' +
-      '      "  var root = document.getElementById(\\"root\\");\\n" + ' +
-      '      "  root.innerHTML = \\"\\";\\n" + ' +
-      '      "  ReactDOM.createRoot(root).render(React.createElement(__Target));\\n" + ' +
-      '      "}\\n" + ' +
+      '    var wrapped = "(function(){\\\\n" + ' +
+      '      "var useState = React.useState;\\\\n" + ' +
+      '      "var useEffect = React.useEffect;\\\\n" + ' +
+      '      "var useRef = React.useRef;\\\\n" + ' +
+      '      "var useMemo = React.useMemo;\\\\n" + ' +
+      '      "var useCallback = React.useCallback;\\\\n" + ' +
+      '      clean + "\\\\n" + ' +
+      '      "var __Target = typeof " + rootName + " !== \\\\\"undefined\\\\\" ? " + rootName + " : " + ' +
+      '      "(typeof MyApp !== \\\\\"undefined\\\\\" ? MyApp : (typeof App !== \\\\\"undefined\\\\\" ? App : (typeof Square !== \\\\\"undefined\\\\\" ? Square : null)));\\\\n" + ' +
+      '      "if (__Target) {\\\\n" + ' +
+      '      "  var root = document.getElementById(\\\\\"root\\\\\");\\\\n" + ' +
+      '      "  root.innerHTML = \\\\\"\\\\\";\\\\n" + ' +
+      '      "  ReactDOM.createRoot(root).render(React.createElement(__Target));\\\\n" + ' +
+      '      "}\\\\n" + ' +
       '      "})();"; ' +
       '    var compiled = Babel.transform(wrapped, { presets: ["react"] }).code; ' +
       '    eval(compiled); ' +
@@ -979,8 +989,8 @@ export function buildWebDocPlaygroundRuntimeScript(): string {
       'function startLoading() { ' +
       '  var root = document.getElementById("root"); ' +
       '  if (root) { ' +
-      '    root.innerHTML = "<div style=\\"display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;color:#71717a;font-size:0.88rem;gap:0.75rem;\\">" + ' +
-      '      "<div style=\\"width:24px;height:24px;border:2px solid #a1a1aa;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;\\"></div>" + ' +
+      '    root.innerHTML = "<div style=\\\\\"display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;color:#71717a;font-size:0.88rem;gap:0.75rem;\\\\\">" + ' +
+      '      "<div style=\\\\\"width:24px;height:24px;border:2px solid #a1a1aa;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;\\\\\"></div>" + ' +
       '      "<span>正在连接运行时资源…</span></div>"; ' +
       '  } ' +
       '  if (window.React && window.ReactDOM && window.Babel) { ' +

@@ -215,6 +215,51 @@ describe('acp-ui-store history + plan', () => {
     expect(tool?.streaming).toBe(false)
   })
 
+  it('迟到 agent 文本 chunk 在收尾后到达：合入正文但不再点亮流式', () => {
+    // 复现：prompt 结果（end_turn）先于文本通知到达，主线程收尾冻结后，
+    // 迟到文本另起 streaming 气泡且永不落定（光环常亮）。修：冻结标记。
+    const msgs = () => {
+      const s = useAcpUiStore.getState()
+      return s.threads.find((t) => t.id === s.activeThreadId)?.messages ?? []
+    }
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    store.beginAgentReply()
+    expect(useAcpUiStore.getState().turnSettled).toBe(false)
+    store.applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: '首段' },
+    })
+    // prompt 结果先到：收尾冻结（prompting 置 false，残留 streaming 清零）
+    store.finishStreaming()
+    expect(useAcpUiStore.getState().turnSettled).toBe(true)
+    expect(msgs().every((m) => !m.streaming)).toBe(true)
+    // 文本通知迟到：正文必须合入（不丢字），但不再点亮流式
+    store.applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: '尾段' },
+    })
+    const messages = msgs()
+    expect(messages.map((m) => m.text).join('')).toContain('首段尾段')
+    expect(messages.every((m) => !m.streaming)).toBe(true)
+  })
+
+  it('回放重建不受冻结标记影响：无 begin 即 streaming，收尾统一冻结', () => {
+    // 定居回放分批到达（freezeSettledStreaming 故意不碰标记），中间态保持
+    // streaming；与“迟到 chunk”场景的区分点是有无 preceding finishStreaming。
+    const msgs = () => {
+      const s = useAcpUiStore.getState()
+      return s.threads.find((t) => t.id === s.activeThreadId)?.messages ?? []
+    }
+    useAcpUiStore.getState().applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: '旧回答' },
+    })
+    expect(msgs().some((m) => m.role === 'agent' && m.streaming)).toBe(true)
+    useAcpUiStore.getState().finishStreaming()
+    expect(msgs().every((m) => !m.streaming)).toBe(true)
+  })
+
   it('attaches batch proposals from the MCP snapshot when ACP omits tool result content', () => {
     useAcpUiStore.getState().appendUserMessage('给这一章划重点')
     useAcpUiStore.getState().beginAgentReply()

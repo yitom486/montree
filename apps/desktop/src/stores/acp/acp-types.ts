@@ -80,6 +80,15 @@ export interface AcpUiStore {
    * 详见 ChatSlice.pendingReplayUserText。
    */
   pendingReplayUserText: { threadId: string; raw: string } | null
+  /**
+   * 本轮内容是否已被收尾冻结（不持久化）：
+   * finishStreaming 置 true；beginAgentReply/新建/切换/清空线程置 false。
+   * 冻结后到达的 agent 文本 chunk（prompt 结果先于文本通知的竞态）照常合入
+   * 正文，但不再点亮 streaming——否则另起一条永不落定的流式气泡。
+   * 定居回放（freezeSettledStreaming）故意不碰：回放本就分批到达，
+   * 中间态保持 streaming，由收尾统一冻结。
+   */
+  turnSettled: boolean
   /** 递增以触发 AgentComposer 聚焦（不持久化） */
   composerFocusNonce: number
   /** 递增以在输入框追加「选区」短标记（不持久化） */

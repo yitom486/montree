@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
+  buildWebDocPlaygroundRuntimeScript,
   buildWebDocReaderDocument,
   extractDocumentTitle,
   extractWebDocArticle,
@@ -552,5 +553,38 @@ describe('web-doc-html', () => {
     )
     expect(doc).toContain('import { spawn } from "chatgpt-app-server";')
     expect(doc).not.toMatch(/^\s*1\s*2/m)
+  })
+
+  it('游乐场外层运行时脚本可解析（曾因三层转义 \\ 漏写致整页 SyntaxError）', () => {
+    const output = buildWebDocPlaygroundRuntimeScript()
+    const inner = output.replace(/^<script>/, '').replace(/<\/script>$/, '')
+    // 只解析不执行：语法错即抛 SyntaxError
+    expect(() => new Function(inner)).not.toThrow()
+  })
+
+  it('游乐场恶意代码经 \\u003c 转义：runner 文档唯一 </script> 且可解析', () => {
+    const hostile = 'const s = "</script><script>alert(1)</script>"; export default function App() {}'
+    const output = buildWebDocPlaygroundRuntimeScript()
+    const inner = output.replace(/^<script>/, '').replace(/<\/script>$/, '')
+    const pg = document.createElement('div')
+    pg.className = 'web-doc-playground'
+    const source = document.createElement('div')
+    source.className = 'web-doc-playground-source'
+    source.textContent = hostile
+    const frame = document.createElement('iframe')
+    frame.className = 'web-doc-playground-iframe'
+    pg.append(source, frame)
+    document.body.append(pg)
+    try {
+      new Function(inner)()
+      const srcdoc = frame.getAttribute('srcdoc') ?? (frame as HTMLIFrameElement).srcdoc ?? ''
+      expect(srcdoc).toContain('u003c/script')
+      // runner 自身闭合唯一，恶意载荷不得提前终结脚本块
+      expect(srcdoc.split('</script').length - 1).toBe(1)
+      const runnerInner = srcdoc.slice(srcdoc.indexOf('<script>') + 8, srcdoc.lastIndexOf('</script>'))
+      expect(() => new Function(runnerInner)).not.toThrow()
+    } finally {
+      pg.remove()
+    }
   })
 })

@@ -111,6 +111,7 @@ export function AgentActivityGroup({ group, onChapterPlanSelect, onEditMessage }
       probe="activity"
       messageId={group.key}
       role="activity"
+      className={group.isActive ? 'agent-beam-ring agent-beam-ring-amber' : undefined}
     >
       <button
         type="button"
@@ -135,14 +136,6 @@ export function AgentActivityGroup({ group, onChapterPlanSelect, onEditMessage }
           ) : null}
           {sub ? <span className="ml-1.5 font-normal opacity-80">（{sub}）</span> : null}
         </span>
-        {group.isActive ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-2.5 bottom-1 h-0.5 overflow-hidden rounded-full bg-muted"
-          >
-            <span className="agent-stream-sweep block h-full w-full rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none" />
-          </span>
-        ) : null}
       </button>
 
       {open ? (

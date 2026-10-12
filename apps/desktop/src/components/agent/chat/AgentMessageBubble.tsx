@@ -152,6 +152,7 @@ export function AgentMessageBubble({
       probe={isUser ? 'user' : 'agent'}
       messageId={message.id}
       role={message.role}
+      className={!isUser && showStreaming ? 'agent-beam-ring agent-beam-ring-emerald rounded-lg' : undefined}
     >
       {isUser ? (
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -218,12 +219,6 @@ export function AgentMessageBubble({
         </div>
       ) : (
         <>
-          {showStreaming ? (
-            <span
-              aria-hidden
-              className="agent-stream-sweep mb-1 block h-0.5 w-full rounded-full bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent motion-reduce:animate-none"
-            />
-          ) : null}
           <Suspense
             fallback={
               <AgentMarkdownFallback text={renderText} className={markdownClassName} />

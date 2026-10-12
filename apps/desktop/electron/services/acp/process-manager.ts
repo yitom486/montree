@@ -19,11 +19,6 @@ function processKey(runtimeId: string): string {
   return context.id === 'default' ? runtimeId : `${context.id}:${runtimeId}`
 }
 
-/**
- * @deprecated 早退判定窗口已去窗口化（dsh 依赖解析慢退漏归因教训）：
- * 保留导出仅防旧引用，`getAcpEarlyExitStderrDetail` 不再读取它。
- */
-export const ACP_EARLY_EXIT_WINDOW_MS = 3_000
 /** 连接失败时拼进错误的 stderr 尾部行数上限。单处常量。 */
 export const ACP_EARLY_EXIT_STDERR_TAIL_LINES = 20
 

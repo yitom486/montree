@@ -21,6 +21,7 @@ import {
   selectSuffixFastState,
 } from '@/lib/agent/acp-model-thinking'
 import { acpDevLog, acpDevWarn } from '@/lib/agent/acp-dev-log'
+import { toast } from 'sonner'
 import { flushAcpStreamBuffer, registerStreamAuthReset } from '@/lib/agent/acp-stream-host'
 import { formatAcpConnectedMessage } from '@/lib/agent/acp-session-restore'
 import {
@@ -607,7 +608,12 @@ export function useAcpSession(workspaceRoot?: string) {
       prompt: AcpContentBlock[]
       messageAttachments?: AcpMessageAttachment[]
     }) => {
-      if (useAcpUiStore.getState().prompting) return
+      // 忙时丢弃曾是静默的：卡住的回合会让后续发送人间蒸发（用户视角“被吞”）。
+      // 仍不排队（保单轮语义），但必须告知，否则与丢消息无异。
+      if (useAcpUiStore.getState().prompting) {
+        toast.info('上一轮还没结束，请稍候或取消后再发送')
+        return
+      }
       if (!payload.prompt.length) return
 
       let sid = useAcpUiStore.getState().sessionId

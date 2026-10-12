@@ -47,12 +47,16 @@ test.describe('Streamdown 正文 S1', () => {
       // 中间态：首段已到、尾段未到（chunk 200ms 间隔，时序上有 600ms+ 窗口）
       await expect(panel.getByText('首段中文正文')).toBeVisible({ timeout: 15_000 })
       await expect(panel.getByText('尾段收束')).toHaveCount(0)
+      // 流式气泡挂翡翠光环（落定即卸）；旧顶栏扫光条已删除
+      await expect(panel.locator('.agent-beam-ring-emerald').first()).toBeVisible()
+      await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
       await panel.screenshot({ path: info.outputPath('stream-mid.png') })
       await info.attach('stream-mid', { path: info.outputPath('stream-mid.png'), contentType: 'image/png' })
 
       // 完成态：全文结构一次成形
       await expect(panel.getByText('尾段收束')).toBeVisible({ timeout: 15_000 })
       await expect(panel.getByText('正在生成')).toHaveCount(0)
+      await expect(panel.locator('.agent-beam-ring-emerald')).toHaveCount(0)
       await expect(panel.locator('table')).toBeVisible()
       await expect(panel.locator('[data-streamdown=code-block-header]')).toContainText('ts')
       await expect(panel.locator('[data-streamdown=code-block] code').first()).toContainText('const answer = 42')

@@ -595,6 +595,18 @@ test.describe('聊天展示层 R2', () => {
       const workLog = panel.getByText(/2 个工具并行执行/).first()
       await expect(workLog).toBeVisible({ timeout: 15_000 })
       await expect(panel.locator('[data-acp-probe="activity"]')).toHaveCount(1)
+      // 运行中整卡琥珀光环（落定即卸）；旧底栏扫光条已删除
+      await expect(panel.locator('.agent-beam-ring-amber')).toHaveCount(1)
+      await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
+      // 光环伪元素真实上漆且在旋转（非挂名类）
+      const beamPaint = await panel.evaluate(() => {
+        const el = document.querySelector('.agent-beam-ring-amber')
+        if (!el) return null
+        const ps = getComputedStyle(el, '::after')
+        return { content: ps.content, animation: ps.animationName }
+      })
+      expect(beamPaint?.content).not.toBe('none')
+      expect(beamPaint?.animation).toContain('agent-beam-spin')
       const expanded = await panel
         .locator('[data-acp-probe="activity"] button[aria-expanded]')
         .first()
@@ -613,6 +625,7 @@ test.describe('聊天展示层 R2', () => {
           .getAttribute('aria-expanded'),
       ).toBe('true')
       await expect(panel.getByText(/工作记录 · 工具调用 2/)).toBeVisible()
+      await expect(panel.locator('.agent-beam-ring-amber')).toHaveCount(0)
       await panel.screenshot({ path: info.outputPath('worklog-stream.png') })
       await info.attach('worklog-stream', { path: info.outputPath('worklog-stream.png'), contentType: 'image/png' })
     } finally {
