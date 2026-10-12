@@ -564,4 +564,30 @@
   .agent-beam-ring::after {
     display: none !important;
   }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   主题切换：View Transitions 全局硬件加速交叉淡化（180ms 统一步调）
+   ========================================================================== */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+/* 切换瞬间屏蔽所有元素自带的局部 transition，消除视觉撕裂与二次动画 */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: none !important;
 }

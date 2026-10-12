@@ -28,6 +28,7 @@ import { PdfOcrBanner } from '@/components/reader/PdfOcrBanner'
 import { PdfOcrTocEditor } from '@/components/reader/PdfOcrTocEditor'
 import { PdfBookSearch } from '@/components/reader/PdfBookSearch'
 import { PdfToolbarMoreMenu } from '@/components/reader/PdfToolbarMoreMenu'
+import { PdfZoomControls } from '@/components/reader/PdfZoomControls'
 import { BodyWatermarkPreviewDialog } from '@/components/reader/BodyWatermarkPreviewDialog'
 import { TocAiPolishControl } from '@/components/reader/TocAiPolishControl'
 import { useReaderNavigationStore, useReaderNavTitles } from '@/stores/reader-navigation-store'
@@ -270,6 +271,45 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
   const estimatedPageHeight = Math.max(120, session.scaledPageSize.height)
   const estimatedPageWidth = Math.max(120, session.scaledPageSize.width)
 
+  // 支持 Ctrl + 鼠标滚轮在 PDF 视口内平滑缩放
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const delta = e.deltaY < 0 ? 0.1 : -0.1
+      session.setScale((prev) => Math.min(3.0, Math.max(0.5, Number((prev + delta).toFixed(2)))))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+    }
+  }, [containerRef, session.setScale])
+
+  // 支持快捷键 (Ctrl + +/-/0)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        session.setScale((prev) => Math.min(3.0, Number((prev + 0.15).toFixed(2))))
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault()
+        session.setScale((prev) => Math.max(0.5, Number((prev - 0.15).toFixed(2))))
+      } else if (e.key === '0') {
+        e.preventDefault()
+        session.fitWidth()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [session.fitWidth, session.setScale])
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {ocrTocManager.showOcrBanner ? (
@@ -393,17 +433,44 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         }}
         onAddBookmark={() => void addPageBookmark()}
         center={
-          <>
-            <Button variant="ghost" size="icon-sm" disabled={session.pageNum <= 1} onClick={session.goPrev}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="min-w-24 text-center text-sm text-muted-foreground">
-              {session.numPages > 0 ? `${session.pageNum} / ${session.numPages}` : '—'}
-            </span>
-            <Button variant="ghost" size="icon-sm" disabled={session.pageNum >= session.numPages} onClick={session.goNext}>
-              <ChevronRight className="size-4" />
-            </Button>
-          </>
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-7 rounded-md text-muted-foreground hover:text-foreground"
+                disabled={session.pageNum <= 1}
+                onClick={session.goPrev}
+                title="上一页"
+                aria-label="上一页"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="min-w-16 text-center font-mono text-xs font-medium tabular-nums text-muted-foreground">
+                {session.numPages > 0 ? `${session.pageNum} / ${session.numPages}` : '—'}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-7 rounded-md text-muted-foreground hover:text-foreground"
+                disabled={session.pageNum >= session.numPages}
+                onClick={session.goNext}
+                title="下一页"
+                aria-label="下一页"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+
+            <div className="h-3.5 w-px bg-border/40" />
+
+            <PdfZoomControls
+              scale={session.scale}
+              setScale={session.setScale}
+              fitWidth={session.fitWidth}
+              disabled={!session.ready}
+            />
+          </div>
         }
         trailing={
           <>

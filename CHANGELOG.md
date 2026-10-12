@@ -6,6 +6,36 @@
 
 ## [未发布]
 
+- ### View Transitions 浏览器原生硬件加速主题平滑切换
+  - **GPU 贴图合成与零卡顿过渡**：彻底抛弃给每个 DOM 元素挂载 `transition: ...` 引发主线程逐帧重算与掉帧的传统做法，接入浏览器原生 View Transitions API。切换主题时由 GPU 将新旧快照做 180ms 交叉淡化（Cross-fade），不论代码编辑器、PDF 渲染、终端或高亮块多么复杂，开销恒定且 100% 步调一致。
+  - **过渡屏蔽层与双重帧保护**：在切换期间自动注入 `.theme-transitioning` 屏蔽所有局部元素的次生 transition，并在过渡完成后的双重 `requestAnimationFrame` 延迟卸载，杜绝动画叠加撕裂与二次抖动；对开启 `prefers-reduced-motion` 的系统平滑降级为即时切换。
+  - **首屏防闪烁（FOUC）**：在 `index.html` 头部注入极轻量同步初始化脚本，在 DOM 首帧绘制前从持久化配置中还原主题，彻底消除冷启动闪烁。
+- ### PDF 阅读器顶栏一体化「微晶缩放胶囊」（PdfZoomControls）
+  - **优雅集成分段缩放控制**：在 PDF 顶部工具栏中区打造现代化毛玻璃缩放药丸，与翻页器呼应，彻底终结缩放功能折叠深藏的问题。
+  - **丰富档位与一键适配**：包含 `[-]` 步进缩小（-15%）、`[120% ▾]` 实时比例显示与预设档位下拉面板（50% ~ 300% 快速选档 + 高亮指示）、`[+]` 步进放大（+15%），以及外置的「自适应宽度 (Fit Width)」快捷按钮，学术论文与宽屏阅读 1 次点击即可无缝贴合视口。
+  - **桌面原生手势与键盘增强**：支持 `Ctrl + 鼠标滚轮` 视口内平滑连续无级缩放，以及 `Ctrl` + `+` / `-` / `0` 全局快捷键控制；按钮集成触感微缩动效（`active:scale-95`）与防遮挡 Tooltip。
+- ### 工作区目录树受限目录容错与防崩机制（WSL / Docker 权限自愈）
+  - **消除 Linux / Docker 目录权限报错**：解决 WSL 远程工作区或本地项目中包含 Docker 容器挂载卷（如 `mysql-data/#innodb_redo`）时，因 Linux `0700` 严格权限导致的 `EPERM: operation not permitted, scandir` 报错弹窗。
+  - **主进程防御性扫描**：在 `scanWorkspace` 递归扫描中增加精细异常捕获，自动静默跳过无读权限的守护进程目录，确保其余代码与文档资源正常加载呈现，对齐 VS Code 健壮性标准。
+- ### WSL 与 Linux 远程工作区直通支持（Zero-Hardcoding）
+  - **应用内远程环境连接器（RemoteConnectModal）**：VS Code 风格设计，动态执行 `wsl.exe -l -v` UTF-16LE 准确探测本地已安装的所有 Linux 发行版与当前默认分发版，自动过滤 Docker 等内部运行镜像，完全杜绝系统配置硬编码。
+  - **Linux 路径双向转换与文件无感直读**：支持 `\\wsl.localhost\<distro>` 与 `\\wsl$\<distro>` 双标准 UNC 路径智能映射；规避 Windows 原生文件选择对话框限制，在应用内树形层级浏览 Linux 文件系统并直达用户 `$HOME`。
+  - **SSH 配置解析建议**：自动检测解析本地 `~/.ssh/config`，提取配置的主机别名并在连接弹窗中提供即时建议。
+- ### 底层 Git 服务接入与状态栏 WSL 一键推送
+  - **底部状态栏（StatusBar）环境标识与分支联动**：底栏常驻当前环境胶囊（`[>< 远程环境]` / `[>< WSL: Ubuntu]`），并展示当前工作区 Git 分支名、未暂存/暂存修改文件计数以及与远端的领先/落后提交数。
+  - **WSL 原生 Git 调度与免密推送**：针对 WSL 工作区自动调度 `wsl.exe -d <distro> --cd <linuxPath> --exec git ...`，支持在 Windows 桌面上一键免密 `Push` 博客文档修改至远端仓库，无缝复用 Linux 宿主内的 SSH Key 与凭据。
+- ### ACP Codex Agent 深度渗透 WSL Linux 环境
+  - **跨平台运行时无感调度**：Agent 子进程自动感知工作区类型，遇到 WSL 路径时自动通过 `wsl.exe -d <distro> --cd <linuxCwd> bash -lic "exec ..."` 进行跨环境穿透调度，使用 Linux 原生 Bash 环境与工具链。
+  - **环境与会话转译**：原生复用 WSL Linux 用户目录下的 `$HOME/.codex` 凭据配置；ACP 会话建立与工作区 Cwd 自动转译为 Linux 内部原生路径。
+- ### ACP 会话与工作区（Cwd）深度绑定、自动 Resume 与多项目隔离
+  - **会话与目录生命周期绑定**：解决 Agent 对话跨项目串线与残留痛点；Store 引入 `currentWorkspaceRoot` 与 `switchWorkspace` 状态机，切换目录或打开新文件夹时自动激活属于该目录的历史会话；全新目录自动创建专属空白线程。
+  - **无缝重连与精准 Resume**：在线切换工作区时自动断开旧会话并重连新目录，连接时携带目标工作区最近活跃会话的 `sessionId` 发起精确 **resume**（新目录走 `session/new`，杜绝把旧目录会话错配给新目录）；离线切换工作区零网络开销，本地活跃线程平滑对齐。
+  - **历史对话双维隔离**：对话历史抽屉（`AgentHistoryMenu`）接入 `selectThreadsForWorkspaceAndRuntime`，顶部展示当前项目名并仅列出属于当前工作区的会话；新建对话自动打上当前工作区戳记。
+  - **WSL 路径等价性与全链路集成测试**：实现 `isSameWorkspace` 自动抹平 WSL UNC 别名（`//wsl$` 与 `//wsl.localhost`）与 Windows 盘符大小写差异，避免冗余空会话；构建全链路集成测试（`acp-workspace-integration.test.ts`），5 组高覆盖率端到端用例 100% 绿灯保障质量。
+- ### 布局与左侧活动栏语义净化
+  - **左侧活动栏按键重构**：移除左侧活动栏底部别扭且多余的 Agent 面板开关按钮，替换为符合主流编辑器直觉的「设置（Settings）」齿轮入口；左侧活动栏纯粹服务于左侧内容（资源管理器、书库、札记）与全局设置。
+  - **就近控制原则**：右侧 Agent 面板专职由顶栏右上角带状态指示灯的 AI 伴读按钮、快捷键 `Ctrl+Shift+A` 以及面板自身收起按钮控制，消除横跨屏幕的视觉与交互割裂。
+
 ---
 
 ## [0.4.9] - 2026-10-12

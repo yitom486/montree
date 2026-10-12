@@ -45,6 +45,7 @@
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
 | `text-document` / `.test.ts` | Markdown/TXT 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区、跨视图 CodeMirror 撤销历史 |
+| `theme-transition` / `.test.ts` | View Transitions 原生主题平滑切换（GPU 贴图合成、180ms 交叉淡化、两帧延迟卸载屏蔽类） |
 
 ## preview/
 

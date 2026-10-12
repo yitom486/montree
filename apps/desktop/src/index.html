@@ -15,6 +15,19 @@
     />
     <title>Montree</title>
     <link rel="icon" type="image/png" href="/icon.png" />
+    <script>
+      try {
+        const raw = localStorage.getItem('markdown-editor-ui');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const theme = parsed?.state?.theme;
+          if (theme === 'dark' || theme === 'sepia') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add(theme);
+          }
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

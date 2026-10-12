@@ -31,4 +31,10 @@ describe('scanWorkspace', () => {
     expect(fileNames).toContain('chapter.txt')
     expect(fileNames).toContain('ignored.mobi')
   })
+
+  it('遇到无权限或不存在的目录时静默容错跳过，不抛出异常', async () => {
+    const nonExistent = join(tmpdir(), 'non-existent-dir-' + Date.now())
+    const tree = await scanWorkspace(nonExistent)
+    expect(tree).toEqual([])
+  })
 })

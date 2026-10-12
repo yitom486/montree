@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
+import { applyThemeWithViewTransition } from '@/lib/editor/theme-transition'
 
 /** 编辑区布局：仅源码 / 仅预览 / 左右分栏 */
 export type EditorViewMode = 'editor' | 'preview' | 'split'
@@ -61,19 +62,27 @@ export const useEditorUiStore = create<EditorUiStore>()(
       sidebarVisible: true,
       fileStates: {},
 
-      setTheme: (theme) => set({ theme }),
-      toggleTheme: () =>
-        set((state) => {
-          if (state.theme === 'light') return { theme: 'sepia' }
-          if (state.theme === 'sepia') return { theme: 'dark' }
-          return { theme: 'light' }
-        }),
-      cycleTheme: () =>
-        set((state) => {
-          if (state.theme === 'light') return { theme: 'sepia' }
-          if (state.theme === 'sepia') return { theme: 'dark' }
-          return { theme: 'light' }
-        }),
+      setTheme: (theme) => {
+        applyThemeWithViewTransition(theme, () => {
+          set({ theme })
+        })
+      },
+      toggleTheme: () => {
+        const current = get().theme
+        const next: AppTheme =
+          current === 'light' ? 'sepia' : current === 'sepia' ? 'dark' : 'light'
+        applyThemeWithViewTransition(next, () => {
+          set({ theme: next })
+        })
+      },
+      cycleTheme: () => {
+        const current = get().theme
+        const next: AppTheme =
+          current === 'light' ? 'sepia' : current === 'sepia' ? 'dark' : 'light'
+        applyThemeWithViewTransition(next, () => {
+          set({ theme: next })
+        })
+      },
 
       setOutlineExpanded: (expanded) => set({ outlineExpanded: expanded }),
       setWebDocExpanded: (expanded) => set({ webDocExpanded: expanded }),

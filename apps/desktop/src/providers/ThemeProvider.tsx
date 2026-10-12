@@ -5,8 +5,10 @@ import { useEditorUiStore, type AppTheme } from '@/stores/editor-ui-store'
 export function useApplyTheme(theme: AppTheme) {
   useEffect(() => {
     const root = document.documentElement
-    root.classList.remove('light', 'sepia', 'dark')
-    root.classList.add(theme)
+    if (!root.classList.contains(theme)) {
+      root.classList.remove('light', 'sepia', 'dark')
+      root.classList.add(theme)
+    }
   }, [theme])
 }
 

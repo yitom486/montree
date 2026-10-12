@@ -30,6 +30,7 @@
 | `AnnotationNoteDialog` | 批注输入；可选 AI 意图/结果 chip 与草稿确认 |
 | `BodyWatermarkPreviewDialog` | 正文水印清洗预览 + 二次确认应用（只读计数/样例 + 签名展示，确认态展示统计/签名，确认后调应用通道，成功展示备份路径/结果；确认前不写库；另有自定义水印文本仅预览区，无应用入口） |
 | `PdfBookSearch` | 手动正文搜索（工具栏紧凑触发按钮 + 独立浮层结果面板；已入库 PDF 走 `queryBook(kind='search')` 点击跳页，EPUB/MOBI/AZW3 走内存 `iterateUnits` 点击按章节跳章，扫描未入库仍提示建索引；≥3 字才请求，输入即清旧结果，最多 20 条；逻辑在 `src/lib/reader/pdf/pdf-book-search`） |
+| `PdfZoomControls` | PDF 顶栏一体化微晶缩放胶囊（步进缩小/放大、百分比下拉预设菜单与一键适合宽度，支持 Ctrl+滚轮与快捷键联动） |
 | `PdfToolbarMoreMenu` | PDF 工具栏“更多工具”下拉菜单 + 罗盘徽章判定（`resolvePdfIndexBadge`：未入库提示仅扫描版；缩放/适合宽度/单页识别/目录重识/识别印刷目录/清缓存/建索引/重新建索引/水印预览等低频操作收进菜单，工具栏只留导航/搜索/徽章；`resolveRosettaIndexMenuAction`：未入库建、已入库重建，两按钮互斥，导入中都不出现） |
 | `ProposeMarkChatBlock`（经 Agent 气泡内嵌） | 正式 Agent / 批注助手会话内批注提议 |
 | `EpubMarkTooltip` / `ReadingProgressRing` | EPUB 批注提示、进度环 |

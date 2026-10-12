@@ -1,5 +1,6 @@
-import { readdir } from 'fs/promises'
-import { join, extname } from 'path'
+import { readdir } from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
+import { join, extname } from 'node:path'
 import { getDocumentKind, isWorkspaceFileExtension } from '@montree/contracts'
 import type { FileTreeNode } from '@montree/contracts'
 
@@ -27,7 +28,13 @@ export async function scanWorkspace(
 ): Promise<FileTreeNode[]> {
   if (depth > WORKSPACE_MAX_DEPTH) return []
 
-  const entries = await readdir(dirPath, { withFileTypes: true })
+  let entries: Dirent[]
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true })
+  } catch {
+    // 权限不足 (EPERM / EACCES)、特殊系统挂载或失效路径时静默容错，避免整树扫描崩溃
+    return []
+  }
   const nodes: FileTreeNode[] = []
 
   const sorted = entries.sort((a, b) => {
