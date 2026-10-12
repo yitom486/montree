@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.9] - 2026-10-12
+
 - ### TTS 伴读多提供商状态隔离与毫秒级时间轴防塌缩
   - **提供商音色状态解耦与主进程防腐自愈**：严格按提供商（Azure / Local OpenAI / Gemini）路由音色与模型字段，彻底修复后台预取（`prefetchNextChapter`）、设置试听与密钥测试中音色混用导致的 `无法从音色名解析语言 locale：Aoede` 异常；主进程引入规范校验卫视（`resolveAzureVoice` / `resolveGeminiVoice`），自动过滤与自愈跨厂商脏数据。
   - **官方时间轴对齐重构与防塌缩安全网**：重构 `alignSentencesWithBoundaries`，解决纯词级边界（`WordBoundary`）按数组下标错配给句子导致全篇在 3 秒内极速穿透下冲的缺陷；基于字符区间（`textOffset`）实现词级时间戳聚合对齐，并增加 50% 音频时长防塌缩保护，杜绝正文高亮狂跳。
@@ -440,7 +444,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.8...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.9...HEAD
+[0.4.9]: https://github.com/yitom486/montree/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/yitom486/montree/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/yitom486/montree/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/yitom486/montree/compare/v0.4.5...v0.4.6
