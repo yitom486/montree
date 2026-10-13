@@ -1,10 +1,11 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
 import { AppTitleBar } from '@/components/layout/AppTitleBar'
 import { StatusBar } from '@/components/layout/StatusBar'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { RemoteConnectModal } from '@/components/layout/RemoteConnectModal'
 import { AgentPanel, useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
 import { FloatingAIHud } from '@/components/agent/FloatingAIHud'
 import {
@@ -37,14 +38,14 @@ export interface WorkspaceShellProps {
   recentWebUrls?: string[]
   recentFiles: string[]
   treeActions?: ReturnType<typeof useFileTreeActions>
-  /** Markdown ????????????????????? */
   headings?: MarkdownHeading[]
   activeHeadingId?: string
   onSelectHeading?: (heading: MarkdownHeading) => void
-  /** ????????????/??? */
   readOnly?: boolean
   onOpenFile: () => void
   onOpenFolder: () => void
+  onOpenRemote?: () => void
+  onCloseWorkspace?: () => void
   onOpenWorkspacePath?: (path: string) => void
   onQuickOpen?: () => void
   onOpenWebDoc?: (url: string) => void
@@ -87,6 +88,8 @@ export function WorkspaceShell({
   readOnly = false,
   onOpenFile,
   onOpenFolder,
+  onOpenRemote,
+  onCloseWorkspace,
   onOpenWorkspacePath,
   onQuickOpen,
   onOpenWebDoc,
@@ -107,6 +110,9 @@ export function WorkspaceShell({
   suppressDockedAgent = false,
   isDirty = false,
 }: WorkspaceShellProps) {
+  const [internalRemoteModalOpen, setInternalRemoteModalOpen] = useState(false)
+  const handleOpenRemoteModal = onOpenRemote || (() => setInternalRemoteModalOpen(true))
+
   const theme = useEditorUiStore((state) => state.theme)
   const cycleTheme = useEditorUiStore((state) => state.cycleTheme)
   const sidebarVisible = useEditorUiStore((state) => state.sidebarVisible)
@@ -240,6 +246,8 @@ export function WorkspaceShell({
               webDocExpanded={webDocExpanded}
               onWebDocToggle={() => setWebDocExpanded(!webDocExpanded)}
               onOpenFolder={onOpenFolder}
+              onOpenRemote={handleOpenRemoteModal}
+              onCloseWorkspace={onCloseWorkspace}
               onOpenWebDoc={onOpenWebDoc}
               onRescanWorkspace={onRescanWorkspace}
               isRescanningWorkspace={isRescanningWorkspace}
@@ -291,8 +299,19 @@ export function WorkspaceShell({
           workspaceRoot={workspaceRoot}
           activeFilePath={activeFilePath}
           onOpenWorkspacePath={onOpenWorkspacePath}
+          onDisconnectWorkspace={onCloseWorkspace}
+          onOpenRemote={handleOpenRemoteModal}
         />
       )}
+
+      {/* 远程环境连接器模态弹窗（供侧边栏与状态栏统一呼出） */}
+      <RemoteConnectModal
+        isOpen={internalRemoteModalOpen}
+        onClose={() => setInternalRemoteModalOpen(false)}
+        currentWorkspace={workspaceRoot}
+        onDisconnectRemote={onCloseWorkspace}
+        onOpenWorkspace={(path) => onOpenWorkspacePath?.(path)}
+      />
 
       {!zenMode && (
         <FloatingAIHud workspaceRoot={workspaceRoot} activeFilePath={activeFilePath} />

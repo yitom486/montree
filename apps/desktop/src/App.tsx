@@ -89,6 +89,7 @@ function App() {
     isFileBusy,
     openFile,
     openFolder,
+    closeWorkspace,
     rescanWorkspace,
     openFileFromTree,
     openRecentFile,
@@ -500,6 +501,7 @@ function App() {
         readOnly={isReader || isWebDoc}
         onOpenFile={() => void openFile()}
         onOpenFolder={() => void openFolder()}
+        onCloseWorkspace={closeWorkspace}
         onOpenWorkspacePath={(path) => void rescanWorkspace(path)}
         onQuickOpen={handleToggleQuickOpen}
         onOpenWebDoc={handleOpenWebDoc}

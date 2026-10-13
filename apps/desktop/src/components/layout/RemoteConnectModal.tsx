@@ -10,7 +10,7 @@ import {
   Server,
   Terminal,
 } from 'lucide-react'
-import { linuxToWindowsPath, type RemoteDirectoryEntry, type SshConfigHost, type WslDistroInfo } from '@montree/contracts'
+import { isWslPath, linuxToWindowsPath, type RemoteDirectoryEntry, type SshConfigHost, type WslDistroInfo } from '@montree/contracts'
 import { remoteApi } from '@/api/remote-api'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +29,8 @@ export interface RemoteConnectModalProps {
   isOpen: boolean
   onClose: () => void
   onOpenWorkspace: (workspacePath: string) => void
+  currentWorkspace?: string
+  onDisconnectRemote?: () => void
 }
 
 type RemoteTab = 'wsl' | 'ssh'
@@ -37,6 +39,8 @@ export function RemoteConnectModal({
   isOpen,
   onClose,
   onOpenWorkspace,
+  currentWorkspace,
+  onDisconnectRemote,
 }: RemoteConnectModalProps) {
   const [activeTab, setActiveTab] = useState<RemoteTab>('wsl')
 
@@ -185,6 +189,32 @@ export function RemoteConnectModal({
             </div>
           </div>
         </DialogHeader>
+
+        {/* 当前远程环境状态与断开连接 */}
+        {currentWorkspace && isWslPath(currentWorkspace) ? (
+          <div className="flex items-center justify-between rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
+            <div className="min-w-0 flex-1 pr-3">
+              <span className="font-medium">当前已连接远程环境：</span>
+              <span className="font-mono text-[11px] truncate block opacity-90 mt-0.5" title={currentWorkspace}>
+                {currentWorkspace}
+              </span>
+            </div>
+            {onDisconnectRemote ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="shrink-0 h-7 px-2.5 text-xs shadow-none"
+                onClick={() => {
+                  onDisconnectRemote()
+                  onClose()
+                }}
+              >
+                断开远程连接
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* 顶部标签切换 */}
         <div className="flex border-b border-border/60 gap-4 text-xs font-medium">

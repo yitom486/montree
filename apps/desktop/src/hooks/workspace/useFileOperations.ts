@@ -323,6 +323,12 @@ export function useFileOperations(onError?: (error: AppError) => void) {
 
   const openFolder = useCallback(() => openFolderMutation.mutateAsync(), [openFolderMutation])
 
+  const closeWorkspace = useCallback(() => {
+    queryClient.setQueryData(queryKeys.workspace, null)
+    useAppSettingsStore.getState().setLastWorkspaceRoot(undefined)
+    toast.success('已关闭工作区')
+  }, [queryClient])
+
   const rescanWorkspace = useCallback(async (targetRootPath?: string) => {
     const rootPath =
       targetRootPath ?? workspace?.rootPath ?? useAppSettingsStore.getState().lastWorkspaceRoot ?? undefined
@@ -331,6 +337,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   }, [rescanWorkspaceMutation, workspace?.rootPath])
 
   const restoreWorkspaceOnStartup = useCallback(async () => {
+    const shouldRestore = useAppSettingsStore.getState().restoreWorkspaceOnStartup
+    if (!shouldRestore) return
     const rootPath = useAppSettingsStore.getState().lastWorkspaceRoot
     if (!rootPath || workspace) return
     await rescanWorkspaceMutation.mutateAsync(rootPath)
@@ -550,6 +558,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       saveFileAsMutation.isPending,
     openFile,
     openFolder,
+    closeWorkspace,
     rescanWorkspace,
     openFileFromTree,
     openRecentFile,

@@ -26,6 +26,8 @@ interface SidebarProps {
   webDocExpanded?: boolean
   onWebDocToggle?: () => void
   onOpenFolder: () => void
+  onOpenRemote?: () => void
+  onCloseWorkspace?: () => void
   onOpenWebDoc?: (url: string) => void
   onRescanWorkspace?: () => void
   isRescanningWorkspace?: boolean
@@ -64,6 +66,8 @@ export function Sidebar({
   webDocExpanded = true,
   onWebDocToggle = () => undefined,
   onOpenFolder,
+  onOpenRemote,
+  onCloseWorkspace,
   onOpenWebDoc,
   onRescanWorkspace,
   isRescanningWorkspace,
@@ -100,6 +104,8 @@ export function Sidebar({
       webPageUrl={webPageUrl}
       recentWebUrls={recentWebUrls}
       onOpenFolder={onOpenFolder}
+      onOpenRemote={onOpenRemote}
+      onCloseWorkspace={onCloseWorkspace}
       onOpenWebDoc={onOpenWebDoc}
       onRescanWorkspace={onRescanWorkspace}
       isRescanning={isRescanningWorkspace}

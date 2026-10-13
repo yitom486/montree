@@ -91,7 +91,6 @@ export function useAcpSession(workspaceRoot?: string) {
   const setPrompting = useAcpUiStore((s) => s.setPrompting)
   const setPromptCapabilities = useAcpUiStore((s) => s.setPromptCapabilities)
   const clearMessagesInStore = useAcpUiStore((s) => s.clearMessages)
-  const selectedRuntimeId = useAcpUiStore((s) => s.selectedRuntimeId)
   const sessionId = useAcpUiStore((s) => s.sessionId)
   const prompting = useAcpUiStore((s) => s.prompting)
 
@@ -259,7 +258,7 @@ export function useAcpSession(workspaceRoot?: string) {
     [appendSystemMessage, setConfigOptions, setPromptCapabilities, setSession, setStatus],
   )
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (explicitRuntimeId?: string) => {
     const cwd = workspaceRoot?.trim() || undefined
     const statusNow = useAcpUiStore.getState().status
     if (statusNow === 'connecting' || statusNow === 'awaiting_auth') {
@@ -269,15 +268,16 @@ export function useAcpSession(workspaceRoot?: string) {
     const epoch = bumpConnectionEpoch()
     setStatus('connecting')
     setAuthError(null)
+    const runtimeIdToUse = explicitRuntimeId || useAcpUiStore.getState().selectedRuntimeId
     const resumeSessionId = activeThreadAgentSessionId()
-    const displayName = resolveAcpRuntimeDisplayName(selectedRuntimeId)
+    const displayName = resolveAcpRuntimeDisplayName(runtimeIdToUse)
     appendSystemMessage(
       resumeSessionId
         ? `正在连接 ${displayName}（尝试恢复会话 ${resumeSessionId.slice(0, 8)}…）…`
         : `正在连接 ${displayName}${cwd ? '' : '（网页会话）'}…`,
     )
     const result = await acpApi.connect({
-      runtimeId: selectedRuntimeId,
+      runtimeId: runtimeIdToUse,
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
@@ -307,7 +307,6 @@ export function useAcpSession(workspaceRoot?: string) {
     appendSystemMessage,
     bumpConnectionEpoch,
     finalizeConnected,
-    selectedRuntimeId,
     setStatus,
     workspaceRoot,
   ])
@@ -387,7 +386,7 @@ export function useAcpSession(workspaceRoot?: string) {
       if (!nextRuntimeId) return
       if (nextRuntimeId === current) {
         if (useAcpUiStore.getState().status === 'disconnected') {
-          void connect()
+          void connect(nextRuntimeId)
         }
         return
       }
@@ -438,7 +437,7 @@ export function useAcpSession(workspaceRoot?: string) {
 
         await finalizeConnected(result.value, `已连接至 ${resolveAcpRuntimeDisplayName(nextRuntimeId)}`)
       } else {
-        void connect()
+        void connect(nextRuntimeId)
       }
     },
     [appendSystemMessage, bumpConnectionEpoch, connect, disconnect, finalizeConnected, setStatus, workspaceRoot],
@@ -488,13 +487,14 @@ export function useAcpSession(workspaceRoot?: string) {
     }
 
     const wasOnline = statusNow === 'connected' || statusNow === 'error'
+    const liveRuntimeId = useAcpUiStore.getState().selectedRuntimeId
     acpDevLog('sync start', {
       statusNow,
       wasOnline,
       forceReconnect,
       resumeSessionId: resumeSessionId ?? null,
       liveSessionId: liveSessionId ?? null,
-      runtimeId: selectedRuntimeId,
+      runtimeId: liveRuntimeId,
       cwd: cwd ?? '(sandbox)',
     })
 
@@ -507,7 +507,7 @@ export function useAcpSession(workspaceRoot?: string) {
           : `正在连接并恢复历史会话 ${resumeSessionId.slice(0, 8)}…`
         : wasOnline
           ? '正在为当前对话创建新的 Agent 会话…'
-          : `正在连接 ${resolveAcpRuntimeDisplayName(selectedRuntimeId)}${cwd ? '' : '（网页会话）'}…`,
+          : `正在连接 ${resolveAcpRuntimeDisplayName(liveRuntimeId)}${cwd ? '' : '（网页会话）'}…`,
     )
 
     if (wasOnline) {
@@ -526,7 +526,7 @@ export function useAcpSession(workspaceRoot?: string) {
     }
 
     const result = await acpApi.connect({
-      runtimeId: selectedRuntimeId,
+      runtimeId: liveRuntimeId,
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
@@ -575,7 +575,6 @@ export function useAcpSession(workspaceRoot?: string) {
     finalizeConnected,
     finishStreaming,
     flushBufferedChunks,
-    selectedRuntimeId,
     setSession,
     setStatus,
     workspaceRoot,

@@ -16,8 +16,10 @@ import {
   Presentation,
   ScrollText,
   Table2,
+  Terminal,
 } from 'lucide-react'
 import type { FileTreeNode } from '@montree/contracts'
+import { isWslPath } from '@montree/contracts'
 import { Button } from '@/components/ui/button'
 import { writeWorkspacePathsToDataTransfer } from '@/lib/agent/acp-composer'
 import { getParentDir, isAncestorOrSelf, isAncestorPath, isMarkdownPath } from '@/lib/workspace/file-tree-ops'
@@ -39,6 +41,8 @@ interface FileExplorerProps {
   /** 最近打开的网页 */
   recentWebUrls?: string[]
   onOpenFolder: () => void
+  onOpenRemote?: () => void
+  onCloseWorkspace?: () => void
   onOpenWebDoc?: (url: string) => void
   onRescanWorkspace?: () => void
   isRescanning?: boolean
@@ -378,6 +382,8 @@ export function FileExplorer({
   webPageUrl,
   recentWebUrls = [],
   onOpenFolder,
+  onOpenRemote,
+  onCloseWorkspace,
   onOpenWebDoc,
   onRescanWorkspace,
   isRescanning = false,
@@ -398,6 +404,7 @@ export function FileExplorer({
   onAbout,
   onQuit,
 }: FileExplorerProps) {
+  const isRemoteWorkspace = Boolean(workspaceRoot && isWslPath(workspaceRoot))
   const rootName = workspaceRoot?.split(/[/\\]/).pop() ?? '工作区'
   const webMode = !workspaceRoot && Boolean(webPageUrl)
   const recentOthers = recentWebUrls.filter((url) => url !== webPageUrl)
@@ -563,10 +570,13 @@ export function FileExplorer({
             canWrite={Boolean(workspaceRoot && treeActions)}
             readOnly={readOnly}
             isRescanning={isRescanning}
+            isRemoteWorkspace={isRemoteWorkspace}
             onNewFile={() => workspaceRoot && beginNew('new-file', workspaceRoot)}
             onNewFolder={() => workspaceRoot && beginNew('new-folder', workspaceRoot)}
             onOpenFile={onOpenFile ?? (() => undefined)}
             onOpenFolder={onOpenFolder}
+            onOpenRemote={onOpenRemote}
+            onCloseWorkspace={onCloseWorkspace}
             onQuickOpen={onQuickOpen}
             onRescanWorkspace={onRescanWorkspace}
             onNewWindow={onNewWindow ?? (() => undefined)}
@@ -633,22 +643,36 @@ export function FileExplorer({
                   </ul>
                 </div>
               ) : null}
-              <div className="border-t border-border/50 px-2 pt-3">
+              <div className="border-t border-border/50 px-2 pt-3 space-y-1.5">
                 <p className="mb-2 text-[11px] text-muted-foreground">
-                  也可打开本地文件夹浏览 Markdown / 电子书
+                  也可打开工作区浏览本地或 Linux 目录
                 </p>
-                <Button size="sm" variant="outline" className="w-full" onClick={onOpenFolder}>
-                  打开文件夹
+                <Button size="sm" variant="outline" className="w-full text-xs" onClick={onOpenFolder}>
+                  打开本地文件夹
                 </Button>
+                {onOpenRemote ? (
+                  <Button size="sm" variant="outline" className="w-full text-xs gap-1.5" onClick={onOpenRemote}>
+                    <Terminal className="size-3.5" />
+                    打开远程文件夹 (WSL / SSH)
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
               <FolderOpen className="size-10 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">打开文件夹以浏览 Markdown 与电子书</p>
-              <Button size="sm" onClick={onOpenFolder}>
-                打开文件夹
-              </Button>
+              <div className="flex flex-col gap-2 w-full max-w-[210px]">
+                <Button size="sm" onClick={onOpenFolder}>
+                  打开本地文件夹
+                </Button>
+                {onOpenRemote ? (
+                  <Button size="sm" variant="outline" onClick={onOpenRemote} className="text-xs gap-1.5">
+                    <Terminal className="size-3.5" />
+                    打开远程文件夹 (WSL / SSH)
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )
         ) : (

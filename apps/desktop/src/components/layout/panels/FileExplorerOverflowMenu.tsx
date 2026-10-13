@@ -14,6 +14,8 @@ import {
   SaveAll,
   Search,
   Settings,
+  Terminal,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,10 +38,13 @@ export interface FileExplorerOverflowMenuProps {
   /** 只读模式（阅读器/在线文档）：文档组隐藏 */
   readOnly?: boolean
   isRescanning?: boolean
+  isRemoteWorkspace?: boolean
   onNewFile: () => void
   onNewFolder: () => void
   onOpenFile: () => void
   onOpenFolder: () => void
+  onOpenRemote?: () => void
+  onCloseWorkspace?: () => void
   onQuickOpen?: () => void
   onRescanWorkspace?: () => void
   onNewWindow: () => void
@@ -58,10 +63,13 @@ export function FileExplorerOverflowMenu({
   canWrite = false,
   readOnly = false,
   isRescanning = false,
+  isRemoteWorkspace = false,
   onNewFile,
   onNewFolder,
   onOpenFile,
   onOpenFolder,
+  onOpenRemote,
+  onCloseWorkspace,
   onQuickOpen,
   onRescanWorkspace,
   onNewWindow,
@@ -107,6 +115,12 @@ export function FileExplorerOverflowMenu({
           打开文件夹
           <DropdownMenuShortcut>Ctrl+Shift+O</DropdownMenuShortcut>
         </DropdownMenuItem>
+        {onOpenRemote ? (
+          <DropdownMenuItem onClick={onOpenRemote}>
+            <Terminal className="size-4" />
+            打开远程文件夹 (WSL / SSH)…
+          </DropdownMenuItem>
+        ) : null}
         {onQuickOpen ? (
           <DropdownMenuItem onClick={onQuickOpen}>
             <Search className="size-4" />
@@ -118,6 +132,12 @@ export function FileExplorerOverflowMenu({
           <DropdownMenuItem disabled={!canWrite || isRescanning} onClick={onRescanWorkspace}>
             <RefreshCw className="size-4" />
             重新扫描工作区
+          </DropdownMenuItem>
+        ) : null}
+        {onCloseWorkspace && canWrite ? (
+          <DropdownMenuItem onClick={onCloseWorkspace} className="text-destructive focus:text-destructive">
+            <XCircle className="size-4" />
+            {isRemoteWorkspace ? '断开远程连接 / 关闭工作区' : '关闭工作区'}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

@@ -11,6 +11,8 @@ export interface StatusBarProps {
   workspaceRoot?: string
   activeFilePath?: string
   onOpenWorkspacePath?: (path: string) => void
+  onDisconnectWorkspace?: () => void
+  onOpenRemote?: () => void
 }
 
 /**
@@ -20,12 +22,16 @@ export function StatusBar({
   workspaceRoot,
   activeFilePath,
   onOpenWorkspacePath,
+  onDisconnectWorkspace,
+  onOpenRemote,
 }: StatusBarProps) {
   const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false)
   const { status, isLoading, isPushing, push, refetch } = useGitStatus(workspaceRoot)
 
   const wslInfo = workspaceRoot && isWslPath(workspaceRoot) ? parseWslPath(workspaceRoot) : null
   const documentKind = activeFilePath ? getDocumentKind(activeFilePath) : null
+
+  const handleOpenRemoteModal = onOpenRemote || (() => setIsRemoteModalOpen(true))
 
   return (
     <>
@@ -47,7 +53,7 @@ export function StatusBar({
                     ? 'bg-sky-500/20 text-sky-400 hover:bg-sky-500/30'
                     : 'bg-primary/10 text-primary hover:bg-primary/20',
                 )}
-                onClick={() => setIsRemoteModalOpen(true)}
+                onClick={handleOpenRemoteModal}
                 aria-label="打开远程工作区管理器"
               >
                 <Terminal className="size-3 shrink-0" />
@@ -55,7 +61,7 @@ export function StatusBar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
-              <p>{wslInfo?.isWsl ? `当前位于 WSL: ${wslInfo.distro}` : '打开远程工作区管理器 (WSL / SSH)'}</p>
+              <p>{wslInfo?.isWsl ? `当前位于 WSL: ${wslInfo.distro}（点击管理或断开连接）` : '打开远程工作区管理器 (WSL / SSH)'}</p>
               <p className="text-[10px] text-muted-foreground">应用内直达 Linux / SSH 环境，无需系统文件对话框</p>
             </TooltipContent>
           </Tooltip>
@@ -170,6 +176,8 @@ export function StatusBar({
       <RemoteConnectModal
         isOpen={isRemoteModalOpen}
         onClose={() => setIsRemoteModalOpen(false)}
+        currentWorkspace={workspaceRoot}
+        onDisconnectRemote={onDisconnectWorkspace}
         onOpenWorkspace={(path) => {
           onOpenWorkspacePath?.(path)
         }}

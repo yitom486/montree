@@ -74,6 +74,8 @@ export interface AppSettingsState {
   defaultViewMode: EditorViewMode
   previewDebounceMs: PreviewDebounceMs
   restoreLastFileOnStartup: boolean
+  /** 启动时是否自动恢复上次工作区（包含 WSL / 远程环境） */
+  restoreWorkspaceOnStartup: boolean
   /** 上次主区展示：本地文件 / 在线文档 / 无 */
   lastActiveSurface: WorkspaceActiveSurface
   lastOpenedFilePath?: string
@@ -102,6 +104,7 @@ interface AppSettingsStore extends AppSettingsState {
   setDefaultViewMode: (mode: EditorViewMode) => void
   setPreviewDebounceMs: (ms: PreviewDebounceMs) => void
   setRestoreLastFileOnStartup: (enabled: boolean) => void
+  setRestoreWorkspaceOnStartup: (enabled: boolean) => void
   setLastActiveSurface: (surface: WorkspaceActiveSurface) => void
   setLastOpenedFilePath: (filePath?: string) => void
   setLastWebDocUrl: (url?: string) => void
@@ -136,6 +139,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       defaultViewMode: 'editor',
       previewDebounceMs: 300,
       restoreLastFileOnStartup: true,
+      restoreWorkspaceOnStartup: true,
       lastActiveSurface: 'none',
       lastOpenedFilePath: undefined,
       lastWebDocUrl: undefined,
@@ -160,6 +164,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       setPreviewDebounceMs: (ms) => set({ previewDebounceMs: ms }),
 
       setRestoreLastFileOnStartup: (enabled) => set({ restoreLastFileOnStartup: enabled }),
+
+      setRestoreWorkspaceOnStartup: (enabled) => set({ restoreWorkspaceOnStartup: enabled }),
 
       setLastActiveSurface: (surface) => set({ lastActiveSurface: surface }),
 
@@ -234,6 +240,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         defaultViewMode: state.defaultViewMode,
         previewDebounceMs: state.previewDebounceMs,
         restoreLastFileOnStartup: state.restoreLastFileOnStartup,
+        restoreWorkspaceOnStartup: state.restoreWorkspaceOnStartup,
         lastActiveSurface: state.lastActiveSurface,
         lastOpenedFilePath: state.lastOpenedFilePath,
         lastWebDocUrl: state.lastWebDocUrl,
@@ -256,6 +263,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
           // Older settings persisted source mode; every launch starts in live preview.
           markdownEditorMode: 'live-preview',
           restoreLastFileOnStartup: p.restoreLastFileOnStartup ?? true,
+          restoreWorkspaceOnStartup: p.restoreWorkspaceOnStartup ?? true,
           lastActiveSurface: p.lastActiveSurface ?? 'none',
           pdfOcrBackgroundPrefetch: p.pdfOcrBackgroundPrefetch ?? false,
           pdfOcrAgentAutoOcr: p.pdfOcrAgentAutoOcr ?? true,

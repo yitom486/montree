@@ -38,6 +38,7 @@ import { clearAllPdfOcrCache } from '@/api/ocr-api'
 import { useOcrComponent } from '@/hooks/reader/useOcrComponent'
 import { SyncSettingsSection } from './SyncSettingsSection'
 import { TtsSettingsSection } from './TtsSettingsSection'
+import { isWslPath } from '@montree/contracts'
 import { toast } from 'sonner'
 
 interface SettingsDialogProps {
@@ -139,9 +140,12 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
   const defaultViewMode = useAppSettingsStore((state) => state.defaultViewMode)
   const previewDebounceMs = useAppSettingsStore((state) => state.previewDebounceMs)
   const restoreLastFileOnStartup = useAppSettingsStore((state) => state.restoreLastFileOnStartup)
+  const restoreWorkspaceOnStartup = useAppSettingsStore((state) => state.restoreWorkspaceOnStartup)
+  const lastWorkspaceRoot = useAppSettingsStore((state) => state.lastWorkspaceRoot)
   const setDefaultViewMode = useAppSettingsStore((state) => state.setDefaultViewMode)
   const setPreviewDebounceMs = useAppSettingsStore((state) => state.setPreviewDebounceMs)
   const setRestoreLastFileOnStartup = useAppSettingsStore((state) => state.setRestoreLastFileOnStartup)
+  const setRestoreWorkspaceOnStartup = useAppSettingsStore((state) => state.setRestoreWorkspaceOnStartup)
   const tabSize = useAppSettingsStore((state) => state.tabSize)
   const editorFontSize = useAppSettingsStore((state) => state.editorFontSize)
   const setTabSize = useAppSettingsStore((state) => state.setTabSize)
@@ -413,15 +417,43 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
               </Button>
             </SettingRow>
             <SettingRow
-              title="启动时恢复上次工作区"
+              title="启动时恢复上次文件与网页"
               description="重启或更新后自动回到上次打开的文档、电子书或在线网页（有未保存草稿时优先恢复草稿）。"
             >
               <ToggleSwitch
                 checked={restoreLastFileOnStartup}
                 onChange={setRestoreLastFileOnStartup}
-                label="启动时恢复上次工作区"
+                label="启动时恢复上次文件与网页"
               />
             </SettingRow>
+            <SettingRow
+              title="启动时恢复工作区与远程环境"
+              description="下次启动时自动重新连接并打开上次的工作区（含 WSL / 远程环境）。关闭后下次启动将处于独立模式。"
+            >
+              <ToggleSwitch
+                checked={restoreWorkspaceOnStartup}
+                onChange={setRestoreWorkspaceOnStartup}
+                label="启动时恢复工作区与远程环境"
+              />
+            </SettingRow>
+            {lastWorkspaceRoot && isWslPath(lastWorkspaceRoot) ? (
+              <SettingRow
+                title="已连接的远程环境"
+                description={`当前记录路径: ${lastWorkspaceRoot}`}
+              >
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="destructive"
+                  onClick={() => {
+                    useAppSettingsStore.getState().setLastWorkspaceRoot(undefined)
+                    toast.success('已清除远程连接记忆，下次启动不会自动重连')
+                  }}
+                >
+                  清除自动连接记忆
+                </Button>
+              </SettingRow>
+            ) : null}
           </section>
 
           <Separator className="my-2" />
