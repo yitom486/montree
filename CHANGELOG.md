@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.11] - 2026-10-14
+
 - ### 修复 ACP 离线切换运行时闭包串线与配置回写反向覆盖
   - **动态绑定与即时状态对齐**：彻底修复在未连接或断开状态下切换 Agent 运行时（如从 ChatGPT/Codex 切换至 OpenCode）时，由于 React Hook 闭包缓存导致向后端发起旧运行时连接请求、并因旧配置回写导致标题与底部模型参数栏（Fast mode/Auto review 等）严重错位的缺陷。
   - **全链路显式透传**：`useAcpSession` 中的 `connect` 与 `switchRuntime` 统一解耦 React 局部状态，支持显式透传目标 `nextRuntimeId` 并直接读取 Zustand Store 实时状态，杜绝任何状态机分支下的运行时串线。
@@ -501,7 +505,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.10...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.11...HEAD
+[0.4.11]: https://github.com/yitom486/montree/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/yitom486/montree/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/yitom486/montree/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/yitom486/montree/compare/v0.4.7...v0.4.8
