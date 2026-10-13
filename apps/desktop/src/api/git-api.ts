@@ -1,8 +1,10 @@
 import type {
   AppError,
   ElectronAPI,
+  GitBranchInfo,
   GitCommitOptions,
   GitCommitResult,
+  GitDiffResult,
   GitPushOptions,
   GitPushResult,
   GitStatusResult,
@@ -47,5 +49,29 @@ export const gitApi = {
     const apiResult = requireElectronAPI()
     if (!apiResult.ok) return apiResult
     return apiResult.value.gitCommit({ cwd, ...options })
+  },
+
+  /** B3：读取未暂存/已暂存 diff（过长截断并标记） */
+  async getDiff(
+    cwd: string,
+    file?: string,
+    staged = false,
+  ): Promise<Result<GitDiffResult, AppError>> {
+    const apiResult = requireElectronAPI()
+    if (!apiResult.ok) return apiResult
+    if (typeof apiResult.value.gitDiff !== 'function') {
+      return err({ code: 'API_UNAVAILABLE', message: 'Git diff API 不可用' })
+    }
+    return apiResult.value.gitDiff({ cwd, file, staged })
+  },
+
+  /** B3：列出分支与当前分支 */
+  async listBranches(cwd: string): Promise<Result<GitBranchInfo, AppError>> {
+    const apiResult = requireElectronAPI()
+    if (!apiResult.ok) return apiResult
+    if (typeof apiResult.value.gitBranches !== 'function') {
+      return err({ code: 'API_UNAVAILABLE', message: 'Git 分支 API 不可用' })
+    }
+    return apiResult.value.gitBranches(cwd)
   },
 }

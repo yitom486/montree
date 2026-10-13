@@ -40,6 +40,11 @@ files:
 electronLanguages:
   - zh-CN
   - en-US
+# 远端工作区 Node 服务：自包含 bundle + manifest（`bun run build:remote-server` 产物），
+# main 在 resourcesPath/remote-server（开发期为本目录）定位并校验后启动
+extraResources:
+  - from: apps/desktop/resources/remote-server
+    to: remote-server
 
 win:
   icon: apps/desktop/resources/icon.ico

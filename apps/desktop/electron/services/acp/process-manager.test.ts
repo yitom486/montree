@@ -64,6 +64,23 @@ describe('连接失败自诊断（stderr 尾部拼进连接失败错误，去窗
 })
 
 describe('resolveAcpExecution', () => {
+  it('WSL 中使用 Linux opencode，不能沿用 Windows opencode.exe 模板', async () => {
+    const { resolveAcpExecution } = await import('./process-manager')
+    const runtime = { id: 'opencode', name: 'OpenCode', description: '', command: 'opencode.exe', args: ['acp'], requiredEnvKeys: [] }
+    if (process.platform === 'win32') {
+      const execution = resolveAcpExecution(runtime, '\\\\wsl.localhost\\Ubuntu\\home\\tomy')
+      expect(execution.args.at(-1)).toContain('opencode')
+      expect(execution.args.at(-1)).not.toContain('opencode.exe')
+    }
+  })
+  it('不同 WSL 发行版与原生环境不能复用同一进程', async () => {
+    const { acpExecutionContext } = await import('./process-manager')
+    if (process.platform === 'win32') {
+      expect(acpExecutionContext('D:\\notes')).toBe('native')
+      expect(acpExecutionContext('\\\\wsl.localhost\\Ubuntu\\home\\tomy')).toBe('wsl:Ubuntu')
+      expect(acpExecutionContext('\\\\wsl.localhost\\Debian\\home\\tomy')).not.toBe(acpExecutionContext('\\\\wsl.localhost\\Ubuntu\\home\\tomy'))
+    }
+  })
   it('WSL 路径自动切换为 wsl.exe 并穿透进入 Linux 命名空间', async () => {
     const { resolveAcpExecution } = await import('./process-manager')
     const runtime = {
@@ -84,6 +101,7 @@ describe('resolveAcpExecution', () => {
       expect(execution.args).toContain('--cd')
       expect(execution.args).toContain('/home/tomy/blog')
       expect(execution.args[execution.args.length - 1]).toContain('bunx')
+      expect(execution.args[execution.args.length - 1]).toContain('${SHELL:-/bin/sh}')
     }
   })
 

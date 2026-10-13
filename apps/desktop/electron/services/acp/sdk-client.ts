@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import { logAcpDiagnostic } from './mcp/diagnostics'
 import { PassThrough, Readable, Writable } from 'node:stream'
 import {
   client as createSdkClientApp,
@@ -106,6 +107,11 @@ export async function sdkRequest<Response, Params>(
       timer.unref?.()
     })
     return await Promise.race([pending, timeout])
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    const code = typeof (error as { code?: unknown })?.code === 'number' ? (error as { code: number }).code : undefined
+    logAcpDiagnostic('acp.request.failed', { method, code, timedOut: controller.signal.aborted, authRequired: /authentication required/i.test(message), pathFailure: /cwd|directory|path|ENOENT/i.test(message) })
+    throw error
   } finally {
     if (timer !== undefined) clearTimeout(timer)
   }

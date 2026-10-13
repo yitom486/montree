@@ -8,6 +8,7 @@ import { installAppMenu } from './window/app-menu'
 import { registerIpcHandlers } from './ipc/register-handlers'
 import { initAppUpdater } from './services/app-updater'
 import { disposeAllAcp } from './services/acp/acp-client'
+import { configureAcpDiagnostics } from './services/acp/mcp/diagnostics'
 import { closeAllBookDbs } from './services/book-db/open-book-db'
 import { disposeAllWorkspaceWatches } from './services/workspace-watcher'
 import { syncManager } from './services/sync/sync-manager'
@@ -86,6 +87,7 @@ app.on('open-url', (event, url) => {
 })
 
 app.whenReady().then(() => {
+  configureAcpDiagnostics(path.join(app.getPath('userData'), 'logs'))
   installAppMenu()
   registerIpcHandlers()
   initAppUpdater()

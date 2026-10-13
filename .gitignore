@@ -32,6 +32,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # pdf.js CMap / fonts（由 vite copy-pdfjs-assets 从 node_modules 生成）
 apps/desktop/src/public/pdfjs
 
+# 远端工作区 Node 服务产物（bun run build:remote-server 生成，随包分发；README 保留）
+apps/desktop/resources/remote-server/*
+!apps/desktop/resources/remote-server/README.md
+
 # Agent 粘贴图片落盘目录（工作区内）
 .inkdown/
 

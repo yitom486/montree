@@ -1,5 +1,24 @@
 // Deterministic ACP peer. No model/network calls except this window's local MCP endpoint.
 const readline = require('node:readline')
+const { spawn } = require('node:child_process')
+async function mcpRequest(mcp, method, params) {
+  if (mcp.type === 'http') {
+    const response = await fetch(mcp.url, { method: 'POST', headers: Object.fromEntries([...mcp.headers.map((header) => [header.name, header.value]), ['Content-Type', 'application/json']]), body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })
+    return response.json()
+  }
+  return new Promise((resolve, reject) => {
+    const child = spawn(mcp.command, mcp.args, { env: { ...process.env, ...Object.fromEntries(mcp.env.map((entry) => [entry.name, entry.value])) }, stdio: 'pipe', windowsHide: true })
+    const timer = setTimeout(() => { child.kill(); reject(new Error('MCP stdio timeout')) }, 10000)
+    child.on('error', (error) => { clearTimeout(timer); reject(error) })
+    child.on('exit', (code) => { clearTimeout(timer); if (code) reject(new Error('MCP child exited')) })
+    readline.createInterface({ input: child.stdout }).on('line', (line) => {
+      clearTimeout(timer)
+      child.stdin.end()
+      resolve(JSON.parse(line))
+    })
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n')
+  })
+}
 const sessions = new Map()
 const permissions = new Map()
 const waiting = new Map()
@@ -46,13 +65,11 @@ async function handle(message) {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
     } else if (command === 'tools') {
       const { mcp } = sessions.get(sessionId)
-      const response = await fetch(mcp.url, { method: 'POST', headers: Object.fromEntries([...mcp.headers.map((header) => [header.name, header.value]), ['Content-Type', 'application/json']]), body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) })
-      const rpc = await response.json()
+      const rpc = await mcpRequest(mcp, 'tools/list')
       output = `TOOLS:${sessionId}|${rpc.result.tools.map((tool) => tool.name).join(',')}`
     } else if (command === 'read') {
       const { mcp, cwd } = sessions.get(sessionId)
-      const response = await fetch(mcp.url, { method: 'POST', headers: Object.fromEntries([...mcp.headers.map((header) => [header.name, header.value]), ['Content-Type', 'application/json']]), body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'montree_read', arguments: { scope: 'viewport' } } }) })
-      const rpc = await response.json()
+      const rpc = await mcpRequest(mcp, 'tools/call', { name: 'montree_read', arguments: { scope: 'viewport' } })
       output = `READ:${sessionId}|${cwd}|${rpc.result?.content?.[0]?.text}`
     } else if (command === 'permission') {
       const answer = await request('session/request_permission', { sessionId, toolCall: { toolCallId: `tool-${sessionId}`, title: `Permission ${sessionId}` }, options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }, { optionId: 'reject', name: 'Reject', kind: 'reject_once' }] })

@@ -9,8 +9,11 @@
 | `file-service.ts` | 打开/保存对话框、读文本/二进制/图片、粘贴图、导出入口 |
 | `workspace.ts` | 扫描工作区树（深度限制、忽略目录、无权限/受限目录容错、去掉空文件夹） |
 | `workspace-fs.ts` | 工作区内新建/重命名/移动/复制/删除 |
-| `workspace-md-search.ts` | 工作区 Markdown 字面检索（只读：根内断言 + symlink 跳过，仅 .md，200 文件/256KB/100 命中上限，仅 inspect 链调用） |
-| `workspace-watcher.ts` | 监听工作区变更并通知渲染进程 |
+| `workspace-md-search.ts` | 工作区 Markdown 字面检索（只读：根内断言 + symlink 跳过，仅 .md，200 文件/256KB/100 命中上限，仅 inspect 链调用；B3 分页 offset/limit/nextOffset） |
+| `workspace-watcher.ts` | 监听工作区变更并通知渲染进程（事件带 workspaceId/代际/变化目录，旧事件不污染新状态；B3 忽略 node_modules/构建产物/Git 内部噪声，合并窗口截断回落全量） |
+| `workspace-host.ts` / `.test.ts` | WorkspaceHost 抽象：本机宿主委托既有实现（行为零变化），远端占位显式拒绝（不回落 UNC）；分发只看描述符 kind |
+| `workspace-bindings.ts` / `.test.ts` | 可信窗口绑定宿主与代际（event.sender 归属；connecting/connected/reconnecting/disconnected/error；销毁自清理） |
+| `remote-workspace-host.ts` / `.test.ts` | B2/B3 远端宿主：实现 WorkspaceHost 接口，读写/CRUD/搜索/Git/图片经 workspace 协议在远端执行；expectedRevision 冲突、断线显式失败（buffer 留渲染端）、代际过期丢弃、跨宿主拒绝、订阅重建与 revision 重核；回环真实服务端验证（T4/T5/T6/T7），真机 WSL 端到端待 Linux Node |
 | `export-save-path.ts` | 导出 HTML/PDF/Markdown 的保存路径 |
 | `web-doc-service.ts` | 在线文档抓取与目录发现入口（网络边界留守：SSRF 策略与重定向校验见 `web-doc/url-policy.ts`；目录抽取/站点谓词已迁 `@montree/web-doc`，本树 `web-doc/` 仅留 `url-policy`/`site-registry`/`e2e-fixture`） |
 | `reader-screenshot-service.ts` / `.test.ts` | Agent 按需截图 owner 窗口的阅读区，返回内存 PNG；裁剪与无文档保护 |
@@ -20,13 +23,21 @@
 
 | 文件 / 目录 | 功能 |
 |------|------|
-| `git/` (`git/git-service.ts` / `.test.ts`) | Git 状态查询、提交与推送服务；自动识别 Windows 与 WSL 路径，通过原生 `git` 或 `wsl.exe` 穿透执行 |
+| `git/` (`git/git-service.ts` / `.test.ts`，`git/git-wsl.test.ts` 真机） | Git 状态查询、提交与推送服务；自动识别 Windows 与 WSL 路径，通过原生 `git` 或 `wsl.exe` 穿透执行；B3 加 diff/分支查询（截断标记/游离 HEAD），真机 Ubuntu 临时仓库验证（无真实远端 push） |
 
 ## 远程与 WSL（remote）
 
 | 文件 | 功能 |
 |------|------|
-| `remote/remote-service.ts` / `.test.ts` | WSL 发行版动态探测（零硬编码）、Linux 家目录探测、目录应用内直接浏览、~/.ssh/config 解析 |
+| `remote/remote-service.ts` / `.test.ts` | WSL 发行版动态探测（零硬编码）、Linux 家目录探测、~/.ssh/config 解析；目录浏览 B1 起经远端服务（须先建连，未连接报 `REMOTE_NOT_CONNECTED`，已移除 UNC/`readdir` 直读） |
+| `remote/wsl-bootstrap.ts` / `.test.ts` | B1 WSL bootstrap：登录 shell/家目录/Node 探针（拒 Windows node 冒充）、经 stdin 管道传输安装（staging→双校验→原子 `mv`，目标按 buildId 存放，空格/非 ASCII 转义）、发行版+root 规划 |
+| `remote/wsl-workspace-host.ts` / `.test.ts` | B1 WSL 宿主：复用 A2 `RemoteServerPipeClient`、经 `wsl.exe` 启动同一服务并握手（期望平台 linux）；浏览/stat 在 Ubuntu 原生执行；代际隔离；断线/版本/缺 Node 明确错误；含 fs UNC 动态拦截回归 |
+| `remote/remote-server-client.ts` / `.test.ts` | A2 本地管道客户端：spawn 真实 Node 服务、长度分帧 stdio、hello 握手（协议版本/Node 22+/期望平台，防 Windows node.exe 冒充）、并行上限、取消、EOF/EPIPE 收尾、脱敏日志 |
+| `remote/wsl-capabilities-live.test.ts` | B3 WSL 真机探针：home/shell 动态得出；无 Linux Node 时断言 `REMOTE_NODE_MISSING` + 安装说明（不 sudo/下载） |
+| `remote/remote-server-host.ts` | A2 连接管理：连接归属调用窗口、代际隔离、窗口销毁回收（只杀本连接进程）；Node 解析与 manifest 校验失败给安装说明 |
+| `remote/remote-server-paths.ts` | 服务产物定位（开发期仓库资源目录/打包后 `resources/remote-server`）与 manifest 校验（协议主版本 + sha256 + 尺寸） |
+
+远端协议纯逻辑见 `packages/workspace-core/`（`@montree/workspace-core`，分帧/路径/revision），Node 服务实现见 `packages/remote-server/`（`@montree/remote-server`），产物构建见 `apps/desktop/resources/remote-server/README.md`（`bun run build:remote-server`）。
 
 ## PDF 解析（pdf-inspector）
 

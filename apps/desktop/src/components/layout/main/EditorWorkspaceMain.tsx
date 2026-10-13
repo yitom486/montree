@@ -108,6 +108,14 @@ interface EditorWorkspaceMainProps {
   onOpenRecentFile: (path: string) => void
   onOpenWebDoc: (url: string) => void
   onOutlineChange?: (state: EditorOutlineState) => void
+  /**
+   * P1 外部修改冲突横幅（dirty 时磁盘被外部改写）：重载丢弃 buffer，
+   * 覆盖用磁盘版本显式写入；关闭仅推迟处理，下次保存继续拒绝。
+   */
+  externalConflict?: { fileName: string } | null
+  onReloadDisk?: () => void
+  onOverwriteDisk?: () => void
+  onDismissConflict?: () => void
 }
 
 export const EditorWorkspaceMain = forwardRef<
@@ -131,6 +139,10 @@ export const EditorWorkspaceMain = forwardRef<
     onOpenRecentFile,
     onOpenWebDoc,
     onOutlineChange,
+    externalConflict,
+    onReloadDisk,
+    onOverwriteDisk,
+    onDismissConflict,
   },
   ref,
 ) {
@@ -419,6 +431,40 @@ export const EditorWorkspaceMain = forwardRef<
           )
         }
       />
+
+      {externalConflict ? (
+        <div
+          role="alert"
+          data-testid="external-change-banner"
+          className="flex items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-200"
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {externalConflict.fileName} 在磁盘上被外部修改，未保存内容已保留。普通保存会继续拒绝覆盖。
+          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded px-2 py-0.5 font-medium hover:bg-amber-500/20"
+            onClick={() => onReloadDisk?.()}
+          >
+            重载磁盘版
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded px-2 py-0.5 font-medium hover:bg-amber-500/20"
+            onClick={() => onOverwriteDisk?.()}
+          >
+            覆盖磁盘版
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded px-1.5 py-0.5 opacity-70 hover:opacity-100"
+            aria-label="稍后处理"
+            onClick={() => onDismissConflict?.()}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <main ref={dataRoot} data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
         {isTextData && filePath && <TextDataReaderContext filePath={filePath} content={content} kind={documentKind} root={() => dataRoot.current} />}

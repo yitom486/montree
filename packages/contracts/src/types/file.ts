@@ -137,6 +137,10 @@ export interface WorkspaceSearchMarkdownPayload {
   workspaceRoot: string
   query: string
   excludePath?: string
+  /** B2 分页：跳过前 offset 条（默认 0） */
+  offset?: number
+  /** B2 分页：本页最多取 limit 条（默认全量，上限 100） */
+  limit?: number
 }
 
 export interface WorkspaceSearchMarkdownHit {
@@ -152,4 +156,6 @@ export interface WorkspaceSearchMarkdownResult {
   /** 精确命中数（文件×行，上限 100） */
   total: number
   hits: WorkspaceSearchMarkdownHit[]
+  /** B2 分页：下一页 offset，无更多时为 null（缺席视为无分页） */
+  nextOffset?: number | null
 }

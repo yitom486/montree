@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
+import { scopeDocumentKey } from '@montree/contracts'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { applyThemeWithViewTransition } from '@/lib/editor/theme-transition'
 
@@ -24,8 +25,12 @@ const DEFAULT_FILE_STATE: FileUiState = {
 
 const UNTITLED_KEY = '__untitled__'
 
-function resolveFileKey(filePath?: string): string {
-  return filePath ?? UNTITLED_KEY
+/**
+ * 文件 UI 状态键：local/缺省沿用裸路径（回归零变化），远端按
+ * workspaceId 命名空间隔离（同一相对路径在不同工作区是不同文档）。
+ */
+function resolveFileKey(filePath?: string, workspaceId?: string): string {
+  return scopeDocumentKey(filePath ?? UNTITLED_KEY, workspaceId)
 }
 
 interface EditorUiStore {
@@ -43,12 +48,13 @@ interface EditorUiStore {
   setFileTreeExpanded: (expanded: boolean) => void
   setSidebarVisible: (visible: boolean) => void
   toggleSidebar: () => void
-  getFileState: (filePath?: string) => FileUiState
-  setViewMode: (filePath: string | undefined, mode: EditorViewMode) => void
+  getFileState: (filePath?: string, workspaceId?: string) => FileUiState
+  setViewMode: (filePath: string | undefined, mode: EditorViewMode, workspaceId?: string) => void
   saveScrollState: (
     filePath: string | undefined,
     editorScrollRatio: number,
     previewScrollRatio: number,
+    workspaceId?: string,
   ) => void
 }
 
@@ -92,16 +98,16 @@ export const useEditorUiStore = create<EditorUiStore>()(
 
       toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
 
-      getFileState: (filePath) => {
-        const key = resolveFileKey(filePath)
+      getFileState: (filePath, workspaceId) => {
+        const key = resolveFileKey(filePath, workspaceId)
         const stored = get().fileStates[key]
         if (stored) return stored
         const defaultViewMode = useAppSettingsStore.getState().defaultViewMode
         return { ...DEFAULT_FILE_STATE, viewMode: defaultViewMode }
       },
 
-      setViewMode: (filePath, mode) => {
-        const key = resolveFileKey(filePath)
+      setViewMode: (filePath, mode, workspaceId) => {
+        const key = resolveFileKey(filePath, workspaceId)
         const prev = get().fileStates[key]
         if (prev?.viewMode === mode) return
 
@@ -116,8 +122,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
         }))
       },
 
-      saveScrollState: (filePath, editorScrollRatio, previewScrollRatio) => {
-        const key = resolveFileKey(filePath)
+      saveScrollState: (filePath, editorScrollRatio, previewScrollRatio, workspaceId) => {
+        const key = resolveFileKey(filePath, workspaceId)
         const prev = get().fileStates[key]
         if (
           prev &&
@@ -154,12 +160,12 @@ export const useEditorUiStore = create<EditorUiStore>()(
 )
 
 /** 读取单文件 UI 状态；须用 useShallow，避免 getFileState 每次返回新对象导致无限重渲染 */
-export function useFileUiState(filePath?: string): FileUiState {
+export function useFileUiState(filePath?: string, workspaceId?: string): FileUiState {
   const defaultViewMode = useAppSettingsStore((state) => state.defaultViewMode)
 
   return useEditorUiStore(
     useShallow((state) => {
-      const key = resolveFileKey(filePath)
+      const key = resolveFileKey(filePath, workspaceId)
       const stored = state.fileStates[key]
       if (stored) return stored
       return { ...DEFAULT_FILE_STATE, viewMode: defaultViewMode }

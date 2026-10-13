@@ -39,6 +39,7 @@ import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { useDraftStore } from '@/stores/draft-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { useWorkspaceIdentity } from '@/stores/workspace-store'
 import { useWebDocStore } from '@/stores/web-doc-store'
 import { baseName } from '@/lib/agent/context/collect-turn-context'
 import { registerReaderContent } from '@/lib/agent/context/reader-content-registry'
@@ -61,6 +62,8 @@ function App() {
   const autoSaveEnabled = useAppSettingsStore((state) => state.autoSaveEnabled)
   const autoSaveIntervalMs = useAppSettingsStore((state) => state.autoSaveIntervalMs)
   const recentFiles = useAppSettingsStore((state) => state.recentFiles)
+  // 草稿/最近文档按工作区身份隔离（local 回落，行为不变）。
+  const { workspaceId } = useWorkspaceIdentity()
   const restoreLastFileOnStartup = useAppSettingsStore((state) => state.restoreLastFileOnStartup)
   const lastActiveSurface = useAppSettingsStore((state) => state.lastActiveSurface)
   const lastOpenedFilePath = useAppSettingsStore((state) => state.lastOpenedFilePath)
@@ -105,6 +108,9 @@ function App() {
     notifyPathDeleted,
     notifyPathRenamed,
     openWebDocument,
+    externalChange,
+    resolveExternalChange,
+    dismissExternalChange,
   } = useFileOperations(reportAppError)
 
   const webPageUrl = useWebDocStore((state) => state.pageUrl)
@@ -123,6 +129,7 @@ function App() {
 
   useDraftPersistence({
     filePath: isMarkdownDocument ? filePath : undefined,
+    workspaceId,
     content,
     savedContent,
     isDirty,
@@ -160,7 +167,7 @@ function App() {
   const handleRestoreDraft = useCallback(() => {
     if (!recoveryDraft || !recoveryDraftKey) return
     restoreDraft(recoveryDraft)
-    clearDraftForFile(recoveryDraft.filePath)
+    clearDraftForFile(recoveryDraft.filePath, recoveryDraft.workspaceId)
     dismissRecovery()
   }, [dismissRecovery, recoveryDraft, recoveryDraftKey, restoreDraft])
 
@@ -549,6 +556,10 @@ function App() {
             recentFiles={recentFiles}
             recentWebUrls={recentWebUrls}
             fileTree={fileTree}
+            externalConflict={externalChange ? { fileName } : null}
+            onReloadDisk={() => void resolveExternalChange('reload')}
+            onOverwriteDisk={() => void resolveExternalChange('overwrite')}
+            onDismissConflict={() => dismissExternalChange()}
             onOpenWikilink={(target) => void handleOpenWikilink(target)}
             onOpenDeepLink={(url) => void handleOpenDeepLink(url)}
             onContentChange={setContent}

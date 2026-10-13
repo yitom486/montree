@@ -9,9 +9,11 @@ import { methods } from '@agentclientprotocol/sdk'
 import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
 import {
-  startTocMcpServer,
   type MontreeMcpServerHandle,
 } from './mcp/montree-mcp-server'
+import { startWindowMcpServer, stopWindowMcpServers } from './mcp/stdio-server'
+import { windowMcpEntry } from './mcp/session-config'
+import { logAcpDiagnostic } from './mcp/diagnostics'
 import { sdkRequest } from './sdk-client'
 import { disposeAllAcpProcesses } from './process-manager'
 import { acpState, claimAcpSession, disarmSuppressSettle, setStatus } from './acp-state'
@@ -23,20 +25,13 @@ import {
 import { disconnectAcp } from './acp-connection'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
-function mcpServerEntry(handle: MontreeMcpServerHandle, name: string): unknown[] {
-  return [
-    {
-      type: 'http',
-      name,
-      url: handle.url,
-      headers: [{ name: 'Authorization', value: `Bearer ${handle.authToken}` }],
-    },
-  ]
+function mcpServerEntry(handle: MontreeMcpServerHandle, name: string, cwd?: string): unknown[] {
+  return windowMcpEntry(handle, name, cwd)
 }
 
 async function ensureTocMcpServer(): Promise<MontreeMcpServerHandle> {
   if (!acpState.tocMcp) {
-    acpState.tocMcp = await startTocMcpServer({ readSnapshot: handleSnapshotRequest })
+    acpState.tocMcp = await startWindowMcpServer({ readSnapshot: handleSnapshotRequest }, 'toc')
   }
   return acpState.tocMcp
 }
@@ -69,16 +64,7 @@ export async function loadAcpSession(payload: {
       {
         sessionId: payload.sessionId,
         cwd,
-        mcpServers: acpState.montreeMcp
-          ? [
-              {
-                type: 'http',
-                name: 'montree',
-                url: acpState.montreeMcp.url,
-                headers: [{ name: 'Authorization', value: `Bearer ${acpState.montreeMcp.authToken}` }],
-              },
-            ]
-          : [],
+        mcpServers: acpState.montreeMcp ? mcpServerEntry(acpState.montreeMcp, 'montree', cwd) : [],
       },
     )
     const id =
@@ -121,9 +107,9 @@ export async function createAcpSession(
   try {
     const mcpServers =
       toolScope === 'toc'
-        ? mcpServerEntry(await ensureTocMcpServer(), 'montree-toc')
+        ? mcpServerEntry(await ensureTocMcpServer(), 'montree-toc', resolvedCwd)
         : acpState.montreeMcp
-          ? mcpServerEntry(acpState.montreeMcp, 'montree')
+          ? mcpServerEntry(acpState.montreeMcp, 'montree', resolvedCwd)
           : []
     const sessionCwd = isWslPath(resolvedCwd) ? windowsToLinuxPath(resolvedCwd) : resolvedCwd
     const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
@@ -195,6 +181,7 @@ export async function promptAcp(payload: {
   }
 
   const prevActiveSessionId = acpState.activePromptSessionId
+  logAcpDiagnostic('acp.prompt.started', { sessionId: payload.sessionId })
   acpState.activePromptSessionId = payload.sessionId
   // 真实用户 prompt 发起前放行：load 重放定居窗口到此结束，后续 updates 均为真实增量
   disarmSuppressSettle()
@@ -209,8 +196,10 @@ export async function promptAcp(payload: {
       600_000, // prompt 涉及多步工具调用或视觉大模型解析，超时放宽至 600s（10分钟），避免大部头教材密集目录解析时前端过早判超时
     )
     const stopReason = typeof result.stopReason === 'string' ? result.stopReason : 'end_turn'
+    logAcpDiagnostic('acp.prompt.completed', { sessionId: payload.sessionId })
     return ok({ stopReason })
   } catch (error) {
+    logAcpDiagnostic('acp.prompt.failed', { sessionId: payload.sessionId })
     try {
       void a.value.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
     } catch {
@@ -237,7 +226,10 @@ export function disposeAllAcp(): void {
   // App 退出：整树杀干净，不保温
   for (const context of listAcpContexts()) {
     context.closed = true
-    runInAcpContext(context, () => { void disconnectAcp(undefined, { killProcess: true }) })
+    runInAcpContext(context, () => {
+      void disconnectAcp(undefined, { killProcess: true })
+      void stopWindowMcpServers()
+    })
   }
   disposeAllAcpProcesses()
 }

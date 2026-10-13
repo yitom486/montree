@@ -101,7 +101,7 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     expect(firstInitial.state.activeThreadId).toBe('old-thread')
     const secondScope = (await chat(second)).scope
     expect(secondScope).not.toBe(firstInitial.scope)
-    await second.getByRole('complementary', { name: '活动栏' }).getByRole('button', { name: '打开 Agent 面板' }).click()
+    await second.getByRole('button', { name: 'AI 伴读', exact: true }).click()
     await expect.poll(async () => (await chat(second)).state?.selectedRuntimeId).toBe('opencode')
     const fresh = await chat(second)
     expect(fresh.state?.selectedRuntimeId).toBe('opencode')
@@ -182,6 +182,8 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     const thirdHandle = await app.browserWindow(third)
     await thirdHandle.evaluate((window) => window.destroy())
 
+    // Connecting mock-window may create its own thread rather than activate seeded opencode history.
+    const activeBeforeReconnect = (await chat(first)).state.activeThreadId
     const oldSid = sidA
     const reconnected = await connect(first, workspace, sidA)
     expect(reconnected.ok, JSON.stringify(reconnected)).toBe(true)
@@ -194,7 +196,8 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     await expect.poll(async () => (await diagnostics(second)).results.read?.ok).toBe(true)
     await first.waitForTimeout(1700)
     const afterA = await chat(first), afterB = await chat(second)
-    expect(afterA.state.activeThreadId).toBe('old-thread')
+    expect(afterA.state.activeThreadId).toBe(activeBeforeReconnect)
+    expect(JSON.stringify(afterA.state.threads)).toContain('OLD_WINDOW_HISTORY')
     expect(JSON.stringify(afterA.state.threads)).not.toContain(sidB)
     expect(JSON.stringify(afterB.state.threads)).not.toContain(sidA)
     await info.attach('window-isolation-transcript', { body: JSON.stringify({ first: await diagnostics(first), second: await diagnostics(second) }, null, 2), contentType: 'application/json' })

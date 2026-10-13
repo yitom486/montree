@@ -7,10 +7,9 @@ import { launchBuiltApp } from './helpers/launch-app'
  * 高亮/上标/脚注/公式/折叠/任务列表/kbd 一次成形，折叠真实点开展示。
  */
 async function openPanel(page: Page) {
-  const activityBar = page.getByRole('complementary', { name: '活动栏' })
   const panel = page.locator('aside[aria-label="Agent 聊天"]:visible')
   if ((await panel.count()) === 0) {
-    await activityBar.getByRole('button', { name: '打开 Agent 面板' }).click()
+    await page.getByRole('button', { name: 'AI 伴读', exact: true }).click()
   }
   await expect(panel.first()).toBeVisible({ timeout: 10_000 })
   return panel.first()

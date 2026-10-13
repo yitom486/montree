@@ -16,18 +16,14 @@ test.describe('Agent 面板壳', () => {
         timeout: 15_000,
       })
 
-      const activityBar = window.getByRole('complementary', { name: '活动栏' })
-      // panelOpen 可能被 persist 成已打开：两种标签都能点
-      const agentToggle = activityBar
-        .getByRole('button', { name: '打开 Agent 面板' })
-        .or(activityBar.getByRole('button', { name: '关闭 Agent 面板' }))
+      const agentToggle = window.getByRole('button', { name: 'AI 伴读', exact: true })
       await expect(agentToggle).toBeVisible({ timeout: 10_000 })
 
       // docked 面板常驻挂载（折叠不断挂），floating 开启时再挂第二个：
       // 全页 role 定位必然撞车，只认当前可见的那个（HUD 双形态设计如此）。
       const panel = window.locator('aside[aria-label="Agent 聊天"]:visible')
       if ((await panel.count()) === 0) {
-        await activityBar.getByRole('button', { name: '打开 Agent 面板' }).click()
+        await agentToggle.click()
       }
       await expect(panel.first()).toBeVisible({ timeout: 10_000 })
       // 面板头已改为运行时名（旧 "Agent" 字样是阶段 9 前的叫法）：断言运行时切换器

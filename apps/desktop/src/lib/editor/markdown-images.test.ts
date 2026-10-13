@@ -6,6 +6,7 @@ import {
   parseMarkdownImageSrc,
   replaceImageSrcInHtml,
   resolveLocalImagePath,
+  resolveWorkspaceImageRef,
 } from './markdown-images'
 
 describe('markdown-images', () => {
@@ -79,5 +80,17 @@ describe('markdown-images', () => {
     expect(replacements).toEqual({
       './a.png': 'data:image/png;base64,QUJD',
     })
+  })
+
+  it('B2：远端文档相对图片解析为工作区相对路径（不拼 UNC）', () => {
+    expect(resolveWorkspaceImageRef('notes/a.md', './assets/p.png')).toBe('notes/assets/p.png')
+    expect(resolveWorkspaceImageRef('notes/a.md', '../shared/p.png')).toBe('shared/p.png')
+    expect(resolveWorkspaceImageRef('a.md', 'p.png')).toBe('p.png')
+    // 绝对路径语义不明、逃逸与外部地址一律拒绝
+    expect(resolveWorkspaceImageRef('notes/a.md', '/x.png')).toBeNull()
+    expect(resolveWorkspaceImageRef('notes/a.md', 'D:/x.png')).toBeNull()
+    expect(resolveWorkspaceImageRef('a.md', '../evil.png')).toBeNull()
+    expect(resolveWorkspaceImageRef('notes/a.md', 'https://example.com/a.png')).toBeNull()
+    expect(resolveWorkspaceImageRef('notes/a.md', '')).toBeNull()
   })
 })

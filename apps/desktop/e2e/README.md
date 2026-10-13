@@ -12,10 +12,11 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 | 文件 | 说明 |
 |------|------|
-| `app-smoke.spec.ts` | 启动、欢迎页、菜单 |
+| `app-smoke.spec.ts` | 启动、欢迎页、菜单；真实 IPC 拒绝未绑定窗口凭 workspaceId 访问远端 |
 | `agent-community.spec.ts` | 社区滚动跟随/上滑逃离、历史窗口与位置恢复回归 |
 | `agent-panel.spec.ts` | Agent 面板壳 |
-| `agent-window-isolation.spec.ts` / `fixtures/mock-window-agent.cjs` | 模拟 ACP Agent 经真实子进程/SDK/IPC/HTTP MCP 验证多窗口聊天、制卡指针、权限、取消、恢复、关闭和 iframe 原生快捷键隔离；不调用真实模型 |
+| `agent-wsl-opencode.spec.ts` | 可选真实 Windows→WSL OpenCode 连接验证（设置 E2E_WSL_OPENCODE_CWD）：加载 Ubuntu 用户登录 shell、独立认证、stdio 工具发现；不发送模型 prompt |
+| `agent-window-isolation.spec.ts` / `fixtures/mock-window-agent.cjs` | 模拟 ACP Agent 经真实子进程/SDK/IPC/stdio MCP 验证多窗口聊天、制卡指针、权限、取消、恢复、关闭和 iframe 原生快捷键隔离；不调用真实模型；HTTP 仅保留专用测试钩子兼容 |
 | `agent-tool-timeline.spec.ts` | 聊天展示层定向回归：种子时间线（单回合一条工作记录/失败摘要/图表独立入口紧凑态/长内容，浅色+深色截图与默认态高度测量）、10 调用收敛基线（一条记录+2 结果入口）、流式工作记录（运行收起·展开后落定保持，需 mock `worklog`/`worklog-done` 台本）、真实 mock 审批 Allow/Reject 全链路（唯一可见·幂等消失）、分隔线三档宽度（约 320/390/480）与 JSON 内部滚动；不调用真实模型 |
 | `agent-streamdown.spec.ts` | Streamdown 正文链路：真实 mock 流式中间态占位与完成态（表格/代码/数字公式/Mermaid/链接）、脚注引用和返回实际点击、社区代码复制、代码头标签与动作浮层无重叠、Shiki token 高亮生效、无面板溢出截图；不调用真实模型 |
 | `agent-rich-check.spec.ts` | 富文本核验单：mock `rich-check` 台本一次回放 mark/上标/脚注成对/行内公式/原生 details 点开展示/只读任务列表/kbd 键帽；附截图；不调用真实模型 |

@@ -13,14 +13,24 @@ const foliateAlias = {
   '@foliate': resolve(appDir, '../../third-party/foliate-js'),
 }
 
-const workspaceAlias = {
-  '@montree/contracts': resolve(appDir, '../../packages/contracts/src/index.ts'),
-  '@montree/reader-core': resolve(appDir, '../../packages/reader-core/src/index.ts'),
-  '@montree/pdf': resolve(appDir, '../../packages/pdf/src/index.ts'),
-  '@montree/ocr-core': resolve(appDir, '../../packages/ocr-core/src/index.ts'),
-  '@montree/annotations': resolve(appDir, '../../packages/annotations/src/index.ts'),
-  '@montree/web-doc': resolve(appDir, '../../packages/web-doc/src/index.ts'),
-}
+const workspaceAlias: Array<{ find: string | RegExp; replacement: string }> = [
+  // contracts 子路径（core/*、types/*）精确优先：远端 bundle 须直引子模块，
+  // 不得经 barrel 拖入无关运行时；对象形式前缀改写会拼出 index.ts/types/* 坏路径
+  {
+    find: /^@montree\/contracts\/(.+)/,
+    replacement: `${resolve(appDir, '../../packages/contracts/src')}/$1`,
+  },
+  ...Object.entries({
+    '@montree/contracts': resolve(appDir, '../../packages/contracts/src/index.ts'),
+    '@montree/reader-core': resolve(appDir, '../../packages/reader-core/src/index.ts'),
+    '@montree/pdf': resolve(appDir, '../../packages/pdf/src/index.ts'),
+    '@montree/ocr-core': resolve(appDir, '../../packages/ocr-core/src/index.ts'),
+    '@montree/annotations': resolve(appDir, '../../packages/annotations/src/index.ts'),
+    '@montree/web-doc': resolve(appDir, '../../packages/web-doc/src/index.ts'),
+    '@montree/workspace-core': resolve(appDir, '../../packages/workspace-core/src/index.ts'),
+    '@montree/remote-server': resolve(appDir, '../../packages/remote-server/src/index.ts'),
+  }).map(([find, replacement]) => ({ find, replacement })),
+]
 
 /** file:// 协议下 crossorigin 会导致 JS/CSS 静默加载失败（生产黑屏） */
 function removeCrossOriginPlugin(): Plugin {
@@ -70,18 +80,21 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     resolve: {
-      alias: { ...workspaceAlias },
+      alias: [...workspaceAlias],
     },
     build: {
       lib: {
-        entry: resolve(appDir, 'electron/main.ts'),
+        entry: {
+          main: resolve(appDir, 'electron/main.ts'),
+          'mcp-stdio': resolve(appDir, 'electron/mcp-stdio.ts'),
+        },
       },
     },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     resolve: {
-      alias: { ...workspaceAlias },
+      alias: [...workspaceAlias],
     },
     build: {
       lib: {
@@ -113,8 +126,9 @@ export default defineConfig({
       alias: [
         // Official web bundle retains common programming languages without shipping every grammar.
         { find: /^shiki$/, replacement: 'shiki/bundle/web' },
-        ...Object.entries({ '@': resolve(appDir, 'src'), ...foliateAlias, ...workspaceAlias })
+        ...Object.entries({ '@': resolve(appDir, 'src'), ...foliateAlias })
           .map(([find, replacement]) => ({ find, replacement })),
+        ...workspaceAlias,
       ],
     },
     plugins: [

@@ -12,6 +12,7 @@ import type { DetectPdfTocPagesPayload, GetPdfOcrTocPayload, GetPdfOcrPagePayloa
 import type { ClassifyPdfDocumentPayload, ExtractPdfBookMarkdownPayload } from '@montree/contracts'
 import type { RosettaActiveImport, RosettaBodyWatermarkApplyPayload, RosettaBodyWatermarkPreviewPayload, RosettaImportPayload, RosettaImportStatus, RosettaInspectContentPayload, RosettaQuery, RosettaTocRebuildPayload } from '@montree/contracts'
 import type { QuizSessionRecord } from '@montree/contracts'
+import type { WindowWorkspaceStatus, WorkspaceChangedEvent, WorkspaceConnectPayload } from '@montree/contracts'
 
 const windowInit = ipcRenderer.sendSync(IPC.APP_GET_WINDOW_INIT) as WindowInit
 const isFreshWindow = windowInit?.isFreshWindow ?? false
@@ -73,13 +74,26 @@ const electronAPI: ElectronAPI = {
   unwatchWorkspace: () => {
     ipcRenderer.send(IPC.WORKSPACE_UNWATCH)
   },
-  onWorkspaceChanged: (callback: (payload: { rootPath: string }) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: { rootPath: string }) => {
+  onWorkspaceChanged: (callback: (payload: WorkspaceChangedEvent) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangedEvent) => {
       callback(payload)
     }
     ipcRenderer.on(IPC.WORKSPACE_CHANGED, handler)
     return () => {
       ipcRenderer.removeListener(IPC.WORKSPACE_CHANGED, handler)
+    }
+  },
+  connectWorkspace: (payload: WorkspaceConnectPayload) =>
+    ipcRenderer.invoke(IPC.WORKSPACE_CONNECT, payload),
+  disconnectWorkspace: () => ipcRenderer.invoke(IPC.WORKSPACE_DISCONNECT),
+  getWorkspaceStatus: () => ipcRenderer.invoke(IPC.WORKSPACE_GET_STATUS),
+  onWorkspaceStatusChanged: (callback: (status: WindowWorkspaceStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: WindowWorkspaceStatus) => {
+      callback(status)
+    }
+    ipcRenderer.on(IPC.WORKSPACE_STATUS_CHANGED, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC.WORKSPACE_STATUS_CHANGED, handler)
     }
   },
   readFile: (filePath: string) => ipcRenderer.invoke(IPC.FILE_READ, filePath),
@@ -88,6 +102,10 @@ const electronAPI: ElectronAPI = {
   readImage: (filePath: string) => ipcRenderer.invoke(IPC.FILE_READ_IMAGE, filePath),
   saveFile: (payload: SaveFilePayload) => ipcRenderer.invoke(IPC.FILE_SAVE, payload),
   saveFileAs: (payload: SaveFilePayload) => ipcRenderer.invoke(IPC.FILE_SAVE_AS, payload),
+  workspaceReadText: (payload) => ipcRenderer.invoke(IPC.WORKSPACE_READ_TEXT, payload),
+  workspaceWriteText: (payload) => ipcRenderer.invoke(IPC.WORKSPACE_WRITE_TEXT, payload),
+  workspaceSaveTextAs: (payload) => ipcRenderer.invoke(IPC.WORKSPACE_SAVE_TEXT_AS, payload),
+  workspaceReadImage: (payload) => ipcRenderer.invoke(IPC.WORKSPACE_READ_IMAGE, payload),
   savePastedImage: (payload: SavePastedImagePayload) =>
     ipcRenderer.invoke(IPC.FILE_SAVE_PASTED_IMAGE, payload),
   createWorkspaceFile: (payload) => ipcRenderer.invoke(IPC.FILE_CREATE, payload),
@@ -356,11 +374,23 @@ const electronAPI: ElectronAPI = {
   gitStatus: (cwd) => ipcRenderer.invoke(IPC.GIT_STATUS, cwd),
   gitPush: (payload) => ipcRenderer.invoke(IPC.GIT_PUSH, payload),
   gitCommit: (payload) => ipcRenderer.invoke(IPC.GIT_COMMIT, payload),
+  gitDiff: (payload) => ipcRenderer.invoke(IPC.GIT_DIFF, payload),
+  gitBranches: (cwd) => ipcRenderer.invoke(IPC.GIT_BRANCHES, cwd),
   /* ===== 远程与 WSL 环境 ===== */
   remoteListWslDistros: () => ipcRenderer.invoke(IPC.REMOTE_LIST_WSL_DISTROS),
   remoteGetWslHome: (distro) => ipcRenderer.invoke(IPC.REMOTE_GET_WSL_HOME, distro),
   remoteBrowseWsl: (payload) => ipcRenderer.invoke(IPC.REMOTE_BROWSE_WSL, payload),
+  remoteConnectWsl: (payload) => ipcRenderer.invoke(IPC.REMOTE_WSL_CONNECT, payload),
+  remoteDisconnectWsl: () => ipcRenderer.invoke(IPC.REMOTE_WSL_DISCONNECT),
+  remoteWslStatus: () => ipcRenderer.invoke(IPC.REMOTE_WSL_STATUS),
+  remoteWslStat: (payload) => ipcRenderer.invoke(IPC.REMOTE_WSL_STAT, payload),
+  remoteOpenWslWorkspace: (payload) => ipcRenderer.invoke(IPC.REMOTE_WSL_OPEN_WORKSPACE, payload),
   remoteListSshConfigHosts: () => ipcRenderer.invoke(IPC.REMOTE_LIST_SSH_CONFIG_HOSTS),
+  /* ===== 远端工作区服务本地管道（A2） ===== */
+  remoteServerConnect: (payload) => ipcRenderer.invoke(IPC.REMOTE_SERVER_CONNECT, payload),
+  remoteServerInvoke: (payload) => ipcRenderer.invoke(IPC.REMOTE_SERVER_INVOKE, payload),
+  remoteServerDisconnect: (connectionId) => ipcRenderer.invoke(IPC.REMOTE_SERVER_DISCONNECT, connectionId),
+  remoteServerStatus: (connectionId) => ipcRenderer.invoke(IPC.REMOTE_SERVER_STATUS, connectionId),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

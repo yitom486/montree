@@ -1,9 +1,11 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
 import { isWslPath, parseWslPath, type AcpRuntimeInfo } from '@montree/contracts'
 import { bindAcpContext, currentAcpContext } from './acp-context'
+import { logAcpDiagnostic } from './mcp/diagnostics'
 
 export interface SpawnedAcpProcess {
   runtimeId: string
+  executionContext?: string
   child: ChildProcessWithoutNullStreams
   kill: () => void
   /** spawn 时间戳（保留供诊断/排序，stderr 归因已去窗口化，不再参与判定） */
@@ -65,6 +67,13 @@ export interface ResolvedAcpExecution {
   shell: boolean
 }
 
+export function acpExecutionContext(cwd?: string): string {
+  if (process.platform === 'win32' && cwd && isWslPath(cwd)) {
+    return `wsl:${parseWslPath(cwd).distro ?? ''}`
+  }
+  return 'native'
+}
+
 /**
  * 解析 ACP 运行命令与执行环境。
  * 当工作区为 WSL 路径时，穿透进入 WSL Linux 命名空间内执行，共享 Linux 凭证与工具链。
@@ -74,11 +83,13 @@ export function resolveAcpExecution(runtime: AcpRuntimeInfo, cwd?: string): Reso
     const parsed = parseWslPath(cwd)
     if (parsed.isWsl && parsed.distro) {
       const linuxCwd = parsed.linuxPath || '~'
-      // 在 WSL 内部利用 bash -lic 执行以加载用户完整的 PATH (bun, npx, node)，并通过 exec 替换 shell 进程
-      const cmdStr = `exec ${[runtime.command, ...runtime.args].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`
+      // Use the account's login shell: bash misses tools configured by zsh/fish users.
+      // The Windows registry says opencode.exe; using it in WSL silently launches Windows again.
+      const command = runtime.id === 'opencode' ? 'opencode' : runtime.command
+      const cmdStr = `exec ${[command, ...runtime.args].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`
       return {
         file: 'wsl.exe',
-        args: ['-d', parsed.distro, '--cd', linuxCwd, 'bash', '-lic', cmdStr],
+        args: ['-d', parsed.distro, '--cd', linuxCwd, 'sh', '-lc', `exec "\${SHELL:-/bin/sh}" -lic '${cmdStr.replace(/'/g, "'\\''")}'`],
         shell: false,
       }
     }
@@ -121,6 +132,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
   }
 
   const execution = resolveAcpExecution(options.runtime, options.cwd)
+  logAcpDiagnostic('agent.spawn', { runtime: options.runtime.id, environment: acpExecutionContext(options.cwd), executable: execution.file })
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...options.env,
@@ -174,6 +186,9 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
       stderrBuffer = stderrBuffer.slice(idx + 1)
       if (line.trim()) {
         pushStderrTailLine(line)
+        if (/mcp|connection|timeout|error/i.test(line)) {
+          logAcpDiagnostic('agent.stderr', { runtime: options.runtime.id, mcp: /mcp/i.test(line), timeout: /timeout/i.test(line), error: /error|failed/i.test(line) })
+        }
         if (process.env.NODE_ENV !== 'production') {
           console.error(`[acp:${options.runtime.id}]`, line)
         }
@@ -184,6 +199,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
 
   const handle: SpawnedAcpProcess = {
     runtimeId: options.runtime.id,
+    executionContext: acpExecutionContext(options.cwd),
     child,
     spawnedAt: Date.now(),
     stderrTail,
@@ -279,7 +295,7 @@ export function listLiveAcpRuntimeIds(): string[] {
  * 取同 runtime 下仍存活的常驻进程（复用时用）。已退出或被外部杀掉的返回 undefined，
  * 调用方应走冷启动并顺手清扫其残留临时目录。
  */
-export function getLiveAcpProcess(runtimeId: string): SpawnedAcpProcess | undefined {
+export function getLiveAcpProcess(runtimeId: string, cwd?: string): SpawnedAcpProcess | undefined {
   const key = processKey(runtimeId)
   const handle = active.get(key)
   if (!handle) return undefined
@@ -287,6 +303,7 @@ export function getLiveAcpProcess(runtimeId: string): SpawnedAcpProcess | undefi
     active.delete(key)
     return undefined
   }
+  if ((handle.executionContext ?? 'native') !== acpExecutionContext(cwd)) return undefined
   return handle
 }
 

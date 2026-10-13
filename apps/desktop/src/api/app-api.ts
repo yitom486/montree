@@ -1,5 +1,5 @@
 import type { RendererErrorPayload } from '@montree/contracts'
-import type { AppUpdateStatus } from '@montree/contracts'
+import type { AppUpdateStatus, WorkspaceChangedEvent } from '@montree/contracts'
 import { ok, err, isOk, type Result } from '@montree/contracts'
 import type { AppError } from '@montree/contracts'
 
@@ -145,7 +145,7 @@ export const appApi = {
   },
 
   /** 工作区文件变化时回调；返回取消订阅 */
-  onWorkspaceChanged(callback: (payload: { rootPath: string }) => void): (() => void) | undefined {
+  onWorkspaceChanged(callback: (payload: WorkspaceChangedEvent) => void): (() => void) | undefined {
     return getElectronAPI()?.onWorkspaceChanged(callback)
   },
 

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { buildWebDocTabsRuntimeScript } from '../src/lib/reader/web-doc/web-doc-code-blocks'
+import { buildWebDocPlaygroundRuntimeScript } from '../src/lib/reader/web-doc/web-doc-html'
 import {
   E2E_WEB_DOC_XSS_URL,
   webDocFixtureDir,
@@ -49,18 +51,21 @@ test.describe('在线文档 XSS 防护（真浏览器）', () => {
       expect(await frameLoc.locator('a[href^="javascript:"]').count()).toBe(0)
       expect(await frameLoc.locator('[onclick]').count()).toBe(0)
       expect(await frameLoc.locator('[onerror]').count()).toBe(0)
-      // 注：Playwright 的 CSS 引擎在 srcdoc 帧内对 [onload] 有误报（整文档序列化无
-      // 该子串），以帧内权威扫描为准；script 仅允许应用自带的多语言 Tab 脚本
-      const domScan = await frame!.evaluate(() => {
-        const html = document.documentElement.outerHTML.toLowerCase()
+      // 枚举 DOM 属性，避免把可信脚本或正文里的 onload 字样当成事件属性；
+      // script 必须逐字匹配应用自带的 Tab / Playground 运行时。
+      const trustedScripts = [buildWebDocTabsRuntimeScript(), buildWebDocPlaygroundRuntimeScript()]
+        .map((html) => html.replace(/^<script>/, '').replace(/<\/script>$/, ''))
+      const domScan = await frame!.evaluate((trusted) => {
         return {
-          hasOnloadString: html.includes('onload'),
+          hasEventHandlers: Array.from(document.querySelectorAll('*')).some((element) =>
+            Array.from(element.attributes).some((attribute) => /^on/i.test(attribute.name)),
+          ),
           untrustedScripts: Array.from(document.scripts).filter(
-            (script) => !(script.textContent ?? '').includes('web-doc-tabs'),
+            (script) => !trusted.includes(script.textContent ?? ''),
           ).length,
         }
-      })
-      expect(domScan.hasOnloadString).toBe(false)
+      }, trustedScripts)
+      expect(domScan.hasEventHandlers).toBe(false)
       expect(domScan.untrustedScripts).toBe(0)
     } finally {
       await app.close()

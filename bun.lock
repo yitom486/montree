@@ -133,8 +133,23 @@
         "@montree/contracts": "workspace:*",
       },
     },
+    "packages/remote-server": {
+      "name": "@montree/remote-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@montree/contracts": "workspace:*",
+        "@montree/workspace-core": "workspace:*",
+      },
+    },
     "packages/web-doc": {
       "name": "@montree/web-doc",
+      "version": "0.0.0",
+      "dependencies": {
+        "@montree/contracts": "workspace:*",
+      },
+    },
+    "packages/workspace-core": {
+      "name": "@montree/workspace-core",
       "version": "0.0.0",
       "dependencies": {
         "@montree/contracts": "workspace:*",
@@ -464,7 +479,11 @@
 
     "@montree/reader-core": ["@montree/reader-core@workspace:packages/reader-core"],
 
+    "@montree/remote-server": ["@montree/remote-server@workspace:packages/remote-server"],
+
     "@montree/web-doc": ["@montree/web-doc@workspace:packages/web-doc"],
+
+    "@montree/workspace-core": ["@montree/workspace-core@workspace:packages/workspace-core"],
 
     "@mozilla/readability": ["@mozilla/readability@0.6.0", "", {}, "sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ=="],
 

@@ -36,7 +36,9 @@ export function AgentAuthDialog({
   onCancel,
 }: AgentAuthDialogProps) {
   const [selected, setSelected] = useState(methods[0]?.id ?? '')
-  const authHint = runtimeId
+  const authHint = runtimeId === 'opencode'
+    ? '使用实际运行 OpenCode 的环境中的配置与登录态。WSL 工作区使用对应发行版内的 OpenCode；若确实需要登录，请在该环境的终端运行 opencode auth login。'
+    : runtimeId
     ? (findBuiltinAcpRuntime(runtimeId)?.authHint ?? FALLBACK_AUTH_HINT)
     : FALLBACK_AUTH_HINT
 

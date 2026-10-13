@@ -1,55 +1,33 @@
-# MCP 本地端点架构与冷门固定端口设计
+# MCP stdio 接入与窗口生命周期
 
-本文档说明 Montree 进程内 MCP（Model Context Protocol）HTTP 服务端点的端口分配策略、冲突弹性容错与鉴权令牌稳定性机制。
+生产会话通过 ACP 下发 stdio 配置：Agent 启动构建产物 out/main/mcp-stdio.js，以 Electron 的 Node 模式运行，stdout 仅承载 MCP JSON-RPC。子进程经窗口专属命名管道（Windows）或 Unix socket（macOS/Linux）接入主进程，不使用 HTTP，无需额外安装 Node/Bun。
 
----
+链路：Agent ↔ stdio 子进程 ↔ 窗口管道 ↔ 主进程工具分发 ↔ 所属窗口的文档快照。
 
-## 1. 背景与根因
+WSL 工作区启动对应发行版的 OpenCode，加载 Ubuntu 用户 SHELL 的登录环境，禁止复用 Windows 的温进程。stdio 命令使用 /mnt 下的 Windows Electron 可执行路径；脚本参数使用 Windows 能识别的正斜杠路径，通过 WSLENV 传递 Node 模式和窗口管道配置。协议仍是标准 ACP/MCP，不复制 Windows 的供应商认证到 Ubuntu。
 
-在引入固定端口之前，Montree 的进程内 MCP 服务采用 `server.listen(0, '127.0.0.1')` 由操作系统动态分配临时端口（通常落在 49152~65535 范围）：
+## 生命周期
 
-1. **端口漂移与长会话脱节**：
-   - 在开发调试热重载（HMR / 主进程重载）或应用短暂重启后，MCP 服务重新分配了新的随机端口（例如从 `61177` 变为 `59783`）。
-   - 外部 Agent 运行时（如 Antigravity CLI / Codex 等 ACP 会话）在其现有会话内仍然保持最初的连接配置，后续发起工具调用时发往旧端口，被系统网络栈直接以 `connectex: No connection could be made because the target machine actively refused it` 拒绝。
-2. **鉴权令牌重置隐患**：
-   - 若每次启动随机生成 `authToken`，即便端口保持不变，旧会话重发请求也会遭遇 `401 Unauthorized` 鉴权拦截。
+- 新建窗口时启动窗口文档服务；断开 ACP、切换智能体和聊天保留端点及令牌。
+- 新建、加载、恢复会话均下发所属窗口的 stdio 命令与环境配置。Agent 管理 stdio 子进程，Montree 主进程管理窗口服务。
+- 每窗口独立端点、随机令牌及固定快照归属。关闭窗口销毁其所有服务和连接；退出应用清理全部窗口。
+- 目录助手按需启动独立 toc 服务，仅暴露目录工具，同样随窗口关闭。
+- 管道鉴权超时为 5 秒，通过后无闲置超时；管道关闭时 stdio 子进程结束。
+- session/new 失败时保留 MCP 配置重试，禁止悄悄建立无工具会话。
+- stdio 不保证修复 Agent 自身的工具目录或缓存问题。
 
----
+## 日志
 
-## 2. 端口分配策略
+发行版与开发版均在各自 userData/logs/acp-mcp.log 持久化服务启动/关闭、客户端鉴权/连接/关闭、工具发现数量、工具名/耗时/失败、会话恢复、请求失败及 Agent stderr 分类。单文件约 5 MiB 后轮转，保留一份 previous 文件。
 
-为彻底根治端口漂移，Montree 采用了**冷门注册端口 + 弹性顺延 + 动态安全降级**的三级策略：
+日志不保存令牌、管道地址、环境值、工具参数或结果、选区及提示词。Agent 原始 stderr 尾部仍只保留在内存，文件仅记录错误分类。
 
-| 服务端点 | 默认固定端口 | 环境变量覆盖 | 说明 |
-|----------|--------------|--------------|------|
-| 主 MCP 服务 (`montree`) | **`39281`** | `MONTREE_MCP_PORT` | 提供正文快照、选区读取、书签批注等核心阅读/编辑工具 |
-| 目录副服务 (`montree-toc`) | **`39291`** | `MONTREE_TOC_MCP_PORT` | 目录副会话专用大纲分析工具（独立端点挂载） |
+Montree 日志只能说明其收到的请求；Agent 不发请求时，仍需结合 Agent 日志判定工具目录是否包含 Montree。
 
-### 选段考量
-- 位于 `1024~49151`（IANA 注册端口段），避开了现代操作系统（Windows/Linux/macOS）的动态出站临时端口范围（49152~65535），不会被其他出站 socket 随机占用。
-- 远离前端与开发常见端口（如 3000、5173、8000、8080、9229 等），日常开发极难发生冲突。
+## 实现与兼容
 
----
+`../../mcp-stdio.ts`：独立子进程构建入口；`mcp/stdio-server.ts`：窗口文档服务；`mcp/session-config.ts`：ACP stdio 配置；`mcp/diagnostics.ts`：诊断日志。
 
-## 3. 容错与弹性重试（`listenWithFallback`）
+`mcp/montree-mcp-server.ts` 仅保留 HTTP 适配与专用 E2E/诊断兼容钩子，生产 ACP 会话不再挂载它；旧 39281/39291 端口不再用于生产 stdio。
 
-当检测到端口已被占用（`EADDRINUSE`，如用户双开多实例，或旧进程处于 TIME_WAIT 尚未彻底回收）：
-1. **自动顺延递增**：依次递增探测接下来的 5 个相邻端口（例如 `39281 → 39282 → ...`）。
-2. **安全降级保底**：若连续重试均被占用，自动回落至动态端口 `0`（由操作系统分配空闲端口），确保 MCP 服务永远不会崩溃阻断主进程。
-
----
-
-## 4. 窗口归属与鉴权 Token
-
-- **窗口独立端点**：主服务和目录副服务按窗口异步上下文保存句柄；同时启动合并为同一请求。端口占用时按上述策略顺延，各窗口不会共享同一个服务。
-- **独立令牌**：生产窗口端点使用随机令牌，避免旧进程或其他窗口在端口复用后继续访问。兼容的无窗口调用保留 `getOrCreateAuthToken`，在当前用户临时目录存储 `montree-mcp-<label>-token.txt`。
-- **仅限回环地址**：服务仅监听 `127.0.0.1`，外部局域网不可见；临时文件受操作系统用户权限保护。
-- **固定归属**：HTTP 回调绑定启动窗口，文档快照和截图只发到该窗口，关闭后不回退到聚焦窗口。新建或恢复 Agent 会话时重新下发所属窗口的 MCP 配置；窗口关闭只清理自己的端点与子进程。
-
----
-
-## 5. 代码与测试入口
-
-- 核心实现：[`apps/desktop/electron/services/acp/mcp/montree-mcp-server.ts`](./mcp/montree-mcp-server.ts)
-- 单元测试：[`apps/desktop/electron/services/acp/mcp/montree-mcp-server.test.ts`](./mcp/montree-mcp-server.test.ts)
-- 会话消费：[`apps/desktop/electron/services/acp/acp-session-ops.ts`](./acp-session-ops.ts) 与 [`apps/desktop/electron/services/acp/acp-connection.ts`](./acp-connection.ts)
+`mcp/stdio-server.test.ts` 以真实 Electron Node 子进程验证工具发现、读取、重连、窗口/令牌隔离及日志隐私。agent-window-isolation E2E 覆盖真实应用的 ACP/stdio/IPC 联动。

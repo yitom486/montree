@@ -18,7 +18,7 @@ export const useDraftStore = create<DraftStore>()(
         set((state) => ({
           drafts: {
             ...state.drafts,
-            [getDraftKey(draft.filePath)]: draft,
+            [getDraftKey(draft.filePath, draft.workspaceId)]: draft,
           },
         })),
 

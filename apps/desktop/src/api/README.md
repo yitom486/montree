@@ -20,8 +20,9 @@
 | `rosetta-api.ts` | 罗盘索引：扫描书一键导入、进度订阅、书信息、统一读查询、纯本地目录重建、正文水印只读预览、备份并应用正文水印（二次确认后调用，空计划 noop）、已入库内容只读取证 |
 | `pdf-inspect-api.ts` | pdf-inspector 主进程分类与整档 Markdown |
 | `tts-api.ts` | 语音朗读：Gemini TTS 合成、双 Key 智能容灾、磁盘缓存管理 |
-| `git-api.ts` | Git 版本控制：状态查询、远程推送与提交；支持 Windows 与 WSL 自动穿透 |
-| `remote-api.ts` | 远程环境（WSL 分发版动态探测、Linux 目录应用内直接浏览、~/.ssh/config 解析） |
-| `query-keys.ts` | TanStack Query key 工厂 |
+| `git-api.ts` | Git 版本控制：状态查询、远程推送与提交；支持 Windows 与 WSL 自动穿透；B3 加 diff/分支查询（远端经 Ubuntu 执行） |
+| `remote-api.ts` | 远程环境（WSL 分发版动态探测、~/.ssh/config 解析；经 Ubuntu 远端服务建连/浏览/stat，未连接明确报错；P1 打开远端工作区并绑定本窗口）与 A2 本地管道远端服务接入（serverConnect/serverInvoke/serverDisconnect/serverStatus） |
+| `workspace-api.ts` | 本机工作区宿主绑定：connect/disconnect/getStatus/状态订阅；B2/B3 宿主相对读写（revision 冲突检查）、远端另存为、宿主图片、可取消分页搜索（IPC 薄封装）；P1 `toHostTextRef` 裸路径→宿主引用 |
+| `query-keys.ts` | TanStack Query key 工厂（含 workspaceId/文档身份隔离） |
 
 新增能力顺序（见 AGENTS.md）：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。

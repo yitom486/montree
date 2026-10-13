@@ -1,0 +1,13 @@
+{
+  "name": "@montree/workspace-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@montree/contracts": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  }
+}

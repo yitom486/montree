@@ -10,6 +10,8 @@ import {
 import { currentAcpContext, getAcpContext, listAcpContexts, runInAcpContext, forgetAcpContext, type AcpContext } from '../services/acp/acp-context'
 import { disposeContextAcpProcesses } from '../services/acp/process-manager'
 import { captureReaderViewport } from '../services/reader-screenshot-service'
+import { startWindowMcpServer, stopWindowMcpServers } from '../services/acp/mcp/stdio-server'
+import { handleSnapshotRequest } from '../services/acp/acp-bridges'
 
 const registered = new WeakSet<AcpContext>()
 
@@ -123,6 +125,7 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
           disposeContextAcpProcesses()
           try { await disconnectAcp(undefined, { killProcess: true }) }
           finally {
+            await stopWindowMcpServers()
             acpState.sessionUpdateListeners.clear()
             acpState.statusListeners.clear()
             acpState.snapshotBridge = null
@@ -131,6 +134,9 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
           }
         }).catch((error) => console.error('[acp] 窗口 Agent 清理失败', error))
       })
+      void startWindowMcpServer({ readSnapshot: handleSnapshotRequest }).then((handle) => {
+        if (!context.closed) acpState.montreeMcp = handle
+      }).catch(() => { /* connect retries and returns the actionable error */ })
     }
     return callback()
   })

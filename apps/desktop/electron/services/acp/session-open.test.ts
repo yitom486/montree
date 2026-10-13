@@ -2,10 +2,21 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { agent, client, methods, RequestError } from '@agentclientprotocol/sdk'
 import {
   isTransientAcpTransportError,
+  isAuthenticationRequired,
   restoreOrCreateAcpSession,
 } from './session-open'
 
 const liveConnections: Array<{ close: () => void }> = []
+
+describe('认证错误分类', () => {
+  it('只有真实登录要求才进入认证弹窗，路径/MCP/超时失败不会被误判', () => {
+    expect(isAuthenticationRequired('Authentication required')).toBe(true)
+    expect(isAuthenticationRequired('not authenticated')).toBe(true)
+    expect(isAuthenticationRequired('Invalid cwd: directory does not exist')).toBe(false)
+    expect(isAuthenticationRequired('MCP authentication required')).toBe(false)
+    expect(isAuthenticationRequired('请求超时: session/new')).toBe(false)
+  })
+})
 
 afterEach(() => {
   while (liveConnections.length > 0) {
@@ -204,7 +215,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     expect(seen[0]).toMatchObject({ sessionId: 'old-9', cwd: '/ws' })
   })
 
-  it('session/new 失败时裸调（mcpServers: []）重试一次，成功则继续', async () => {
+  it('session/new 失败时保留 MCP 配置重试，成功则继续', async () => {
     const seen: unknown[] = []
     let calls = 0
     const result = await restoreOrCreateAcpSession({
@@ -229,10 +240,10 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     expect(result.sessionId).toBe('n2')
     expect(result.restoreMethod).toBe('new')
     expect(calls).toBe(2)
-    expect(seen[1]).toMatchObject({ mcpServers: [] })
+    expect(seen[1]).toMatchObject({ mcpServers: [{ type: 'http', name: 'montree', url: 'http://x' }] })
   })
 
-  it('session/new 裸调仍失败时返回原错（首次错误为准）', async () => {
+  it('session/new 保留 MCP 重试仍失败时返回原错', async () => {
     const first = new Error('first boom')
     let calls = 0
     await expect(
@@ -257,7 +268,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     expect(calls).toBe(2)
   })
 
-  it('恢复建新同样走 MCP 裸调重试（resume 失败 → new 首次失败 → 裸调成功）', async () => {
+  it('恢复失败后建新会话的重试也保留 MCP 配置', async () => {
     let newCalls = 0
     const seenNewParams: unknown[] = []
     const sdk = setupSdkRequest({
@@ -291,7 +302,7 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     expect(result.sessionId).toBe('recovered')
     expect(result.restoreMethod).toBe('new')
     expect(newCalls).toBe(2)
-    expect(seenNewParams[1]).toMatchObject({ mcpServers: [] })
+    expect(seenNewParams[1]).toMatchObject({ mcpServers: [{ type: 'http', name: 'montree', url: 'http://x' }] })
   })
 
   it('顶层 models 方言合成 model 选项（恢复建新路径）', async () => {

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   searchWorkspaceMarkdown,
+  paginateWorkspaceHits,
   WORKSPACE_MD_MAX_FILES,
 } from './workspace-md-search'
 
@@ -114,5 +115,23 @@ describe('searchWorkspaceMarkdown', () => {
     expect(first.total).toBe(5)
     expect(first).toEqual(second)
     expect(WORKSPACE_MD_MAX_FILES).toBe(200)
+  })
+
+  it('B3 分页：offset/limit 切片且 nextOffset 指示更多', () => {
+    const root = makeRoot()
+    for (let i = 0; i < 5; i += 1) write(root, `f${i}.md`, '王道计')
+    const full = searchWorkspaceMarkdown({ root, query: '王道计' })
+    expect(full.total).toBe(5)
+    const page1 = paginateWorkspaceHits(full.hits, 0, 2)
+    expect(page1.hits).toHaveLength(2)
+    expect(page1.nextOffset).toBe(2)
+    const page2 = paginateWorkspaceHits(full.hits, page1.nextOffset, 2)
+    expect(page2.hits).toHaveLength(2)
+    expect(page2.nextOffset).toBe(4)
+    const page3 = paginateWorkspaceHits(full.hits, page2.nextOffset, 2)
+    expect(page3.hits).toHaveLength(1)
+    expect(page3.nextOffset).toBeNull()
+    // 非法输入回落全量
+    expect(paginateWorkspaceHits(full.hits, -1, 0).hits).toHaveLength(5)
   })
 })

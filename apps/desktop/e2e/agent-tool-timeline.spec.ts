@@ -8,7 +8,7 @@ import { launchBuiltApp } from './helpers/launch-app'
  * 2. 真实 mock Agent 审批：权限卡唯一可见 → 点 Allow → 卡片消失。
  */
 
-function seedTimelineScript() {
+async function seedTimelineScript() {
   const base = Date.now()
   const longPath = `D:/project/js/Electron/inkdown/${'非常长的目录名-'.repeat(12)}a.ts`
   const thread = {
@@ -16,7 +16,7 @@ function seedTimelineScript() {
     title: '展示回归',
     createdAt: base,
     updatedAt: base,
-    runtimeId: 'codex-acp',
+    runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel,
     agentSessionIds: {},
     messages: [
       { id: 'u-1', role: 'user', text: '这一章的核心观点是什么', createdAt: base },
@@ -125,7 +125,7 @@ function seedTimelineScript() {
     ],
   }
   localStorage.setItem(
-    'montree-acp-ui',
+    (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
     JSON.stringify({
       version: 0,
       state: {
@@ -140,10 +140,9 @@ function seedTimelineScript() {
 }
 
 async function openPanel(page: Page) {
-  const activityBar = page.getByRole('complementary', { name: '活动栏' })
   const panel = page.locator('aside[aria-label="Agent 聊天"]:visible')
   if ((await panel.count()) === 0) {
-    await activityBar.getByRole('button', { name: '打开 Agent 面板' }).click()
+    await page.getByRole('button', { name: 'AI 伴读', exact: true }).click()
   }
   await expect(panel.first()).toBeVisible({ timeout: 10_000 })
   return panel.first()
@@ -248,7 +247,7 @@ test.describe('聊天展示层 R2', () => {
       })
       await window.setViewportSize({ width: 1600, height: 900 })
       await window.evaluate(`(${seedTimelineScript.toString()})()`)
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
@@ -270,7 +269,7 @@ test.describe('聊天展示层 R2', () => {
       await expectSeededTimeline(panel, info, 'light')
 
       // 深色
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         const raw = JSON.parse(localStorage.getItem('markdown-editor-ui') ?? '{"state":{}}')
         raw.state = { ...(raw.state ?? {}), theme: 'dark' }
         localStorage.setItem('markdown-editor-ui', JSON.stringify(raw))
@@ -455,7 +454,7 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 1600, height: 900 })
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         const base = Date.now()
         const messages: Array<Record<string, unknown>> = [
           { id: 'u-10', role: 'user', text: '批量梳理十节', createdAt: base },
@@ -510,7 +509,7 @@ test.describe('聊天展示层 R2', () => {
         })
         messages.push({ id: 'a-10', role: 'agent', text: '十节已梳理完毕。', createdAt: base + 70, updatedAt: base + 170, streaming: false })
         localStorage.setItem(
-          'montree-acp-ui',
+          (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
           JSON.stringify({
             version: 0,
             state: {
@@ -518,12 +517,12 @@ test.describe('聊天展示层 R2', () => {
               hudDisplayMode: 'docked',
               selectedRuntimeId: 'codex-acp',
               activeThreadId: 'thread-converge',
-              threads: [{ id: 'thread-converge', title: '收敛基线', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', agentSessionIds: {}, messages }],
+              threads: [{ id: 'thread-converge', title: '收敛基线', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel, agentSessionIds: {}, messages }],
             },
           }),
         )
       })
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
@@ -641,7 +640,7 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 1600, height: 900 })
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         const base = Date.now()
         const messages: Array<Record<string, unknown>> = []
         for (let turn = 0; turn < 12; turn += 1) {
@@ -662,7 +661,7 @@ test.describe('聊天展示层 R2', () => {
           messages.push({ id: 'a-scroll-' + turn, role: 'agent', text: '第' + (turn + 1) + '答：已梳理。', createdAt: base + turn * 10 + 3, updatedAt: base + turn * 10 + 4, streaming: false })
         }
         localStorage.setItem(
-          'montree-acp-ui',
+          (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
           JSON.stringify({
             version: 0,
             state: {
@@ -670,12 +669,12 @@ test.describe('聊天展示层 R2', () => {
               hudDisplayMode: 'docked',
               selectedRuntimeId: 'codex-acp',
               activeThreadId: 'thread-scroll',
-              threads: [{ id: 'thread-scroll', title: '滚动恢复', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', agentSessionIds: {}, messages }],
+              threads: [{ id: 'thread-scroll', title: '滚动恢复', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel, agentSessionIds: {}, messages }],
             },
           }),
         )
       })
-      await window.evaluate(() => {
+      await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
@@ -714,7 +713,7 @@ test.describe('聊天展示层 R2', () => {
         .poll(
           async () =>
             window.evaluate(() => {
-              const raw = JSON.parse(localStorage.getItem('montree-acp-ui') ?? '{}')
+              const raw = JSON.parse(localStorage.getItem((window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui')) ?? '{}')
               return raw?.state?.chatScrollByThread?.['thread-scroll'] ?? null
             }),
           { timeout: 15_000 },

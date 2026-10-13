@@ -1,0 +1,14 @@
+{
+  "name": "@montree/remote-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@montree/contracts": "workspace:*",
+    "@montree/workspace-core": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  }
+}

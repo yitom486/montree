@@ -9,6 +9,7 @@ import { shouldLogRendererConsole } from '../services/runtime-state'
 import { createWindowCloseController } from './window-close'
 import { createArtifactFrameGuard } from './artifact-navigation-guard'
 import { resolveWindowShortcut } from './window-shortcuts'
+import { withAcpWindow } from '../ipc/acp-window-handlers'
 import {
   getWindowSessionByWebContents,
   registerWindowSession,
@@ -93,6 +94,7 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     },
   })
 
+  withAcpWindow(window.webContents, () => undefined)
   const session: WindowSession = {
     window,
     allowClose: false,

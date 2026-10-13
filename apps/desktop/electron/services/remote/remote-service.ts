@@ -1,5 +1,4 @@
 import { execFile, spawnSync } from 'node:child_process'
-import { readdir, stat } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -8,11 +7,11 @@ import {
   ok,
   type AppError,
   type RemoteBrowseResult,
-  type RemoteDirectoryEntry,
   type Result,
   type SshConfigHost,
   type WslDistroInfo,
 } from '@montree/contracts'
+import { wslWorkspaceHost } from './wsl-workspace-host'
 
 /**
  * 解析 `wsl.exe -l -v` 命令的输出文本（纯函数，跨平台单测友好）。
@@ -117,20 +116,14 @@ export function getLinuxParentPath(linuxPath: string): string | null {
 }
 
 /**
- * 将 Linux 路径拼接进 WSL UNC 访问路径。
- * 兼容优先使用 \\wsl.localhost，若不存在则回落至 \\wsl$
- */
-export function resolveWslUncPath(distro: string, linuxPath: string): string {
-  const clean = linuxPath.replace(/\\/g, '/').replace(/^\/+/, '')
-  const localhostBase = `\\\\wsl.localhost\\${distro}`
-  const wslDollarBase = `\\\\wsl$\\${distro}`
-
-  const base = existsSync(localhostBase) ? localhostBase : wslDollarBase
-  return clean ? `${base}\\${clean.replace(/\//g, '\\')}` : base
-}
-
-/**
- * 应用内直接浏览 WSL 内部目录结构，返回子文件夹列表，完全规避原生弹窗。
+ * 应用内浏览 WSL 目录（B1 起经 Ubuntu 远端服务原生执行）。
+ *
+ * 兼容边界：本入口不再使用 Windows UNC/9P（`\\wsl.localhost\…`）+
+ * 本机 readdir；调用前须先经 `remote:wsl-connect` 建连（见
+ * `wsl-workspace-host.ts`）。未连接/发行版不一致时返回明确的
+ * REMOTE_NOT_CONNECTED，禁止静默回落 UNC、伪装空树。
+ * UNC 语法仅保留于路径识别与日志诊断（`@montree/contracts` 的
+ * `isWslPath`/`parseWslPath`），不生成 UNC 路径交给本机 fs。
  */
 export async function browseWslDirectory(
   distro: string,
@@ -141,39 +134,13 @@ export async function browseWslDirectory(
   }
 
   const normalizedLinuxPath = linuxPath.trim().replace(/\\/g, '/') || '/'
-  const uncTarget = resolveWslUncPath(distro, normalizedLinuxPath)
-
-  try {
-    const dirents = await readdir(uncTarget, { withFileTypes: true })
-    const entries: RemoteDirectoryEntry[] = []
-
-    for (const d of dirents) {
-      // 忽略特殊隐藏文件与挂载伪文件
-      entries.push({
-        name: d.name,
-        isDirectory: d.isDirectory(),
-      })
-    }
-
-    // 排序：目录排在前面，同类按字典序排
-    entries.sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1
-      if (!a.isDirectory && b.isDirectory) return 1
-      return a.name.localeCompare(b.name)
-    })
-
-    return ok({
-      distro,
-      currentPath: normalizedLinuxPath,
-      parentPath: getLinuxParentPath(normalizedLinuxPath),
-      entries,
-    })
-  } catch (e) {
+  if (!wslWorkspaceHost.isConnectedTo(distro)) {
     return err({
-      code: 'FILE_READ_ERROR',
-      message: `无法访问 WSL 路径 (${distro}:${normalizedLinuxPath}): ${e instanceof Error ? e.message : String(e)}`,
+      code: 'REMOTE_NOT_CONNECTED',
+      message: `WSL 远端未连接 (${distro})：请先连接后再浏览（B1 已移除 UNC 直读，不回落本机文件系统）`,
     })
   }
+  return wslWorkspaceHost.browseDirectory(normalizedLinuxPath)
 }
 
 /**

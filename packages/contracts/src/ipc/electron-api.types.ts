@@ -22,7 +22,41 @@ import type {
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
 } from '../types/file'
-import type { RemoteBrowseResult, SshConfigHost, WslDistroInfo } from '../types/remote'
+import type {
+  RemoteBrowseResult,
+  RemoteOpenWslWorkspacePayload,
+  RemoteOpenWslWorkspaceResult,
+  RemoteWslBrowsePayload,
+  RemoteWslConnectPayload,
+  RemoteWslStatPayload,
+  SshConfigHost,
+  WslDistroInfo,
+} from '../types/remote'
+import type { WorkspaceStatResult } from '../types/workspace'
+import type {
+  RemoteServerConnectPayload,
+  RemoteServerConnectionInfo,
+  RemoteServerInvokePayload,
+} from '../types/workspace'
+import type {
+  WorkspaceHostReadRequest,
+  WorkspaceHostReadResult,
+  WorkspaceHostSaveAsRequest,
+  WorkspaceHostSaveAsResult,
+  WorkspaceHostTextRef,
+  WorkspaceHostWriteRequest,
+  WorkspaceHostWriteResult,
+} from '../types/workspace-files'
+import type {
+  GitBranchInfo,
+  GitDiffResult,
+} from '../types/git'
+import type {
+  WindowWorkspaceStatus,
+  WorkspaceChangedEvent,
+  WorkspaceConnectPayload,
+  WorkspaceConnectResult,
+} from '../types/workspace-identity'
 import type { AppError } from '../core/errors'
 import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '../agent/document-tools'
 import type { RendererErrorPayload } from '../types/error-log'
@@ -202,7 +236,17 @@ export interface ElectronAPI {
   /** 停止监听工作区 */
   unwatchWorkspace: () => void
   /** 工作区文件变化时回调；返回取消订阅 */
-  onWorkspaceChanged: (callback: (payload: { rootPath: string }) => void) => () => void
+  onWorkspaceChanged: (callback: (payload: WorkspaceChangedEvent) => void) => () => void
+  /** 绑定当前窗口到本机工作区宿主（返回描述符/代际/状态） */
+  connectWorkspace: (
+    payload: WorkspaceConnectPayload,
+  ) => Promise<Result<WorkspaceConnectResult, AppError>>
+  /** 解绑当前窗口工作区并停止监听 */
+  disconnectWorkspace: () => Promise<Result<void, AppError>>
+  /** 查询当前窗口工作区绑定状态 */
+  getWorkspaceStatus: () => Promise<Result<WindowWorkspaceStatus, AppError>>
+  /** 工作区连接状态变化；返回取消订阅 */
+  onWorkspaceStatusChanged: (callback: (status: WindowWorkspaceStatus) => void) => () => void
   /** 按路径读文本文件 */
   readFile: (filePath: string) => Promise<Result<OpenFileResult, AppError>>
   /** 按路径读二进制文件 */
@@ -214,6 +258,22 @@ export interface ElectronAPI {
   saveFile: (payload: SaveFilePayload) => Promise<Result<SaveFileResult, AppError>>
   /** 另存为 */
   saveFileAs: (payload: SaveFilePayload) => Promise<Result<SaveFileResult, AppError>>
+  /** B2 经宿主读文本（local 传 filePath；远端传 workspaceId + relativePath；返回 revision） */
+  workspaceReadText: (
+    payload: WorkspaceHostReadRequest,
+  ) => Promise<Result<WorkspaceHostReadResult, AppError>>
+  /** B2 经宿主写文本（携带 expectedRevision；冲突报 REVISION_CONFLICT；断线报连接错误） */
+  workspaceWriteText: (
+    payload: WorkspaceHostWriteRequest,
+  ) => Promise<Result<WorkspaceHostWriteResult, AppError>>
+  /** B2 经宿主另存为（远端目录选择语义，不弹 Windows 对话框冒充远端保存） */
+  workspaceSaveTextAs: (
+    payload: WorkspaceHostSaveAsRequest,
+  ) => Promise<Result<WorkspaceHostSaveAsResult, AppError>>
+  /** B2 经宿主读图片（local 传 filePath；远端传 workspaceId + relativePath） */
+  workspaceReadImage: (
+    payload: WorkspaceHostTextRef,
+  ) => Promise<Result<ReadImageResult, AppError>>
   /** 把粘贴的图片写入工作区并返回路径 */
   savePastedImage: (
     payload: SavePastedImagePayload,
@@ -534,16 +594,56 @@ export interface ElectronAPI {
   gitPush: (payload: { cwd: string } & GitPushOptions) => Promise<Result<GitPushResult, AppError>>
   /** 提交当前修改 */
   gitCommit: (payload: { cwd: string } & GitCommitOptions) => Promise<Result<GitCommitResult, AppError>>
+  /** B3 读取未暂存/已暂存 diff（过长截断并标记；file 非法直接失败） */
+  gitDiff: (payload: { cwd: string; file?: string; staged?: boolean }) => Promise<Result<GitDiffResult, AppError>>
+  /** B3 列出分支与当前分支（游离 HEAD 时 current 为 null） */
+  gitBranches: (cwd: string) => Promise<Result<GitBranchInfo, AppError>>
 
   /* ================================================================
-   * 远程环境（remote:*）：WSL 发行版动态探测、Linux 目录浏览、SSH 探测
+   * 远程环境（remote:*）：WSL 发行版动态探测、远端服务浏览/stat、SSH 探测
+   * B1 起 WSL 浏览/stat 经 Ubuntu 远端服务执行，不走 Windows UNC。
    * ================================================================ */
   /** 动态获取系统检测到的 WSL 分发版列表 */
   remoteListWslDistros: () => Promise<Result<WslDistroInfo[], AppError>>
   /** 获取 WSL 指定分发版的 Linux 用户家目录（$HOME） */
   remoteGetWslHome: (distro: string) => Promise<Result<string, AppError>>
-  /** 应用内浏览 WSL Linux 目录下的子文件与目录（不弹系统对话框） */
-  remoteBrowseWsl: (payload: { distro: string; dirPath?: string }) => Promise<Result<RemoteBrowseResult, AppError>>
+  /**
+   * 应用内浏览 WSL Linux 目录（须先 remoteConnectWsl 建连；
+   * 未连接/断线返回明确错误，不回落 UNC、不伪装空目录）。
+   */
+  remoteBrowseWsl: (
+    payload: { distro: string; dirPath?: string } & Partial<RemoteWslBrowsePayload>,
+  ) => Promise<Result<RemoteBrowseResult, AppError>>
+  /** 经 wsl.exe 管道安装/启动远端服务并完成握手 */
+  remoteConnectWsl: (
+    payload: RemoteWslConnectPayload,
+  ) => Promise<Result<RemoteServerConnectionInfo, AppError>>
+  /** 断开 WSL 远端连接并清理本连接启动的服务进程 */
+  remoteDisconnectWsl: () => Promise<Result<void, AppError>>
+  /** 查询当前 WSL 远端连接状态 */
+  remoteWslStatus: () => Promise<Result<RemoteServerConnectionInfo | null, AppError>>
+  /** 查询远端文件/目录 stat（Ubuntu 服务原生执行） */
+  remoteWslStat: (payload: RemoteWslStatPayload) => Promise<Result<WorkspaceStatResult, AppError>>
+  /** 打开远端工作区（连接归属调用窗口；同一远端根多窗口共享会话） */
+  remoteOpenWslWorkspace: (
+    payload: RemoteOpenWslWorkspacePayload,
+  ) => Promise<Result<RemoteOpenWslWorkspaceResult, AppError>>
   /** 读取本机 ~/.ssh/config 里的 Host 主机列表 */
   remoteListSshConfigHosts: () => Promise<Result<SshConfigHost[], AppError>>
+
+  /* ================================================================
+   * 远端工作区服务（remote-server:*）：A2 本地管道接入
+   * ================================================================ */
+  /** 启动本地管道远端服务并完成版本握手（连接归属调用窗口） */
+  remoteServerConnect: (
+    payload: RemoteServerConnectPayload,
+  ) => Promise<Result<RemoteServerConnectionInfo, AppError>>
+  /** 经已连接服务执行一次 workspace 协议调用 */
+  remoteServerInvoke: (
+    payload: RemoteServerInvokePayload,
+  ) => Promise<Result<unknown, AppError>>
+  /** 断开指定连接并回收服务进程 */
+  remoteServerDisconnect: (connectionId: string) => Promise<Result<void, AppError>>
+  /** 查询本地管道连接状态（含握手信息） */
+  remoteServerStatus: (connectionId: string) => Promise<Result<RemoteServerConnectionInfo, AppError>>
 }

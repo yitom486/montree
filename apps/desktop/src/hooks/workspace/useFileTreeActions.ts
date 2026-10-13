@@ -14,12 +14,15 @@ import {
 } from '@/lib/workspace/file-tree-ops'
 import { buildExportHtml, getSuggestedExportName } from '@/lib/editor/export-document'
 import { reportAppError } from '@/lib/workspace/report-error'
-import { isOk } from '@montree/contracts'
+import { CROSS_WORKSPACE_MOVE_MESSAGE, isOk } from '@montree/contracts'
+import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
 import type { FileTreeNode } from '@montree/contracts'
 import { getDocumentKind } from '@montree/contracts'
 
 interface UseFileTreeActionsOptions {
   workspaceRoot?: string
+  /** B2：当前树所属工作区（缺席视为本机；跨宿主粘贴拒绝） */
+  workspaceId?: string
   tree: FileTreeNode[]
   rescanWorkspace: () => Promise<void> | void
   /** 删除/重命名当前打开文件时回调 */
@@ -30,6 +33,7 @@ interface UseFileTreeActionsOptions {
 
 export function useFileTreeActions({
   workspaceRoot,
+  workspaceId,
   tree,
   rescanWorkspace,
   onPathRemoved,
@@ -37,6 +41,7 @@ export function useFileTreeActions({
   onOpenFile,
 }: UseFileTreeActionsOptions) {
   const [clipboard, setClipboard] = useState<TreeClipboardEntry | null>(null)
+  const currentWorkspaceId = workspaceId ?? LOCAL_WORKSPACE_ID
 
   const refresh = useCallback(async () => {
     await rescanWorkspace()
@@ -62,9 +67,10 @@ export function useFileTreeActions({
       path: node.path,
       isDirectory: node.type === 'directory',
       name: node.name,
+      workspaceId: currentWorkspaceId,
     })
     toast.message('已复制')
-  }, [])
+  }, [currentWorkspaceId])
 
   const setCut = useCallback((node: FileTreeNode) => {
     setClipboard({
@@ -72,13 +78,20 @@ export function useFileTreeActions({
       path: node.path,
       isDirectory: node.type === 'directory',
       name: node.name,
+      workspaceId: currentWorkspaceId,
     })
     toast.message('已剪切')
-  }, [])
+  }, [currentWorkspaceId])
 
   const pasteInto = useCallback(
     async (target: FileTreeNode | 'root') => {
       if (!workspaceRoot || !clipboard) return
+      // B2：跨宿主复制/移动明确不支持（不得偷渡；请用导出/导入）
+      const fromWorkspaceId = clipboard.workspaceId ?? LOCAL_WORKSPACE_ID
+      if (fromWorkspaceId !== currentWorkspaceId) {
+        reportAppError({ code: 'UNSUPPORTED_OPERATION', message: CROSS_WORKSPACE_MOVE_MESSAGE })
+        return
+      }
       const parentDir = resolvePasteTargetDir(
         target === 'root' ? 'root' : { path: target.path, type: target.type },
         workspaceRoot,
@@ -105,7 +118,7 @@ export function useFileTreeActions({
       toast.success(clipboard.mode === 'cut' ? '已移动' : '已粘贴')
       await refresh()
     },
-    [clipboard, onPathRenamed, refresh, tree, workspaceRoot],
+    [clipboard, currentWorkspaceId, onPathRenamed, refresh, tree, workspaceRoot],
   )
 
   const createFile = useCallback(

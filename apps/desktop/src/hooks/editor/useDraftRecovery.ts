@@ -15,7 +15,7 @@ export function useDraftRecoveryPrompt(options?: { enabled?: boolean }) {
     const { drafts } = useDraftStore.getState()
     const latest = pickLatestRecoverableDraft(drafts)
     if (latest) {
-      setRecoveryDraftKey(getDraftKey(latest.filePath))
+      setRecoveryDraftKey(getDraftKey(latest.filePath, latest.workspaceId))
     }
   }, [enabled])
 

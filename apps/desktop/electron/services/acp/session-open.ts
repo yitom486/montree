@@ -1,8 +1,13 @@
 import { RequestError } from '@agentclientprotocol/sdk'
 import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@montree/contracts'
 import { mergeTopLevelModelsIntoConfigOptions } from "@yitom/acp-client"
+import { logAcpDiagnostic } from './mcp/diagnostics'
 
 export type AcpRpcRequest = (method: string, params?: unknown) => Promise<unknown>
+
+export function isAuthenticationRequired(message: string): boolean {
+  return !/\bmcp\b/i.test(message) && /authentication required|not authenticated|please (?:log|sign) in|需要认证|尚未认证/i.test(message)
+}
 
 export interface RestoreOrCreateSessionInput {
   /** SDK 调用源：(method, params) => agent.request(method, params)（超时由 sdk-client 显式透传） */
@@ -11,7 +16,7 @@ export interface RestoreOrCreateSessionInput {
   resumeSessionId: string | null
   resumeSupported: boolean
   loadSupported: boolean
-  /** 客户端自带的 MCP server（Montree 工具）；Agent 不支持 HTTP 传输时传空数组 */
+  /** 客户端自带的窗口 MCP stdio 配置 */
   mcpServers?: unknown[]
   /** session/load 回放期间回调（主进程用来压制 UI 更新） */
   onSuppressUpdates?: (suppress: boolean) => void
@@ -71,7 +76,7 @@ export async function restoreOrCreateAcpSession(
   const resumeId = input.resumeSessionId?.trim() || null
   const restoreAttempts: AcpSessionRestoreAttempt[] = []
   const delayMs = input.retryDelayMs ?? 250
-  const log =
+  const outputLog =
     input.log ??
     ((level, message, data) => {
       // 生产环境不刷常规 ACP 诊断；失败 warn 仍保留便于排障
@@ -80,6 +85,17 @@ export async function restoreOrCreateAcpSession(
       if (level === 'warn') console.warn(line, data ?? '')
       else console.info(line, data ?? '')
     })
+  const log: NonNullable<RestoreOrCreateSessionInput['log']> = (level, message, data) => {
+    logAcpDiagnostic('acp.session', {
+      action: message,
+      level,
+      sessionId: typeof data?.sessionId === 'string' ? data.sessionId : undefined,
+      method: typeof data?.method === 'string' ? data.method : undefined,
+      attempt: typeof data?.try === 'number' ? data.try : undefined,
+      mcpCount: input.mcpServers?.length ?? 0,
+    })
+    outputLog(level, message, data)
+  }
 
   const tryRestoreMethod = async (
     method: 'resume' | 'load',
@@ -129,8 +145,7 @@ export async function restoreOrCreateAcpSession(
     loadSupported: input.loadSupported,
   })
 
-  // session/new 共用 helper：首次失败时裸调（mcpServers: []）重试一次；
-  // 成功则继续，仍失败抛原错（首次错误为准，便于 UI 显示真实原因）。
+  // Retry with the same tools; never silently create a reader session without MCP.
   const requestSessionNew = async (): Promise<Record<string, unknown>> => {
     const baseParams = {
       cwd: input.cwd,
@@ -139,15 +154,14 @@ export async function restoreOrCreateAcpSession(
     try {
       return (await input.request('session/new', baseParams)) as Record<string, unknown>
     } catch (firstError) {
-      // 已是裸调则无重试意义，直接抛
       if ((input.mcpServers ?? []).length === 0) throw firstError
-      log('warn', 'session/new failed, retry without mcpServers', {
+      log('warn', 'session/new failed, retry with mcpServers', {
         error: errorMessage(firstError),
       })
       try {
         return (await input.request('session/new', {
           cwd: input.cwd,
-          mcpServers: [],
+          mcpServers: input.mcpServers ?? [],
         })) as Record<string, unknown>
       } catch {
         throw firstError

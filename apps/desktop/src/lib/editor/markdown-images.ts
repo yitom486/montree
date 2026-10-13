@@ -107,6 +107,34 @@ export interface LocalImageRef {
   absolutePath: string
 }
 
+/**
+ * B2：远端文档相对图片 → 工作区相对路径（经宿主读取，不拼 UNC）。
+ * 绝对路径（`/x.png`）在远端语义不明（工作区根？宿主根？），显式拒绝；
+ * `..` 逃出工作区根返回 null（由服务端二次校验）。
+ */
+export function resolveWorkspaceImageRef(
+  docRelativePath: string,
+  src: string,
+): string | null {
+  const imageSrc = parseMarkdownImageSrc(src.trim())
+  if (!imageSrc || isExternalImageSrc(imageSrc)) return null
+  const normalized = imageSrc.replace(/\\/g, '/')
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) return null
+  const base = docRelativePath.replace(/\\/g, '/').split('/').filter(Boolean)
+  base.pop()
+  for (const part of normalized.split('/')) {
+    if (!part || part === '.') continue
+    if (part === '..') {
+      if (base.length === 0) return null
+      base.pop()
+      continue
+    }
+    base.push(part)
+  }
+  if (base.length === 0) return null
+  return base.join('/')
+}
+
 export function extractLocalImageRefsFromHtml(
   html: string,
   markdownFilePath: string | undefined,

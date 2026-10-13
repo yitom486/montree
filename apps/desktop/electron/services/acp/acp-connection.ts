@@ -25,15 +25,13 @@ import { buildAcpProxySpawnEnv, readAcpProxySettings } from './acp-proxy-service
 import { runConnectAuthGate } from "@yitom/acp-client"
 import {
   parseLoadSessionSupported,
-  parseMcpHttpSupported,
   parsePromptCapabilities,
   parseResumeSessionSupported,
 } from "@yitom/acp-client"
-import {
-  startMontreeMcpServer,
-  stopMontreeMcpServer,
-} from './mcp/montree-mcp-server'
-import { restoreOrCreateAcpSession } from './session-open'
+import { startWindowMcpServer } from './mcp/stdio-server'
+import { windowMcpEntry } from './mcp/session-config'
+import { logAcpDiagnostic } from './mcp/diagnostics'
+import { restoreOrCreateAcpSession, isAuthenticationRequired } from './session-open'
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
 import { ensureBunForCommand } from '../bun-runtime'
@@ -179,16 +177,7 @@ async function openSessionAfterAuth(
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
-      mcpServers: acpState.montreeMcp
-        ? [
-            {
-              type: 'http',
-              name: 'montree',
-              url: acpState.montreeMcp.url,
-              headers: [{ name: 'Authorization', value: `Bearer ${acpState.montreeMcp.authToken}` }],
-            },
-          ]
-        : [],
+      mcpServers: acpState.montreeMcp ? windowMcpEntry(acpState.montreeMcp, 'montree', cwd) : [],
       onSuppressUpdates: (suppress) => {
         acpState.suppressSessionUpdates = suppress
       },
@@ -276,7 +265,8 @@ export async function connectAcp(payload: {
   // 常驻复用：同 runtime 有存活温进程时跳过冷启动（省掉解压 + 导包）。
   // 温进程是否健康由后面的
   // initialize 握手验证；若握手失败，catch 会杀掉毒进程，下次点击走冷启动自愈。
-  const warmHandle = getLiveAcpProcess(runtime.id)
+  const warmHandle = getLiveAcpProcess(runtime.id, payload.cwd)
+  logAcpDiagnostic('acp.connect.started', { runtime: runtime.id, environment: payload.cwd && isWslPath(payload.cwd) ? 'wsl' : 'native', reused: Boolean(warmHandle) })
   if (warmHandle) {
     // 剥离旧会话状态但保温进程：旧 SDK 连接只关闭，不断 stdio。
     await disconnectAcp()
@@ -514,21 +504,23 @@ export async function connectAcp(payload: {
     // 多模态图片能力裁决：服务端显式声明优先；未显式禁用时默认开启并自动检测大模型/多模态证据
     acpState.cachedPromptCapabilities = resolveAcpPromptCapabilities(caps, initResult, runtime)
 
-    // codex 不会主动走 fs/read_text_file，只有 MCP 工具能让它拉到我们的内存数据
-    if (parseMcpHttpSupported(caps)) {
-      acpState.montreeMcp = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest })
-    } else {
-      acpState.montreeMcp = null
-      console.warn('[acp-mcp] Agent 未声明 mcpCapabilities.http，Montree 工具不可用')
-    }
+    // stdio is mandatory in ACP; the window broker survives Agent reconnects.
+    acpState.montreeMcp = await startWindowMcpServer({ readSnapshot: handleSnapshotRequest })
+    logAcpDiagnostic('acp.mcp.configured', { runtime: runtime.id, transport: 'stdio' })
 
     // preflight/auth gate 一律走 adapter.probeAuth（防御性回落中性结果）；
     // authMethods 排序走 adapter.orderAuthMethods（可选）。
     let authMethods = parseAuthMethods(initResult.authMethods)
     authMethods = safeOrderAuthMethods(adapter, authMethods)
 
-    const preflight = safeProbeAuth(adapter)
+    const wslOpenCode = runtime.id === 'opencode' && isWslPath(cwd)
+    // Ubuntu's OpenCode is the authority for its login state, not Windows credential files.
+    const preflight = wslOpenCode
+      ? { codexHome: '', hasCodexHome: false, hasAuthFile: false, hasApiKeyEnv: false, looksLoggedIn: false }
+      : safeProbeAuth(adapter)
+    logAcpDiagnostic('acp.auth.probe', { runtime: runtime.id, environment: isWslPath(cwd) ? 'wsl' : 'native', fileProbeEnvironment: wslOpenCode ? 'agent-direct' : 'native', looksLoggedIn: preflight.looksLoggedIn })
     let openedWithoutAuth: Extract<AcpConnectResult, { phase: 'ready' }> | null = null
+    let directSessionError: AppError | undefined
     // keychain 化兜底：adapter 未声明 tryDirectSessionFirst 视为 false（防御性读取）。
     let tryDirectSessionFirst = false
     try {
@@ -552,11 +544,20 @@ export async function connectAcp(payload: {
           openedWithoutAuth = direct.value
           return true
         }
+        directSessionError = direct.error
+        logAcpDiagnostic('acp.direct-session.failed', { code: direct.error.code, authRequired: isAuthenticationRequired(direct.error.message) })
         return false
       },
     })
 
     if (gate.outcome === 'needs_auth') {
+      // The auth gate collapses every session error to needs_auth; preserve non-auth failures.
+      if (directSessionError && !isAuthenticationRequired(directSessionError.message)) {
+        const failure = directSessionError
+        await disconnectAcp(undefined, { killProcess: true })
+        setStatus('error', failure.message)
+        return err(failure)
+      }
       setStatus('awaiting_auth')
       return ok({
         phase: 'needs_auth',
@@ -659,9 +660,7 @@ export async function disconnectAcp(
     }
   }
 
-  await stopMontreeMcpServer()
-  acpState.montreeMcp = null
-  acpState.tocMcp = null
+  logAcpDiagnostic('acp.disconnected', { killProcess: opts?.killProcess === true })
 
   acpState.sessionId = null
   acpState.runtimeId = null

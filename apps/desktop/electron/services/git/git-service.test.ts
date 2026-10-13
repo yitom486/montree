@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
+  getGitDiff,
+  getGitStatus,
+  gitCommit,
+  isSafeGitDiffPath,
+  listGitBranches,
   parseGitAheadBehind,
+  parseGitBranchList,
   parseGitPorcelain,
   resolveGitExecution,
 } from './git-service'
+import { execGitCommand } from './git-service'
 
 describe('git-service 纯逻辑测试', () => {
   it('resolveGitExecution 正确分流 Windows 与 WSL 命令执行', () => {
@@ -88,5 +98,90 @@ UU merge-conflict.md
     expect(parseGitAheadBehind('0 5\n')).toEqual({ ahead: 0, behind: 5 })
     expect(parseGitAheadBehind('3 4')).toEqual({ ahead: 3, behind: 4 })
     expect(parseGitAheadBehind('')).toEqual({ ahead: 0, behind: 0 })
+  })
+
+  it('isSafeGitDiffPath 拒绝绝对路径与穿越', () => {
+    expect(isSafeGitDiffPath('posts/a.md')).toBe(true)
+    expect(isSafeGitDiffPath('a.md')).toBe(true)
+    expect(isSafeGitDiffPath('')).toBe(false)
+    expect(isSafeGitDiffPath('/etc/passwd')).toBe(false)
+    expect(isSafeGitDiffPath('D:/x/a.md')).toBe(false)
+    expect(isSafeGitDiffPath('../outside.md')).toBe(false)
+    expect(isSafeGitDiffPath('a/../../b.md')).toBe(false)
+    expect(isSafeGitDiffPath('a.md\0')).toBe(false)
+  })
+
+  it('parseGitBranchList 去星号与空行', () => {
+    expect(parseGitBranchList('main\n* dev\n\n  feature/x\n')).toEqual(['main', 'dev', 'feature/x'])
+    expect(parseGitBranchList('')).toEqual([])
+  })
+})
+
+/**
+ * B3 临时仓库验证：status/diff/branch/commit 全走本机 git，
+ * 身份经 GIT_* 环境变量注入（不碰全局配置），无真实远端 push。
+ */
+describe('git-service 临时仓库（无远端 push）', () => {
+  const dirs: string[] = []
+  const savedEnv: Record<string, string | undefined> = {}
+  for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']) {
+    savedEnv[key] = process.env[key]
+    process.env[key] = key.includes('EMAIL') ? 'montree-test@example.com' : 'montree-test'
+  }
+  afterEach(() => {
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    while (dirs.length > 0) {
+      rmSync(dirs.pop() as string, { recursive: true, force: true })
+    }
+  })
+
+  async function makeRepo(): Promise<string> {
+    const dir = mkdtempSync(join(tmpdir(), 'montree-git-'))
+    dirs.push(dir)
+    expect((await execGitCommand(dir, ['init', '-b', 'main'])).exitCode).toBe(0)
+    return dir
+  }
+
+  it('status/diff/branch/commit 闭环', async () => {
+    const dir = await makeRepo()
+    writeFileSync(join(dir, 'a.md'), 'hello\n', 'utf8')
+
+    const status1 = await getGitStatus(dir)
+    expect(status1.isRepo).toBe(true)
+    expect(status1.branch).toBe('main')
+    expect(status1.files.some((f) => f.path === 'a.md' && f.status === 'untracked')).toBe(true)
+
+    const commit = await gitCommit(dir, { message: 'init', stageAll: true })
+    expect(commit.ok).toBe(true)
+
+    writeFileSync(join(dir, 'a.md'), 'hello world\n', 'utf8')
+    const diff = await getGitDiff(dir, 'a.md')
+    expect(diff.ok).toBe(true)
+    if (diff.ok) {
+      expect(diff.value.truncated).toBe(false)
+      expect(diff.value.diff).toContain('hello world')
+    }
+    const badDiff = await getGitDiff(dir, '../evil.md')
+    expect(badDiff.ok).toBe(false)
+
+    const branches = await listGitBranches(dir)
+    expect(branches.ok).toBe(true)
+    if (branches.ok) {
+      expect(branches.value.current).toBe('main')
+      expect(branches.value.branches).toContain('main')
+      expect(branches.value.detached).toBe(false)
+    }
+
+    const status2 = await getGitStatus(dir)
+    expect(status2.files.some((f) => f.path === 'a.md' && f.status === 'modified')).toBe(true)
+  })
+
+  it('非仓库返回 isRepo=false（不抛）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'montree-git-plain-'))
+    dirs.push(dir)
+    expect((await getGitStatus(dir)).isRepo).toBe(false)
   })
 })

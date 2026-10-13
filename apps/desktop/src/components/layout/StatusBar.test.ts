@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusBar } from './StatusBar'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -16,10 +17,15 @@ vi.mock('@/api/remote-api', () => ({
   remoteApi: {
     listWslDistros: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     getWslHome: vi.fn().mockResolvedValue({ ok: true, value: '/home' }),
+    connectWsl: vi.fn().mockResolvedValue({ ok: true, value: { state: 'connected', distro: 'Ubuntu' } }),
+    disconnectWsl: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
+    wslStatus: vi.fn().mockResolvedValue({ ok: true, value: { state: 'disconnected' } }),
     browseWsl: vi.fn().mockResolvedValue({
       ok: true,
       value: { distro: 'Ubuntu', currentPath: '/', parentPath: null, entries: [] },
     }),
+    statWsl: vi.fn().mockResolvedValue({ ok: false, error: { code: 'REMOTE_NOT_CONNECTED', message: '未连接' } }),
+    openWslWorkspace: vi.fn().mockResolvedValue({ ok: false, error: { code: 'REMOTE_NOT_CONNECTED', message: '未连接' } }),
     listSshConfigHosts: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   },
 }))
@@ -27,11 +33,25 @@ vi.mock('@/api/remote-api', () => ({
 describe('StatusBar', () => {
   let container: HTMLDivElement
   let root: Root
+  let queryClient: QueryClient
+
+  function renderBar(props: Record<string, unknown>) {
+    act(() => {
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(TooltipProvider, null, createElement(StatusBar, props)),
+        ),
+      )
+    })
+  }
 
   beforeEach(() => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     mockUseGitStatus.mockReturnValue({
       status: null,
       isLoading: false,
@@ -46,33 +66,18 @@ describe('StatusBar', () => {
       root.unmount()
     })
     container.remove()
+    queryClient.clear()
   })
 
   it('渲染默认 UTF-8 与文档类型', () => {
-    act(() => {
-      root.render(
-        createElement(TooltipProvider, null,
-          createElement(StatusBar, {
-            activeFilePath: 'D:/notes/post.md',
-          })
-        ),
-      )
-    })
+    renderBar({ activeFilePath: 'D:/notes/post.md' })
 
     expect(container.textContent).toContain('UTF-8')
     expect(container.textContent).toContain('markdown')
   })
 
   it('识别 WSL 路径并展示 WSL: <distro> 徽章', () => {
-    act(() => {
-      root.render(
-        createElement(TooltipProvider, null,
-          createElement(StatusBar, {
-            workspaceRoot: '\\\\wsl.localhost\\Ubuntu\\home\\tomy\\blog',
-          })
-        ),
-      )
-    })
+    renderBar({ workspaceRoot: '\\\\wsl.localhost\\Ubuntu\\home\\tomy\\blog' })
 
     expect(container.textContent).toContain('WSL: Ubuntu')
   })
@@ -93,15 +98,7 @@ describe('StatusBar', () => {
       refetch: vi.fn(),
     })
 
-    act(() => {
-      root.render(
-        createElement(TooltipProvider, null,
-          createElement(StatusBar, {
-            workspaceRoot: 'D:/my-blog',
-          })
-        ),
-      )
-    })
+    renderBar({ workspaceRoot: 'D:/my-blog' })
 
     expect(container.textContent).toContain('main')
     expect(container.textContent).toContain('*3')

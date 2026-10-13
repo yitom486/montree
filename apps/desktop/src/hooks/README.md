@@ -69,11 +69,11 @@
 
 | 文件 | 功能 |
 |------|------|
-| `useFileOperations` | 打开/保存/另存、工作区扫描、外部文件打开（工作区切到文件所在目录）；正文 `content` / `filePath` 的源头。另导出 `useAppMeta` |
-| `useFileTreeActions` | 文件树新建、重命名、删除、复制粘贴、导出 |
+| `useFileOperations` | 打开/保存/另存、工作区扫描、外部文件打开（工作区切到文件所在目录）；正文 `content` / `filePath` 的源头。另导出 `useAppMeta`；B2 经宿主读写（revision 冲突检查）、外部修改提示（重载/覆盖，P1 冲突基线保护 + 静默保存不打扰）、远端另存为；P1 远端绑定下经 `toHostTextRef` 直达远端会话 |
+| `useFileTreeActions` | 文件树新建、重命名、删除、复制粘贴、导出；B2 跨工作区剪贴明确拒绝 |
 | `useSidebarPanelSync` | 布尔可见性 ↔ `react-resizable-panels` 折叠（`useCollapsiblePanelSync`） |
 | `useGlobalErrorHandlers` | 捕获未处理 Promise / `window.error`，并同步 verbose 日志开关 |
-| `useGitStatus` | 工作区 Git 状态、领先/落后 commit、分支名与一键 Push / Commit 操作（TanStack Query 自动缓存与刷新） |
+| `useGitStatus` | 工作区 Git 状态、领先/落后 commit、分支名与一键 Push / Commit 操作（TanStack Query 自动缓存与刷新）；B3 加 `useGitDiff` / `useGitBranches` 独立查询（远端经 Ubuntu 执行） |
 
 ## agent/
 

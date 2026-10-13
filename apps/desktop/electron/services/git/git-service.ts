@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { isWslPath, parseWslPath, ok, err, type Result, type AppError, type GitCommitOptions, type GitCommitResult, type GitFileStatus, type GitFileStatusCode, type GitPushOptions, type GitPushResult, type GitStatusResult } from '@montree/contracts'
+import { isWslPath, parseWslPath, ok, err, type Result, type AppError, type GitBranchInfo, type GitCommitOptions, type GitCommitResult, type GitDiffResult, type GitFileStatus, type GitFileStatusCode, type GitPushOptions, type GitPushResult, type GitStatusResult } from '@montree/contracts'
 
 export interface SpawnGitExecution {
   command: string
@@ -67,7 +67,8 @@ export function execGitCommand(
 
       child.on('close', (code) => {
         resolve({
-          stdout: stdout.trim(),
+          // 只去尾部换行：porcelain 行首空格是 XY 状态位，trim 会吃掉并错位 path
+          stdout: stdout.replace(/[\r\n]+$/, ''),
           stderr: stderr.trim(),
           exitCode: code ?? 0,
         })
@@ -257,5 +258,72 @@ export async function gitCommit(
     success: true,
     commitHash: hashRes.stdout.trim() || undefined,
     message: options.message,
+  })
+}
+
+/** diff 输出上限（字符；超则截断并标记，不静默丢尾） */
+export const GIT_DIFF_MAX_CHARS = 256 * 1024
+
+/**
+ * 校验 diff 目标路径：禁止 NUL、绝对路径与 `..`（防 `--` 后仍逃逸的写法）。
+ * 纯函数，可单测。
+ */
+export function isSafeGitDiffPath(path: string): boolean {
+  if (!path || path.includes('\0')) return false
+  const normalized = path.replace(/\\/g, '/')
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) return false
+  if (normalized.split('/').includes('..')) return false
+  return true
+}
+
+/**
+ * 读取未暂存 diff（B3：远端由 Node 服务执行 Git，此处为本机宿主实现）。
+ * staged=true 时读已暂存（--cached）diff；file 省略时为整树。
+ */
+export async function getGitDiff(
+  cwd: string,
+  file?: string,
+  staged = false,
+): Promise<Result<GitDiffResult, AppError>> {
+  if (file !== undefined && !isSafeGitDiffPath(file)) {
+    return err({ code: 'INVALID_ARGUMENT', message: 'diff 路径非法' })
+  }
+  const args = ['diff', '--no-color', ...(staged ? ['--cached'] : [])]
+  if (file) args.push('--', file)
+  const res = await execGitCommand(cwd, args)
+  if (res.exitCode !== 0) {
+    return err({ code: 'GIT_ERROR', message: res.stderr || res.stdout || '读取 Git 差异失败' })
+  }
+  if (res.stdout.length > GIT_DIFF_MAX_CHARS) {
+    return ok({ file, diff: res.stdout.slice(0, GIT_DIFF_MAX_CHARS), truncated: true })
+  }
+  return ok({ file, diff: res.stdout, truncated: false })
+}
+
+/**
+ * 解析 `git branch --format=%(refname:short)` 输出。纯函数。
+ */
+export function parseGitBranchList(raw: string): string[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^(\*)\s+/, ''))
+    .filter(Boolean)
+}
+
+/** 列出分支与当前分支（游离 HEAD 时 current 为 null 且 detached=true） */
+export async function listGitBranches(cwd: string): Promise<Result<GitBranchInfo, AppError>> {
+  const listRes = await execGitCommand(cwd, ['branch', '--format=%(refname:short)'])
+  if (listRes.exitCode !== 0) {
+    return err({ code: 'GIT_ERROR', message: listRes.stderr || listRes.stdout || '读取分支失败' })
+  }
+  const currentRes = await execGitCommand(cwd, ['branch', '--show-current'])
+  if (currentRes.exitCode !== 0) {
+    return err({ code: 'GIT_ERROR', message: currentRes.stderr || '读取当前分支失败' })
+  }
+  const current = currentRes.stdout.trim() || null
+  return ok({
+    current,
+    branches: parseGitBranchList(listRes.stdout),
+    detached: current === null,
   })
 }

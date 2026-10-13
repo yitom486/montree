@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./core/*": "./src/core/*.ts",
+    "./types/*": "./src/types/*.ts",
     "./package.json": "./package.json"
   }
 }

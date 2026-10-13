@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  browseWslDirectory,
   decodeWslBuffer,
   getLinuxParentPath,
   parseSshConfigFile,
   parseWslListOutput,
-  resolveWslUncPath,
 } from './remote-service'
+import { wslWorkspaceHost } from './wsl-workspace-host'
 
 describe('parseWslListOutput', () => {
   it('正确解析并标记默认发行版，过滤掉 docker-desktop-data', () => {
@@ -49,6 +50,18 @@ describe('decodeWslBuffer', () => {
   it('支持解码 UTF-8 缓冲区', () => {
     const buf = Buffer.from('Ubuntu\r\n', 'utf8')
     expect(decodeWslBuffer(buf)).toContain('Ubuntu')
+  })
+})
+
+describe('browseWslDirectory（B1 兼容边界：须先建连，不回落 UNC）', () => {
+  it('未连接时返回 REMOTE_NOT_CONNECTED，不伪装空目录', async () => {
+    wslWorkspaceHost.disconnect()
+    const res = await browseWslDirectory('Ubuntu', '/tmp')
+    // 非 Windows 环境返回 UNSUPPORTED_FORMAT，Windows 未连接返回 NOT_CONNECTED
+    expect(res.ok).toBe(false)
+    if (!res.ok) {
+      expect(['REMOTE_NOT_CONNECTED', 'UNSUPPORTED_FORMAT']).toContain(res.error.code)
+    }
   })
 })
 

@@ -13,10 +13,15 @@
  *     R6a apps/desktop/src 下非 api/ 禁止 window.electronAPI（含 electronAPI）、
  *         '@electron/remote'、'electron'、'node:'
  *     R6b apps/desktop/electron 下禁止 react / react-dom（含子路径）
+ *   R7 远端服务隔离：packages/remote-server 下禁止 electron、node:sqlite、
+ *       @firecrawl/pdf-inspector（@firecrawl/*）、@yitom/acp-client、
+ *       @agentclientprotocol/*、scripts/ 与 third-party（含相对引入），
+ *       请求 id 另有 `ws-` 命名空间约定（见 workspace-core）。
  *
  * 豁免：行尾 `// check-deps:allow <R|模块> - 理由` 为唯一豁免，同行生效。
  *   白名单（R2）：packages/acp/src/jsonrpc-transport.ts 与
- *   packages/acp/src/jsonrpc-transport.test.ts 的 node:stream 各一行（ACP stdio）。
+ *   packages/acp/src/jsonrpc-transport.test.ts 的 node:stream 各一行（ACP stdio）；
+ *   packages/remote-server 整包允许 node: 内建（Node-only 服务，见 R7 禁止表）。
  *
  * 输出：每违一行，末计数；有违退出码 1，否则 0。--json 输出最小 JSON。
  */
@@ -131,6 +136,24 @@ function isRemoteSpec(spec: string): boolean {
   return spec === '@electron/remote' || spec.startsWith('@electron/remote/')
 }
 
+/** R7：remote-server 禁止的运行时依赖（远端 Node-only，不带桌面/Electron 能力）。 */
+function isRemoteServerForbidden(spec: string): string | null {
+  if (spec === 'electron' || spec.startsWith('electron/')) return 'electron'
+  if (spec === 'node:sqlite') return 'node:sqlite'
+  if (spec === '@firecrawl/pdf-inspector' || spec.startsWith('@firecrawl/')) {
+    return '@firecrawl/pdf-inspector'
+  }
+  if (spec === '@yitom/acp-client' || spec.startsWith('@yitom/acp-client/')) {
+    return '@yitom/acp-client'
+  }
+  if (spec === '@agentclientprotocol/sdk' || spec.startsWith('@agentclientprotocol/')) {
+    return '@agentclientprotocol'
+  }
+  const segments = spec.split('/')
+  if (segments.includes('scripts') || segments.includes('third-party')) return 'scripts/third-party'
+  return null
+}
+
 function escapesPackage(file: string, pkgRoot: string, spec: string): boolean {
   if (!spec.startsWith('.')) return false
   const base = spec.split('?')[0]!.split('#')[0]!
@@ -160,13 +183,20 @@ for (const file of allFiles) {
 
     // R1–R5：仅 packages
     if (pkgRoot) {
+      const pkgName = pkgRoot.split(sep).pop() ?? ''
+      const isNodeExemptPkg = pkgName === 'acp' || pkgName === 'remote-server'
       for (const spec of specs) {
         if (isElectronSpec(spec) && !isAllowed(line, 'R1', spec)) {
           push(file, lineNo, 'R1', `包禁止引用 electron: '${spec}'`)
         }
-        const isAcpPkg = pkgRoot.endsWith(`${sep}acp`) || pkgRoot.endsWith('/acp')
-        if (isNodeSpec(spec) && !isAcpPkg && !isAllowed(line, 'R2', spec)) {
+        if (isNodeSpec(spec) && !isNodeExemptPkg && !isAllowed(line, 'R2', spec)) {
           push(file, lineNo, 'R2', `包禁止引用 node: '${spec}'`)
+        }
+        if (pkgName === 'remote-server') {
+          const forbidden = isRemoteServerForbidden(spec)
+          if (forbidden && !isAllowed(line, 'R7', spec)) {
+            push(file, lineNo, 'R7', `远端服务禁止引用 ${forbidden}: '${spec}'`)
+          }
         }
         if (isReactSpec(spec) && !isAllowed(line, 'R3', spec)) {
           push(file, lineNo, 'R3', `包禁止引用 react: '${spec}'`)

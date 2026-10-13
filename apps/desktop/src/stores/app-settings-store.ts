@@ -66,11 +66,23 @@ export const EDITOR_FONT_SIZE_OPTION_LABELS: Array<{ value: EditorFontSize; labe
 export const RECENT_FILES_LIMIT_OPTIONS = [5, 10, 20] as const
 export type RecentFilesLimit = (typeof RECENT_FILES_LIMIT_OPTIONS)[number]
 
+/** 工作区身份感知的最近文档条目（workspaceId + 路径双键防串）。 */
+export interface RecentDocumentEntry {
+  workspaceId: string
+  path: string
+  openedAt: number
+}
+
 export interface AppSettingsState {
   autoSaveEnabled: boolean
   autoSaveIntervalMs: AutoSaveIntervalMs
   maxRecentFiles: RecentFilesLimit
   recentFiles: string[]
+  /**
+   * 工作区身份感知的最近文档（A1）：同一相对路径在不同工作区是不同条目，
+   * 防与裸路径 recentFiles 串用；本机模式两处同时记录。
+   */
+  recentDocuments: RecentDocumentEntry[]
   defaultViewMode: EditorViewMode
   previewDebounceMs: PreviewDebounceMs
   restoreLastFileOnStartup: boolean
@@ -123,9 +135,12 @@ interface AppSettingsStore extends AppSettingsState {
   addRecentFile: (filePath: string) => void
   removeRecentFile: (filePath: string) => void
   clearRecentFiles: () => void
+  addRecentDocument: (workspaceId: string, filePath: string) => void
+  removeRecentDocument: (workspaceId: string, filePath: string) => void
+  clearRecentDocuments: () => void
 }
 
-function trimRecentFiles(files: string[], limit: number): string[] {
+function trimRecentFiles<T>(files: T[], limit: number): T[] {
   return files.slice(0, Math.max(1, limit))
 }
 
@@ -136,6 +151,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       autoSaveIntervalMs: 30000,
       maxRecentFiles: 10,
       recentFiles: [],
+      recentDocuments: [],
       defaultViewMode: 'editor',
       previewDebounceMs: 300,
       restoreLastFileOnStartup: true,
@@ -210,6 +226,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         set((state) => ({
           maxRecentFiles: limit,
           recentFiles: trimRecentFiles(state.recentFiles, limit),
+          recentDocuments: trimRecentFiles(state.recentDocuments, limit),
         })),
 
       addRecentFile: (filePath) =>
@@ -229,6 +246,32 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         })),
 
       clearRecentFiles: () => set({ recentFiles: [] }),
+
+      addRecentDocument: (workspaceId, filePath) =>
+        set((state) => {
+          const path = filePath.trim()
+          const scope = workspaceId.trim()
+          if (!path || !scope) return state
+
+          const next = [
+            { workspaceId: scope, path, openedAt: Date.now() },
+            ...state.recentDocuments.filter(
+              (item) => !(item.workspaceId === scope && item.path === path),
+            ),
+          ]
+          return {
+            recentDocuments: trimRecentFiles(next, state.maxRecentFiles),
+          }
+        }),
+
+      removeRecentDocument: (workspaceId, filePath) =>
+        set((state) => ({
+          recentDocuments: state.recentDocuments.filter(
+            (item) => !(item.workspaceId === workspaceId && item.path === filePath),
+          ),
+        })),
+
+      clearRecentDocuments: () => set({ recentDocuments: [] }),
     }),
     {
       name: 'markdown-editor-settings',
@@ -237,6 +280,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         autoSaveIntervalMs: state.autoSaveIntervalMs,
         maxRecentFiles: state.maxRecentFiles,
         recentFiles: state.recentFiles,
+        recentDocuments: state.recentDocuments,
         defaultViewMode: state.defaultViewMode,
         previewDebounceMs: state.previewDebounceMs,
         restoreLastFileOnStartup: state.restoreLastFileOnStartup,

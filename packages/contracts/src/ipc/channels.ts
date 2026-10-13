@@ -120,6 +120,18 @@ export const IPC = {
   WORKSPACE_UNWATCH: 'workspace:unwatch',
   /** main→renderer：工作区磁盘变化，渲染进程应刷新树 */
   WORKSPACE_CHANGED: 'workspace:changed',
+  /* ================================================================
+   * 本机工作区宿主（workspace:*，A1）：可信窗口绑定宿主与代际。
+   * 连接状态 connecting/connected/reconnecting/disconnected/error。
+   * ================================================================ */
+  /** invoke：绑定当前窗口到本机工作区宿主（返回描述符/代际/状态） */
+  WORKSPACE_CONNECT: 'workspace:connect',
+  /** invoke：解绑当前窗口工作区并停止监听 */
+  WORKSPACE_DISCONNECT: 'workspace:disconnect',
+  /** invoke：查询当前窗口工作区绑定状态 */
+  WORKSPACE_GET_STATUS: 'workspace:get-status',
+  /** main→renderer：工作区连接状态变化（含代际，旧事件不得覆盖新状态） */
+  WORKSPACE_STATUS_CHANGED: 'workspace:status-changed',
 
   /* ================================================================
    * 阅读书签/批注（marks:*）
@@ -354,6 +366,24 @@ export const IPC = {
   GIT_PUSH: 'git:push',
   /** invoke：提交修改 */
   GIT_COMMIT: 'git:commit',
+  /** invoke：B3 读取未暂存/已暂存 diff（过长截断并标记） */
+  GIT_DIFF: 'git:diff',
+  /** invoke：B3 列出分支与当前分支（游离 HEAD 显式标记） */
+  GIT_BRANCHES: 'git:branches',
+
+  /* ================================================================
+   * 工作区宿主相对操作（workspace:*）：B2/B3 经宿主执行，不拼 UNC。
+   * local 传本机绝对 filePath；wsl/ssh 传 DocumentRef（workspaceId +
+   * 相对路径），远端绝对 root 由主进程连接状态持有。
+   * ================================================================ */
+  /** invoke：B2 经宿主读文本（返回内容、编码/换行信息与 revision） */
+  WORKSPACE_READ_TEXT: 'workspace:read-text',
+  /** invoke：B2 经宿主写文本（携带 expectedRevision；冲突报 REVISION_CONFLICT） */
+  WORKSPACE_WRITE_TEXT: 'workspace:write-text',
+  /** invoke：B2 远端另存为（远端目录选择语义，不弹 Windows 对话框） */
+  WORKSPACE_SAVE_TEXT_AS: 'workspace:save-text-as',
+  /** invoke：B2 经宿主读图片（相对预览图片，不走 renderer 文件接口） */
+  WORKSPACE_READ_IMAGE: 'workspace:read-image',
 
   /* ================================================================
    * 远程环境（remote:*）：动态探测 WSL 发行版、浏览 Linux 目录、SSH 探测
@@ -362,10 +392,36 @@ export const IPC = {
   REMOTE_LIST_WSL_DISTROS: 'remote:list-wsl-distros',
   /** invoke：获取 WSL 指定分发版的 Linux 用户家目录（$HOME） */
   REMOTE_GET_WSL_HOME: 'remote:get-wsl-home',
-  /** invoke：应用内浏览 WSL Linux 目录下的子文件夹 */
+  /**
+   * invoke：应用内浏览 WSL Linux 目录（B1 起经 Ubuntu 远端服务原生执行，
+   * 不走 Windows UNC；调用前须先 remote:wsl-connect 建连，断线/未连接
+   * 返回明确错误，禁静默回落 UNC 或伪装空目录）。
+   */
   REMOTE_BROWSE_WSL: 'remote:browse-wsl',
+  /** invoke：经 wsl.exe 管道安装/启动远端服务并完成握手，返回连接状态 */
+  REMOTE_WSL_CONNECT: 'remote:wsl-connect',
+  /** invoke：断开 WSL 远端连接并清理本连接启动的服务进程 */
+  REMOTE_WSL_DISCONNECT: 'remote:wsl-disconnect',
+  /** invoke：查询当前 WSL 远端连接状态（含握手信息与代际） */
+  REMOTE_WSL_STATUS: 'remote:wsl-status',
+  /** invoke：查询远端文件/目录 stat（Ubuntu 服务原生执行） */
+  REMOTE_WSL_STAT: 'remote:wsl-stat',
+  /** invoke：打开远端工作区（连接选中根→注册远端宿主→绑定调用窗口→返回初始树） */
+  REMOTE_WSL_OPEN_WORKSPACE: 'remote:wsl-open-workspace',
   /** invoke：解析本机 ~/.ssh/config 里的 Host 主机列表 */
   REMOTE_LIST_SSH_CONFIG_HOSTS: 'remote:list-ssh-config-hosts',
+  /* ================================================================
+   * 远端工作区服务（remote-server:*）：A2 本地管道接入。
+   * 连接/调用/断开走 Node 服务进程；B 阶段 WSL/SSH 复用同一服务。
+   * ================================================================ */
+  /** invoke：启动本地管道远端服务并完成版本握手 */
+  REMOTE_SERVER_CONNECT: 'remote-server:connect',
+  /** invoke：经已连接服务执行一次 workspace 协议调用 */
+  REMOTE_SERVER_INVOKE: 'remote-server:invoke',
+  /** invoke：断开指定连接并回收服务进程 */
+  REMOTE_SERVER_DISCONNECT: 'remote-server:disconnect',
+  /** invoke：查询本地管道连接状态（含握手信息） */
+  REMOTE_SERVER_STATUS: 'remote-server:status',
 } as const
 
 /** `IPC` 全部通道字符串的联合类型，用于约束 handle/on/invoke 的 channel 参数 */

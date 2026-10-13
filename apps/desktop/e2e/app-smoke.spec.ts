@@ -2,6 +2,28 @@ import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 
 test.describe('应用启动', () => {
+  test('未绑定窗口不能凭 renderer workspaceId 读写远端会话', async () => {
+    const app = await launchBuiltApp()
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      const results = await window.evaluate(async () => {
+        const api = window.electronAPI
+        const workspaceId = 'wsl:Ubuntu:/another-window'
+        return [
+          await api.workspaceReadText({ workspaceId, relativePath: 'secret.md' }),
+          await api.workspaceSaveTextAs({ workspaceId, fileName: 'new.md', content: 'denied' }),
+        ]
+      })
+      for (const result of results) {
+        expect(result.ok).toBe(false)
+        if (!result.ok) expect(result.error.code).toBe('INVALID_STATE')
+      }
+    } finally {
+      await app.close()
+    }
+  })
+
   test('主窗口加载并显示欢迎页与资源管理器菜单', async () => {
     const app = await launchBuiltApp()
 

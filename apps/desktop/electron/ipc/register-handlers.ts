@@ -16,6 +16,16 @@ import type {
   WorkspaceSearchMarkdownPayload,
 } from '@montree/contracts'
 import type { RendererErrorPayload } from '@montree/contracts'
+import type { AppError, Result } from '@montree/contracts'
+import type { WorkspaceWatchEvent } from '@montree/contracts'
+import type { WindowWorkspaceStatus, WorkspaceConnectPayload } from '@montree/contracts'
+import type {
+  WorkspaceHostReadRequest,
+  WorkspaceHostSaveAsRequest,
+  WorkspaceHostTextRef,
+  WorkspaceHostWriteRequest,
+} from '@montree/contracts'
+import { makeLocalWorkspaceDescriptor, makeWslWorkspaceDescriptor } from '@montree/contracts'
 import type {
   AppendFlashcardReviewPayload,
   CreateReadingMarkPayload,
@@ -54,14 +64,40 @@ import {
   extractPdfBookMarkdown,
 } from '../services/pdf-inspector-service'
 import type { SyncConfig } from '@montree/contracts'
+import type {
+  RemoteWslConnectPayload,
+  RemoteWslStatPayload,
+} from '@montree/contracts'
+import type {
+  RemoteOpenWslWorkspacePayload,
+  RemoteOpenWslWorkspaceResult,
+} from '@montree/contracts'
 import type { GitCommitOptions, GitPushOptions } from '@montree/contracts'
-import { getGitStatus, gitPush, gitCommit } from '../services/git/git-service'
+import type {
+  RemoteServerConnectPayload,
+  RemoteServerInvokePayload,
+} from '@montree/contracts'
 import {
   listWslDistros,
   getWslHome,
-  browseWslDirectory,
   listSshConfigHosts,
 } from '../services/remote/remote-service'
+import { remoteServerHosts } from '../services/remote/remote-server-host'
+import {
+  disposeWslHostForWindow,
+  getWslHostForWindow,
+  peekWslHostForWindow,
+  takeWslHostForWindow,
+  type WslWorkspaceHost,
+} from '../services/remote/wsl-workspace-host'
+import { getGitDiff, listGitBranches } from '../services/git/git-service'
+import {
+  bindRemoteHostToWindow,
+  getRemoteHost,
+  registerRemoteHost,
+  unbindRemoteHostFromWindow,
+  RemoteWorkspaceHost,
+} from '../services/remote-workspace-host'
 import { syncManager } from '../services/sync/sync-manager'
 import { readSyncConfig, writeSyncConfig } from '../services/sync/sync-config-service'
 import { writeLocalProgress } from '../services/sync/reading-progress-sync'
@@ -86,29 +122,7 @@ import {
   getTtsBatchJob,
   cancelTtsBatchJob,
 } from '../services/tts/tts-service'
-import {
-  exportHtmlDocument,
-  exportPdfDocument,
-  exportMarkdownDocument,
-  openDocumentDialog,
-  openFolderDialog,
-  scanWorkspaceFolder,
-  readBinaryFileByPath,
-  readFileByPath,
-  readImageAsDataUrl,
-  saveFileDialog,
-  savePastedImage,
-} from '../services/file-service'
-import {
-  workspaceCopy,
-  workspaceCreateDirectory,
-  workspaceCreateFile,
-  workspaceDelete,
-  workspaceMove,
-  workspaceRename,
-} from '../services/workspace-fs'
 import { getAppVersion } from '../services/app-service'
-import { searchWorkspaceMarkdown } from '../services/workspace-md-search'
 import { installBunRuntime, probeBunRuntime } from '../services/bun-runtime'
 import {
   checkAppUpdate,
@@ -189,7 +203,16 @@ import {
   inspectOcrComponentStatus,
 } from '../services/ocr/ocr-component-manager'
 import { getWindowSessionByWebContents } from '../window/window-session'
-import { setWorkspaceWatch, stopWorkspaceWatch } from '../services/workspace-watcher'
+import { setWorkspaceWatch, stopWorkspaceWatch, WORKSPACE_WATCH_MAX_DIRS } from '../services/workspace-watcher'
+import { getWorkspaceHostForWindow, setRemoteHostResolver } from '../services/workspace-host'
+import {
+  bindWindowWorkspace,
+  ensureWindowWorkspace,
+  getWindowWorkspaceDescriptor,
+  getWindowWorkspaceStatus,
+  setWindowWorkspaceState,
+  unbindWindowWorkspace,
+} from '../services/workspace-bindings'
 import { listAcpRuntimes } from "@yitom/acp-client"
 import {
   emptyAcpAuthPreflight,
@@ -220,8 +243,287 @@ function withAiSessionWindow<T extends { purpose?: string }>(sender: Electron.We
   return scope === 'main' ? payload : { ...payload, purpose: `${payload.purpose?.trim() || 'card-studio'}:${scope}` }
 }
 
+/** 推送工作区连接状态（main→renderer；调用方保证 sender 可信）。 */
+function pushWorkspaceStatus(sender: Electron.WebContents, status: WindowWorkspaceStatus): void {
+  if (!sender.isDestroyed()) {
+    sender.send(IPC.WORKSPACE_STATUS_CHANGED, status)
+  }
+}
+
+/**
+ * 打开/扫描/监听成功后绑定可信窗口工作区并推送状态。
+ * root 不变时复用既有绑定（generation 不抖，watch 订阅不误判过期）。
+ */
+function trackWindowWorkspaceRoot(sender: Electron.WebContents, rootPath: string): void {
+  const status = ensureWindowWorkspace(sender, makeLocalWorkspaceDescriptor(rootPath))
+  pushWorkspaceStatus(sender, status)
+}
+
+/**
+ * B2/B3 宿主文本目标解析（可信 sender 归属）：
+ * 远端语义优先（防本机路径冒充远端）；已绑定窗口传不一致 id 直接拒绝，
+ * 不信任 renderer 跨窗口访问（§3.5）；远端会话缺席返回明确未连接错误。
+ */
+function resolveHostTextTarget(
+  event: Electron.IpcMainInvokeEvent,
+  payload: WorkspaceHostTextRef,
+):
+  | { kind: 'local'; filePath: string }
+  | { kind: 'remote'; host: RemoteWorkspaceHost; relativePath: string }
+  | { error: { code: 'INVALID_ARGUMENT' | 'INVALID_STATE' | 'REMOTE_NOT_CONNECTED'; message: string } } {
+  const workspaceId =
+    typeof payload?.workspaceId === 'string' ? payload.workspaceId.trim() : ''
+  const relativePath =
+    typeof payload?.relativePath === 'string' ? payload.relativePath.trim() : ''
+  if (workspaceId && relativePath) {
+    const bound = getWindowWorkspaceDescriptor(event.sender.id)
+    if (!bound || bound.kind === 'local' || bound.id !== workspaceId) {
+      return {
+        error: { code: 'INVALID_STATE', message: '工作区归属与窗口绑定不一致（不可跨窗口访问）' },
+      }
+    }
+    const host = getRemoteHost(workspaceId)
+    if (!host) {
+      return {
+        error: {
+          code: 'REMOTE_NOT_CONNECTED',
+          message: `远端工作区未连接 (${workspaceId})：不断线误报成功，未保存内容仍在本地`,
+        },
+      }
+    }
+    autoBindRemoteSender(event.sender, workspaceId)
+    return { kind: 'remote', host, relativePath }
+  }
+  const filePath = typeof payload?.filePath === 'string' ? payload.filePath : ''
+  if (filePath) return { kind: 'local', filePath }
+  return { error: { code: 'INVALID_ARGUMENT', message: '缺少 filePath 或 workspaceId/relativePath' } }
+}
+
+/** 远端会话的窗口级引用（sender 销毁时释放；关 A 不杀 B 由 refcount 保证）。 */
+const remoteSenderBindings = new Map<number, Set<string>>()
+
+/**
+ * P1/P2 会话拥有的 WSL 传输宿主（workspaceId → 已转移所有权的 WSL 宿主）。
+ * 所有权在打开远端工作区时从窗口注册表转移到会话；会话释放（最后一个
+ * 窗口离开）时关闭传输，只清理本会话进程，不全局 pkill。
+ */
+const sessionWslHosts = new Map<string, WslWorkspaceHost>()
+
+/** P4 远端监听转发（webContentsId → 订阅取消函数；事件按窗口代际过滤后推送）。 */
+const remoteWatchForwards = new Map<number, { workspaceId: string; unsubscribe: () => void }>()
+
+/** P4 已在远端建立根订阅的会话（workspaceId；会话释放时清除标记）。 */
+const remoteRootSubscriptions = new Set<string>()
+
+/** P2 窗口注册表销毁清理已登记的窗口（防重复登记）。 */
+const wslRegistryCleanupRegistered = new Set<number>()
+
+function closeWslSessionTransport(workspaceId: string): void {
+  const host = sessionWslHosts.get(workspaceId)
+  if (!host) return
+  sessionWslHosts.delete(workspaceId)
+  try {
+    host.disconnect()
+  } catch {
+    // 清理永不抛异常
+  }
+}
+
+function dropRemoteWatchForward(webContentsId: number): void {
+  const forward = remoteWatchForwards.get(webContentsId)
+  if (!forward) return
+  remoteWatchForwards.delete(webContentsId)
+  try {
+    forward.unsubscribe()
+  } catch {
+    // 清理永不抛异常
+  }
+}
+
+/**
+ * P2 释放窗口的远端会话绑定（切换/断开/销毁时用）：最后一个窗口离开
+ * 才关闭会话传输（关 A 不杀 B）；仅解绑，不动窗口的描述符绑定，
+ * 描述符解绑由调用方另行处理。
+ */
+function releaseWindowRemoteBinding(webContentsId: number): void {
+  const bound = getWindowWorkspaceDescriptor(webContentsId)
+  if (!bound || bound.kind === 'local') return
+  const released = unbindRemoteHostFromWindow(bound.id, webContentsId)
+  if (released) {
+    closeWslSessionTransport(bound.id)
+    remoteRootSubscriptions.delete(bound.id)
+  }
+}
+
+/** P2 窗口注册表销毁清理（只动本窗口的浏览连接，会话传输归会话表）。 */
+function ensureWslRegistryCleanup(sender: Electron.WebContents): void {
+  if (wslRegistryCleanupRegistered.has(sender.id)) return
+  wslRegistryCleanupRegistered.add(sender.id)
+  sender.once('destroyed', () => {
+    wslRegistryCleanupRegistered.delete(sender.id)
+    dropRemoteWatchForward(sender.id)
+    disposeWslHostForWindow(sender.id)
+  })
+}
+
+function autoBindRemoteSender(sender: Electron.WebContents, workspaceId: string): void {
+  if (!bindRemoteHostToWindow(workspaceId, sender.id)) return
+  let bound = remoteSenderBindings.get(sender.id)
+  if (!bound) {
+    bound = new Set()
+    remoteSenderBindings.set(sender.id, bound)
+    sender.once('destroyed', () => {
+      const ids = remoteSenderBindings.get(sender.id)
+      remoteSenderBindings.delete(sender.id)
+      for (const id of ids ?? []) {
+        // P2：最后一个窗口离开才关闭会话传输（关 A 不杀 B）
+        if (unbindRemoteHostFromWindow(id, sender.id)) {
+          closeWslSessionTransport(id)
+          remoteRootSubscriptions.delete(id)
+        }
+      }
+      dropRemoteWatchForward(sender.id)
+    })
+  }
+  bound.add(workspaceId)
+}
+
+/**
+ * B3 Git 后端：窗口绑定远端且会话存在时走远端 Ubuntu 执行；
+ * 绑定远端但无会话时明确失败（不回落本机 git 误读 Windows 路径）。
+ */
+function getRemoteGitHost(
+  senderId: number,
+): { host: RemoteWorkspaceHost } | { host: null; remoteBound: boolean } {
+  const descriptor = getWindowWorkspaceDescriptor(senderId)
+  if (!descriptor || descriptor.kind === 'local') return { host: null, remoteBound: false }
+  const host = getRemoteHost(descriptor.id)
+  if (!host) return { host: null, remoteBound: true }
+  return { host }
+}
+
+/**
+ * P4 远端监听：窗口已绑定远端描述符时，经远端宿主订阅工作区根，
+ * 事件按窗口代际过滤后以 workspace:changed 推送（载荷与本机同形，
+ * 渲染端代际守卫与按目录刷新逻辑复用）。无会话时只不启动本机
+ * 监听，不伪装成功；后续读/扫会报明确未连接错误。
+ */
+async function watchRemoteWorkspace(
+  sender: Electron.WebContents,
+  descriptor: { id: string; rootLabel: string },
+): Promise<void> {
+  if (sender.isDestroyed()) return
+  stopWorkspaceWatch(sender.id)
+  const host = getRemoteHost(descriptor.id)
+  if (!host || !host.isConnected()) return
+  if (!remoteRootSubscriptions.has(descriptor.id)) {
+    try {
+      const sub = await host.watchDirectory('')
+      if (!sub.ok) return
+    } catch {
+      return
+    }
+    remoteRootSubscriptions.add(descriptor.id)
+  }
+  dropRemoteWatchForward(sender.id)
+  const windowGeneration = getWindowWorkspaceStatus(sender.id).generation
+  const unsubscribe = host.onWatchEvent((event: WorkspaceWatchEvent) => {
+    if (sender.isDestroyed()) return
+    const dirs = new Set<string>()
+    let truncated = false
+    for (const change of event.changes ?? []) {
+      const rel = (change.path || '').replace(/\\/g, '/')
+      if (!rel) continue
+      const idx = rel.lastIndexOf('/')
+      dirs.add(idx <= 0 ? '.' : rel.slice(0, idx))
+      if (dirs.size >= WORKSPACE_WATCH_MAX_DIRS) {
+        truncated = true
+        break
+      }
+    }
+    sender.send(IPC.WORKSPACE_CHANGED, {
+      rootPath: descriptor.rootLabel,
+      workspaceId: descriptor.id,
+      generation: windowGeneration,
+      ...(dirs.size > 0 ? { dirs: [...dirs].sort() } : {}),
+      ...(truncated ? { truncatedDirs: true } : {}),
+    })
+  })
+  remoteWatchForwards.set(sender.id, { workspaceId: descriptor.id, unsubscribe })
+}
+
+/**
+ * P1 打开远端工作区（生产接线）：连接选中根 → 创建并注册远端宿主 →
+ * 以可信 sender 绑定窗口 → 推送状态 → 返回初始树。同一远端根多窗口
+ * 共享同一会话（refcount，关 A 不杀 B）；切换工作区先释放旧绑定。
+ */
+async function openWslWorkspaceForWindow(
+  sender: Electron.WebContents,
+  distro: string,
+  linuxPath: string,
+): Promise<Result<RemoteOpenWslWorkspaceResult, AppError>> {
+  const normalizedRoot = linuxPath.trim().replace(/\\/g, '/').replace(/\/+$/, '') || '/'
+  // 切换前先释放旧远端绑定（最后一个离开才关传输）并停掉旧监听
+  releaseWindowRemoteBinding(sender.id)
+  stopWorkspaceWatch(sender.id)
+  dropRemoteWatchForward(sender.id)
+
+  const descriptor = makeWslWorkspaceDescriptor(distro, normalizedRoot)
+  const live = getRemoteHost(descriptor.id)
+  if (live?.isConnected()) {
+    // P2 会话复用：本窗口的浏览连接如有则清理，不另起远端进程
+    disposeWslHostForWindow(sender.id)
+    autoBindRemoteSender(sender, descriptor.id)
+    const bound = bindWindowWorkspace(sender, descriptor, 'connected')
+    pushWorkspaceStatus(sender, bound)
+    const tree = await live.scanWorkspace()
+    if (!tree.ok) return err(tree.error)
+    return ok({
+      descriptor,
+      generation: bound.generation,
+      status: bound,
+      folder: { rootPath: tree.value.rootPath, tree: tree.value.tree },
+    })
+  }
+
+  const host = getWslHostForWindow(sender.id)
+  ensureWslRegistryCleanup(sender)
+  if (host.connectedRoot() !== descriptor.rootLabel || !host.isConnectedTo(distro)) {
+    const connected = await host.connect(distro, descriptor.rootLabel)
+    if (!connected.ok) {
+      bindWindowWorkspace(sender, descriptor, 'connecting')
+      const errored = setWindowWorkspaceState(sender.id, 'error', connected.error)
+      pushWorkspaceStatus(sender, errored)
+      return err(connected.error)
+    }
+  }
+  const transport = host.getTransport()
+  const sessionGeneration = host.getSessionGeneration()
+  if (!transport || !sessionGeneration) {
+    return err({ code: 'REMOTE_NOT_CONNECTED', message: '远端服务传输不可用（不回落、不伪装成功）' })
+  }
+  // 旧断线会话同 id 残留时先清传输，再注册新宿主并转移连接所有权
+  closeWslSessionTransport(descriptor.id)
+  sessionWslHosts.set(descriptor.id, takeWslHostForWindow(sender.id) ?? host)
+  const remoteHost = new RemoteWorkspaceHost(descriptor, transport, sessionGeneration)
+  registerRemoteHost(remoteHost)
+  autoBindRemoteSender(sender, descriptor.id)
+  const bound = bindWindowWorkspace(sender, descriptor, 'connected')
+  pushWorkspaceStatus(sender, bound)
+  const tree = await remoteHost.scanWorkspace()
+  if (!tree.ok) return err(tree.error)
+  return ok({
+    descriptor,
+    generation: bound.generation,
+    status: bound,
+    folder: { rootPath: tree.value.rootPath, tree: tree.value.tree },
+  })
+}
+
 /** 集中注册 IPC；文件/书签等耗时操作均为 async，不阻塞主进程事件循环 */
 export function registerIpcHandlers(): void {
+  // P1：wsl/ssh 描述符分发到远端会话表；无会话时显式 unavailable（不回落）
+  setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()
   if (process.env.E2E_READER_VISUAL === '1') {
     Object.assign(globalThis, {
@@ -280,19 +582,27 @@ export function registerIpcHandlers(): void {
     )
   })
 
-  // --- 文件 / 工作区：打开、读写、树操作、导出、监听 ---
-  ipcMain.handle(IPC.FILE_OPEN, (_event, options?: OpenDialogOptions) =>
-    openDocumentDialog(options),
+  // --- 文件 / 工作区：打开、读写、树操作、导出、监听（经 WorkspaceHost 分发） ---
+  ipcMain.handle(IPC.FILE_OPEN, (event, options?: OpenDialogOptions) =>
+    getWorkspaceHostForWindow(event.sender.id).openDocument(options),
   )
-  ipcMain.handle(IPC.FILE_OPEN_FOLDER, (_event, options?: OpenDialogOptions) =>
-    openFolderDialog(options),
-  )
-  ipcMain.handle(IPC.FILE_SCAN_WORKSPACE, (_event, rootPath: string) =>
-    scanWorkspaceFolder(rootPath),
-  )
+  ipcMain.handle(IPC.FILE_OPEN_FOLDER, async (event, options?: OpenDialogOptions) => {
+    const result = await getWorkspaceHostForWindow(event.sender.id).openFolder(options)
+    // P1：远端绑定窗口的扫描结果不得改绑为本机描述符
+    const bound = getWindowWorkspaceDescriptor(event.sender.id)
+    if (result.ok && (!bound || bound.kind === 'local')) trackWindowWorkspaceRoot(event.sender, result.value.rootPath)
+    return result
+  })
+  ipcMain.handle(IPC.FILE_SCAN_WORKSPACE, async (event, rootPath: string) => {
+    const result = await getWorkspaceHostForWindow(event.sender.id).scanWorkspace(rootPath)
+    // P1：远端绑定窗口的扫描结果不得改绑为本机描述符
+    const bound = getWindowWorkspaceDescriptor(event.sender.id)
+    if (result.ok && (!bound || bound.kind === 'local')) trackWindowWorkspaceRoot(event.sender, result.value.rootPath)
+    return result
+  })
   // P2.2 工作区 Markdown 字面检索：只读，不暴露给模型（无 MCP 接线）。
   // root 由渲染端文件树状态给出；query 长度 double-check（渲染端已先拒短词）。
-  ipcMain.handle(IPC.WORKSPACE_SEARCH_MARKDOWN, (_event, payload: WorkspaceSearchMarkdownPayload) => {
+  ipcMain.handle(IPC.WORKSPACE_SEARCH_MARKDOWN, async (event, payload: WorkspaceSearchMarkdownPayload) => {
     try {
       const workspaceRoot =
         typeof payload?.workspaceRoot === 'string' ? payload.workspaceRoot.trim() : ''
@@ -303,13 +613,14 @@ export function registerIpcHandlers(): void {
       if (!query.trim() || [...query.trim()].length > 200) {
         return err({ code: 'INVALID_ARGUMENT', message: '检索词无效' })
       }
-      return ok(
-        searchWorkspaceMarkdown({
-          root: workspaceRoot,
-          query: query.trim(),
-          excludePath: typeof payload?.excludePath === 'string' ? payload.excludePath : null,
-        }),
-      )
+      return await getWorkspaceHostForWindow(event.sender.id).searchMarkdown({
+        workspaceRoot,
+        query: query.trim(),
+        excludePath: typeof payload?.excludePath === 'string' ? payload.excludePath : undefined,
+        // B3 分页：offset/limit 透传，宿主返回 nextOffset（缺席视为无更多）
+        ...(typeof payload?.offset === 'number' ? { offset: payload.offset } : {}),
+        ...(typeof payload?.limit === 'number' ? { limit: payload.limit } : {}),
+      })
     } catch (cause) {
       return err({
         code: 'UNKNOWN',
@@ -320,51 +631,171 @@ export function registerIpcHandlers(): void {
 
   ipcMain.on(IPC.WORKSPACE_WATCH, (event, rootPath: string) => {
     if (typeof rootPath !== 'string' || rootPath.length === 0) return
-    setWorkspaceWatch(event.sender, rootPath)
+    // P4：窗口已绑定远端时经远端宿主订阅，禁止改绑为本机监听
+    const bound = getWindowWorkspaceDescriptor(event.sender.id)
+    if (bound && bound.kind !== 'local') {
+      void watchRemoteWorkspace(event.sender, bound)
+      return
+    }
+    const status = ensureWindowWorkspace(event.sender, makeLocalWorkspaceDescriptor(rootPath))
+    // 渲染端按代际过滤 watch 事件，必须先同步这次本机绑定的代际。
+    pushWorkspaceStatus(event.sender, status)
+    setWorkspaceWatch(event.sender, rootPath, {
+      workspaceId: status.workspaceId,
+      generation: status.generation,
+    })
   })
 
   ipcMain.on(IPC.WORKSPACE_UNWATCH, (event) => {
+    dropRemoteWatchForward(event.sender.id)
     stopWorkspaceWatch(event.sender.id)
   })
-  ipcMain.handle(IPC.FILE_READ, (_event, filePath: string) => readFileByPath(filePath))
-  ipcMain.handle(IPC.FILE_READ_BINARY, (_event, filePath: string) =>
-    readBinaryFileByPath(filePath),
+
+  // --- 本机工作区宿主绑定（workspace:*，A1）：可信 sender 归属 + 代际 ---
+  ipcMain.handle(IPC.WORKSPACE_CONNECT, (event, payload: WorkspaceConnectPayload) => {
+    const rootPath = typeof payload?.rootPath === 'string' ? payload.rootPath.trim() : ''
+    if (!rootPath) {
+      return err({ code: 'INVALID_ARGUMENT', message: '缺少本机工作区根目录' })
+    }
+    pushWorkspaceStatus(
+      event.sender,
+      bindWindowWorkspace(event.sender, makeLocalWorkspaceDescriptor(rootPath), 'connecting'),
+    )
+    const connected = setWindowWorkspaceState(event.sender.id, 'connected')
+    pushWorkspaceStatus(event.sender, connected)
+    const descriptor = getWindowWorkspaceDescriptor(event.sender.id)
+    if (!descriptor) {
+      return err({ code: 'WORKSPACE_ERROR', message: '工作区绑定失败' })
+    }
+    return ok({ descriptor, generation: connected.generation, status: connected })
+  })
+
+  ipcMain.handle(IPC.WORKSPACE_DISCONNECT, (event) => {
+    // P2/P4：先释放远端会话绑定（最后一个离开才关传输）与远端转发，
+    // 再停本机监听、清窗口浏览连接并解绑推送
+    releaseWindowRemoteBinding(event.sender.id)
+    dropRemoteWatchForward(event.sender.id)
+    stopWorkspaceWatch(event.sender.id)
+    disposeWslHostForWindow(event.sender.id)
+    pushWorkspaceStatus(event.sender, unbindWindowWorkspace(event.sender.id))
+    return ok(undefined)
+  })
+
+  ipcMain.handle(IPC.WORKSPACE_GET_STATUS, (event) =>
+    ok(getWindowWorkspaceStatus(event.sender.id)),
   )
-  ipcMain.handle(IPC.FILE_READ_IMAGE, (_event, filePath: string) => readImageAsDataUrl(filePath))
-  ipcMain.handle(IPC.FILE_SAVE, (_event, payload: SaveFilePayload) => saveFileDialog(payload))
+  ipcMain.handle(IPC.FILE_READ, async (event, filePath: string) => {
+    const result = await getWorkspaceHostForWindow(event.sender.id).readText(filePath)
+    if (!result.ok) return result
+    return ok({ filePath: result.value.filePath, content: result.value.content })
+  })
+  ipcMain.handle(IPC.FILE_READ_BINARY, (event, filePath: string) =>
+    getWorkspaceHostForWindow(event.sender.id).readBinary(filePath),
+  )
+  ipcMain.handle(IPC.FILE_READ_IMAGE, (event, filePath: string) =>
+    getWorkspaceHostForWindow(event.sender.id).readImage(filePath),
+  )
+  ipcMain.handle(IPC.FILE_SAVE, (event, payload: SaveFilePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).saveFile(payload),
+  )
   ipcMain.handle(IPC.FILE_SAVE_BINARY_DOCUMENT, (_event, payload: SaveBinaryDocumentPayload) => saveBinaryDocument(payload))
-  ipcMain.handle(IPC.FILE_SAVE_AS, (_event, payload: SaveFilePayload) =>
-    saveFileDialog({ ...payload, filePath: undefined }),
+  ipcMain.handle(IPC.FILE_SAVE_AS, (event, payload: SaveFilePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).saveFileAs(payload),
   )
-  ipcMain.handle(IPC.FILE_SAVE_PASTED_IMAGE, (_event, payload: SavePastedImagePayload) =>
-    savePastedImage(payload),
+  // --- B2/B3 宿主相对读写（workspace:*）：local 经窗口 host，远端经会话表 ---
+  ipcMain.handle(IPC.WORKSPACE_READ_TEXT, async (event, payload: WorkspaceHostReadRequest) => {
+    const target = resolveHostTextTarget(event, payload ?? {})
+    if ('error' in target) return err(target.error)
+    if (target.kind === 'remote') return target.host.readText(target.relativePath)
+    const result = await getWorkspaceHostForWindow(event.sender.id).readText(target.filePath)
+    if (!result.ok) return result
+    return ok({
+      filePath: result.value.filePath,
+      content: result.value.content,
+      revision: result.value.revision,
+    })
+  })
+  ipcMain.handle(IPC.WORKSPACE_WRITE_TEXT, async (event, payload: WorkspaceHostWriteRequest) => {
+    if (typeof payload?.content !== 'string') {
+      return err({ code: 'INVALID_ARGUMENT', message: '缺少正文内容' })
+    }
+    const target = resolveHostTextTarget(event, payload)
+    if ('error' in target) return err(target.error)
+    if (target.kind === 'remote') {
+      return target.host.writeText(target.relativePath, {
+        content: payload.content,
+        expectedRevision: payload.expectedRevision,
+      })
+    }
+    const result = await getWorkspaceHostForWindow(event.sender.id).writeText(target.filePath, {
+      content: payload.content,
+      expectedRevision: payload.expectedRevision,
+    })
+    if (!result.ok) return result
+    return ok({ filePath: result.value.filePath, revision: result.value.revision })
+  })
+  ipcMain.handle(IPC.WORKSPACE_SAVE_TEXT_AS, async (event, payload: WorkspaceHostSaveAsRequest) => {
+    if (typeof payload?.content !== 'string') {
+      return err({ code: 'INVALID_ARGUMENT', message: '缺少正文内容' })
+    }
+    const workspaceId =
+      typeof payload?.workspaceId === 'string' ? payload.workspaceId.trim() : ''
+    // B2 远端另存为：远端目录选择语义，不弹 Windows 对话框冒充远端保存
+    if (workspaceId && typeof payload?.fileName === 'string') {
+      const bound = getWindowWorkspaceDescriptor(event.sender.id)
+      if (!bound || bound.kind === 'local' || bound.id !== workspaceId) {
+        return err({ code: 'INVALID_STATE', message: '工作区归属与窗口绑定不一致（不可跨窗口访问）' })
+      }
+      const host = getRemoteHost(workspaceId)
+      if (!host) {
+        return err({
+          code: 'REMOTE_NOT_CONNECTED',
+          message: `远端工作区未连接 (${workspaceId})：不断线误报成功`,
+        })
+      }
+      autoBindRemoteSender(event.sender, workspaceId)
+      const saved = await host.saveTextAs(payload.dirRelativePath, payload.fileName, payload.content)
+      if (!saved.ok) return saved
+      return ok({ filePath: saved.value.relativePath, revision: saved.value.revision })
+    }
+    // 本机：沿用对话框流程（与 FILE_SAVE_AS 同语义）
+    return getWorkspaceHostForWindow(event.sender.id).saveFileAs({ content: payload.content })
+  })
+  ipcMain.handle(IPC.WORKSPACE_READ_IMAGE, async (event, payload: WorkspaceHostTextRef) => {
+    const target = resolveHostTextTarget(event, payload ?? {})
+    if ('error' in target) return err(target.error)
+    if (target.kind === 'remote') return target.host.readImage(target.relativePath)
+    return getWorkspaceHostForWindow(event.sender.id).readImage(target.filePath)
+  })
+  ipcMain.handle(IPC.FILE_SAVE_PASTED_IMAGE, (event, payload: SavePastedImagePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).savePastedImage(payload),
   )
-  ipcMain.handle(IPC.FILE_CREATE, (_event, payload: WorkspaceFsCreateFilePayload) =>
-    workspaceCreateFile(payload),
+  ipcMain.handle(IPC.FILE_CREATE, (event, payload: WorkspaceFsCreateFilePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).createFile(payload),
   )
-  ipcMain.handle(IPC.FILE_CREATE_DIR, (_event, payload: WorkspaceFsCreateDirPayload) =>
-    workspaceCreateDirectory(payload),
+  ipcMain.handle(IPC.FILE_CREATE_DIR, (event, payload: WorkspaceFsCreateDirPayload) =>
+    getWorkspaceHostForWindow(event.sender.id).createDirectory(payload),
   )
-  ipcMain.handle(IPC.FILE_RENAME, (_event, payload: WorkspaceFsRenamePayload) =>
-    workspaceRename(payload),
+  ipcMain.handle(IPC.FILE_RENAME, (event, payload: WorkspaceFsRenamePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).renamePath(payload),
   )
-  ipcMain.handle(IPC.FILE_DELETE, (_event, payload: WorkspaceFsDeletePayload) =>
-    workspaceDelete(payload),
+  ipcMain.handle(IPC.FILE_DELETE, (event, payload: WorkspaceFsDeletePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).deletePath(payload),
   )
-  ipcMain.handle(IPC.FILE_COPY, (_event, payload: WorkspaceFsCopyPayload) =>
-    workspaceCopy(payload),
+  ipcMain.handle(IPC.FILE_COPY, (event, payload: WorkspaceFsCopyPayload) =>
+    getWorkspaceHostForWindow(event.sender.id).copyPath(payload),
   )
-  ipcMain.handle(IPC.FILE_MOVE, (_event, payload: WorkspaceFsMovePayload) =>
-    workspaceMove(payload),
+  ipcMain.handle(IPC.FILE_MOVE, (event, payload: WorkspaceFsMovePayload) =>
+    getWorkspaceHostForWindow(event.sender.id).movePath(payload),
   )
-  ipcMain.handle(IPC.FILE_EXPORT_HTML, (_event, payload: ExportDocumentPayload) =>
-    exportHtmlDocument(payload),
+  ipcMain.handle(IPC.FILE_EXPORT_HTML, (event, payload: ExportDocumentPayload) =>
+    getWorkspaceHostForWindow(event.sender.id).exportHtml(payload),
   )
-  ipcMain.handle(IPC.FILE_EXPORT_PDF, (_event, payload: ExportDocumentPayload) =>
-    exportPdfDocument(payload),
+  ipcMain.handle(IPC.FILE_EXPORT_PDF, (event, payload: ExportDocumentPayload) =>
+    getWorkspaceHostForWindow(event.sender.id).exportPdf(payload),
   )
-  ipcMain.handle(IPC.FILE_EXPORT_MARKDOWN, (_event, payload: ExportMarkdownPayload) =>
-    exportMarkdownDocument(payload),
+  ipcMain.handle(IPC.FILE_EXPORT_MARKDOWN, (event, payload: ExportMarkdownPayload) =>
+    getWorkspaceHostForWindow(event.sender.id).exportMarkdown(payload),
   )
 
   // --- 窗口 / 应用壳：标题、退出、新建窗、外链 ---
@@ -825,26 +1256,66 @@ export function registerIpcHandlers(): void {
   /* ----------------------------------------------------------------
    * Git 版本控制（git:*）
    * ---------------------------------------------------------------- */
-  ipcMain.handle(IPC.GIT_STATUS, async (_event, cwd: string) => {
+  ipcMain.handle(IPC.GIT_STATUS, async (event, cwd: string) => {
     try {
-      const res = await getGitStatus(cwd)
+      const res = await getWorkspaceHostForWindow(event.sender.id).gitStatus(cwd)
       return ok(res)
     } catch (e) {
       return err({ code: 'GIT_ERROR', message: e instanceof Error ? e.message : String(e) })
     }
   })
-  ipcMain.handle(IPC.GIT_PUSH, async (_event, payload: { cwd: string } & GitPushOptions) => {
+  ipcMain.handle(IPC.GIT_PUSH, async (event, payload: { cwd: string } & GitPushOptions) => {
     try {
-      return await gitPush(payload.cwd, payload)
+      return await getWorkspaceHostForWindow(event.sender.id).gitPush(payload)
     } catch (e) {
       return err({ code: 'GIT_PUSH_FAILED', message: e instanceof Error ? e.message : String(e) })
     }
   })
-  ipcMain.handle(IPC.GIT_COMMIT, async (_event, payload: { cwd: string } & GitCommitOptions) => {
+  ipcMain.handle(IPC.GIT_COMMIT, async (event, payload: { cwd: string } & GitCommitOptions) => {
     try {
-      return await gitCommit(payload.cwd, payload)
+      return await getWorkspaceHostForWindow(event.sender.id).gitCommit(payload)
     } catch (e) {
       return err({ code: 'GIT_COMMIT_FAILED', message: e instanceof Error ? e.message : String(e) })
+    }
+  })
+  // B3：diff/branch（远端绑定时经 Ubuntu 执行，无会话则明确失败不回落）
+  ipcMain.handle(
+    IPC.GIT_DIFF,
+    async (event, payload: { cwd: string; file?: string; staged?: boolean }) => {
+      try {
+        const remote = getRemoteGitHost(event.sender.id)
+        if (remote.host) return remote.host.gitDiff(payload?.file, payload?.staged === true)
+        if (remote.remoteBound) {
+          return err({
+            code: 'REMOTE_NOT_CONNECTED',
+            message: '远端工作区未连接：Git 在远端执行，不回落本机',
+          })
+        }
+        if (!payload || typeof payload.cwd !== 'string' || !payload.cwd) {
+          return err({ code: 'INVALID_ARGUMENT', message: '缺少工作区目录' })
+        }
+        return getGitDiff(payload.cwd, payload.file, payload.staged === true)
+      } catch (e) {
+        return err({ code: 'GIT_ERROR', message: e instanceof Error ? e.message : String(e) })
+      }
+    },
+  )
+  ipcMain.handle(IPC.GIT_BRANCHES, async (event, cwd: string) => {
+    try {
+      const remote = getRemoteGitHost(event.sender.id)
+      if (remote.host) return remote.host.gitBranch()
+      if (remote.remoteBound) {
+        return err({
+          code: 'REMOTE_NOT_CONNECTED',
+          message: '远端工作区未连接：Git 在远端执行，不回落本机',
+        })
+      }
+      if (typeof cwd !== 'string' || !cwd) {
+        return err({ code: 'INVALID_ARGUMENT', message: '缺少工作区目录' })
+      }
+      return listGitBranches(cwd)
+    } catch (e) {
+      return err({ code: 'GIT_ERROR', message: e instanceof Error ? e.message : String(e) })
     }
   })
 
@@ -855,8 +1326,85 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.REMOTE_GET_WSL_HOME, async (_event, distro: string) => getWslHome(distro))
   ipcMain.handle(
     IPC.REMOTE_BROWSE_WSL,
-    async (_event, payload: { distro: string; dirPath?: string }) =>
-      browseWslDirectory(payload.distro, payload.dirPath),
+    async (event, payload: { distro: string; dirPath?: string }) => {
+      // P2：浏览走调用窗口自己的连接；未建连明确报错，不碰全局单例
+      const distro = typeof payload?.distro === 'string' ? payload.distro.trim() : ''
+      if (!distro) {
+        return err({ code: 'INVALID_ARGUMENT', message: '缺少 WSL 发行版' })
+      }
+      const host = peekWslHostForWindow(event.sender.id)
+      if (!host || !host.isConnectedTo(distro)) {
+        return err({
+          code: 'REMOTE_NOT_CONNECTED',
+          message: `WSL 远端未连接 (${distro})：请先连接后再浏览（不回落本机文件系统）`,
+        })
+      }
+      return host.browseDirectory(payload?.dirPath)
+    },
+  )
+  ipcMain.handle(IPC.REMOTE_WSL_CONNECT, async (event, payload: RemoteWslConnectPayload) => {
+    if (!payload || typeof payload.distro !== 'string' || !payload.distro.trim()) {
+      return err({ code: 'INVALID_ARGUMENT', message: '缺少 WSL 发行版' })
+    }
+    // P2：连接归属调用窗口；同窗口重连由宿主代际守卫取代旧连接
+    const host = getWslHostForWindow(event.sender.id)
+    ensureWslRegistryCleanup(event.sender)
+    return host.connect(payload.distro.trim(), payload.linuxRoot)
+  })
+  ipcMain.handle(IPC.REMOTE_WSL_DISCONNECT, async (event) => {
+    // P2：只释放本窗口（会话 refcount 决定传输是否关闭，不杀他人连接）
+    releaseWindowRemoteBinding(event.sender.id)
+    dropRemoteWatchForward(event.sender.id)
+    stopWorkspaceWatch(event.sender.id)
+    disposeWslHostForWindow(event.sender.id)
+    pushWorkspaceStatus(event.sender, unbindWindowWorkspace(event.sender.id))
+    return ok(undefined)
+  })
+  ipcMain.handle(IPC.REMOTE_WSL_STATUS, async (event) => ok(peekWslHostForWindow(event.sender.id)?.status() ?? null))
+  ipcMain.handle(IPC.REMOTE_WSL_STAT, async (event, payload: RemoteWslStatPayload) => {
+    if (!payload || typeof payload.filePath !== 'string' || !payload.filePath.trim()) {
+      return err({ code: 'INVALID_ARGUMENT', message: '缺少远端路径' })
+    }
+    // P2：stat 走调用窗口自己的连接；须先建连
+    const host = peekWslHostForWindow(event.sender.id)
+    if (!host) {
+      return err({ code: 'REMOTE_NOT_CONNECTED', message: 'WSL 远端未连接：请先连接后再查询' })
+    }
+    return host.statPath(payload.filePath)
+  })
+  ipcMain.handle(
+    IPC.REMOTE_WSL_OPEN_WORKSPACE,
+    async (event, payload: RemoteOpenWslWorkspacePayload) => {
+      // P1：连接选中根→注册远端宿主→绑定调用窗口→返回初始树
+      const distro = typeof payload?.distro === 'string' ? payload.distro.trim() : ''
+      const linuxPath = typeof payload?.linuxPath === 'string' ? payload.linuxPath.trim() : ''
+      if (!distro) {
+        return err({ code: 'INVALID_ARGUMENT', message: '缺少 WSL 发行版' })
+      }
+      if (!linuxPath || !linuxPath.replace(/\\/g, '/').startsWith('/')) {
+        return err({ code: 'INVALID_ARGUMENT', message: '远端路径须为 Ubuntu 内绝对路径' })
+      }
+      return openWslWorkspaceForWindow(event.sender, distro, linuxPath)
+    },
   )
   ipcMain.handle(IPC.REMOTE_LIST_SSH_CONFIG_HOSTS, async () => listSshConfigHosts())
+
+  /* ----------------------------------------------------------------
+   * 远端工作区服务本地管道（remote-server:*，A2）
+   * 连接归属 event.sender 窗口；sender 销毁时回收其全部连接。
+   * ---------------------------------------------------------------- */
+  ipcMain.handle(IPC.REMOTE_SERVER_CONNECT, (event, payload: RemoteServerConnectPayload) => {
+    const sender = event.sender
+    sender.once('destroyed', () => remoteServerHosts.releaseSender(sender.id))
+    return remoteServerHosts.connect(sender.id, payload)
+  })
+  ipcMain.handle(IPC.REMOTE_SERVER_INVOKE, (event, payload: RemoteServerInvokePayload) =>
+    remoteServerHosts.invoke(event.sender.id, payload),
+  )
+  ipcMain.handle(IPC.REMOTE_SERVER_DISCONNECT, (event, connectionId: string) =>
+    remoteServerHosts.disconnect(event.sender.id, connectionId),
+  )
+  ipcMain.handle(IPC.REMOTE_SERVER_STATUS, (event, connectionId: string) =>
+    remoteServerHosts.status(event.sender.id, connectionId),
+  )
 }

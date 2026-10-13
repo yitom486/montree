@@ -12,7 +12,7 @@
 | `Sidebar` | 侧栏（装配 panels/ 的手风琴内容面板，支持资源管理器、在线文档与大纲的折叠与拖拽分栏） |
 | `SplitPane` | 通用分栏容器 |
 | `StatusBar` | 底部状态栏（WSL 环境提示、Git 分支/变更计数/待推提交与一键推送、文档格式编码） |
-| `RemoteConnectModal` | 远程环境连接器（VS Code 风格，应用内直达 WSL 分发版与 Linux 目录浏览、SSH 探测，规避系统对话框） |
+| `RemoteConnectModal` | 远程环境连接器（应用内直达 WSL 分发版；经 Ubuntu 远端服务建连 + 浏览，确认目录后打开远端工作区并绑定本窗口，不再生成 UNC，SSH 探测，规避系统对话框） |
 
 ## panels/ 侧栏内容面板
 

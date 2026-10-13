@@ -57,6 +57,8 @@ export interface TreeClipboardEntry {
   path: string
   isDirectory: boolean
   name: string
+  /** B2：来源工作区（缺席视为本机；跨工作区粘贴明确拒绝，T7） */
+  workspaceId?: string
 }
 
 export function resolvePasteTargetDir(

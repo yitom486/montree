@@ -35,6 +35,24 @@ export const WORKSPACE_MD_MAX_FILE_BYTES = 256 * 1024
 export const WORKSPACE_MD_MAX_HITS = 100
 export const WORKSPACE_MD_MAX_LINE_CHARS = 2000
 
+/**
+ * B3 分页切片（纯函数）：offset/limit 归一化后切 hits；
+ * nextOffset 为 null 时无更多（调用方把缺席也视为无更多）。
+ */
+export function paginateWorkspaceHits(
+  hits: WorkspaceMarkdownHit[],
+  offset?: number | null,
+  limit?: number | null,
+): { hits: WorkspaceMarkdownHit[]; nextOffset: number | null } {
+  const start = Number.isInteger(offset) && (offset as number) > 0 ? (offset as number) : 0
+  const size =
+    Number.isInteger(limit) && (limit as number) > 0
+      ? Math.min(limit as number, WORKSPACE_MD_MAX_HITS)
+      : WORKSPACE_MD_MAX_HITS
+  const page = hits.slice(start, start + size)
+  return { hits: page, nextOffset: start + size < hits.length ? start + size : null }
+}
+
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown'])
 const SKIP_DIRECTORIES = new Set(['node_modules', '.git', '.montree', 'dist', 'out', 'release'])
 

@@ -10,7 +10,8 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `editor-ui-store.ts` | 主题、视图模式、侧栏、各文件滚动位置等编辑器 UI |
 | `app-settings-store.ts` / `.test.ts` | 用户设置（自动保存间隔、verbose 日志等）；Markdown 默认所见即所得，源码切换不持久化，兼容旧设置迁移 |
 | `active-document-store.ts` | 当前打开文档路径/类型（供 Agent turn-context 等） |
-| `draft-store.ts` | 未保存草稿（localStorage） |
+| `draft-store.ts` | 未保存草稿（localStorage；键按 workspaceId 隔离，local 沿用裸键） |
+| `workspace-store.ts` / `.test.ts` | 当前窗口工作区描述符/连接状态（身份与代际守卫；对象 selector 经 useShallow） |
 | `error-log-store.ts` | 渲染端错误日志列表 |
 | `reader-navigation-store.ts` | 阅读器目录 / flatIndex / 当前章（侧栏与底栏共用）/ PDF 当前页 pageNum（仅 Agent 快照用） |
 | `reading-progress-store.ts` | 阅读进度百分比等（含在线文档滚动比例） |

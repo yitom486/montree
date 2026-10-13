@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp,
   Folder,
@@ -10,8 +11,10 @@ import {
   Server,
   Terminal,
 } from 'lucide-react'
-import { isWslPath, linuxToWindowsPath, type RemoteDirectoryEntry, type SshConfigHost, type WslDistroInfo } from '@montree/contracts'
+import { isWslPath, type RemoteDirectoryEntry, type RemoteServerConnectionInfo, type SshConfigHost, type WslDistroInfo } from '@montree/contracts'
 import { remoteApi } from '@/api/remote-api'
+import { queryKeys } from '@/api/query-keys'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,6 +31,10 @@ import { cn } from '@/lib/utils'
 export interface RemoteConnectModalProps {
   isOpen: boolean
   onClose: () => void
+  /**
+   * 遗留回调（SSH D 阶段用）：WSL 确认不再经此回调走本机重扫，
+   * 而是经 remoteOpenWslWorkspace 完成远端宿主注册与窗口绑定。
+   */
   onOpenWorkspace: (workspacePath: string) => void
   currentWorkspace?: string
   onDisconnectRemote?: () => void
@@ -38,10 +45,10 @@ type RemoteTab = 'wsl' | 'ssh'
 export function RemoteConnectModal({
   isOpen,
   onClose,
-  onOpenWorkspace,
   currentWorkspace,
   onDisconnectRemote,
 }: RemoteConnectModalProps) {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<RemoteTab>('wsl')
 
   // WSL 状态
@@ -54,6 +61,10 @@ export function RemoteConnectModal({
   const [homePath, setHomePath] = useState<string>('/home')
   const [isLoadingWsl, setIsLoadingWsl] = useState<boolean>(false)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  // B1 远端连接：浏览经 Ubuntu 服务执行，须先建连；失败显式报错，不回落 UNC
+  const [connection, setConnection] = useState<RemoteServerConnectionInfo | null>(null)
+  const [connectedDistro, setConnectedDistro] = useState<string>('')
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   // SSH 状态
   const [sshHosts, setSshHosts] = useState<SshConfigHost[]>([])
@@ -62,14 +73,50 @@ export function RemoteConnectModal({
   const [sshPort, setSshPort] = useState<string>('22')
   const [sshPath, setSshPath] = useState<string>('/home')
 
-  // 加载发行版和 SSH 配置（零硬编码，动态检测本机环境）
+  // 建立远端连接（经 wsl.exe 管道安装/启动 Ubuntu 服务并握手），成功后浏览
+  const connectAndBrowse = useCallback(async (distro: string, targetPath?: string) => {
+    setIsLoadingWsl(true)
+    setConnectError(null)
+    setSelectedFolder(null)
+    try {
+      const connRes = await remoteApi.connectWsl({ distro })
+      if (!connRes.ok) {
+        setConnection(null)
+        setConnectedDistro('')
+        setConnectError(connRes.error.message)
+        setEntries([])
+        return
+      }
+      setConnection(connRes.value)
+      setConnectedDistro(distro)
+      const homeRes = await remoteApi.getWslHome(distro)
+      const resolvedHome = homeRes.ok ? homeRes.value : '/home'
+      setHomePath(resolvedHome)
+      const dest = targetPath ?? resolvedHome
+      const browseRes = await remoteApi.browseWsl(distro, dest)
+      if (browseRes.ok) {
+        setCurrentPath(browseRes.value.currentPath)
+        setInputPath(browseRes.value.currentPath)
+        setParentPath(browseRes.value.parentPath)
+        setEntries(browseRes.value.entries.filter((e) => e.isDirectory))
+      } else {
+        setConnectError(browseRes.error.message)
+      }
+    } catch (e) {
+      console.error('连接远程环境失败', e)
+      setConnectError(e instanceof Error ? e.message : '连接远程环境失败')
+    } finally {
+      setIsLoadingWsl(false)
+    }
+  }, [])
+
+  // 加载发行版和 SSH 配置（零硬编码，动态检测本机环境），随后建连并浏览
   useEffect(() => {
     if (!isOpen) return
 
     let cancelled = false
 
     async function init() {
-      setIsLoadingWsl(true)
       try {
         const [distroRes, sshRes] = await Promise.all([
           remoteApi.listWslDistros(),
@@ -89,25 +136,10 @@ export function RemoteConnectModal({
           const defaultOne = list.find((d) => d.isDefault) ?? list[0]
           const targetDistro = defaultOne?.name ?? ''
           setSelectedDistro(targetDistro)
-
-          // 动态获取其 Linux 家目录
-          const homeRes = await remoteApi.getWslHome(targetDistro)
-          const resolvedHome = homeRes.ok ? homeRes.value : '/home'
-          setHomePath(resolvedHome)
-          setCurrentPath(resolvedHome)
-          setInputPath(resolvedHome)
-
-          // 浏览该目录
-          const browseRes = await remoteApi.browseWsl(targetDistro, resolvedHome)
-          if (browseRes.ok) {
-            setEntries(browseRes.value.entries.filter((e) => e.isDirectory))
-            setParentPath(browseRes.value.parentPath)
-          }
+          if (targetDistro) await connectAndBrowse(targetDistro)
         }
       } catch (e) {
         console.error('初始化远程环境失败', e)
-      } finally {
-        if (!cancelled) setIsLoadingWsl(false)
       }
     }
 
@@ -116,14 +148,19 @@ export function RemoteConnectModal({
     return () => {
       cancelled = true
     }
-  }, [isOpen])
+  }, [isOpen, connectAndBrowse])
 
-  // 导航至指定 Linux 路径
+  // 导航至指定 Linux 路径（须已建连；断线则先重连，不回落 UNC）
   const navigateTo = useCallback(
     async (distro: string, targetPath: string) => {
       if (!distro || !targetPath) return
+      if (connection?.state !== 'connected' || connectedDistro !== distro) {
+        await connectAndBrowse(distro, targetPath)
+        return
+      }
       setIsLoadingWsl(true)
       setSelectedFolder(null)
+      setConnectError(null)
       try {
         const res = await remoteApi.browseWsl(distro, targetPath)
         if (res.ok) {
@@ -132,45 +169,62 @@ export function RemoteConnectModal({
           setParentPath(res.value.parentPath)
           setEntries(res.value.entries.filter((e) => e.isDirectory))
         } else {
+          setConnectError(res.error.message)
           toast.error(`无法进入路径: ${res.error.message}`)
         }
       } finally {
         setIsLoadingWsl(false)
       }
     },
-    [],
+    [connection, connectedDistro, connectAndBrowse],
   )
 
-  // 切换分发版
+  // 切换分发版（重建连接：代际隔离，旧连接进程由主进程清理）
   const handleSelectDistro = async (newDistro: string) => {
     setSelectedDistro(newDistro)
-    setIsLoadingWsl(true)
-    try {
-      const homeRes = await remoteApi.getWslHome(newDistro)
-      const resolvedHome = homeRes.ok ? homeRes.value : '/home'
-      setHomePath(resolvedHome)
-      await navigateTo(newDistro, resolvedHome)
-    } finally {
-      setIsLoadingWsl(false)
-    }
+    await connectAndBrowse(newDistro)
   }
 
-  // 确认打开选中的 WSL 工作区
-  const handleConfirmOpenWsl = () => {
+  // P1 确认打开选中的 WSL 目录：连接选中根→注册远端宿主→绑定本窗口→
+  // 写回工作区身份与初始文件树（不再只验证后关闭，不走本机重扫）。
+  const handleConfirmOpenWsl = async () => {
     if (!selectedDistro) {
       toast.error('未选择 WSL 分发版')
       return
     }
 
-    // 如果选了列表中的子文件夹，则进入子文件夹；否则进入当前浏览的目录
     const finalLinuxPath = selectedFolder
       ? `${currentPath.replace(/\/+$/, '')}/${selectedFolder}`
       : currentPath
 
-    const windowsUnc = linuxToWindowsPath(finalLinuxPath, selectedDistro)
-    onOpenWorkspace(windowsUnc)
+    const opened = await remoteApi.openWslWorkspace({
+      distro: selectedDistro,
+      linuxPath: finalLinuxPath || '/',
+    })
+    if (!opened.ok) {
+      setConnectError(opened.error.message)
+      toast.error(`打开远端工作区失败: ${opened.error.message}`)
+      return
+    }
+    const { descriptor, status, folder } = opened.value
+    queryClient.setQueryData(queryKeys.workspaceOf(descriptor.id), folder)
+    useWorkspaceStore.getState().setConnected({ descriptor, generation: status.generation, status })
     onClose()
-    toast.success(`已切换至 WSL 工作区 (${selectedDistro}): ${finalLinuxPath}`)
+    const hand = status.state === 'connected' ? connection?.handshake : null
+    toast.success(
+      `已打开远端工作区 (${selectedDistro}): ${finalLinuxPath || '/'}${hand ? ` [${hand.platform}/${hand.arch} ${hand.nodeVersion}]` : ''}`,
+    )
+  }
+
+  // 显式断开（清理本连接启动的远端服务进程）
+  const handleDisconnectWsl = async () => {
+    await remoteApi.disconnectWsl()
+    setConnection(null)
+    setConnectedDistro('')
+    setEntries([])
+    setConnectError(null)
+    onDisconnectRemote?.()
+    onClose()
   }
 
   return (
@@ -355,6 +409,37 @@ export function RemoteConnectModal({
                   </Button>
                 </form>
 
+                {/* 远端连接状态（B1：浏览经 Ubuntu 服务执行，仅显示有效状态） */}
+                {connection?.state === 'connected' && connection.handshake ? (
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-800 dark:text-emerald-300">
+                    <span className="font-medium">远端服务已连接：</span>
+                    <span className="font-mono">
+                      {connection.handshake.platform}/{connection.handshake.arch} {connection.handshake.nodeVersion}
+                      {' '}build={connection.handshake.buildId.slice(0, 12)}
+                    </span>
+                    <button
+                      type="button"
+                      className="ml-2 underline underline-offset-2 hover:opacity-80"
+                      onClick={() => void handleDisconnectWsl()}
+                    >
+                      断开
+                    </button>
+                  </div>
+                ) : null}
+                {connectError ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+                    <span className="font-medium">连接失败：</span>
+                    <span className="whitespace-pre-wrap break-words">{connectError}</span>
+                    <button
+                      type="button"
+                      className="ml-2 underline underline-offset-2 hover:opacity-80"
+                      onClick={() => void connectAndBrowse(selectedDistro, currentPath || undefined)}
+                    >
+                      重试
+                    </button>
+                  </div>
+                ) : null}
+
                 {/* 应用内文件树列表 */}
                 <div className="min-h-[220px] max-h-[300px] flex-1 overflow-y-auto rounded-md border border-border/60 bg-muted/20 p-1">
                   {isLoadingWsl ? (
@@ -506,12 +591,12 @@ export function RemoteConnectModal({
             <Button
               type="button"
               size="sm"
-              onClick={handleConfirmOpenWsl}
+              onClick={() => void handleConfirmOpenWsl()}
               disabled={isLoadingWsl}
               className="text-xs gap-1.5"
             >
               <FolderOpen className="size-3.5" />
-              <span>在此目录打开工作区</span>
+              <span>打开远端工作区</span>
             </Button>
           )}
         </DialogFooter>

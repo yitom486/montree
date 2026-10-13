@@ -42,3 +42,18 @@ export interface GitCommitResult {
   commitHash?: string
   message?: string
 }
+
+/** B3：单文件/整树 diff（过长截断并标记，不静默丢尾） */
+export interface GitDiffResult {
+  /** 省略时为整树未暂存 diff（含 --stat 头部由调用方裁剪展示） */
+  file?: string
+  diff: string
+  truncated: boolean
+}
+
+/** B3：分支列表（游离 HEAD 时 current 为 null 且 detached） */
+export interface GitBranchInfo {
+  current: string | null
+  branches: string[]
+  detached: boolean
+}

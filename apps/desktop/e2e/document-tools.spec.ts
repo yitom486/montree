@@ -180,7 +180,7 @@ test('JSON、LOG、本地HTML和Word接入通用正文、目录与搜索', async
       await open(page, name)
       await expect.poll(async () => { try { return await snapshot(app, 'chapter.txt') } catch { return '' } }).toContain(text)
       expect(await snapshot(app, 'search', { query: 'needle' })).toContain('needle')
-      expect(await snapshot(app, 'viewport.txt')).toContain('needle')
+      await expect.poll(() => snapshot(app, 'viewport.txt')).toContain('needle')
       expect(JSON.parse(await snapshot(app, 'toc.json')).entries.length).toBeGreaterThan(0)
     }
   } finally { await app.close() }

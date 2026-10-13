@@ -3,11 +3,12 @@
 **主进程**源码。入口：`main.ts`；渲染进程通过 `preload.ts` 的 `contextBridge` 调 IPC。  
 渲染进程在 [`src/`](../src/README.md)；跨进程契约在 `packages/contracts/`（`@montree/contracts`，原 `shared/` 核心/IPC/类型；`shared/` 已清空，阶段 10 删除）。
 
-门禁：`bun run lint:docs`（`scripts/lint-docs.ts`）+ `bun run lint:deps`（`scripts/check-deps.ts`，R1–R6 依赖边界）。
+门禁：`bun run lint:docs`（`scripts/lint-docs.ts`）+ `bun run lint:deps`（`scripts/check-deps.ts`，R1–R7 依赖边界）。
 
 | 目录 / 文件 | 职责 |
 |-------------|------|
 | `main.ts` | 应用生命周期、注册 IPC、创建窗口、退出时释放 ACP / 工作区监听 |
+| `mcp-stdio.ts` | Agent 启动的 MCP stdio 子进程入口；经窗口专属命名管道/Unix socket 访问主进程文档服务，stdout 仅输出协议消息 |
 | `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI` |
 | [`ipc/`](./ipc/) | `ipcMain` 处理器注册 |
 | [`window/`](./window/) | BrowserWindow 创建、关闭确认、标题；`window/app-menu.ts` 安装 Edit 菜单角色（Ctrl+C/V） |
