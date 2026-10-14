@@ -26,3 +26,5 @@
 | `query-keys.ts` | TanStack Query key 工厂（含 workspaceId/文档身份隔离） |
 
 新增能力顺序（见 AGENTS.md）：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。
+
+- React artifact 编译 API：`react-artifact-api.ts`，仅通过 preload 请求主进程转换 JSX/TSX，返回离线 HTML；模型代码只在隔离 iframe 运行。

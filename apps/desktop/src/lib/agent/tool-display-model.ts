@@ -23,6 +23,8 @@ export type ToolResultKind =
   | 'chapter-suggestion'
   | 'chapter-comparison'
   | 'html-artifact'
+  | 'component-ui'
+  | 'react-artifact'
   | 'diff'
   | 'text'
   | 'none'
@@ -132,6 +134,8 @@ export function classifyToolResultKind(
   const detail = message.toolContentText || message.text || ''
   if (message.presentResult?.kind === 'chapter-comparison') return 'chapter-comparison'
   if (message.presentResult?.kind === 'html-artifact') return 'html-artifact'
+  if (message.presentResult?.kind === 'component-ui') return 'component-ui'
+  if (message.presentResult?.kind === 'react-artifact') return 'react-artifact'
   if (title.includes('montree_generate_diagram') || detail.includes('mermaidCode')) {
     return 'diagram'
   }
@@ -150,7 +154,11 @@ export function classifyToolResultKind(
   if (title.includes('montree_present') && detail.includes('html-artifact')) {
     return 'html-artifact'
   }
+  if (title.includes('montree_present') && detail.includes('component-ui')) {
+    return 'component-ui'
+  }
   if ((message.toolDiffs ?? []).length > 0) return 'diff'
+  if (title.includes('montree_present') && detail.includes('react-artifact')) return 'react-artifact'
   if (detail && detail !== title) return 'text'
   return 'none'
 }
@@ -163,7 +171,8 @@ export function isPromotedToolResultKind(kind: ToolResultKind): boolean {
     kind === 'content-audit' ||
     kind === 'chapter-suggestion' ||
     kind === 'chapter-comparison' ||
-    kind === 'html-artifact'
+    kind === 'html-artifact' ||
+    kind === 'component-ui' || kind === 'react-artifact'
   )
 }
 

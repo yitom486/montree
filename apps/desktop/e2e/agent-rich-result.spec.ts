@@ -188,10 +188,16 @@ test.describe('富结果生产链路 S2', () => {
       await switchDialog.getByRole('button').filter({ hasText: 'other.md' }).click()
       await expect(switchDialog).toBeHidden()
       const anchorCountBefore = (await window.evaluate(() => (window as any).__anchors)).length
-      await card.getByRole('button', { name: '定位原文' }).first().click()
+      const citations = card.locator('[data-slot="citations"]')
+      await expect(citations.getByRole('button', { name: '引用来源 · 2 处' })).toBeVisible()
+      await citations.getByRole('button', { name: '引用来源 · 2 处' }).click()
+      await expect(citations.locator('li')).toHaveCount(2)
+      await expect(citations).not.toContainText('仅评述，无摘录')
+      await citations.locator('li button').first().click()
       await expect(window.getByText(/请先打开原文档后再定位/)).toBeVisible({ timeout: 10_000 })
       expect(await window.evaluate(() => (window as any).__anchors)).toHaveLength(anchorCountBefore)
 
+      await citations.scrollIntoViewIfNeeded()
       await panel.screenshot({ path: info.outputPath('compare.png') })
       await info.attach('compare', { path: info.outputPath('compare.png'), contentType: 'image/png' })
 

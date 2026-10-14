@@ -189,6 +189,7 @@ import type {
  * （interface 内成员顺序无语义，仅作阅读分区；通道字符串见 ../ipc/channels.ts）
  */
 export interface ElectronAPI {
+  compileReactArtifact: (payload: { source: string; css?: string }) => Promise<Result<string, AppError>>
   /* ===== 应用与窗口：静态注入 + 窗口生命周期 ===== */
   /** 当前操作系统：`win32` / `darwin` / `linux` */
   platform: string

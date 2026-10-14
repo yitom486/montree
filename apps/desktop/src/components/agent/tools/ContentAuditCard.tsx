@@ -13,6 +13,7 @@ import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardCl
 import { cn } from '@/lib/utils'
 import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import type { ContentAuditHit } from '@montree/contracts'
+import { BeuiCitations } from '@/components/agent/chat/BeuiCitations'
 
 export interface ContentAuditPayload {
   query: string
@@ -224,6 +225,10 @@ export function ContentAuditCard({
           })
         )}
       </div>
+      <BeuiCitations label="检索证据" citations={hits.filter(hit => hit.text?.trim() && (hit.locator?.url || hit.locator?.filePath || hit.locator?.pageNumber != null || hit.locator?.chapterTitle)).map((hit, index) => ({
+        id: `${hit.source}:${index}`, title: formatLocator(hit), detail: resolveSourceBadge(hit.source).label, excerpt: hit.text,
+        onSelect: !hit.locator?.url || /^https?:\/\//i.test(hit.locator.url.trim()) ? () => handleLocate(hit) : undefined,
+      }))} />
     </div>
   )
 }

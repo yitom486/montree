@@ -17,6 +17,51 @@ async function openPanel(page: Page) {
 }
 
 test.describe('Streamdown 正文 S1', () => {
+  test('等待计时与动效、真实思考展开、BeUI 输出完成动作', async ({}, info) => {
+    const app = await launchBuiltApp({ E2E_ACP_WINDOW_TEST: '1', E2E_ACP_COMMAND: process.execPath, E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs') })
+    try {
+      const window = await app.firstWindow()
+      await window.setViewportSize({ width: 1600, height: 900 })
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
+      await window.evaluate(() => {
+        const now = Date.now()
+        localStorage.setItem('markdown-editor-ui', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
+        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
+          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'status-ui',
+          threads: [{ id: 'status-ui', runtimeId: 'mock-window', title: '状态回归', createdAt: now, updatedAt: now, messages: [] }],
+        } }))
+      })
+      await window.reload()
+      const panel = await openPanel(window)
+      await panel.locator('textarea').fill('status-flow')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      const waiting = panel.getByTestId('agent-loading-state').first()
+      await expect(waiting).toContainText('等待响应')
+      await expect(waiting.locator('.agent-pixel-loader > span')).toHaveCount(9)
+      await window.emulateMedia({ reducedMotion: 'reduce' })
+      expect(await waiting.locator('.agent-pixel-loader > span').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none')
+      await window.emulateMedia({ reducedMotion: 'no-preference' })
+      expect(await waiting.locator('.agent-pixel-loader > span').first().evaluate(el => getComputedStyle(el).animationName)).toBe('agent-pixel-pulse')
+      await panel.screenshot({ path: info.outputPath('waiting-response.png') })
+      await expect(waiting.locator('[aria-label^="已等待"]')).not.toHaveText('0s')
+      const thought = panel.locator('[data-part-key^="thought-"]').first()
+      await expect(thought).toContainText('先检查当前文档证据。')
+      await expect(thought.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+      await expect(panel.getByTestId('agent-loading-state')).toHaveCount(0)
+      await panel.screenshot({ path: info.outputPath('thinking-live.png') })
+      const response = panel.locator('[data-slot="streaming-response"]').last()
+      await expect(response).toContainText('已完成证据核对。')
+      await expect(response).toHaveAttribute('data-state', 'complete')
+      await expect(response.getByRole('button', { name: '复制回答原文' })).toBeVisible()
+      const activity = panel.locator('[data-slot="agent-activity"]')
+      await expect(activity.locator(':scope > button')).toHaveAttribute('aria-expanded', 'false')
+      await activity.locator(':scope > button').click()
+      await expect(thought.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+      await panel.screenshot({ path: info.outputPath('beui-response.png') })
+    } finally { await app.close() }
+  })
+
   test('流式中间态与完成态：表格/代码/公式/Mermaid/链接/复制', async ({}, info) => {
     const app = await launchBuiltApp({
       E2E_ACP_WINDOW_TEST: '1',
@@ -46,6 +91,8 @@ test.describe('Streamdown 正文 S1', () => {
       // 中间态：首段已到、尾段未到（chunk 200ms 间隔，时序上有 600ms+ 窗口）
       await expect(panel.getByText('首段中文正文')).toBeVisible({ timeout: 15_000 })
       await expect(panel.getByText('尾段收束')).toHaveCount(0)
+      // 空行/新块到达不应把已显示正文从尾渲染器搬到头渲染器。
+      const firstParagraph = await panel.locator('.agent-md p').filter({ hasText: '首段中文正文' }).elementHandle()
       // 流式气泡挂翡翠光环（落定即卸）；旧顶栏扫光条已删除
       await expect(panel.locator('.agent-beam-ring-emerald').first()).toBeVisible()
       await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
@@ -54,6 +101,8 @@ test.describe('Streamdown 正文 S1', () => {
 
       // 完成态：全文结构一次成形
       await expect(panel.getByText('尾段收束')).toBeVisible({ timeout: 15_000 })
+      expect(await firstParagraph!.evaluate(el => el.isConnected)).toBe(true)
+      await expect(panel.locator('.agent-md p').filter({ hasText: '首段中文正文' })).toHaveCount(1)
       await expect(panel.getByText('正在生成')).toHaveCount(0)
       await expect(panel.locator('.agent-beam-ring-emerald')).toHaveCount(0)
       // BUI：用户分支走 BuiMessage，用户动作（复制正文/编辑后继续）保留

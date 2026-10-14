@@ -342,6 +342,85 @@ describe('buildPresentResult html-artifact', () => {
   })
 })
 
+describe('buildPresentResult component-ui', () => {
+  const uiOf = (root: unknown) => ({
+    kind: 'component-ui',
+    title: '两章对比选择',
+    chapters: [
+      { key: 'c1', label: '第一章', flatIndex: 0 },
+      { key: 'c2', label: '第二章', flatIndex: 1 },
+    ],
+    ui: { root },
+  })
+
+  it('合法树组装稳定信封并验摘录', async () => {
+    const dispose = setupBook()
+    try {
+      const json = await buildPresentResult(
+        uiOf([
+          { component: 'Text', props: { text: '选维度', variant: 'title' } },
+          {
+            component: 'Select',
+            props: { id: 'dim', options: [{ value: 'm', label: '论证方法' }] },
+          },
+          { component: 'Evidence', props: { excerpt: '论点甲', chapterKey: 'c1' } },
+          { component: 'Button', props: { label: '继续分析', action: 'submit-selection' } },
+        ]),
+      )
+      const parsed = parsePresentResult(json)
+      expect(parsed?.kind).toBe('component-ui')
+      const again = await buildPresentResult(
+        uiOf([
+          { component: 'Text', props: { text: '选维度', variant: 'title' } },
+          {
+            component: 'Select',
+            props: { id: 'dim', options: [{ value: 'm', label: '论证方法' }] },
+          },
+          { component: 'Evidence', props: { excerpt: '论点甲', chapterKey: 'c1' } },
+          { component: 'Button', props: { label: '继续分析', action: 'submit-selection' } },
+        ]),
+      )
+      expect(JSON.parse(again).id).toBe(JSON.parse(json).id)
+    } finally {
+      dispose()
+    }
+  })
+
+  it('无 Select/伪造摘录/未知组件整单拒绝', async () => {
+    const dispose = setupBook()
+    try {
+      await expect(
+        buildPresentResult(uiOf([{ component: 'Text', props: { text: '纯展示' } }])),
+      ).rejects.toThrow(/Select/)
+      await expect(
+        buildPresentResult(
+          uiOf([
+            {
+              component: 'Select',
+              props: { id: 's', options: [{ value: 'a', label: 'A' }] },
+            },
+            { component: 'Evidence', props: { excerpt: '根本不在原文', chapterKey: 'c1' } },
+            { component: 'Button', props: { label: '提交', action: 'submit-selection' } },
+          ]),
+        ),
+      ).rejects.toThrow(/原文/)
+      await expect(
+        buildPresentResult(
+          uiOf([
+            {
+              component: 'Select',
+              props: { id: 's', options: [{ value: 'a', label: 'A' }] },
+            },
+            { component: 'Map', props: {} },
+          ]),
+        ),
+      ).rejects.toThrow()
+    } finally {
+      dispose()
+    }
+  })
+})
+
 describe('stripHostileHtmlHead', () => {
   it('大小写与引号变体均剥离，正文保留', () => {
     expect(stripHostileHtmlHead('<BASE HREF="/">ok')).toBe('ok')

@@ -57,6 +57,17 @@ describe('ChapterComparisonCard', () => {
     expect(container.querySelectorAll('[data-testid="comparison-item"]')).toHaveLength(2)
   })
 
+  it('引用列表只收已验证摘录，定位仍走宿主回调', () => {
+    const onLocate = renderCard()
+    const citations = container.querySelector('[data-slot="citations"]')!
+    expect(citations.textContent).toContain('引用来源 · 1 处')
+    act(() => citations.querySelector('button')!.click())
+    expect(citations.textContent).toContain('原文一')
+    expect(citations.textContent).not.toContain('只有评述')
+    act(() => citations.querySelector<HTMLButtonElement>('li button')!.click())
+    expect(onLocate).toHaveBeenCalledWith(0, '原文一')
+  })
+
   it('章节筛选隔离：取消后条目过滤，再选回来恢复', () => {
     renderCard()
     const chips = [...container.querySelectorAll('button[aria-pressed]')]

@@ -139,20 +139,16 @@
 
 /*
  * 流式新块挂载动画（只播一次）：新段落/代码块/表格“滑入”（淡入 + 上滑
- * 5px + 2px 模糊消散），块内逐字更新不重挂载故不重播。由 AgentBlock 在
+ * 仅淡入，避免新块上滑/模糊与视口跟滚叠加形成抖动。由 AgentBlock 在
  * streaming 时才挂 `agent-block-in` 类——历史恢复/落定态走外层消息级
  * fade-slide-in，不 double。reduce-motion 由文件头统一关停。
  */
 @keyframes agent-block-in {
   from {
     opacity: 0;
-    transform: translateY(5px);
-    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
   }
 }
 .agent-md .agent-block-in {

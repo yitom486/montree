@@ -1,4 +1,5 @@
-// Beautiful UI 视觉参考，本地适配；MIT © 2026 Shane Levine，见 ../LICENSE.beautiful-ui。
+// BeUI Message Bubble 视觉适配，MIT © 2026 Saurabh Chauhan，见 ../LICENSE.beui。
+// 保留宿主宽度、附件与动作槽，Motion 改用 CSS，不接管会话或视口。
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ interface BuiMessageProps {
 }
 
 // 入场动效只引用全局已落地的 bui keyframes，不新增样式；reduced-motion 由全局统关。
-const ENTER_ANIMATION = 'bui-fade-up 240ms cubic-bezier(0.23,1,0.32,1) both'
+const ENTER_ANIMATION = 'beui-message-in 240ms cubic-bezier(0.16,1,0.3,1) both'
 
 function BuiMessageActions({ children }: { children: ReactNode }) {
   // hover 与键盘焦点才显：鼠标悬停走 group-hover，Tab 进入按钮走 focus-within，避免常驻挤占正文。
@@ -44,10 +45,12 @@ export function BuiMessage({ from, streaming = false, actions, className, childr
     return (
       <div
         data-bui-message="user"
+        data-slot="message-bubble"
+        data-align="end"
         className={cn('bui-anim group flex w-full justify-end', className)}
         style={{ animation: ENTER_ANIMATION }}
       >
-        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-br-md border border-border/60 bg-secondary px-3.5 py-2.5 text-[13px] leading-relaxed text-secondary-foreground">
+        <div data-slot="message-bubble-content" className="relative min-w-9 max-w-[85%] rounded-2xl rounded-br-md border border-border/50 bg-secondary px-3.5 py-2.5 text-[13px] leading-relaxed text-secondary-foreground shadow-xs">
           <div className="min-w-0 break-words [overflow-wrap:anywhere]">{children}</div>
           {actions ? <BuiMessageActions>{actions}</BuiMessageActions> : null}
         </div>
@@ -58,12 +61,15 @@ export function BuiMessage({ from, streaming = false, actions, className, childr
   return (
     <div
       data-bui-message="assistant"
+      data-slot="message-bubble"
+      data-align="start"
       className={cn('bui-anim group w-full min-w-0', className)}
       style={{ animation: ENTER_ANIMATION }}
     >
       <div
+        data-slot="message-bubble-content"
         className={cn(
-          'min-w-0 px-1 py-1 text-[13px] leading-relaxed text-foreground',
+          'min-w-0 w-full rounded-2xl border border-border/35 bg-muted/15 px-3 py-2 text-[13px] leading-relaxed text-foreground',
           streaming && 'agent-beam-ring agent-beam-ring-emerald rounded-lg',
         )}
       >

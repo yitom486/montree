@@ -20,6 +20,7 @@ const e2eFoliateReader = windowInit?.e2eFoliateReader ?? false
 const e2ePdfStructure = windowInit?.e2ePdfStructure ?? false
 
 const electronAPI: ElectronAPI = {
+  compileReactArtifact: (payload) => ipcRenderer.invoke(IPC.COMPILE_REACT_ARTIFACT, payload),
   platform: process.platform,
   isFreshWindow,
   windowScopeId: windowInit?.windowScopeId,

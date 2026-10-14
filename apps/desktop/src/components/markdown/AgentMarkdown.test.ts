@@ -39,6 +39,31 @@ async function render(text: string, streaming = false): Promise<HTMLElement> {
 }
 
 describe('AgentMarkdown（Streamdown 接入）', () => {
+  it('空行与后续段落到达时保留已有正文节点和原生折叠状态', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const draw = async (text: string, streaming = true) => {
+      await act(async () => root.render(createElement(AgentMarkdown, { text, streaming })))
+    }
+    try {
+      await draw('首段正文。')
+      const paragraph = container.querySelector('p')!
+      await draw('首段正文。\n\n')
+      expect(container.querySelector('p')).toBe(paragraph)
+      const prefix = '首段正文。\n\n<details><summary>证据</summary>原文摘录</details>'
+      await draw(prefix)
+      const details = container.querySelector('details')!
+      details.open = true
+      await draw(prefix + '\n\n后续内容。')
+      expect(container.querySelector('p')).toBe(paragraph)
+      expect(container.querySelector('details')).toBe(details)
+      expect(details.open).toBe(true)
+      await draw(prefix + '\n\n后续内容。', false)
+      expect(container.querySelector('p')).toBe(paragraph)
+      expect(container.querySelector('details')).toBe(details)
+    } finally { act(() => root.unmount()); container.remove() }
+  })
   it('渲染中文加粗、表格、任务列表与单换行', async () => {    const el = await render('这是**加粗**的中文\n第二行\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] 完成\n- [ ] 待办')
     expect(el.querySelector('strong')?.textContent).toBe('加粗')
     expect(el.querySelector('table')).not.toBeNull()
@@ -48,8 +73,7 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     expect(el.querySelector('p')?.innerHTML).toContain('<br>')
   })
 
-  it('头尾分块不重复渲染：尾为空时只出头', async () => {
-    // 流式 chunk 常以空行结尾（tail 为空）：此前 tail 兜底渲染全文导致双份
+  it('流式空行结尾不重复渲染正文', async () => {
     const el = await render('# 标题\n\n首段正文。\n\n', true)
     const hits = [...el.querySelectorAll('p')].filter((p) => p.textContent === '首段正文。')
     expect(hits).toHaveLength(1)
@@ -69,7 +93,7 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     expect(resolveMermaidTheme('sepia')).toBe('neutral')
   })
 
-  it('流式中新块挂载带滑入类，落定态不带（旧块不重播）', async () => {
+  it('流式中新块挂载带淡入类，落定态不带', async () => {
     const running = await render('首段。\n\n次段。', true)
     expect(running.querySelector('.agent-block-in')).not.toBeNull()
     const done = await render('首段。\n\n次段。', false)
@@ -100,6 +124,38 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     const el = await render('<script>alert(1)</script><iframe src="https://example.com"></iframe>')
     expect(el.querySelector('script')).toBeNull()
     expect(el.querySelector('iframe')).toBeNull()
+  })
+
+  it('裸 HTML 容器与强调渲染为元素，围栏内仍显示源码', async () => {
+    const raw = '<div style="padding:8px;border:1px solid #888;border-radius:8px">我是裸div <b>粗体</b> <button>真按钮</button><a href="https://openai.com">链接</a></div>'
+    const el = await render(raw)
+    expect(el.querySelector('b')?.textContent).toBe('粗体')
+    expect(el.querySelector('a')?.getAttribute('href')).toBe('https://openai.com/')
+    expect(el.textContent).not.toContain('<div>')
+    expect(el.querySelector('[style*="padding:8px"]')).toBeNull()
+    expect([...el.querySelectorAll('button')].some(button => button.textContent === '真按钮')).toBe(false)
+    const fenced = await render('```html\n' + raw + '\n```')
+    expect(fenced.querySelector('code')?.textContent).toContain(raw)
+    expect(fenced.querySelector('b')).toBeNull()
+  })
+
+  it('反引号与转义后的 HTML 保持文本，不再次解释成标签', async () => {
+    const raw = '<div>裸块 <b>粗体</b></div>'
+    const inline = await render('`' + raw + '`')
+    expect(inline.querySelector('code')?.textContent).toBe(raw)
+    expect(inline.querySelector('b')).toBeNull()
+    const escaped = await render('&lt;div&gt;裸块 &lt;b&gt;粗体&lt;/b&gt;&lt;/div&gt;')
+    expect(escaped.textContent).toContain(raw)
+    expect(escaped.querySelector('b')).toBeNull()
+  })
+
+  it('用户原文中的反引号说明不影响后续裸 HTML', async () => {
+    const source = '对，你看得很准。\n\n刚才那段是包在 ````html 里面的，所以只会当代码高亮显示，不会真渲染成按钮、卡片。\n\n要测 Markdown 支持的那种 HTML，得是**裸 HTML**，直接裸写在正文里，不要加围栏，比如下面这行就是真的：\n\n<div style="padding:8px;border:1px solid #888;border-radius:8px">我是裸div <b>粗体</b> <button>真按钮</button></div>\n\n你贴到 Montree 试的时候，贴这个裸版本：\n\n现在又可以渲染了呢\n\n<div style="padding:12px;border:1px solid #ccc">裸块 <a href="https://openai.com">链接</a></div>\n\n如果它渲染成卡片/按钮就是支持，如果原样吐出尖括号就是被过滤/转义了。'
+    for (const streaming of [true, false]) {
+      const el = await render(source, streaming)
+      expect(el.querySelector('b')?.textContent).toBe('粗体')
+      expect(el.querySelector('a')?.getAttribute('href')).toBe('https://openai.com/')
+    }
   })
 
   it('社区代码块包含工具栏、复制入口与原文', async () => {

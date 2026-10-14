@@ -22,6 +22,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-rich-check.spec.ts` | 富文本核验单：mock `rich-check` 台本一次回放 mark/上标/脚注成对/行内公式/原生 details 点开展示/只读任务列表/kbd 键帽；附截图；不调用真实模型 |
 | `agent-mermaid.spec.ts` | Mermaid 双修：深色主题节点深底（相对亮度断言）+ 深→亮切换旧图重绘（themeKey remount）+ 普通滚轮不劫持列表滚动（合成滚轮缩放纹丝不动、且不被 preventDefault）+ ±按钮缩放可用；附深/浅截图；不调用真实模型 |
 | `agent-rich-result.spec.ts` | 富结果生产链路：真实 MCP `montree_present` 调用→回放→章节比较卡筛选/证据（Markdown 编辑/预览实际章节滚动与原文选区、跨文档禁止）；EPUB 目录就绪、真实跨章节滚动及选区可见；HTML 预览交互/隔离探针（前置脚本禁网、脚本与链接/改名自导航阻止）、静默取消及真实点击导出逐字回读、深色壳截图和主题变化保持 iframe；发现/复放/拒绝回归；不调用真实模型 |
+| `agent-generative-ui.spec.ts` | 生成式 UI 生产链路：React artifact 内联（真实工具→同卡构建→聊天内直接 iframe 可交互，计数/输入状态在宿主更新后保持，同一镜像单实例；编译/运行错误卡内降级，晚到 ready 不覆盖失败；伪造挂载/超高钳制 640/320-390-480 无溢出/超高内部滚动/亮暗截图）+ component-ui 全流程（选维度提交→原 session 回显→证据定位）+ 线程隔离；不调用真实模型 |
 | `export-pdf.spec.ts` | Markdown 导出 PDF（`E2E_AUTO_EXPORT_PATH`） |
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开 |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
@@ -71,3 +72,5 @@ apps/desktop/e2e/fixtures/ocr/
 | `helpers/web-doc-fixture.ts` | fixture 目录与测试 URL 常量 |
 | `helpers/ebook-fixture.ts` | 自研最小 PDF / EPUB / Markdown 生成器（无新依赖） |
 | `../src/lib/data/presentation-test-fixture.ts` | 模型与 Electron 测试共用的真实 PPTX 图表/内嵌工作簿/母版/嵌套组合 fixture |
+
+R3 生成式 UI 集成回归（`agent-generative-ui.spec.ts`）：真实 MCP 源码→iframe 提出请求→未确认不发送→宿主确认后原 session 回显；运行错误修复请求走同链。fixture `ARTIFACT_REPLY` 标记携带真实接收 sessionId，不调用真实模型。

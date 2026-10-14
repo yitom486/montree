@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
 import { cn } from '@/lib/utils'
 import type { PresentChapterComparison } from '@montree/contracts'
+import { BeuiCitations } from '@/components/agent/chat/BeuiCitations'
 
 interface ChapterComparisonCardProps {
   result: PresentChapterComparison
@@ -151,6 +152,11 @@ export function ChapterComparisonCard({ result, onLocateChapter, className }: Ch
           )
         })}
       </div>
+      <BeuiCitations citations={visibleItems.filter(item => item.verified && item.excerpt?.trim()).map(item => ({
+        id: `${result.id}:${item.id}`, title: chapterLabel(item.chapterKey), detail: result.documentLabel,
+        excerpt: item.excerpt,
+        onSelect: item.flatIndex != null && onLocateChapter ? () => onLocateChapter(item.flatIndex!, item.excerpt) : undefined,
+      }))} />
     </div>
   )
 }

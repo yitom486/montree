@@ -18,6 +18,8 @@ import { AgentHeaderOverflowMenu } from '@/components/agent/AgentHeaderOverflowM
 import { CompactConfigMenu } from '@/components/agent/CompactConfigMenu'
 import { AgentMessageList } from '@/components/agent/chat/AgentMessageList'
 import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
+import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
+import { isStaleGenerativeSubmit } from '@/lib/agent/generative-submit'
 import { Button } from '@/components/ui/button'
 import { appendSelectionChatMarker } from '@/lib/agent/context/selection-chat-marker'
 import { splitConfigOptions, rankPrimary } from '@/lib/agent/acp-config-menu'
@@ -123,6 +125,29 @@ export const AgentPanel = memo(function AgentPanel({
       })
     },
     [selectChapterMarkPlan, sendPrompt],
+  )
+
+  /**
+   * 生成式 UI 提交（G3）：选择态经宿主回调沿原 sendPrompt 回到同一会话。
+   * 归属校验：提交时活动线程须与界面所属线程一致，否则拒绝（防切线程串线）；
+   * busy/会话有效性由 sendPrompt 统一处理（prompting 时 toast，不另起历史/执行器）。
+   */
+  const generativeSubmitInFlight = useRef(false)
+  const handleGenerativeSubmit = useCallback(
+    async (payload: GenerativeSubmitPayload) => {
+      const currentThreadId = useAcpUiStore.getState().activeThreadId
+      if (isStaleGenerativeSubmit(payload.threadId, currentThreadId)) {
+        toast.message('该界面属于历史对话，已切换线程；请在当前对话重新生成后再提交')
+        return
+      }
+      if (generativeSubmitInFlight.current || useAcpUiStore.getState().prompting) return
+      generativeSubmitInFlight.current = true
+      try { await sendPrompt({
+        text: payload.displayText,
+        prompt: [{ type: 'text', text: payload.promptText }],
+      }) } finally { generativeSubmitInFlight.current = false }
+    },
+    [sendPrompt],
   )
 
   useEffect(() => {
@@ -535,6 +560,7 @@ export const AgentPanel = memo(function AgentPanel({
         authHint={authHint}
         runtimeName={runtimeName}
         onChapterPlanSelect={handleChapterPlanSelect}
+        onGenerativeSubmit={handleGenerativeSubmit}
         onEditMessage={(text) => setDraft(text)}
       />
 

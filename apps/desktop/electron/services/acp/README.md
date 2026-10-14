@@ -24,4 +24,4 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 
 标记提议模型 `mark-proposal`（单条·批量）与章级建议 `chapter-mark-plan` 已归 `@montree/annotations`（与渲染 `ChapterMarkPlanCard` / `ProposeMarkCard` 对接），不在本包。
 
-`mcp/document-tools.ts` 为宿主文档编辑扩展：`montree_table_read/edit`、`montree_ppt_read/edit/edit_text/delete/chart_edit/design_edit/animation_edit`、`montree_document_undo/save`，通过快照桥接操作当前内存模型；工具使用文档路径、revision、选区 ID 和匹配数量校验，不自行解析用户文件。`edit_text` 支持段落、片段与 UTF-16 字符范围及组合内部，替换前核对原文，保留范围外样式。高级查询先返回能力/影响范围/样式/效果 ID；图表与内嵌 XLSX 同步，设计工具核对共享影响页，动画工具核对旧列表，复杂内容保留并拒绝覆盖。
+`mcp/document-tools.ts` 为宿主文档编辑扩展：`montree_table_read/edit`、`montree_ppt_read/edit/edit_text/delete/chart_edit/design_edit/animation_edit`、`montree_document_undo/save`，通过快照桥接操作当前内存模型；工具使用文档路径、revision、选区 ID 和匹配数量校验，不自行解析用户文件。`edit_text` 支持段落、片段与 UTF-16 字符范围及组合内部，替换前核对原文，保留范围外样式。高级查询先返回能力/影响范围/样式/效果 ID；图表与内嵌 XLSX 同步，设计工具核对共享影响页，动画工具核对旧列表，复杂内容保留并拒绝覆盖。`montree_present` 另含展示声明（`chapter-comparison` / `html-artifact` / `component-ui` 生成式 UI 树，后者经 `present-result-builder.buildComponentUi` 验章节归属与白名单后由渲染 `generative/ComponentUiCard` 经官方 `GenerativeUIRender` 呈现）。

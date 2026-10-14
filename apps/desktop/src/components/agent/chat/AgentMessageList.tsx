@@ -15,6 +15,7 @@ import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
 import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
 import { AgentPermissionCard } from '@/components/agent/permission/AgentPermissionCard'
+import { AgentLoadingState, currentRunStatus } from '@/components/agent/chat/AgentLoadingState'
 import { timelineRendersInlineApproval } from '@/lib/agent/acp-permission-ui'
 import { logAcpLayoutProbe } from '@/lib/agent/acp-layout-probe'
 import {
@@ -26,6 +27,7 @@ import {
 import { AGENT_CHAT_COL_CLASS } from '@/components/agent/chat/AgentChatItem'
 import { AgentMark } from '@/components/agent/AgentMark'
 import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
+import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
 
 interface AgentMessageListProps {
   bottomRef: RefObject<HTMLDivElement | null>
@@ -33,6 +35,7 @@ interface AgentMessageListProps {
   authHint: string | null
   runtimeName?: string
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
+  onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void
   onEditMessage?: (text: string) => void
 }
 
@@ -51,6 +54,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   authHint,
   runtimeName,
   onChapterPlanSelect,
+  onGenerativeSubmit,
   onEditMessage,
 }: AgentMessageListProps) {
   const messages = useAcpActiveMessages()
@@ -59,6 +63,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
   const threadId = useAcpUiStore((s) => s.activeThreadId)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const streamingAny = messages.some((m) => m.streaming) || prompting
+  const runStatus = currentRunStatus(messages, pendingPermission != null)
+  const runStartedAt = messages.findLast(message => message.role === 'user')?.createdAt
   const viewportRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
 
@@ -83,19 +89,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
     })
   }, [])
 
-  // 流式输出期间跟随置底：仅在贴底时跟滚，防止打扰用户向上回翻
-  useLayoutEffect(() => {
-    if (!streamingAny || !isNearBottomRef.current) return
-    const el = viewportRef.current
-    if (!el) return
-    el.scrollTop = el.scrollHeight
-    const frameId = requestAnimationFrame(() => {
-      if (isNearBottomRef.current && el) {
-        el.scrollTop = el.scrollHeight
-      }
-    })
-    return () => cancelAnimationFrame(frameId)
-  }, [messages, streamingAny])
+  // chunk 与正文高度变化交给 Viewport 的 autoScroll，避免两套跟滚互相抢位置。
 
   // 新发送提问或进入思考：重置贴底并滚到底部
   const lastUserMsgId = useMemo(
@@ -389,6 +383,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
                   <AgentActivityGroup
                     key={item.key}
                     group={item}
+                    running={item.turnKey === (lastUserMsgId ? `turn:${threadId}:${lastUserMsgId}` : `prefix:${threadId ?? 'default'}`) && (streamingAny || item.isActive)}
                     onChapterPlanSelect={onChapterPlanSelect}
                     onEditMessage={onEditMessage}
                   />
@@ -396,17 +391,18 @@ const ThreadMessageList = memo(function ThreadMessageList({
                   <AgentMessageBubble
                     key={item.key}
                     message={item.message}
+                    runStatus={runStatus}
                     onChapterPlanSelect={onChapterPlanSelect}
+                    threadId={threadId}
+                    prompting={prompting}
+                    onGenerativeSubmit={onGenerativeSubmit}
                     onEditMessage={onEditMessage}
                   />
                 ),
               )}
 
-              {prompting && !messages.some((m) => m.streaming) ? (
-                <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin motion-reduce:animate-none" />
-                  正在生成…
-                </div>
+              {prompting && !messages.some((m) => m.streaming && (m.role === 'agent' || m.role === 'thought')) ? (
+                <AgentLoadingState label={runStatus.label} awaitingApproval={runStatus.phase === 'approval'} seconds={runStartedAt ? Math.max(0, Math.floor((nowMs - runStartedAt) / 1000)) : null} />
               ) : null}
 
               {pendingOrphan && pendingPermission ? (

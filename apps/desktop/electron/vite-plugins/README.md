@@ -6,3 +6,4 @@
 |------|------|
 | `copy-pdfjs-assets.ts` | 把 `pdfjs-dist` 的 cmaps/fonts/wasm 拷到 `src/public/pdfjs`（中文 CID 刚需） |
 | `shiki-themes.ts` | 仅生产构建裁剪 Shiki 主题注册表至 GitHub 亮暗两套；保留 web 语言集合，升级后入口未命中则构建报错 |
+| `react-artifact-runtime.ts` | 构建时生成自包含浏览器 React 运行库，输出 out/main/react-artifact-runtime.js，不依赖 CDN |

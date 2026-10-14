@@ -47,7 +47,7 @@ describe('AgentMessageBubble BUI 壳回归', () => {
     render({ id: 'th-1', role: 'thought', text: '先读当前页内容摘要', streaming: false } as AcpChatMessage)
     const shell = container.querySelector('[data-part-key="thought-th-1"]')
     expect(shell).not.toBeNull()
-    expect(container.textContent).toContain('思考 · 先读当前页内容摘要')
+    expect(container.textContent).toContain('已思考')
     const toggle = shell!.querySelector('button[aria-expanded="false"]')
     expect(toggle).not.toBeNull()
     act(() => {
@@ -60,6 +60,31 @@ describe('AgentMessageBubble BUI 壳回归', () => {
     render({ id: 'th-2', role: 'thought', text: '正在分析', streaming: true } as AcpChatMessage)
     expect(container.querySelector('[data-part-key="thought-th-2"]')).not.toBeNull()
     expect(container.textContent).toContain('思考中')
+    expect(container.querySelector('button[aria-expanded="true"]')).not.toBeNull()
+  })
+
+  it('空白流式回复等待响应，不伪称思考；有正文后切到输出外壳', () => {
+    render({ id: 'a-1', role: 'agent', text: '', createdAt: Date.now(), streaming: true } as AcpChatMessage)
+    expect(container.textContent).toContain('等待响应')
+    expect(container.textContent).not.toContain('正在思考')
+    render({ id: 'a-1', role: 'agent', text: '正文', createdAt: Date.now(), streaming: true } as AcpChatMessage)
+    expect(container.querySelector('[data-slot="streaming-response"]')?.getAttribute('aria-busy')).toBe('true')
+    expect(container.querySelector('button[aria-label="复制回答原文"]')).toBeNull()
+    render({ id: 'a-1', role: 'agent', text: '正文', streaming: false } as AcpChatMessage)
+    expect(container.querySelector('[data-slot="streaming-response"]')?.getAttribute('aria-busy')).toBe('false')
+    expect(container.querySelector('button[aria-label="复制回答原文"]')).not.toBeNull()
+  })
+
+  it('思考落定自动收起一次，之后可手动展开', () => {
+    const message = { id: 'th-finish', role: 'thought', text: '分析证据', streaming: true } as AcpChatMessage
+    render(message)
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-expanded]')!
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    render({ ...message, streaming: false })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    act(() => toggle.click())
+    render({ ...message, streaming: false, text: '分析证据完成' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('系统消息走 BuiMessage system 布局', () => {

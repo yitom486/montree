@@ -5,6 +5,7 @@
 import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { BeuiThinkingShimmer } from './BeuiAgentProgress'
 
 export interface BuiThinkingRow {
   primary: string
@@ -16,6 +17,7 @@ export interface BuiThinkingProps {
   state: 'running' | 'done'
   titleActive: string
   titleDone: string
+  elapsedSeconds?: number | null
   rows: BuiThinkingRow[]
   expanded: boolean
   onToggle: () => void
@@ -34,6 +36,7 @@ export function BuiThinking({
   state,
   titleActive,
   titleDone,
+  elapsedSeconds,
   rows,
   expanded,
   onToggle,
@@ -63,17 +66,7 @@ export function BuiThinking({
         />
         <span role="status" className="contents">
           {running ? (
-            <span
-              className="bg-clip-text text-[13px] font-medium whitespace-nowrap text-transparent"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%)',
-                backgroundSize: '200% 100%',
-                animation: 'bui-shimmer-text 1.4s linear infinite',
-              }}
-            >
-              {titleActive}
-            </span>
+            <span className="text-[13px] font-medium whitespace-nowrap"><BeuiThinkingShimmer>{titleActive}</BeuiThinkingShimmer></span>
           ) : (
             <span
               className="min-w-0 break-words text-[13px] font-medium text-muted-foreground [overflow-wrap:anywhere]"
@@ -83,6 +76,7 @@ export function BuiThinking({
             </span>
           )}
         </span>
+        {elapsedSeconds != null ? <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70">{elapsedSeconds}s</span> : null}
         <ChevronDown
           className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-300"
           style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}

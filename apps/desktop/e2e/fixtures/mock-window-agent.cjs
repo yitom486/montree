@@ -61,6 +61,7 @@ async function handle(message) {
       return
     }
     let output = command
+    if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
     } else if (command === 'tools') {
@@ -98,6 +99,13 @@ async function handle(message) {
         text(sessionId, part)
       }
       output = `STREAM:${sessionId}|done`
+    } else if (command === 'status-flow') {
+      // 给状态 UI 一个可观察的等待窗口；思考只来自此真实协议事件。
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '先检查当前文档证据。' } } } })
+      await new Promise((resolve) => setTimeout(resolve, 1600))
+      text(sessionId, '已完成证据核对。')
+      output = `STATUS:${sessionId}|done`
     } else if (command === 'rich-check') {
       // 富文本核验单：高亮/上标/脚注/公式/折叠/任务列表/kbd，一次回放，不编造。
       text(sessionId, '高亮 ==标记== 与 ^上标^。\n\n注脚[^7]\n\n[^7]: 注脚正文\n\n行内公式 $E=mc^2$。\n\n<details><summary>点我展开</summary>里面是细节</details>\n\n- [x] 已做\n- [ ] 待做\n\n按 <kbd>Ctrl</kbd>+<kbd>K</kbd>')

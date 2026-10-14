@@ -98,6 +98,8 @@
 
 ## agent/
 
+Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `../components/markdown/AgentMarkdown.tsx`。
+
 | 文件 | 功能 |
 |------|------|
 | `acp-composer` | 输入框附件、工作区路径拖入 |
@@ -121,7 +123,8 @@
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
 | `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议） |
-| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich（落定/收尾标记后解析，非法保持原样） |
+| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich（落定/收尾标记后解析，非法保持原样；含 component-ui） |
+| `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线） |
 | `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文） |
 | `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标） |
 | `chat-timeline` / `.test.ts` | 聊天时间线纯分组：按真实 user 回合归属（同一回合普通调用汇总一条工作记录，文本保序；无 user 前缀独立成段，scopeKey 按线程隔离）；整回合计数+窗口适配（未加载注记）；失败/待审批/富结果提升单条；稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组） |

@@ -152,12 +152,19 @@ for (const match of yml.matchAll(/node_modules\/(@[^/\s*]+\/[^/\s*]+|[^/\s*]+)/g
 }
 
 for (const dep of [...mainDeps].sort()) {
+  // 唯一显式内联的主进程编译器；同时核验产物，防配置回退 external 后漏包。
+  if (dep === 'sucrase') {
+    const bundles = readdirSync(join(outDir, 'main')).filter(file => file.endsWith('.js'))
+    const externalReference = bundles.some(file => /(?:\b(?:require|import)\s*\(\s*|\bfrom\s*)["']sucrase(?:\/[^"']*)?["']/.test(readFileSync(join(outDir, 'main', file), 'utf8')))
+    if (externalReference) fail('sucrase 应内联但主进程产物仍有外部引用')
+    continue
+  }
   if (!whitelisted.has(dep)) {
     fail(`主进程依赖未进打包白名单: ${dep}（electron-builder.yml files 缺 node_modules/${dep}）`)
   }
 }
 if (failures === 0) {
-  pass(`主进程 ${mainDeps.size} 个裸包依赖均在打包白名单内`)
+  pass(`主进程 ${mainDeps.size} 个裸包依赖均已打包或明确内联`)
 }
 
 console.log(failures > 0 ? `\ncheck:bundle 未通过：${failures} 项` : '\ncheck:bundle 全部通过')

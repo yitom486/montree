@@ -92,3 +92,9 @@
 
 见 [`acp/`](./acp/)。
 
+
+## React artifact
+
+| 文件 | 功能 |
+|------|------|
+| `react-artifact-service.ts` / `.test.ts` | 96KiB 单文件 JSX/TSX 离线转换；Sucrase 独立懒块内联打包，不执行模型源码；生成预置 React 运行库 HTML，由 iframe CSP 限制运行 |

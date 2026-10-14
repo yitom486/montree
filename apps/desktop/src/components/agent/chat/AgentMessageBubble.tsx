@@ -1,10 +1,12 @@
 import { ArrowRight, Check, Copy, Layers, Pencil } from 'lucide-react'
-import { Suspense, useDeferredValue, useMemo, useState } from 'react'
+import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AgentChatItem,
 } from '@/components/agent/chat/AgentChatItem'
 import { BuiMessage } from '@/components/agent/chat/BuiMessage'
 import { BuiThinking } from '@/components/agent/chat/BuiThinking'
+import { AgentLoadingState, useElapsedSeconds, type currentRunStatus } from '@/components/agent/chat/AgentLoadingState'
+import { BeuiStreamingResponse } from '@/components/agent/chat/BeuiStreamingResponse'
 import { AgentToolCallCard } from '@/components/agent/tools/AgentToolCallCard'
 import { AgentResultEntry } from '@/components/agent/tools/AgentResultEntry'
 import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
@@ -23,12 +25,17 @@ import { useRevealText } from '@/hooks/agent/useRevealText'
 import { AgentMarkdownFallback, AgentMarkdownLazy } from '@/components/markdown/AgentMarkdown.lazy'
 import { cn } from '@/lib/utils'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
+import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
 import '@/styles/markdown-preview.css'
 
 interface AgentMessageBubbleProps {
   message: AcpChatMessage
+  runStatus?: ReturnType<typeof currentRunStatus>
   resolveMarkProposal?: ResolveMarkProposal
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
+  threadId?: string
+  prompting?: boolean
+  onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void
   /**
    * 用户消息“编辑后继续”：把原文回填输入框由用户续改后发新回合。
    * 无分支重写语义；缺省时不渲染编辑按钮。
@@ -38,16 +45,26 @@ interface AgentMessageBubbleProps {
 
 export function AgentMessageBubble({
   message,
+  runStatus,
   resolveMarkProposal,
   onChapterPlanSelect,
+  threadId,
+  prompting,
+  onGenerativeSubmit,
   onEditMessage,
 }: AgentMessageBubbleProps) {
   const resolveFromStore = useAcpUiStore((s) => s.resolveMarkProposal)
   const resolve = resolveMarkProposal ?? resolveFromStore
   const pendingPermission = useAcpPendingPermission()
   const [copied, setCopied] = useState(false)
-  // 思考展开由本气泡受控：跨流式更新与落定保持（挂载期内不重置）
-  const [thoughtOpen, setThoughtOpen] = useState(false)
+  // 流式 chunk 不重置选择；思考落定只自动收起一次，之后仍可手动查看。
+  const [thoughtOpen, setThoughtOpen] = useState(Boolean(message.streaming))
+  const wasThinking = useRef(Boolean(message.streaming))
+  useEffect(() => {
+    if (message.role === 'thought' && wasThinking.current && !message.streaming) setThoughtOpen(false)
+    wasThinking.current = Boolean(message.streaming)
+  }, [message.role, message.streaming])
+  const elapsedSeconds = useElapsedSeconds(message.createdAt, Boolean(message.streaming) && (message.role === 'thought' || !message.text.trim()), message.updatedAt)
 
   const copyText = async (text: string) => {
     if (!text || copied) return
@@ -109,7 +126,7 @@ export function AgentMessageBubble({
       isRichToolMessage(message) &&
       hasBusinessResult(detail, message.toolTitle)
     ) {
-      return <AgentResultEntry message={message} />
+      return <AgentResultEntry message={message} threadId={threadId} prompting={prompting} onGenerativeSubmit={onGenerativeSubmit} />
     }
     return (
       <AgentToolCallCard message={message} />
@@ -121,12 +138,9 @@ export function AgentMessageBubble({
   }
 
   if (message.role === 'thought') {
-    const preview = message.text.replace(/\s+/g, ' ').trim()
     const collapsedLabel = message.streaming
       ? '思考中'
-      : preview
-        ? `思考 · ${preview.slice(0, 48)}${preview.length > 48 ? '…' : ''}`
-        : '思考'
+      : '已思考'
 
     return (
       <div data-acp-probe="thought" className="mb-0 min-w-0">
@@ -134,6 +148,7 @@ export function AgentMessageBubble({
           state={message.streaming ? 'running' : 'done'}
           titleActive="思考中"
           titleDone={collapsedLabel}
+          elapsedSeconds={elapsedSeconds}
           rows={[]}
           expanded={thoughtOpen}
           onToggle={() => setThoughtOpen((v) => !v)}
@@ -152,18 +167,18 @@ export function AgentMessageBubble({
   const showEmptyStreaming = !isUser && message.streaming && !message.text.trim()
   // 排空期间保持流式外衣，避免闪烁切换
   const showStreaming = active && !isUser
+  if (showEmptyStreaming && runStatus?.phase === 'thinking') return null
 
   return (
     <AgentChatItem
       variant="bubble"
-      bare={isUser}
+      bare
       tone={isUser ? 'user' : 'agent'}
       align={isUser ? 'end' : 'start'}
       streaming={isUser ? Boolean(message.streaming) : active}
       probe={isUser ? 'user' : 'agent'}
       messageId={message.id}
       role={message.role}
-      className={!isUser && showStreaming ? 'agent-beam-ring agent-beam-ring-emerald rounded-lg' : undefined}
     >
       {isUser ? (
         <BuiMessage
@@ -228,12 +243,14 @@ export function AgentMessageBubble({
           ) : null}
         </BuiMessage>
       ) : showEmptyStreaming ? (
-        <div className="flex items-center gap-2 py-1 text-[11px] text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-          <span>正在思考…</span>
-        </div>
+        <AgentLoadingState label={runStatus?.label ?? (pendingPermission ? '等待批准' : '等待响应')} seconds={elapsedSeconds} awaitingApproval={runStatus?.phase === 'approval' || pendingPermission != null} />
       ) : (
-        <>
+        <BuiMessage from="assistant" streaming={showStreaming}>
+        <BeuiStreamingResponse streaming={showStreaming} actions={message.text ? (
+          <button type="button" aria-label="复制回答原文" title="复制回答原文（Markdown）" onClick={() => void copyText(message.text)} className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
+            {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+          </button>
+        ) : null}>
           <Suspense
             fallback={
               <AgentMarkdownFallback text={renderText} className={markdownClassName} />
@@ -241,20 +258,8 @@ export function AgentMessageBubble({
           >
             <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />
           </Suspense>
-          {!showEmptyStreaming && message.text ? (
-            <div className="mt-1 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
-              <button
-                type="button"
-                aria-label="复制回答原文"
-                title="复制回答原文（Markdown）"
-                onClick={() => void copyText(message.text)}
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-              </button>
-            </div>
-          ) : null}
-        </>
+        </BeuiStreamingResponse>
+        </BuiMessage>
       )}
       {(message.steps?.length ?? 0) > 0 ? (
         <div className="mt-3 space-y-2 pt-2 border-t border-border/40 font-serif">

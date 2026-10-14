@@ -1,4 +1,5 @@
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
+import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC, ok, err } from '@montree/contracts'
 import type {
@@ -522,6 +523,11 @@ async function openWslWorkspaceForWindow(
 
 /** 集中注册 IPC；文件/书签等耗时操作均为 async，不阻塞主进程事件循环 */
 export function registerIpcHandlers(): void {
+  ipcMain.handle(IPC.COMPILE_REACT_ARTIFACT, async (event, payload: unknown) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) return err({ code: 'INVALID_ARGUMENT', message: '编译请求来源非法' })
+    try { return ok(await compileReactArtifact(payload)) }
+    catch (error) { return err({ code: 'INVALID_ARGUMENT', message: error instanceof Error ? error.message : 'React 编译失败' }) }
+  })
   // P1：wsl/ssh 描述符分发到远端会话表；无会话时显式 unavailable（不回落）
   setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()

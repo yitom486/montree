@@ -7,6 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 import { copyPdfjsAssetsPlugin } from './electron/vite-plugins/copy-pdfjs-assets'
 import { shikiThemesPlugin } from './electron/vite-plugins/shiki-themes'
+import { reactArtifactRuntimePlugin } from './electron/vite-plugins/react-artifact-runtime'
 
 const appDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -79,7 +80,7 @@ function foliatePaginatorGuardPlugin(): Plugin {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['sucrase'] }), reactArtifactRuntimePlugin(resolve(appDir, 'src/components/agent/generative/react-artifact-runtime.ts'))],
     resolve: {
       alias: [...workspaceAlias],
     },

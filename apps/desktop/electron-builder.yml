@@ -12,6 +12,8 @@ files:
   - out/**/*
   - package.json
   - apps/desktop/src/components/agent/LICENSE.beautiful-ui
+  - apps/desktop/src/components/agent/LICENSE.beui
+  - apps/desktop/resources/LICENSE.react-artifact.txt
   - node_modules/electron-updater/**/*
   - node_modules/builder-util-runtime/**/*
   - node_modules/fs-extra/**/*

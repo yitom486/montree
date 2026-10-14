@@ -21,7 +21,21 @@ export const PRESENT_COMPARE_MAX_ITEMS = 30
 export const PRESENT_MAX_TITLE_CHARS = 200
 export const PRESENT_MAX_TEXT_CHARS = 2000
 
-export type PresentResultKind = 'chapter-comparison' | 'html-artifact'
+/**
+ * React artifact 挂载占位（不含引号）：主进程编译模板以 `"__MONTREE_MOUNT_ID__"`
+ * 字面量发出渲染确认，渲染端按本次挂载 ID 做 JSON 字面量替换后送显。
+ * 未替换的导出文件里它只是无监听者的普通字符串，不影响离线运行。
+ */
+export const REACT_ARTIFACT_MOUNT_TOKEN = '__MONTREE_MOUNT_ID__' as const
+
+import {
+  COMPONENT_UI_MAX_BYTES,
+  COMPONENT_UI_MAX_TEXT_CHARS,
+  validateComponentUiSpec,
+  type ComponentUiSpec,
+} from './component-ui'
+
+export type PresentResultKind = 'chapter-comparison' | 'html-artifact' | 'component-ui' | 'react-artifact'
 
 export interface PresentResultBase {
   schemaVersion: typeof PRESENT_SCHEMA_VERSION
@@ -72,7 +86,26 @@ export interface PresentHtmlArtifact extends PresentResultBase {
   html: string
 }
 
-export type MontreePresentResult = PresentChapterComparison | PresentHtmlArtifact
+export interface PresentComponentUi extends PresentResultBase {
+  kind: 'component-ui'
+  /** 证据绑定章节（2–6 章，与比较卡同规则，先读后呈，不编造摘录） */
+  chapters: PresentChapterRef[]
+  /**
+   * 生成式 UI 树（与官方 GenerativeUISpec 同形，仅白名单组件）。
+   * 宿主用官方 GenerativeUIRender 渲染，props 只含 JSON 数据。
+   */
+  ui: ComponentUiSpec
+  /** 提交按钮兜底文案（树内 Button 仍为准，此处仅无按钮时用） */
+  submitLabel?: string
+}
+
+export interface PresentReactArtifact extends PresentResultBase {
+  kind: 'react-artifact'
+  source: string
+  css?: string
+}
+
+export type MontreePresentResult = PresentChapterComparison | PresentHtmlArtifact | PresentComponentUi | PresentReactArtifact
 
 /** FNV-1a 32bit（两端同实现；稳定 ID 基础） */
 export function presentResultHash(canonical: string): string {
@@ -203,10 +236,46 @@ export function parsePresentResult(value: unknown): MontreePresentResult | null 
     return { ...base, kind: 'chapter-comparison', chapters, items }
   }
 
+  if (input.kind === 'react-artifact') {
+    if (typeof input.source !== 'string' || !input.source.trim() || presentUtf8Bytes(input.source) > PRESENT_MAX_HTML_BYTES) return null
+    if (input.css !== undefined && (typeof input.css !== 'string' || presentUtf8Bytes(input.css) > 16 * 1024)) return null
+    return { ...base, kind: 'react-artifact', source: input.source, ...(typeof input.css === 'string' ? { css: input.css } : {}) }
+  }
+
   if (input.kind === 'html-artifact') {
     if (typeof input.html !== 'string' || !input.html.trim()) return null
     if (presentUtf8Bytes(input.html) > PRESENT_MAX_HTML_BYTES) return null
     return { ...base, kind: 'html-artifact', html: input.html }
+  }
+
+  if (input.kind === 'component-ui') {
+    if (base.documentFingerprint === undefined) return null
+    if (!Array.isArray(input.chapters)) return null
+    if (
+      input.chapters.length < PRESENT_COMPARE_MIN_CHAPTERS ||
+      input.chapters.length > PRESENT_COMPARE_MAX_CHAPTERS
+    ) {
+      return null
+    }
+    const chapters: PresentChapterRef[] = []
+    const keys = new Set<string>()
+    for (const row of input.chapters) {
+      const parsed = parseChapterRef(row)
+      if (!parsed || keys.has(parsed.key)) return null
+      keys.add(parsed.key)
+      chapters.push(parsed)
+    }
+    if (typeof input.ui !== 'object' || input.ui === null) return null
+    if (validateComponentUiSpec(input.ui) !== null) return null
+    if (presentUtf8Bytes(JSON.stringify(input.ui)) > COMPONENT_UI_MAX_BYTES) return null
+    const submitLabel = asOptionalText(input.submitLabel, PRESENT_MAX_TITLE_CHARS)
+    return {
+      ...base,
+      kind: 'component-ui',
+      chapters,
+      ui: input.ui as ComponentUiSpec,
+      ...(submitLabel !== undefined ? { submitLabel } : {}),
+    }
   }
 
   return null

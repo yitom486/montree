@@ -186,6 +186,7 @@ async function expectSeededTimeline(
   // 注：种子含两个工具调用 2 的组，首组用于下述展开断言。
   const workLog = panel.getByText(/工作记录 · 工具调用 4/).first()
   await expect(workLog).toBeVisible()
+  await expect(panel.locator('[data-slot="agent-activity"]').first()).toBeVisible()
   await expect(panel.getByText(/工作记录 · 工具调用 2/)).toHaveCount(0)
   await expect(panel.getByText(/工作了 .* · \d+ 步/)).toHaveCount(0)
   await expect(panel.getByText('第一章第一段正文摘要')).toHaveCount(0)
@@ -223,8 +224,10 @@ async function expectSeededTimeline(
   // BUI：思考默认收进工作记录，展开后走 BuiThinking 壳（data-part-key 透传 thought-<id>）
   await expect(panel.locator('[data-part-key="thought-th-1"]')).toHaveCount(1)
 
-  // BUI chip pill：工具行含 pill 状 chip（rounded-full）与状态徽标
-  await expect(panel.locator('[data-acp-probe="activity"] span.rounded-full').first()).toBeVisible()
+  // BeUI 时间线展示真实工具目标与状态，详情仍由原工具入口展开。
+  const activityRows = panel.locator('[data-slot="agent-activity-row"]')
+  await expect(activityRows.locator('span[title]').first()).toBeVisible()
+  await expect(activityRows.getByText(/已完成/).first()).toBeVisible()
 
   // 长内容不撑开面板
   const overflow = await panel.evaluate(
@@ -235,6 +238,7 @@ async function expectSeededTimeline(
   )
 
   const path = await info.outputPath(`timeline-${tag}.png`)
+  await workLog.scrollIntoViewIfNeeded()
   await panel.screenshot({ path })
   await info.attach(`timeline-${tag}`, { path, contentType: 'image/png' })
   await info.attach(`timeline-measure-${tag}`, {
@@ -627,7 +631,7 @@ test.describe('聊天展示层 R2', () => {
     }
   })
 
-  test('流式工作记录：运行默认收起，手动展开后落定不收起', async ({}, info) => {    const app = await launchBuiltApp({
+  test('流式工作记录：最新工具固定展示，完成收起且可查看历史', async ({}, info) => {    const app = await launchBuiltApp({
       E2E_ACP_WINDOW_TEST: '1',
       E2E_ACP_COMMAND: process.execPath,
       E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
@@ -658,7 +662,7 @@ test.describe('聊天展示层 R2', () => {
       await prompt('worklog')
       // 运行中（mock 不主动结束回合，工具保持流式）：一条工作记录，
       // 默认收起，只见真实当前操作（2 个并行，不伪造串行）
-      const workLog = panel.getByText(/2 个工具并行执行/).first()
+      const workLog = panel.getByText(/工作中.*0\/2/).first()
       await expect(workLog).toBeVisible({ timeout: 15_000 })
       await expect(panel.locator('[data-acp-probe="activity"]')).toHaveCount(1)
       // 运行中整卡琥珀光环（落定即卸）；旧底栏扫光条已删除
@@ -677,11 +681,10 @@ test.describe('聊天展示层 R2', () => {
         .locator('[data-acp-probe="activity"] button[aria-expanded]')
         .first()
         .getAttribute('aria-expanded')
-      expect(expanded).toBe('false')
+      expect(expanded).toBe('true')
+      await expect(panel.locator('[data-slot="agent-activity-row"]')).toHaveCount(1)
 
       // 手动展开后落定：保持展开，行内工具可见
-      await panel.locator('[data-acp-probe="activity"] button[aria-expanded]').first().click()
-      await expect(panel.getByRole('button', { name: /读取文件/ }).first()).toBeVisible()
       await prompt('worklog-done')
       await expect(panel.getByText(/WORKLOG:.*done/)).toBeVisible({ timeout: 15_000 })
       expect(
@@ -689,7 +692,9 @@ test.describe('聊天展示层 R2', () => {
           .locator('[data-acp-probe="activity"] button[aria-expanded]')
           .first()
           .getAttribute('aria-expanded'),
-      ).toBe('true')
+      ).toBe('false')
+      await panel.locator('[data-acp-probe="activity"] button[aria-expanded]').first().click()
+      await expect(panel.locator('[data-slot="agent-activity-row"]')).toHaveCount(2)
       await expect(panel.getByText(/工作记录 · 工具调用 2/)).toBeVisible()
       await expect(panel.locator('.agent-beam-ring-amber')).toHaveCount(0)
       await panel.screenshot({ path: info.outputPath('worklog-stream.png') })

@@ -15,7 +15,7 @@ export function enrichToolMessageWithPresentResult(
     if (message.turnEnded !== true) return message
   }
   const text = message.toolContentText || message.text
-  if (!text || (!text.includes('chapter-comparison') && !text.includes('html-artifact'))) {
+  if (!text || (!text.includes('chapter-comparison') && !text.includes('html-artifact') && !text.includes('component-ui') && !text.includes('react-artifact'))) {
     return message
   }
   let parsed: MontreePresentResult | null = null

@@ -1,14 +1,20 @@
 import {
+  COMPONENT_UI_MAX_BYTES,
   PRESENT_COMPARE_MAX_CHAPTERS,
   PRESENT_COMPARE_MAX_ITEMS,
   PRESENT_COMPARE_MIN_CHAPTERS,
   PRESENT_MAX_HTML_BYTES,
   PRESENT_MAX_TITLE_CHARS,
+  collectEvidenceRefs,
+  collectSelectIds,
   parsePresentResult,
   presentResultId,
   presentResultSizeError,
   presentUtf8Bytes,
+  validateComponentUiSpec,
+  type ComponentUiSpec,
   type MontreePresentResult,
+  type PresentChapterRef,
   type PresentComparisonItem,
 } from '@montree/contracts'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
@@ -303,6 +309,75 @@ function buildArtifact(args: Record<string, unknown>, title: string): string {
   return finalizePresentResult(result)
 }
 
+function buildComponentUi(args: Record<string, unknown>, title: string): Promise<string> {
+  const rawChapters = args.chapters
+  if (!Array.isArray(rawChapters)) fail('component-ui 需要 chapters 数组（2–6 章，先读后呈）')
+  if (rawChapters.length < PRESENT_COMPARE_MIN_CHAPTERS || rawChapters.length > PRESENT_COMPARE_MAX_CHAPTERS) {
+    fail(`chapters 须 ${PRESENT_COMPARE_MIN_CHAPTERS}–${PRESENT_COMPARE_MAX_CHAPTERS} 章，收到 ${rawChapters.length}`)
+  }
+  const pinned = pinComparisonSource()
+  return (async () => {
+    const chapters: ResolvedChapter[] = []
+    const keys = new Set<string>()
+    for (let i = 0; i < rawChapters.length; i += 1) {
+      const resolved = await resolveChapterPinned(pinned, rawChapters[i], i)
+      if (keys.has(resolved.key)) fail(`chapters[${i}].key 重复：${resolved.key}`)
+      keys.add(resolved.key)
+      chapters.push(resolved)
+    }
+    const byKey = new Map(chapters.map((c) => [c.key, c]))
+    const ui = args.ui
+    if (!ui || typeof ui !== 'object') fail('component-ui 需要 ui 树（含 root，仅白名单组件）')
+    if (presentUtf8Bytes(JSON.stringify(ui)) > COMPONENT_UI_MAX_BYTES) {
+      fail(`ui 树超过 ${COMPONENT_UI_MAX_BYTES / 1024}KiB 上限，请精简后重试`)
+    }
+    const treeError = validateComponentUiSpec(ui)
+    if (treeError) fail(`ui 树校验未通过：${treeError}`)
+    const { ids, error: selectError } = collectSelectIds((ui as { root?: unknown }).root)
+    if (selectError) fail(`ui 树校验未通过：${selectError}`)
+    if (ids.length === 0) fail('ui 树须含至少一个 Select（可提交的选择），纯展示请用 chapter-comparison')
+    // Evidence 摘录逐条验原文：失败保留但剥离定位（verified=false），不伪造章号/位置
+    const refs = collectEvidenceRefs((ui as { root?: unknown }).root)
+    for (const ref of refs) {
+      const chapter = byKey.get(ref.chapterKey)
+      if (!chapter) fail(`Evidence.chapterKey 未在 chapters 中声明：${ref.chapterKey}`)
+      if (!verifyExcerpt(chapter.text, ref.excerpt)) {
+        fail(`Evidence 摘录须是「${chapter.label}」原文（未验证通过），请先用 montree_read 读取后再填`)
+      }
+    }
+    assertSameSource(pinned, '序列化前')
+    const summary = optionalSummary(args.summary)
+    const submitLabel = typeof args.submitLabel === 'string' && args.submitLabel.trim()
+      ? args.submitLabel.trim().slice(0, 200)
+      : undefined
+    const fingerprint = pinned.filePath
+    const documentLabel = pinned.label
+    const result: MontreePresentResult = {
+      schemaVersion: 1,
+      kind: 'component-ui',
+      id: presentResultId(
+        'component-ui',
+        JSON.stringify({
+          fingerprint,
+          title,
+          chapters: chapters.map((c) => [c.key, c.label, c.index]),
+          ui,
+        }),
+      ),
+      title,
+      ...(summary !== undefined ? { summary } : {}),
+      documentFingerprint: fingerprint,
+      documentLabel,
+      chapters: chapters.map(
+        (c): PresentChapterRef => ({ key: c.key, label: c.label, flatIndex: c.index }),
+      ),
+      ui: ui as ComponentUiSpec,
+      ...(submitLabel !== undefined ? { submitLabel } : {}),
+    }
+    return finalizePresentResult(result)
+  })()
+}
+
 function finalizePresentResult(result: MontreePresentResult): string {
   const parsed = parsePresentResult(result)
   if (!parsed) throw new Error('呈现结果自检失败（内部错误，请重试或精简输入）')
@@ -337,5 +412,17 @@ export async function buildPresentResult(args: Record<string, unknown>): Promise
   const title = requiredTitle(args.title)
   if (kind === 'chapter-comparison') return buildComparison(args, title)
   if (kind === 'html-artifact') return buildArtifact(args, title)
-  fail('kind 须为 chapter-comparison 或 html-artifact')
+  if (kind === 'component-ui') return buildComponentUi(args, title)
+  if (kind === 'react-artifact') {
+    const bound = optionalArtifactFingerprint()
+    const result = parsePresentResult({ schemaVersion: 1, kind, title, source: args.source, css: args.css,
+      id: presentResultId(kind, JSON.stringify([bound.fingerprint, title, args.source, args.css])),
+      summary: optionalSummary(args.summary), documentFingerprint: bound.fingerprint, documentLabel: bound.label })
+    if (!result || result.kind !== 'react-artifact') fail('React 源码须非空且 ≤96KiB，CSS ≤16KiB')
+    const { compileReactArtifact } = await import('@/api/react-artifact-api')
+    const compiled = await compileReactArtifact(result.source, result.css)
+    if (!compiled.ok) fail(`React 编译失败：${compiled.error.message}`)
+    return finalizePresentResult(result)
+  }
+  fail('kind 须为 chapter-comparison、html-artifact 或 component-ui')
 }

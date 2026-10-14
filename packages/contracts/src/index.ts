@@ -33,6 +33,8 @@ export * from "./agent/document-tools";
 export * from "./agent/montree-virtual-fs";
 export * from "./agent/content-audit";
 export * from "./agent/present-result";
+export * from "./agent/react-artifact-actions";
+export * from "./agent/component-ui";
 export * from "./constants/app";
 export * from "./constants/extensions";
 export * from "./constants/images";

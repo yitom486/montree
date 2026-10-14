@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/query-keys'
 import { readingMarksApi } from '@/api/reading-marks-api'
@@ -29,6 +29,10 @@ import {
 import {
   HtmlArtifactCard,
 } from '@/components/agent/tools/HtmlArtifactCard'
+import {
+  ComponentUiCardLazy,
+  type GenerativeSubmitPayload,
+} from '@/components/agent/generative/ComponentUiCard.lazy'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { checkPresentDocument } from '@/lib/agent/present-locate'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
@@ -36,6 +40,8 @@ import { parsePresentResult, type MontreePresentResult } from '@montree/contract
 import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
 import { normalizeLoadKey } from '@montree/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+
+const ReactArtifactCardLazy = lazy(() => import('../generative/ReactArtifactCard').then(module => ({ default: module.ReactArtifactCard })))
 
 export function buildNoteFromDiagram(payload: DiagramPayload): string {
   const lines: string[] = []
@@ -201,10 +207,10 @@ function parsePresentPayload(
   title?: string,
   enriched?: MontreePresentResult,
 ): MontreePresentResult | null {
-  if (enriched && (enriched.kind === 'chapter-comparison' || enriched.kind === 'html-artifact')) {
+  if (enriched && (enriched.kind === 'chapter-comparison' || enriched.kind === 'html-artifact' || enriched.kind === 'component-ui' || enriched.kind === 'react-artifact')) {
     return enriched
   }
-  if (!detail || (!detail.includes('chapter-comparison') && !detail.includes('html-artifact') && !title?.includes('montree_present'))) {
+  if (!detail || (!detail.includes('chapter-comparison') && !detail.includes('html-artifact') && !detail.includes('component-ui') && !detail.includes('react-artifact') && !title?.includes('montree_present'))) {
     return null
   }
   try {
@@ -258,8 +264,10 @@ function buildFallbackAnchor(
  * 阅读业务结果分发（R2/U3）：图表 / 跨章互引 / 内容审计 / 章节建议。
  * 只负责“富结果是什么、怎么交互”；通用折叠外壳与审批在调用方。
  * compactResults：结果入口使用，图表默认紧凑预览（完整功能经入口进入）。
+ * onGenerativeSubmit/threadId/prompting：component-ui 卡的选择提交链路
+ * （AgentResultEntry 透传自 AgentMessageBubble，归属与 busy 由面板层校验）。
  */
-export function ToolBusinessResult({ message, compactResults }: { message: AcpChatMessage; compactResults?: boolean }) {
+export function ToolBusinessResult({ message, compactResults, threadId, prompting, onGenerativeSubmit }: { message: AcpChatMessage; compactResults?: boolean; threadId?: string; prompting?: boolean; onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void }) {
   const detail = message.toolContentText || message.text
   const diagramPayload = useMemo(
     () => parseDiagramPayload(detail, message.toolTitle),
@@ -473,6 +481,48 @@ export function ToolBusinessResult({ message, compactResults }: { message: AcpCh
       {presentPayload?.kind === 'html-artifact' ? (
         <div className="mt-1">
           <HtmlArtifactCard key={presentPayload.id} result={presentPayload} />
+        </div>
+      ) : null}
+      {presentPayload?.kind === 'react-artifact' ? <Suspense fallback={<p role="status">正在加载交互界面…</p>}><ReactArtifactCardLazy key={presentPayload.id} result={presentPayload} toolStreaming={message.streaming} toolStatus={message.toolStatus} threadId={threadId} prompting={prompting} onSubmit={onGenerativeSubmit} /></Suspense> : null}
+      {presentPayload?.kind === 'component-ui' ? (
+        <div className="mt-1">
+          <ComponentUiCardLazy
+            key={presentPayload.id}
+            result={presentPayload}
+            threadId={threadId ?? ''}
+            prompting={prompting}
+            onSubmit={onGenerativeSubmit}
+            onLocateChapter={(flatIndex, excerpt) => {
+              void (async () => {
+                const verdict = checkPresentDocument(
+                  presentPayload,
+                  useActiveDocumentStore.getState().filePath,
+                )
+                if (!verdict.ok) {
+                  toast.message(verdict.message)
+                  return
+                }
+                let navigated = false
+                try {
+                  navigated = await openChapterForMarkRecovery(flatIndex, excerpt)
+                } catch (error) {
+                  toast.message(error instanceof Error ? error.message : '打开章节失败，请重试')
+                  return
+                }
+                const after = checkPresentDocument(
+                  presentPayload,
+                  useActiveDocumentStore.getState().filePath,
+                )
+                if (!after.ok) {
+                  toast.message(after.message)
+                  return
+                }
+                if (navigated && excerpt) {
+                  emitAnchorHighlight(excerpt)
+                }
+              })()
+            }}
+          />
         </div>
       ) : null}
       {presentPayload == null && presentUnparsable ? (

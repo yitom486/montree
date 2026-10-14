@@ -594,6 +594,16 @@
   }
 }
 
+@keyframes agent-pixel-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.agent-pixel-loader > span { animation: agent-pixel-pulse 1.2s ease-in-out infinite; }
+@keyframes beui-message-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-slide-in,
   .animate-result-card-in,

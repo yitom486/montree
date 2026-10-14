@@ -25,54 +25,7 @@ import {
   remarkAgentAlert,
 } from '@/components/markdown/agent-markdown-plugins'
 import { cn } from '@/lib/utils'
-import { splitStreamText } from '@/lib/agent/stream-blocks'
 
-/**
- * 冻结头：同值跳过重渲染。头只随段落到达变化（低频），
- * 尾部每帧解析但有界——总解析量从 O(n²) 降到近似 O(n)。
- * 共享同一 contexts（StreamingFlag/AnchorPrefix 在外层），挂载/主题稳定。
- */
-const HeadStream = memo(function HeadStream({
-  text,
-  streaming,
-  rehypePlugins,
-  mermaid,
-  themeKey,
-  className,
-}: {
-  text: string
-  streaming: boolean
-  rehypePlugins: NonNullable<React.ComponentProps<typeof Streamdown>['rehypePlugins']>
-  mermaid: NonNullable<React.ComponentProps<typeof Streamdown>['mermaid']>
-  /** App 主题：翻转即整实例 remount——mermaid 把颜色焊死在 SVG 里，
-   * 社区收到新 config 不重绘旧图，不换 key 切主题旧图永远是旧色。 */
-  themeKey: string
-  className?: string
-}) {
-  return (
-    <Streamdown
-      key={themeKey}
-      mode="streaming"
-      isAnimating={streaming}
-      // 与主区一致：块淡入关闭，字符流只保留揭示动效
-      animated={false}
-      lineNumbers
-      translations={STREAMDOWN_TRANSLATIONS}
-      codeBlockMaxHeight={360}
-      mermaid={mermaid}
-      plugins={STREAMDOWN_PLUGINS}
-      remarkPlugins={STREAMDOWN_REMARK_PLUGINS}
-      rehypePlugins={rehypePlugins}
-      allowedTags={STREAMDOWN_ALLOWED_TAGS}
-      urlTransform={STREAMDOWN_URL_TRANSFORM}
-      components={agentComponents}
-      BlockComponent={AgentBlock}
-      className={className}
-    >
-      {text}
-    </Streamdown>
-  )
-})
 
 /**
  * Agent 专用 Markdown 入口（S1）：Streamdown 真实安装使用。
@@ -84,7 +37,7 @@ const HeadStream = memo(function HeadStream({
  * - footnote 经 micromark 官方扩展桥接；alert 经 remark 插件（输出 .markdown-alert，与既有 CSS 同源）；
  * - mark/sub/sup 经自研 rehype 微插件（消毒之后运行，不扩消毒面）；
  * - code / mermaid 用 Streamdown 官方插件，工具栏、复制、下载、全屏交给社区；
- * - animated 接管增量揭示，不再自建文字队列或节流解析；
+ * - 增量揭示由 useRevealText 控制，Streamdown 内置分块复用已完成节点；
  * - 不解析任意 raw HTML：裸标签先经 rehype-raw 转元素、再按消毒表剥离——
  *   details/summary/kbd 在表内成元素，其余（script/iframe/事件属性等）
  *   剥离或转义，与聊天消毒语义一致（见单测“裸 script/iframe 不执行”）。
@@ -98,10 +51,10 @@ const StreamingFlag = createContext(false)
 
 /**
  * 静态 Streamdown 配置全部提升到模块级：引用稳定，
- * 冻结头 memo 才能跳过重渲染（行内字面量每帧都是新引用，memo 必穿透）。
+ * 块 memo 才能跳过重渲染（行内字面量每帧都是新引用，memo 必穿透）。
  * 保持可变类型（Streamdown 要 Pluggable[]/AllowedTags）。
  * 唯一例外是 mermaid 主题：跟随 App 主题，引用随主题翻转（低频），
- * 头尾随之重渲染一次，图表重绘新主题（E2E 锁定）。
+ * 正文随之重渲染一次，图表重绘新主题（E2E 锁定）。
  */
 const STREAMDOWN_TRANSLATIONS = { copyCode: '复制代码', copied: '已复制', downloadFile: '下载代码', viewFullscreen: '全屏查看', exitFullscreen: '退出全屏', close: '关闭', zoomIn: '放大', zoomOut: '缩小', resetView: '重置视图', downloadDiagram: '下载图表', downloadDiagramAsSvg: '下载 SVG', downloadDiagramAsPng: '下载 PNG', downloadDiagramAsMmd: '下载 Mermaid 源码' }
 const STREAMDOWN_MERMAID_BASE = { securityLevel: 'strict', startOnLoad: false, suppressErrorRendering: true } as const
@@ -140,7 +93,7 @@ const AgentBlock = memo(function AgentBlock(props: BlockProps) {
     Array.isArray(plugin) && plugin[0] === rehypeAgentAnchors
       ? [rehypeAgentAnchors, { prefix, blockIndex: props.index }] : plugin,
   ) as BlockProps['rehypePlugins'], [props.rehypePlugins, props.index, prefix])
-  // 流式中新块挂载播一次滑入（CSS animation 只在挂载跑一次；
+  // 流式中新块挂载仅淡入（CSS animation 只在挂载跑一次；
   // 块内逐字更新走同元素复用，不重播、不闪烁）。落定/历史态不挂类，
   // 由外层消息级 fade-slide-in 负责入场，避免 double。
   return (
@@ -301,22 +254,11 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, streaming, clas
   const source = useMemo(() => {
     // 顺序：SVG 规范化 → 货币 $ 转义（只看原文手写 $）→ LaTeX 定界符规范
     // （`\(2+2\)`→`$2+2$`，不受转义影响）。流式未闭合公式不补全。
-    // 预处理仍是整文一次（纯字符扫描，相对解析可忽略）；重解析才分头尾。
+    // 预处理仍是整文一次（纯字符扫描，相对解析可忽略）；解析交给 Streamdown 内置分块。
     return normalizeLatexDelimiters(
       escapeCurrencyDollars(normalizeRawSvgDataUriImages(text)),
     )
   }, [text])
-  // 头尾切分：引用稳定（同值复用上一次对象），头 memo 跳过；
-  // 尾有界，逐帧只解析尾部。脚注回退整文（见 splitStreamText）。
-  // 头尾切分：同值复用上一次对象，保证 head 字符串引用稳定，
-  // memo 头才能跳过（render 内守卫赋值，幂等无副作用）。
-  // 尾有界，逐帧只解析尾部。脚注回退整文（见 splitStreamText）。
-  const splitRef = useRef({ head: '', tail: '', fallbackFull: false })
-  const split = useMemo(() => splitStreamText(source), [source])
-  if (split.head !== splitRef.current.head || split.tail !== splitRef.current.tail) {
-    splitRef.current = split
-  }
-  const stableSplit = splitRef.current
   // Streamdown 分块解析：跨块标题链接在 DOM 提交后绑定首个同名标题，
   // 仅修正锚点属性，不重新灌入正文或重建代码/图表。
   useLayoutEffect(() => {
@@ -354,29 +296,13 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, streaming, clas
     <div ref={rootRef} data-status={streaming ? 'running' : 'complete'}>
     <AnchorPrefix.Provider value={anchorPrefix}>
     <StreamingFlag.Provider value={streaming}>
-      {stableSplit.head ? (
-        <AnchorPrefix.Provider value={`${anchorPrefix}-head`}>
-          <div data-stream-part="head">
-            <HeadStream
-              text={stableSplit.head}
-              streaming={streaming}
-              rehypePlugins={rehypePlugins}
-              mermaid={mermaidProp}
-              themeKey={appTheme}
-              className={className}
-            />
-          </div>
-        </AnchorPrefix.Provider>
-      ) : null}
-      {stableSplit.tail || stableSplit.fallbackFull ? (
-      <div data-stream-part="tail">
       <Streamdown
         key={appTheme}
         mode="streaming"
         isAnimating={streaming}
         // 块淡入关闭：字符流由 useRevealText 匀速揭示；Streamdown 的 animated
         // 是另一套词级 cascade 调度（见 AnimateOptions：sep/stagger/maxBacklogMs），
-        // 与外部切片同活，双开即双层调度叠加闪烁。块级“滑入”改由 AgentBlock
+        // 与外部切片同活，双开即双层调度叠加闪烁。块级淡入改由 AgentBlock
         // 挂载动画实现（只播一次，旧块不重播），见下方。
         animated={false}
         lineNumbers
@@ -392,10 +318,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({ text, streaming, clas
         BlockComponent={AgentBlock}
         className={className}
       >
-        {stableSplit.tail || source}
+        {source}
       </Streamdown>
-      </div>
-      ) : null}
     </StreamingFlag.Provider>
     </AnchorPrefix.Provider>
     </div>
