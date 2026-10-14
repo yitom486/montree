@@ -54,7 +54,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: 构建应用
-        run: bun run build
+        run: bun run build:remote-server && bun run build
 
       - name: 体积与打包清单检查
         run: bun run check:bundle

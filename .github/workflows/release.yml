@@ -93,7 +93,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: 构建并打包
-        run: bun run build && bunx electron-builder --config apps/desktop/electron-builder.yml ${{ matrix.args }} --publish never
+        run: bun run build:remote-server && bun run build && bunx electron-builder --config apps/desktop/electron-builder.yml ${{ matrix.args }} --publish never
         env:
           # CI 无代码签名证书，跳过自动签名探测
           CSC_IDENTITY_AUTO_DISCOVERY: false
