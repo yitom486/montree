@@ -2,6 +2,8 @@
 
 ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。已按渲染链分子目录（2026-09 重构）。
 
+Beautiful UI 展示语法来源：`slev12397/beautiful-ui`，main tree `44a274e598395ab61e7c96c26fda2758780253b7`（2026-10-14 获取）。按 Montree 主题与真实 ACP 数据适配，无演示定时器与额外运行时依赖。完整许可见 `LICENSE.beautiful-ui`（MIT © 2026 Shane Levine），打包配置随应用分发。BuiThinking/BuiMessage/BuiApprovalCard 与工作记录 chip 行为本地改写。
+
 ## 根目录：面板与接线
 
 | 文件 | 功能 |
@@ -25,18 +27,20 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 | 文件 | 功能 |
 |------|------|
 | `AgentMessageList` | 消息列表容器（`lib/agent/chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新） |
-| `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条，运行中默认收起；运行摘要含 done/total 进度与最近落定事件 + 运行中整卡琥珀光环；整回合计数+取消/未知/未加载注记；详情为轻量工具行，按需展开单个调用；用户选择跨 chunk/落定保留） |
+| `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条，运行中默认收起；运行摘要含 done/total 进度与最近落定事件 + 运行中整卡琥珀光环；整回合计数+取消/未知/未加载注记；详情为轻量工具行（目标 chip pill 语法），按需展开单个调用；用户选择跨 chunk/落定保留） |
 | `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（默认收起、选择保持、单次渲染、失败摘要、审批外置） |
 | `AgentResultEntry` | 富业务结果独立入口（紧凑过程行 + 独立业务卡，单次调用只渲染一处，`probe="result"`） |
 | `tools/result-card.ts` | 六张业务卡统一外壳（单层中性描边/浅底头/primary 图标/11px 摘要；去装饰标签与 teal 独走；跨章水墨热力与朱砂印属卡内数据可视化保留；比较卡 `@container` 留各自文件） |
-| `AgentChatItem` | AI Elements Message 的产品布局/探针桥接（卡片与系统提示共用约束） |
-| `AgentMessageBubble` | 用户/助手气泡（Markdown、tool 卡/结果入口、提议块挂接；助手正文无 AGENT 冗余头，流式由描边光环 + tip 呼吸光标表达；正文经打字机揭示（小步高频提交） + deferred 让路滚动/输入，新块挂载播一次滑入；消息动作行 hover/focus 才显：用户复制+编辑回填续改，助手复制原文） |
+| `AgentChatItem` | AI Elements Message 的产品布局/探针桥接（卡片与系统提示共用约束；`bare` 供自带气泡的子组件使用，避免双层外观） |
+| `BuiThinking` | Thinking 展开视觉（Beautiful UI ThinkingState 语法重写：sparkle+shimmer/fade 标题、chevron、grid-rows 展开、时间线 rail；状态与展开全受控，无定时无演示数据；`body` 槽承载思考 markdown，原渲染管线与安全语义不变） |
+| `BuiMessage` | 消息布局语法（用户右气泡 / 助手通栏 / 系统居中；动作槽 hover/focus 才显；流式光环沿用 beam 语义；只做布局，不碰 ACP 状态） |
+| `AgentMessageBubble` | 用户/助手气泡（用户与系统分支经 `BuiMessage` 布局，附件/时间/复制/编辑原样保留；思考分支经 `BuiThinking` 头+展开壳、正文仍走 AgentMarkdown 管线；Markdown、tool 卡/结果入口、提议块挂接；助手正文无 AGENT 冗余头，流式由描边光环 + tip 呼吸光标表达；正文经打字机揭示（小步高频提交） + deferred 让路滚动/输入，新块挂载播一次滑入；消息动作行 hover/focus 才显：用户复制+编辑回填续改，助手复制原文） |
 
 ## tools/ 工具调用展示
 
 | 文件 | 功能 |
 |------|------|
-| `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；运行/成功/失败默认收起，保留用户展开选择；失败摘要行内可见、提议恢复操作在折叠外；审批经 `ToolApprovalSlot` 外挂且唯一；`detailsOnly` 让工作记录一次点击直接查看详情；`suppressBusinessResult`/`bare` 供结果入口复用过程行，业务卡不双挂） |
+| `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；运行/成功/失败默认收起，保留用户展开选择；失败摘要行内可见、提议恢复操作在折叠外；审批经 `ToolApprovalSlot` 外挂且唯一；`detailsOnly` 让工作记录一次点击直接查看详情；`suppressBusinessResult`/`bare` 供结果入口复用过程行，业务卡不双挂；工作记录行目标 chip pill 借 Beautiful UI ToolChips 语法） |
 | `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议/章节比较/HTML Artifact 卡 + 知识卡片沉淀/原文定位；`compactResults` 下图表默认紧凑预览） |
 | `ChapterComparisonCard` / `.test.ts` | 章节比较卡（章节筛选、证据展开、原文定位；按结果 ID 隔离局部状态） |
 | `HtmlArtifactCard` / `.test.ts` | HTML Artifact 卡与隔离预览（allow-scripts 沙箱、宿主 CSP/postMessage 校验、查看源码、宿主导出） |
@@ -46,7 +50,6 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 | `ChapterSuggestionCard` | 智能导读与续读推荐卡（章节关联度分数 / 推荐理由 / 一键切章研读） |
 | `AgentDiffPreview` | diff 预览 |
 | `AgentPlanCard` | 计划条目卡 |
-| `AgentBlockRenderer` | 兼容入口（tool 消息） |
 
 ## propose/ 批注提议
 
@@ -60,7 +63,8 @@ ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。�
 
 | 文件 | 功能 |
 |------|------|
-| `AgentPermissionCard` | 工具权限请求卡（聊天内联审批按钮；同步领取当前请求实现跨卡幂等，旧请求/重复点击不再发送） |
+| `AgentPermissionCard` | 工具权限请求卡（渲染 Beautiful UI ApprovalCard 视觉：圆角卡+选项行+取消；选项/标题来自真实 pending，同步领取实现跨卡幂等，旧请求/重复点击不再发送；busy 选中行转圈并全禁用） |
+| `BuiApprovalCard` | 权限卡纯视觉（单 pending 请求：标题+选项按钮+取消；无问答状态机、无输入框、无 Skip/Continue；跨卡幂等由调用方保证） |
 | `ToolApprovalSlot` | 工具审批槽（命中当前 pending 才渲染；通用工具卡与批注提议分支统一经此挂载，调用方置于折叠容器外） |
 
 > 订阅接线已在 `hooks/agent/useAcpPermissionIngest` / `useMontreeSnapshotHost`（原 `AgentPermissionHost` / `AgentSnapshotHost` 假组件已删，App 根直接调 Hook）。

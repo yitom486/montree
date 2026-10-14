@@ -47,6 +47,8 @@ interface AgentChatItemProps {
   /** bubble：用户靠右，其余靠左；card/system 忽略 */
   align?: 'start' | 'end'
   streaming?: boolean
+  /** 子节点已自带气泡外观时，只保留消息布局与探针。 */
+  bare?: boolean
   probe?: string
   messageId?: string
   role?: string
@@ -124,6 +126,7 @@ export function AgentChatItem({
   tone = 'default',
   align = 'start',
   streaming,
+  bare = false,
   probe,
   messageId,
   role,
@@ -158,17 +161,19 @@ export function AgentChatItem({
         data-acp-probe={probe ?? (isUser ? 'user' : 'agent')}
         className={cn(AGENT_CHAT_COL_CLASS, 'max-w-full animate-fade-slide-in', align === 'end' && 'items-end')}
       >
-        <MessageContent
-          className={cn(
-            'text-[13px] leading-relaxed',
-            isUser
-              ? 'max-w-[85%] rounded-2xl rounded-tr-xs border border-border/70 bg-secondary px-3.5 py-2.5 text-secondary-foreground shadow-xs group-[.is-user]:bg-secondary group-[.is-user]:text-secondary-foreground'
-              : 'w-full px-1 py-1 text-foreground',
-            className,
-          )}
-        >
-          {children}
-        </MessageContent>
+        {bare ? children : (
+          <MessageContent
+            className={cn(
+              'text-[13px] leading-relaxed',
+              isUser
+                ? 'max-w-[85%] rounded-2xl rounded-tr-xs border border-border/70 bg-secondary px-3.5 py-2.5 text-secondary-foreground shadow-xs group-[.is-user]:bg-secondary group-[.is-user]:text-secondary-foreground'
+                : 'w-full px-1 py-1 text-foreground',
+              className,
+            )}
+          >
+            {children}
+          </MessageContent>
+        )}
       </Message>
     )
   }

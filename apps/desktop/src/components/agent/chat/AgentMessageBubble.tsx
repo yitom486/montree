@@ -1,9 +1,10 @@
 import { ArrowRight, Check, Copy, Layers, Pencil } from 'lucide-react'
 import { Suspense, useDeferredValue, useMemo, useState } from 'react'
-import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import {
   AgentChatItem,
 } from '@/components/agent/chat/AgentChatItem'
+import { BuiMessage } from '@/components/agent/chat/BuiMessage'
+import { BuiThinking } from '@/components/agent/chat/BuiThinking'
 import { AgentToolCallCard } from '@/components/agent/tools/AgentToolCallCard'
 import { AgentResultEntry } from '@/components/agent/tools/AgentResultEntry'
 import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
@@ -16,8 +17,7 @@ import {
   ChapterMarkPlanCard,
   type ChapterMarkPlanSelectPayload,
 } from '@/components/agent/propose/ChapterMarkPlanCard'
-import { ProposeMarkBlockList, ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
-import type { ResolveMarkProposal } from '@/components/agent/tools/AgentBlockRenderer'
+import { ProposeMarkBlockList, ProposeMarkChatBlock, type ResolveMarkProposal } from '@/components/agent/propose/ProposeMarkChatBlock'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
 import { useRevealText } from '@/hooks/agent/useRevealText'
 import { AgentMarkdownFallback, AgentMarkdownLazy } from '@/components/markdown/AgentMarkdown.lazy'
@@ -46,6 +46,8 @@ export function AgentMessageBubble({
   const resolve = resolveMarkProposal ?? resolveFromStore
   const pendingPermission = useAcpPendingPermission()
   const [copied, setCopied] = useState(false)
+  // 思考展开由本气泡受控：跨流式更新与落定保持（挂载期内不重置）
+  const [thoughtOpen, setThoughtOpen] = useState(false)
 
   const copyText = async (text: string) => {
     if (!text || copied) return
@@ -78,9 +80,9 @@ export function AgentMessageBubble({
 
   if (message.role === 'system') {
     return (
-      <AgentChatItem variant="system" probe="system" messageId={message.id} role="system">
+      <BuiMessage from="system">
         {message.text}
-      </AgentChatItem>
+      </BuiMessage>
     )
   }
 
@@ -127,14 +129,22 @@ export function AgentMessageBubble({
         : '思考'
 
     return (
-      <Reasoning defaultOpen={false} isStreaming={Boolean(message.streaming)} data-acp-probe="thought" className="mb-0 min-w-0">
-        <ReasoningTrigger className="min-h-11 text-xs focus-visible:ring-2 focus-visible:ring-ring" getThinkingMessage={() => collapsedLabel} />
-        <ReasoningContent className="min-w-0 pb-2 text-xs text-muted-foreground">
-          <Suspense fallback={<AgentMarkdownFallback text={message.text} />}>
-            <AgentMarkdownLazy text={renderText} streaming={Boolean(message.streaming)} className={markdownClassName} />
-          </Suspense>
-        </ReasoningContent>
-      </Reasoning>
+      <div data-acp-probe="thought" className="mb-0 min-w-0">
+        <BuiThinking
+          state={message.streaming ? 'running' : 'done'}
+          titleActive="思考中"
+          titleDone={collapsedLabel}
+          rows={[]}
+          expanded={thoughtOpen}
+          onToggle={() => setThoughtOpen((v) => !v)}
+          partKey={`thought-${message.id}`}
+          body={
+            <Suspense fallback={<AgentMarkdownFallback text={message.text} />}>
+              <AgentMarkdownLazy text={renderText} streaming={Boolean(message.streaming)} className={markdownClassName} />
+            </Suspense>
+          }
+        />
+      </div>
     )
   }
 
@@ -146,6 +156,7 @@ export function AgentMessageBubble({
   return (
     <AgentChatItem
       variant="bubble"
+      bare={isUser}
       tone={isUser ? 'user' : 'agent'}
       align={isUser ? 'end' : 'start'}
       streaming={isUser ? Boolean(message.streaming) : active}
@@ -155,7 +166,33 @@ export function AgentMessageBubble({
       className={!isUser && showStreaming ? 'agent-beam-ring agent-beam-ring-emerald rounded-lg' : undefined}
     >
       {isUser ? (
-        <div className="flex min-w-0 flex-col gap-1.5">
+        <BuiMessage
+          from="user"
+          actions={
+            <>
+              <button
+                type="button"
+                aria-label="复制正文"
+                title="复制正文"
+                onClick={() => void copyText(message.text)}
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+              </button>
+              {onEditMessage && message.text.trim() ? (
+                <button
+                  type="button"
+                  aria-label="编辑后继续"
+                  title="拿回输入框续改（发送后为新回合）"
+                  onClick={() => onEditMessage(message.text)}
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              ) : null}
+            </>
+          }
+        >
           {(message.attachments?.length ?? 0) > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {message.attachments!.map((att) => (
@@ -187,31 +224,9 @@ export function AgentMessageBubble({
           {message.createdAt ? (
             <div className="flex items-center justify-end gap-0.5 pt-0.5 select-none font-mono text-[10px] text-muted-foreground/60">
               {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              <span className="ml-1 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
-                <button
-                  type="button"
-                  aria-label="复制正文"
-                  title="复制正文"
-                  onClick={() => void copyText(message.text)}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-                </button>
-                {onEditMessage && message.text.trim() ? (
-                  <button
-                    type="button"
-                    aria-label="编辑后继续"
-                    title="拿回输入框续改（发送后为新回合）"
-                    onClick={() => onEditMessage(message.text)}
-                    className="flex size-8 items-center justify-center rounded-md text-muted-foreground/80 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                ) : null}
-              </span>
             </div>
           ) : null}
-        </div>
+        </BuiMessage>
       ) : showEmptyStreaming ? (
         <div className="flex items-center gap-2 py-1 text-[11px] text-muted-foreground">
           <span className="size-1.5 rounded-full bg-primary animate-pulse" />

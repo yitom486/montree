@@ -55,12 +55,15 @@ function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
         <ToolStateIcon state={aiState} />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground/90">
           {display.title}
-          {display.targetSummary ? (
-            <span className="ml-1.5 font-normal text-muted-foreground">
-              {display.targetSummary}
-            </span>
-          ) : null}
         </span>
+        {display.targetSummary ? (
+          <span
+            className="inline-flex h-5 min-w-0 max-w-[45%] flex-1 cursor-default items-center truncate rounded-full bg-muted px-1.5 font-mono text-[10px] text-muted-foreground"
+            title={display.targetSummary}
+          >
+            {display.targetSummary}
+          </span>
+        ) : null}
         {display.durationMs != null ? (
           <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
             {formatDuration(display.durationMs)}

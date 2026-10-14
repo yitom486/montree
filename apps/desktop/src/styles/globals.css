@@ -555,10 +555,52 @@
   animation: result-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/*
+ * Beautiful UI 借用动效（V0 契约，2026-10-14）：
+ * 上游 Thinking/ToolChips/Approval/PromptBar 的入场与 shimmer 语法，
+ * 重写为我方 keyframes（不复制上游 foundation，不引入新依赖）。
+ * 使用方在动效根加 `bui-anim` 类 + 内联 animation 引用下方 keyframes；
+ * reduced-motion 下统一关停（本文件底部媒体查询）。
+ * 上游来源：slev12397/beautiful-ui（MIT），见 ACP 计划 V0 来源记录。
+ */
+@keyframes bui-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bui-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bui-shimmer-text {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-slide-in,
-  .animate-result-card-in {
+  .animate-result-card-in,
+  .bui-anim,
+  .bui-anim * {
     animation: none !important;
+    transition: none !important;
   }
   /* 光环静态下如一笔污渍，直接隐藏 */
   .agent-beam-ring::after {

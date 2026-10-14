@@ -178,6 +178,9 @@ async function expectSeededTimeline(
   }
   await expect(panel.getByText('这一章的核心观点是什么')).toBeVisible({ timeout: 10_000 })
 
+  // BUI 壳：用户分支走 BuiMessage（思考默认收进工作记录，展开后见 BuiThinking 壳，见下）
+  await expect(panel.locator('[data-bui-message="user"]').first()).toBeVisible()
+
   // 工作记录：工具调用计数可见，不用消息数冒充步骤数；默认收起。
   // 旧文案「工作了 Xs · N 步」必须消失（精确匹配旧格式，避免误伤「步骤」等词）。
   // 注：种子含两个工具调用 2 的组，首组用于下述展开断言。
@@ -216,6 +219,12 @@ async function expectSeededTimeline(
   await expect(readRow).toBeVisible()
   await readRow.click()
   await expect(panel.getByText('第一章第一段正文摘要')).toBeVisible()
+
+  // BUI：思考默认收进工作记录，展开后走 BuiThinking 壳（data-part-key 透传 thought-<id>）
+  await expect(panel.locator('[data-part-key="thought-th-1"]')).toHaveCount(1)
+
+  // BUI chip pill：工具行含 pill 状 chip（rounded-full）与状态徽标
+  await expect(panel.locator('[data-acp-probe="activity"] span.rounded-full').first()).toBeVisible()
 
   // 长内容不撑开面板
   const overflow = await panel.evaluate(
@@ -325,6 +334,8 @@ test.describe('聊天展示层 R2', () => {
       }
       const approval = panel.getByTestId('agent-permission-card')
       await expect(approval).toBeVisible({ timeout: 15_000 })
+      // BUI：权限卡走 BuiApprovalCard 视觉（外层保留 agent-permission-card testid）
+      await expect(approval.getByTestId('bui-approval-card')).toBeVisible()
       await expect(window.getByText('等待批准').first()).toBeVisible()
       await panel.screenshot({ path: info.outputPath('approval.png') })
       await info.attach('approval', { path: info.outputPath('approval.png'), contentType: 'image/png' })
@@ -346,9 +357,65 @@ test.describe('聊天展示层 R2', () => {
       const approval2 = panel.getByTestId('agent-permission-card')
       await expect(approval2).toBeVisible({ timeout: 15_000 })
       await expect(approval2).toHaveCount(1)
+      await expect(approval2.getByTestId('bui-approval-card')).toBeVisible()
       await approval2.getByRole('button', { name: 'Reject' }).click()
       await expect(approval2).toBeHidden({ timeout: 15_000 })
       await expect(panel.getByText(/PERMISSION:.*reject/)).toBeVisible({ timeout: 15_000 })
+    } finally {
+      await app.close()
+    }
+  })
+
+  test('真实 mock 审批（深色）：卡片可见，Allow 后消失', async ({}, info) => {
+    // 深色走启动时主题（localStorage 预置 + reload），审批在深色启动后实时创建，
+    // 不经过 reload，不丢失 pending。实时点击切换在 GPU 禁用的 E2E 下 view-transition
+    // 回调可能被跳过（见报告），故深色覆盖用启动态而非切换态。
+    const app = await launchBuiltApp({
+      E2E_ACP_WINDOW_TEST: '1',
+      E2E_ACP_COMMAND: process.execPath,
+      E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
+    })
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      await window.evaluate(async () => {
+        const raw = JSON.parse(localStorage.getItem('markdown-editor-ui') ?? '{"state":{}}')
+        raw.state = { ...(raw.state ?? {}), theme: 'dark' }
+        localStorage.setItem('markdown-editor-ui', JSON.stringify(raw))
+      })
+      await window.reload()
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      await expect(window.locator('html.dark')).toHaveCount(1)
+      const panel = await openPanel(window)
+
+      const connected = await window.evaluate(() =>
+        (window as any).electronAPI.acpConnect({ runtimeId: 'mock-window' }),
+      )
+      expect(connected.ok, JSON.stringify(connected)).toBe(true)
+      const sessionId = connected.value.sessionId as string
+      await window.evaluate(
+        ({ sessionId }) => {
+          void (window as any).electronAPI.acpPrompt({
+            sessionId,
+            prompt: [{ type: 'text', text: 'permission' }],
+          })
+        },
+        { sessionId },
+      )
+      const approval = panel.getByTestId('agent-permission-card')
+      await expect(approval).toBeVisible({ timeout: 15_000 })
+      await expect(approval.getByTestId('bui-approval-card')).toBeVisible()
+      await expect(window.getByText('等待批准').first()).toBeVisible()
+      await panel.screenshot({ path: info.outputPath('approval-dark.png') })
+      await info.attach('approval-dark', { path: info.outputPath('approval-dark.png'), contentType: 'image/png' })
+      await approval.getByRole('button', { name: 'Allow' }).click()
+      await expect(approval).toBeHidden({ timeout: 15_000 })
+      await expect(panel.getByText(/PERMISSION:/)).toBeVisible({ timeout: 15_000 })
     } finally {
       await app.close()
     }

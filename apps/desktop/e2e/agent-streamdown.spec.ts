@@ -56,6 +56,10 @@ test.describe('Streamdown 正文 S1', () => {
       await expect(panel.getByText('尾段收束')).toBeVisible({ timeout: 15_000 })
       await expect(panel.getByText('正在生成')).toHaveCount(0)
       await expect(panel.locator('.agent-beam-ring-emerald')).toHaveCount(0)
+      // BUI：用户分支走 BuiMessage，用户动作（复制正文/编辑后继续）保留
+      await expect(panel.locator('[data-bui-message="user"]').first()).toBeVisible()
+      await expect(panel.getByRole('button', { name: '复制正文', exact: true }).first()).toBeVisible()
+      await expect(panel.getByRole('button', { name: '编辑后继续', exact: true }).first()).toBeVisible()
       await expect(panel.locator('table')).toBeVisible()
       await expect(panel.locator('[data-streamdown=code-block-header]')).toContainText('ts')
       await expect(panel.locator('[data-streamdown=code-block] code').first()).toContainText('const answer = 42')
@@ -91,6 +95,10 @@ test.describe('Streamdown 正文 S1', () => {
       await back.click()
       const reference = await back.getAttribute('href')
       await expect(window.locator(`[id="${reference!.slice(1)}"]`)).toBeFocused()
+      // Mermaid 系社区可见性门渲染（IntersectionObserver + rootMargin 300px + idle 回调）：
+      // 脚注往返后面板停在底部时图表可能在视口外而永不渲染，先滚入视口再断言
+      //（同仓 agent-mermaid.spec.ts:95 既有做法，非放宽断言）。
+      await panel.locator('[data-streamdown="mermaid-block"]').first().scrollIntoViewIfNeeded()
       await expect(panel.locator('[data-streamdown="mermaid"] svg').first()).toBeVisible({
         timeout: 15_000,
       })

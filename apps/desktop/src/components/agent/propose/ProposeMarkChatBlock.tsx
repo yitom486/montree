@@ -12,6 +12,12 @@ import { toastMarkProposalFailure } from '@/lib/agent/mark-proposal-failure'
 import { cn } from '@/lib/utils'
 import type { MarkProposalStatus, ProposedMark } from '@montree/annotations'
 
+/** 提议决议回调（原 tools/AgentBlockRenderer 兼容入口已删除，类型收敛至此）。 */
+export type ResolveMarkProposal = (
+  proposalId: string,
+  status: Exclude<MarkProposalStatus, 'pending'>,
+) => void
+
 interface ProposeMarkChatBlockProps {
   proposal: ProposedMark
   status?: MarkProposalStatus
