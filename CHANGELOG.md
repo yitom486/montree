@@ -8,13 +8,9 @@
 
 ---
 
-## [0.4.13] - 2026-10-14
-
-- **跨平台发布校验修复**：WSL 探针允许注入的模拟运行器在 Linux CI 中执行，真实 `wsl.exe` 调用仍限制在 Windows；本版同时包含 v0.4.12 的生成式界面、聊天展示与体积优化更新。
-
----
-
 ## [0.4.12] - 2026-10-14
+
+- **跨平台发布校验修复**：WSL 探针允许注入的模拟运行器在 Linux CI 中执行，真实 `wsl.exe` 调用仍限制在 Windows。
 
 - **生成式交互界面**：Agent 可通过 `montree_present` 展示结构化组件或 React 交互页面；React 页面在隔离 iframe 中直接呈现，支持构建状态、错误展示、重跑与历史恢复。
 - **交互回到原会话**：页面提出分析请求或请求修复时，先由宿主展示内容，经用户确认后发送到原 ACP 会话，保留页面输入与组件状态。
@@ -520,8 +516,7 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.13...HEAD
-[0.4.13]: https://github.com/yitom486/montree/compare/v0.4.12...v0.4.13
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.12...HEAD
 [0.4.12]: https://github.com/yitom486/montree/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/yitom486/montree/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/yitom486/montree/compare/v0.4.9...v0.4.10
