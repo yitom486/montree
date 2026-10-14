@@ -2,6 +2,8 @@
 
 预览与 Agent 气泡**共用**的 Markdown 渲染块。
 
+Agent 代码高亮沿用 Streamdown 默认 `github-light` / `github-dark` 双主题。生产构建经 `apps/desktop/electron/vite-plugins/shiki-themes.ts` 仅打包这两套主题，保留既有 Shiki web 语言支持；开发态仍使用上游注册表。若以后增加代码高亮主题，须同步构建白名单。
+
 | 文件 | 功能 |
 |------|------|
 | `MarkdownContent` / `.test.ts` | 保留完整 HTML 容器，通过 React portal 原位挂载 Mermaid，折叠区中的图表随正文一起展开/收起 |

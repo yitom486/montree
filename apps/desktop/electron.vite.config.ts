@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 import { copyPdfjsAssetsPlugin } from './electron/vite-plugins/copy-pdfjs-assets'
+import { shikiThemesPlugin } from './electron/vite-plugins/shiki-themes'
 
 const appDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -117,6 +118,7 @@ export default defineConfig({
     root: resolve(appDir, 'src'),
     base: './',
     build: {
+      minify: true,
       modulePreload: { polyfill: false },
       rollupOptions: {
         input: resolve(appDir, 'src/index.html'),
@@ -137,6 +139,7 @@ export default defineConfig({
       removeCrossOriginPlugin(),
       foliatePaginatorGuardPlugin(),
       copyPdfjsAssetsPlugin(),
+      shikiThemesPlugin(),
     ],
   },
 })

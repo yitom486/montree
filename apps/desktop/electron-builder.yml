@@ -27,6 +27,8 @@ files:
   - node_modules/argparse/**/*
   - node_modules/sax/**/*
   - node_modules/pdfjs-dist/**/*
+  # 仅排除调试映射；legacy 主进程解析、字体与 worker 仍保留。
+  - '!node_modules/pdfjs-dist/**/*.map'
   # pdf-inspector Node 绑定（主进程分类/抽取/OCR）与其平台二进制包
   - node_modules/@firecrawl/pdf-inspector/**/*
   - node_modules/@firecrawl/pdf-inspector-*/**/*
