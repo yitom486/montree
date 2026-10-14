@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 
@@ -63,10 +64,13 @@ test.describe('Streamdown 正文 S1', () => {
   })
 
   test('流式中间态与完成态：表格/代码/公式/Mermaid/链接/复制', async ({}, info) => {
+    mkdirSync(info.outputDir, { recursive: true })
+    const streamGate = info.outputPath('stream-continue')
     const app = await launchBuiltApp({
       E2E_ACP_WINDOW_TEST: '1',
       E2E_ACP_COMMAND: process.execPath,
       E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
+      E2E_ACP_STREAM_GATE: streamGate,
     })
     try {
       const window = await app.firstWindow()
@@ -88,7 +92,7 @@ test.describe('Streamdown 正文 S1', () => {
       await panel.locator('textarea').fill('stream')
       await panel.getByRole('button', { name: '发送', exact: true }).click()
 
-      // 中间态：首段已到、尾段未到（chunk 200ms 间隔，时序上有 600ms+ 窗口）
+      // 中间态：首段已到、尾段未到；确认后放行，独立于 CI 懒加载速度。
       await expect(panel.getByText('首段中文正文')).toBeVisible({ timeout: 15_000 })
       await expect(panel.getByText('尾段收束')).toHaveCount(0)
       // 空行/新块到达不应把已显示正文从尾渲染器搬到头渲染器。
@@ -98,6 +102,7 @@ test.describe('Streamdown 正文 S1', () => {
       await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
       await panel.screenshot({ path: info.outputPath('stream-mid.png') })
       await info.attach('stream-mid', { path: info.outputPath('stream-mid.png'), contentType: 'image/png' })
+      writeFileSync(streamGate, 'continue')
 
       // 完成态：全文结构一次成形
       await expect(panel.getByText('尾段收束')).toBeVisible({ timeout: 15_000 })

@@ -1,6 +1,7 @@
 // Deterministic ACP peer. No model/network calls except this window's local MCP endpoint.
 const readline = require('node:readline')
 const { spawn } = require('node:child_process')
+const { existsSync } = require('node:fs')
 async function mcpRequest(mcp, method, params) {
   if (mcp.type === 'http') {
     const response = await fetch(mcp.url, { method: 'POST', headers: Object.fromEntries([...mcp.headers.map((header) => [header.name, header.value]), ['Content-Type', 'application/json']]), body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })
@@ -97,6 +98,14 @@ async function handle(message) {
       for (const part of parts) {
         await new Promise((resolve) => setTimeout(resolve, 200))
         text(sessionId, part)
+        if (part === parts[0] && process.env.E2E_ACP_STREAM_GATE) {
+          // 首段中间态由测试确认后再续流，避免慢 CI 的懒加载吞掉观察窗口。
+          const deadline = Date.now() + 30000
+          while (!existsSync(process.env.E2E_ACP_STREAM_GATE)) {
+            if (Date.now() > deadline) throw new Error('stream gate timeout')
+            await new Promise((resolve) => setTimeout(resolve, 20))
+          }
+        }
       }
       output = `STREAM:${sessionId}|done`
     } else if (command === 'status-flow') {
