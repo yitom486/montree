@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.13] - 2026-10-14
+
 - **跨平台发布校验修复**：WSL 探针允许注入的模拟运行器在 Linux CI 中执行，真实 `wsl.exe` 调用仍限制在 Windows；本版同时包含 v0.4.12 的生成式界面、聊天展示与体积优化更新。
 
 ---
@@ -516,7 +520,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.12...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.13...HEAD
+[0.4.13]: https://github.com/yitom486/montree/compare/v0.4.12...v0.4.13
 [0.4.12]: https://github.com/yitom486/montree/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/yitom486/montree/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/yitom486/montree/compare/v0.4.9...v0.4.10
