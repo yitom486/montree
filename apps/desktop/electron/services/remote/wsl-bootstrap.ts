@@ -156,7 +156,8 @@ export async function probeWslEnvironment(
   distro: string,
   runner: WslRunner = realWslRunner,
 ): Promise<{ ok: true; probe: WslProbe } | { ok: false; code: string; message: string }> {
-  if (process.platform !== 'win32') {
+  // 注入的运行器可在任意宿主模拟探针；真实 wsl.exe 仍仅允许 Windows。
+  if (process.platform !== 'win32' && runner === realWslRunner) {
     return { ok: false, code: 'REMOTE_CONNECTION_FAILED', message: 'WSL bootstrap 仅支持 Windows' }
   }
   const res = await runner(['-d', distro, '--exec', 'sh', '-c', PROBE_SCRIPT], undefined, 15000)
