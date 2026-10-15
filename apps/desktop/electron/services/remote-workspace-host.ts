@@ -524,17 +524,20 @@ export class RemoteWorkspaceHost implements WorkspaceHost {
       branch: string | null
       behind: number
       ahead: number
+      hasUpstream?: boolean
       files: Array<{ path: string; status: string; staged: boolean }>
       totalChanges: number
     }>('gitStatus', {}, 30000)
     if (!result.ok) {
-      return { isRepo: false, branch: null, ahead: 0, behind: 0, files: [], totalChanges: 0 }
+      return { isRepo: false, branch: null, ahead: 0, behind: 0, hasUpstream: false, files: [], totalChanges: 0 }
     }
     return {
       isRepo: result.value.isRepo,
       branch: result.value.branch,
       ahead: result.value.ahead,
       behind: result.value.behind,
+      // 老版本远端不回该字段，缺省按无上游处理（UI 会给出发布分支而非裸 push）
+      hasUpstream: result.value.hasUpstream ?? false,
       files: result.value.files.map((f) => ({
         path: f.path,
         status: f.status as GitStatusResult['files'][number]['status'],

@@ -320,6 +320,8 @@ describe('B3 远端 Git（回环真实 git，无真实远端 push）', () => {
       const status1 = await host.gitStatus(root)
       expect(status1.isRepo).toBe(true)
       expect(status1.files.some((f) => f.path === 'a.md')).toBe(true)
+      // 新仓库无上游：远端映射缺省为 false（状态栏走发布分支而非裸 push）
+      expect(status1.hasUpstream).toBe(false)
 
       const commit = await host.gitCommit({ cwd: root, message: 'init', stageAll: true })
       expect(commit.ok).toBe(true)

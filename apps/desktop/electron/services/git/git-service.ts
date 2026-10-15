@@ -157,6 +157,7 @@ export async function getGitStatus(cwd: string): Promise<GitStatusResult> {
       branch: null,
       ahead: 0,
       behind: 0,
+      hasUpstream: false,
       files: [],
       totalChanges: 0,
     }
@@ -185,11 +186,16 @@ export async function getGitStatus(cwd: string): Promise<GitStatusResult> {
     behind = parsedAB.behind
   }
 
+  // 5. 是否有关联上游（供状态栏决定一键推送还是发布分支；无上游时上一步必然失败）
+  const upstreamRes = await execGitCommand(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])
+  const hasUpstream = upstreamRes.exitCode === 0 && upstreamRes.stdout.trim() !== ''
+
   return {
     isRepo: true,
     branch,
     ahead,
     behind,
+    hasUpstream,
     files,
     totalChanges: files.length,
   }

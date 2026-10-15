@@ -31,6 +31,23 @@ export function StatusBar({
   const wslInfo = workspaceRoot && isWslPath(workspaceRoot) ? parseWslPath(workspaceRoot) : null
   const documentKind = activeFilePath ? getDocumentKind(activeFilePath) : null
 
+  // 推送三态：无上游且分支可发布 → 发布分支；有上游且有待推送 → 一键推送；
+  // 有上游且已同步 → 禁用（空转报成功比报错更糟）；游离 HEAD 无分支名可发 → 禁用。
+  // 旧快照/旧远端可能缺 hasUpstream，缺省按有上游处理（保持原裸 push 行为）。
+  const hasUpstream = status?.hasUpstream !== false
+  const branchName = status?.branch && !/^\(.*\)$/.test(status.branch) ? status.branch : null
+  const canPublish = Boolean(status?.isRepo && !hasUpstream && branchName)
+  const pushDisabled = isPushing || (hasUpstream && (status?.ahead ?? 0) === 0) || (!hasUpstream && !canPublish)
+  const pushLabel = canPublish ? '发布分支' : (status?.ahead ?? 0) > 0 ? `推送 (↑${status?.ahead})` : '推送'
+
+  const handlePush = () => {
+    if (canPublish && branchName) {
+      void push({ remote: 'origin', branch: branchName, setUpstream: true })
+      return
+    }
+    void push()
+  }
+
   const handleOpenRemoteModal = onOpenRemote || (() => setIsRemoteModalOpen(true))
 
   return (
@@ -120,25 +137,28 @@ export function StatusBar({
                     size="sm"
                     className={cn(
                       'h-5 px-1.5 text-[11px] gap-1 font-normal text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                      status.ahead > 0 && 'text-primary font-medium hover:text-primary',
+                      (status.ahead > 0 || canPublish) && 'text-primary font-medium hover:text-primary',
                     )}
-                    onClick={() => void push()}
-                    disabled={isPushing}
-                    aria-label="一键推送"
+                    onClick={handlePush}
+                    disabled={pushDisabled}
+                    title={canPublish ? '发布当前分支到远程仓库' : pushDisabled && !isPushing ? '已与远程同步' : undefined}
+                    aria-label={canPublish ? '发布分支' : '一键推送'}
                   >
                     {isPushing ? (
                       <Loader2 className="size-3 animate-spin text-primary" />
                     ) : (
                       <UploadCloud className="size-3" />
                     )}
-                    <span>{isPushing ? '正在推送…' : status.ahead > 0 ? `推送 (↑${status.ahead})` : '推送'}</span>
+                    <span>{isPushing ? '正在推送…' : pushLabel}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   <p>
-                    {status.ahead > 0
-                      ? `一键推送到远程仓库（${status.ahead} 个本地提交待推送）`
-                      : '一键推送到远程仓库 (git push)'}
+                    {canPublish
+                      ? `发布当前分支到远程仓库（git push -u origin ${branchName})`
+                      : status.ahead > 0
+                        ? `一键推送到远程仓库（${status.ahead} 个本地提交待推送）`
+                        : '已与远程同步，无需推送'}
                   </p>
                   {wslInfo?.isWsl && <p className="text-[10px] text-muted-foreground">自动利用 WSL 内部 SSH 凭证执行</p>}
                 </TooltipContent>

@@ -105,4 +105,95 @@ describe('StatusBar', () => {
     expect(container.textContent).toContain('↑2')
     expect(container.textContent).toContain('推送 (↑2)')
   })
+
+  it('无工作区时不渲染 Git 区（有目录才查状态）', () => {
+    mockUseGitStatus.mockClear()
+    renderBar({})
+
+    expect(mockUseGitStatus).toHaveBeenLastCalledWith(undefined)
+    expect(container.textContent).toContain('UTF-8')
+    expect(container.textContent).not.toContain('推送')
+    expect(container.querySelector('[aria-label="一键推送"]')).toBeNull()
+  })
+
+  it('无上游时显示发布分支，点击带 setUpstream 发布', () => {
+    const pushMock = vi.fn()
+    mockUseGitStatus.mockReturnValue({
+      status: {
+        isRepo: true,
+        branch: 'feature-x',
+        ahead: 0,
+        behind: 0,
+        hasUpstream: false,
+        files: [],
+        totalChanges: 0,
+      },
+      isLoading: false,
+      isPushing: false,
+      push: pushMock,
+      refetch: vi.fn(),
+    })
+
+    renderBar({ workspaceRoot: 'D:/my-blog' })
+
+    const btn = container.querySelector('[aria-label="发布分支"]') as HTMLButtonElement
+    expect(btn).not.toBeNull()
+    expect(btn.disabled).toBe(false)
+    expect(container.textContent).toContain('发布分支')
+
+    act(() => {
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(pushMock).toHaveBeenCalledTimes(1)
+    expect(pushMock).toHaveBeenCalledWith({ remote: 'origin', branch: 'feature-x', setUpstream: true })
+  })
+
+  it('有上游且已同步时推送按钮禁用（不空转报成功）', () => {
+    mockUseGitStatus.mockReturnValue({
+      status: {
+        isRepo: true,
+        branch: 'main',
+        ahead: 0,
+        behind: 0,
+        hasUpstream: true,
+        files: [],
+        totalChanges: 0,
+      },
+      isLoading: false,
+      isPushing: false,
+      push: vi.fn(),
+      refetch: vi.fn(),
+    })
+
+    renderBar({ workspaceRoot: 'D:/my-blog' })
+
+    const btn = container.querySelector('[aria-label="一键推送"]') as HTMLButtonElement
+    expect(btn).not.toBeNull()
+    expect(btn.disabled).toBe(true)
+    expect(container.textContent).not.toContain('发布分支')
+  })
+
+  it('游离 HEAD 无上游时不可发布（无分支名可发）', () => {
+    mockUseGitStatus.mockReturnValue({
+      status: {
+        isRepo: true,
+        branch: '(a1b2c3d)',
+        ahead: 0,
+        behind: 0,
+        hasUpstream: false,
+        files: [],
+        totalChanges: 0,
+      },
+      isLoading: false,
+      isPushing: false,
+      push: vi.fn(),
+      refetch: vi.fn(),
+    })
+
+    renderBar({ workspaceRoot: 'D:/my-blog' })
+
+    expect(container.querySelector('[aria-label="发布分支"]')).toBeNull()
+    const btn = container.querySelector('[aria-label="一键推送"]') as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+  })
 })

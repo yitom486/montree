@@ -368,7 +368,7 @@ export class UnavailableWorkspaceHost implements WorkspaceHost {
   }
 
   async gitStatus(_cwd: string): Promise<GitStatusResult> {
-    return { isRepo: false, branch: null, ahead: 0, behind: 0, files: [], totalChanges: 0 }
+    return { isRepo: false, branch: null, ahead: 0, behind: 0, hasUpstream: false, files: [], totalChanges: 0 }
   }
 
   async gitPush(

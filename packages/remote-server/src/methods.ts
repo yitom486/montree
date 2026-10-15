@@ -524,6 +524,7 @@ export interface RemoteGitStatus {
   branch: string | null;
   behind: number;
   ahead: number;
+  hasUpstream: boolean;
   files: Array<{ path: string; status: string; staged: boolean }>;
   totalChanges: number;
 }
@@ -558,7 +559,7 @@ export async function gitStatus(env: GitEnv): Promise<Result<RemoteGitStatus, Ap
     throwIfCancelled(env.signal);
     const inside = await runGit(env, ["rev-parse", "--is-inside-work-tree"]).catch(() => null);
     if (!inside || inside.stdout.trim() !== "true") {
-      return ok({ isRepo: false, branch: null, behind: 0, ahead: 0, files: [], totalChanges: 0 });
+      return ok({ isRepo: false, branch: null, behind: 0, ahead: 0, hasUpstream: false, files: [], totalChanges: 0 });
     }
     const [porcelain, branchOut] = await Promise.all([
       runGit(env, ["status", "--porcelain=v1", "-b"]),
@@ -568,7 +569,9 @@ export async function gitStatus(env: GitEnv): Promise<Result<RemoteGitStatus, Ap
     const { ahead, behind } = parseAheadBehind(header);
     const branch = branchOut.stdout.trim() || null;
     const files = parsePorcelainStatus(porcelain.stdout);
-    return ok({ isRepo: true, branch, behind, ahead, files, totalChanges: files.length });
+    // -b 首行形如 ## main...origin/main（含 ... 即有关联上游；## main 则无）
+    const hasUpstream = header.includes("...");
+    return ok({ isRepo: true, branch, behind, ahead, hasUpstream, files, totalChanges: files.length });
   } catch (error) {
     return err(toAppError(error, "GIT_ERROR", "查询 Git 状态失败"));
   }

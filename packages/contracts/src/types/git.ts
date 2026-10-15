@@ -15,6 +15,8 @@ export interface GitStatusResult {
   behind: number
   /** 本地领先远程分支待 push 的 commit 数量 */
   ahead: number
+  /** 当前分支是否已关联上游分支（无上游时推送需先发布分支） */
+  hasUpstream: boolean
   /** 改动文件列表 */
   files: GitFileStatus[]
   /** 未暂存或已暂存的总文件改动数 */

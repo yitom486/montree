@@ -6,6 +6,7 @@ import {
   getGitDiff,
   getGitStatus,
   gitCommit,
+  gitPush,
   isSafeGitDiffPath,
   listGitBranches,
   parseGitAheadBehind,
@@ -183,5 +184,51 @@ describe('git-service 临时仓库（无远端 push）', () => {
     const dir = mkdtempSync(join(tmpdir(), 'montree-git-plain-'))
     dirs.push(dir)
     expect((await getGitStatus(dir)).isRepo).toBe(false)
+  })
+
+  it('执行失败不抛（坏 cwd 返回非零退出码）', async () => {
+    const res = await execGitCommand(join(tmpdir(), 'montree-git-nope-不存在'), ['status'])
+    expect(res.exitCode).not.toBe(0)
+  })
+
+  it('ahead 经本地裸仓库真实计数（覆盖状态栏 ↑N 链路）', async () => {
+    const remote = mkdtempSync(join(tmpdir(), 'montree-git-remote-'))
+    dirs.push(remote)
+    expect((await execGitCommand(remote, ['init', '--bare'])).exitCode).toBe(0)
+
+    const dir = await makeRepo()
+    writeFileSync(join(dir, 'a.md'), 'hi\n', 'utf8')
+    expect((await gitCommit(dir, { message: 'init', stageAll: true })).ok).toBe(true)
+    expect((await execGitCommand(dir, ['remote', 'add', 'origin', remote])).exitCode).toBe(0)
+    const pushed = await gitPush(dir, { remote: 'origin', branch: 'main', setUpstream: true })
+    expect(pushed.ok).toBe(true)
+
+    expect((await getGitStatus(dir)).ahead).toBe(0)
+    writeFileSync(join(dir, 'b.md'), 'more\n', 'utf8')
+    expect((await gitCommit(dir, { message: 'second', stageAll: true })).ok).toBe(true)
+    const status = await getGitStatus(dir)
+    expect(status.ahead).toBe(1)
+    expect(status.behind).toBe(0)
+  })
+
+  it('hasUpstream 无上游为 false，发布分支后为 true（状态栏发布分支链路）', async () => {
+    const dir = await makeRepo()
+    writeFileSync(join(dir, 'a.md'), 'hi\n', 'utf8')
+    expect((await gitCommit(dir, { message: 'init', stageAll: true })).ok).toBe(true)
+
+    const before = await getGitStatus(dir)
+    expect(before.isRepo).toBe(true)
+    expect(before.hasUpstream).toBe(false)
+    expect(before.ahead).toBe(0)
+
+    const remote = mkdtempSync(join(tmpdir(), 'montree-git-remote-up-'))
+    dirs.push(remote)
+    expect((await execGitCommand(remote, ['init', '--bare'])).exitCode).toBe(0)
+    expect((await execGitCommand(dir, ['remote', 'add', 'origin', remote])).exitCode).toBe(0)
+    expect((await gitPush(dir, { remote: 'origin', branch: 'main', setUpstream: true })).ok).toBe(true)
+
+    const after = await getGitStatus(dir)
+    expect(after.hasUpstream).toBe(true)
+    expect(after.ahead).toBe(0)
   })
 })
