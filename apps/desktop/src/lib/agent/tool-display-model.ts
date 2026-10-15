@@ -1,5 +1,6 @@
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { explainToolFailure } from '@/lib/agent/tool-failure-message'
+import { isPresentToolTitle } from './parse-present-result'
 
 /**
  * 工具调用纯展示模型（R1）。
@@ -89,7 +90,7 @@ const TITLE_RULES: Array<{ test: RegExp; title: string }> = [
   { test: /montree_inspect_content/i, title: '内容审计' },
   { test: /montree_suggest_chapters/i, title: '章节建议' },
   { test: /montree_propose_mark|propose.?mark/i, title: '批注提议' },
-  { test: /montree_present/i, title: '展示呈现' },
+  { test: /(?:^|[.:]|__)montree_present$/i, title: '展示呈现' },
   { test: /montree_read|mcp\.montree\.montree_read/i, title: '读取文档' },
   { test: /montree_get_selection/i, title: '读取选区' },
   { test: /montree_capture_viewport/i, title: '读取当前页' },
@@ -136,6 +137,8 @@ export function classifyToolResultKind(
   if (message.presentResult?.kind === 'html-artifact') return 'html-artifact'
   if (message.presentResult?.kind === 'component-ui') return 'component-ui'
   if (message.presentResult?.kind === 'react-artifact') return 'react-artifact'
+  // agy 会先读取 MCP schema 文件；它包含所有结果种类，但不是执行结果。
+  if (/montree_present\.json\b/i.test(title)) return 'text'
   if (title.includes('montree_generate_diagram') || detail.includes('mermaidCode')) {
     return 'diagram'
   }
@@ -148,17 +151,17 @@ export function classifyToolResultKind(
   if (title.includes('montree_suggest_chapters') || detail.includes('"chapters"')) {
     return 'chapter-suggestion'
   }
-  if (title.includes('montree_present') && detail.includes('chapter-comparison')) {
+  if (isPresentToolTitle(title) && detail.includes('chapter-comparison')) {
     return 'chapter-comparison'
   }
-  if (title.includes('montree_present') && detail.includes('html-artifact')) {
+  if (isPresentToolTitle(title) && detail.includes('html-artifact')) {
     return 'html-artifact'
   }
-  if (title.includes('montree_present') && detail.includes('component-ui')) {
+  if (isPresentToolTitle(title) && detail.includes('component-ui')) {
     return 'component-ui'
   }
   if ((message.toolDiffs ?? []).length > 0) return 'diff'
-  if (title.includes('montree_present') && detail.includes('react-artifact')) return 'react-artifact'
+  if (isPresentToolTitle(title) && detail.includes('react-artifact')) return 'react-artifact'
   if (detail && detail !== title) return 'text'
   return 'none'
 }

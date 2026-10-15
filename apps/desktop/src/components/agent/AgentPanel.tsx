@@ -473,11 +473,6 @@ export const AgentPanel = memo(function AgentPanel({
               )}
               {statusLabel}
             </span>
-            {view.status === 'connecting' && view.selectedRuntimeId === 'agy' ? (
-              <p className="truncate text-[10px] text-muted-foreground">
-                首次连接需下载约 100MB 桥组件（仅一次），请耐心等待不要重复点击
-              </p>
-            ) : null}
           </div>
           {view.activeTitle ? (
             <p className="truncate text-[10px] text-muted-foreground" title={view.activeTitle}>

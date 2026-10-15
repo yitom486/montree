@@ -35,6 +35,7 @@ import {
 } from '@/components/agent/generative/ComponentUiCard.lazy'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { checkPresentDocument } from '@/lib/agent/present-locate'
+import { isPresentToolTitle } from '@/lib/agent/parse-present-result'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { parsePresentResult, type MontreePresentResult } from '@montree/contracts'
 import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
@@ -237,7 +238,7 @@ export function hasBusinessResult(detail?: string, title?: string): boolean {
 
 /** montree_present 标题命中但解析失败时，是否应显示可读失败而非空区 */
 export function isUnparsablePresentResult(detail?: string, title?: string): boolean {
-  if (!title?.includes('montree_present')) return false
+  if (!isPresentToolTitle(title)) return false
   if (!detail) return false
   return parsePresentPayload(detail, title) == null
 }

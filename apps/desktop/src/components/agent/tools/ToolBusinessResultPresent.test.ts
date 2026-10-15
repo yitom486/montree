@@ -93,6 +93,12 @@ describe('ToolBusinessResult present 分发', () => {
     expect(container.textContent).toContain('呈现结果无法解析')
   })
 
+  it('agy 读取工具 schema 文件不误报呈现失败', () => {
+    render(toolMessage(JSON.stringify({ name: 'montree_present', inputSchema: { properties: { kind: { enum: ['html-artifact', 'chapter-comparison'] } } } }), 'Read: C:/mcp/montree/montree_present.json'))
+    expect(container.textContent).not.toContain('呈现结果无法解析')
+    expect(container.querySelector('[data-testid="html-artifact-card"]')).toBeNull()
+  })
+
   it('enrich 挂载的 presentResult 优先使用', () => {
     const message = toolMessage(COMPARE)
     message.presentResult = JSON.parse(COMPARE)

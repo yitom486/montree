@@ -118,6 +118,11 @@ describe('summarizeToolTarget', () => {
 })
 
 describe('classifyToolResultKind', () => {
+  it('读取 present schema 不改成展示工具或提升为结果卡', () => {
+    const title = 'Read: C:/mcp/montree/montree_present.json'
+    expect(readableToolTitle(title)).toBe('读取文件')
+    expect(classifyToolResultKind(tool({ toolTitle: title, toolContentText: '{"name":"montree_present","chapters":{},"kind":{"enum":["html-artifact"]}}' }))).toBe('text')
+  })
   it('分类富业务结果与普通文本', () => {
     expect(
       classifyToolResultKind(
