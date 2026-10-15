@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { stripHostileHtmlHead } from '@/lib/agent/context/present-result-builder'
 import { parseReactArtifactRequest, REACT_ARTIFACT_REQUEST_MAX_BYTES } from '@montree/contracts'
+import { useArtifactZoom } from './ArtifactZoomSurface'
+import { registerThemeParticipant, type ThemeTransitionTarget } from '@/lib/editor/theme-transition'
 
 /**
  * 隔离 iframe 共享宿主（I1）：内联 React 预览与 HTML 对话框共用同一套
@@ -27,7 +29,7 @@ export function newArtifactMountId(): string {
 
 function hostScript(mountId: string, allowRequests: boolean): string {
   const requestApi = allowRequests ? `window.montreeArtifact=Object.freeze({requestAnalysis:function(text){if(typeof text!=="string"||!text.trim()||new TextEncoder().encode(text.trim()).byteLength>${REACT_ARTIFACT_REQUEST_MAX_BYTES})return false;send("artifact-request-analysis",text.trim());return true}});` : ''
-  return `<script>(function(){var m=${JSON.stringify(mountId)};function send(t,v){try{var o={mountId:m,type:t,value:v};if(new TextEncoder().encode(JSON.stringify(o)).byteLength>${ARTIFACT_MESSAGE_MAX_BYTES})return;parent.postMessage(o,"*")}catch(e){}}${requestApi}try{send("artifact-ready",1)}catch(e){}var last=0;function report(){try{var now=Date.now();if(now-last<${ARTIFACT_HEIGHT_MIN_INTERVAL_MS})return;last=now;var h=document.documentElement?document.documentElement.scrollHeight:0;send("artifact-height",h||0)}catch(e){}}try{if("ResizeObserver" in window&&document.documentElement){new ResizeObserver(report).observe(document.documentElement)}window.addEventListener("load",report);setTimeout(report,500)}catch(e){}window.addEventListener("error",function(e){try{send("artifact-error",String((e&&e.message)||"error").slice(0,200))}catch(_){}});})();</script>`
+  return `<script>(function(){var m=${JSON.stringify(mountId)};document.documentElement.dataset.artifactMountId=m;window.addEventListener("message",function(e){var d=e.data;if(e.source!==parent||!d||d.type!=="artifact-theme"||d.mountId!==m||["light","dark","sepia"].indexOf(d.value)<0)return;document.documentElement.dataset.theme=d.value;if(Number.isSafeInteger(d.requestId)){var id=d.requestId;requestAnimationFrame(function(){requestAnimationFrame(function(){parent.postMessage({type:"artifact-theme-applied",mountId:m,requestId:id},"*")})})}});document.addEventListener("keydown",function(e){if(e.key==="Escape")send("artifact-preview-close",1)},true);function send(t,v){try{var o={mountId:m,type:t,value:v};if(new TextEncoder().encode(JSON.stringify(o)).byteLength>${ARTIFACT_MESSAGE_MAX_BYTES})return;parent.postMessage(o,"*")}catch(e){}}${requestApi}try{send("artifact-ready",1)}catch(e){}var last=0;function report(){try{var now=Date.now();if(now-last<${ARTIFACT_HEIGHT_MIN_INTERVAL_MS})return;last=now;var h=document.documentElement?document.documentElement.scrollHeight:0;send("artifact-height",h||0)}catch(e){}}try{if("ResizeObserver" in window&&document.documentElement){new ResizeObserver(report).observe(document.documentElement)}window.addEventListener("load",report);setTimeout(report,500)}catch(e){}window.addEventListener("error",function(e){try{send("artifact-error",String((e&&e.message)||"error").slice(0,200))}catch(_){}});})();</script>`
 }
 
 /**
@@ -63,9 +65,10 @@ export function buildArtifactDocument(source: string, mountId: string, allowRequ
       takeExtras(headMatch[1] ?? '')
       bodyRest = rest.replace(headMatch[0], '')
     }
-    bodyContent += bodyRest.replace(/<\/?\s*(html|head|body|title)\b[^>]*>/gi, '')
+    // head 已独立移除；保留 SVG 内的 title，供 aria-labelledby 与导出使用。
+    bodyContent += bodyRest.replace(/<\/?\s*(html|head|body)\b[^>]*>/gi, '')
   } else {
-    bodyContent = cleaned.replace(/<\/?\s*(html|head|body|title)\b[^>]*>/gi, '')
+    bodyContent = cleaned.replace(/<\/?\s*(html|head|body)\b[^>]*>/gi, '')
   }
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8">' +
@@ -94,6 +97,7 @@ export interface ArtifactFrameProps {
   className?: string
   onBridgeMessage?: (message: ArtifactBridgeMessage) => void
   allowRequests?: boolean
+  colorScheme?: ThemeTransitionTarget
 }
 
 /**
@@ -113,8 +117,32 @@ export function ArtifactFrame({
   className,
   onBridgeMessage,
   allowRequests = false,
+  colorScheme,
 }: ArtifactFrameProps) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const themeRequest = useRef(0)
+  const pendingTheme = useRef<{ requestId: number; resolve: () => void } | null>(null)
+  const zoom = useArtifactZoom()
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const sendTheme = () => {
+    if (colorScheme) frameRef.current?.contentWindow?.postMessage({ type: 'artifact-theme', mountId, value: colorScheme }, '*')
+  }
+  useLayoutEffect(sendTheme, [colorScheme, mountId])
+  const followsTheme = colorScheme !== undefined
+  useLayoutEffect(() => {
+    if (!followsTheme) return
+    const unregister = registerThemeParticipant((theme) => {
+      pendingTheme.current?.resolve()
+      if (!frameRef.current?.contentWindow) return Promise.resolve()
+      const requestId = ++themeRequest.current
+      return new Promise<void>((resolve) => {
+        pendingTheme.current = { requestId, resolve }
+        frameRef.current!.contentWindow!.postMessage({ type: 'artifact-theme', mountId, value: theme, requestId }, '*')
+      })
+    })
+    return () => { unregister(); pendingTheme.current?.resolve(); pendingTheme.current = null }
+  }, [mountId, followsTheme])
   const lastHeight = useRef(initialHeight)
   const lastHeightAt = useRef(0)
   const sinkRef = useRef(onBridgeMessage)
@@ -138,7 +166,7 @@ export function ArtifactFrame({
       if (!frame || event.source !== frame.contentWindow) return
       const data = event.data
       if (!data || typeof data !== 'object') return
-      const message = data as { mountId?: unknown; type?: unknown; value?: unknown }
+      const message = data as { mountId?: unknown; type?: unknown; value?: unknown; requestId?: unknown }
       if (message.mountId !== expectedMountId) return
       let size = 0
       try {
@@ -147,6 +175,15 @@ export function ArtifactFrame({
         return
       }
       if (size > ARTIFACT_MESSAGE_MAX_BYTES) return
+      if (message.type === 'artifact-theme-applied' && message.requestId === pendingTheme.current?.requestId) {
+        pendingTheme.current?.resolve()
+        pendingTheme.current = null
+        return
+      }
+      if (message.type === 'artifact-preview-close') {
+        zoomRef.current?.close()
+        return
+      }
       if (allowRequests && message.type === 'artifact-request-analysis') {
         const text = parseReactArtifactRequest(message.value)
         if (text) sinkRef.current?.({ kind: 'analysis-request', text })
@@ -188,6 +225,7 @@ export function ArtifactFrame({
       name={`montree-artifact-${mountId}`}
       sandbox="allow-scripts"
       srcDoc={srcDoc}
+      onLoad={sendTheme}
       data-testid={frameTestId}
       className={className ?? 'h-full min-h-[320px] w-full border-0 bg-transparent'}
       style={className ? { height: initialHeight } : undefined}

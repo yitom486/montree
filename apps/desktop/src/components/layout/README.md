@@ -18,8 +18,9 @@
 
 | 文件 | 功能 |
 |------|------|
-| `FileExplorer` | 资源管理器（支持手风琴折叠展开，新建/重命名/删除/拖拽等树操作见 `hooks/workspace/useFileTreeActions`；header 留折叠与 ⋯ 溢出菜单） |
-| `FileBreadcrumb` | 文件面包屑（编辑/阅读主区共用） |
+| `FileExplorer` | 资源管理器（BeUI 风格右键菜单、边缘避让与 Shift+F10/方向键操作；新建/重命名/删除/拖拽等树操作见 `hooks/workspace/useFileTreeActions`；header 留折叠与 ⋯ 溢出菜单） |
+| `FileBreadcrumb` | BeUI 风格文件面包屑：工作区相对路径、上级菜单、窄栏折叠与资源管理器定位（编辑/阅读主区共用） |
+| `panels/FileBreadcrumb.test.ts` | Windows / POSIX 根路径与工作区边界回归 |
 | `DocumentOutline` | Markdown 大纲（侧栏消费，支持手风琴折叠） |
 
 ## main/ 主工作区（按文档模式）

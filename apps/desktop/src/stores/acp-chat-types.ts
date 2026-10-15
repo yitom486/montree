@@ -98,6 +98,27 @@ export function parseToolDiffs(content: unknown): AcpToolDiff[] {
 }
 
 /** 把 ACP tool content[] 压成可读摘要（卡片展开区；diff 另有可视化） */
+/** ACP runtimes may report MCP results in rawOutput instead of display content. */
+export function toolUpdateContentText(update: Record<string, unknown>): string | undefined {
+  const display = 'content' in update ? flattenToolContent(update.content) : undefined
+  if (display?.trim()) return display
+  const raw = update.rawOutput
+  if (typeof raw === 'string') return raw
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return display
+  const envelope = raw as Record<string, unknown>
+  const result = 'result' in envelope ? envelope.result : envelope
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    const mcp = result as Record<string, unknown>
+    if (mcp.structuredContent && typeof mcp.structuredContent === 'object') return JSON.stringify(mcp.structuredContent)
+    const text = flattenToolContent(mcp.content)
+    if (text) return text
+  }
+  if (typeof result === 'string') return result
+  if (typeof envelope.error === 'string') return envelope.error
+  if (envelope.error && typeof envelope.error === 'object' && 'message' in envelope.error && typeof envelope.error.message === 'string') return envelope.error.message
+  return display
+}
+
 export function flattenToolContent(content: unknown): string {
   if (!Array.isArray(content)) {
     return extractTextFromContent(content)

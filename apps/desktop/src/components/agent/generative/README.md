@@ -15,3 +15,5 @@
 组件组合的渲染类型保持稳定，选择与提交状态经 Context 更新；提交包含同步防重复与 8KiB 限制。React artifact 当前仅预置 React，编译器 Sucrase 在主进程独立懒块，未提供任意依赖安装或直接宿主业务操作；文本请求桥接见下文R3。
 
 R3：React 页面可调用 `window.montreeArtifact.requestAnalysis(text)` 提出 ≤1536 UTF-8 字节的文本请求。`ArtifactFrame` 仅在显式 allowRequests 时开放并校验来源/挂载/字节上限；宿主展示不可被后续消息替换的待发送内容，用户确认后经原 `onGenerativeSubmit` / ACP `sendPrompt` 继续归属会话。运行失败可准备修复请求（携带该 artifact 源码与错误），同样需确认。无任意 IPC、文件操作或自动发送；离线导出 API 返回 false。页面内部状态在确认提交时保持。
+
+React 内联预览与 ComponentUiCard 均使用 `../tools/ArtifactZoomSurface.tsx` 居中放大。保持同一 iframe/组件实例与选择、输入状态；iframe 内 Escape 经既有来源/挂载 ID 校验后关闭预览。

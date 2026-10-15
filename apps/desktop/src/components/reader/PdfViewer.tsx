@@ -626,9 +626,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         ) : null}
       </div>
 
-      {markTooltipPos && hoveredMark && !inspector.active ? (
-        <EpubMarkTooltip mark={hoveredMark} x={markTooltipPos.x} y={markTooltipPos.y} />
-      ) : null}
+      <EpubMarkTooltip key={filePath} disabled={Boolean(inspector.active)} mark={hoveredMark} x={markTooltipPos?.x ?? 0} y={markTooltipPos?.y ?? 0} />
 
       {inspector.pos && inspector.active ? (
         <ReadingMarkPopover
@@ -637,6 +635,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           x={inspector.pos.x}
           y={inspector.pos.y}
           onSelect={inspector.select}
+          onDismiss={inspector.close}
           onChangeColor={(color) => {
             void updateMark({ id: inspector.active!.id, color })
           }}

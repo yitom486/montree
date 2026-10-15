@@ -39,6 +39,8 @@ interface EditorUiStore {
   webDocExpanded: boolean
   fileTreeExpanded: boolean
   sidebarVisible: boolean
+  directoryReveal: { path: string; version: number } | null
+  revealDirectory: (path: string) => void
   fileStates: Record<string, FileUiState>
   setTheme: (theme: AppTheme) => void
   toggleTheme: () => void
@@ -66,6 +68,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
       webDocExpanded: true,
       fileTreeExpanded: true,
       sidebarVisible: true,
+      directoryReveal: null,
+      revealDirectory: (path) => set((state) => ({ directoryReveal: { path, version: (state.directoryReveal?.version ?? 0) + 1 }, sidebarVisible: true, fileTreeExpanded: true })),
       fileStates: {},
 
       setTheme: (theme) => {

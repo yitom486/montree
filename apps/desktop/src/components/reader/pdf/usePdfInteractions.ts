@@ -12,7 +12,7 @@ import {
   type PdfSelectionSnapshot,
   type ReaderUnit,
 } from '@montree/reader-core'
-import { findPdfMarksAtPoint, findPdfNoteMarkAtPoint } from '@/lib/reader/marks/pdf-reading-marks'
+import { findPdfMarksAtPoint } from '@/lib/reader/marks/pdf-reading-marks'
 import { parseNoteToCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { useReaderSelectionActions } from '@/hooks/reader/useReaderSelectionActions'
 import { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
@@ -656,7 +656,8 @@ export function usePdfInteractions({
       const pageElement = pageAnchorRefs.current.get(page)
       if (!pageElement) return
 
-      const hit = findPdfNoteMarkAtPoint(marks, page, event.clientX, event.clientY, pageElement)
+      const hits = findPdfMarksAtPoint(marks, page, event.clientX, event.clientY, pageElement)
+      const hit = hits.find((mark) => Boolean(mark.note?.trim())) ?? hits.find((mark) => Boolean(mark.excerpt?.trim()))
       if (!hit) {
         if (hoveredMark) {
           setHoveredMark(null)
@@ -665,7 +666,6 @@ export function usePdfInteractions({
         return
       }
       if (hoveredMark?.id === hit.id) {
-        setMarkTooltipPos({ x: event.clientX, y: event.clientY })
         return
       }
       setHoveredMark(hit)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArtifactZoomSurface } from '../tools/ArtifactZoomSurface'
 import { Code2, Download, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { fileApi } from '@/api/file-api'
@@ -243,7 +244,7 @@ export function ReactArtifactCard({ result, threadId, prompting, onSubmit, toolS
 
       {showFrame && displayHtml != null ? (
         <div className="px-2 pb-1">
-          <div className="min-h-[320px] overflow-hidden rounded-lg border border-border/60 bg-background">
+          <ArtifactZoomSurface title={result.title}>
             <ArtifactFrame
               key={`${result.id}-${mountId}`}
               title={`${result.title}（交互预览）`}
@@ -268,7 +269,7 @@ export function ReactArtifactCard({ result, threadId, prompting, onSubmit, toolS
                 }
               }}
             />
-          </div>
+          </ArtifactZoomSurface>
           {status === 'runtime-error' && reactCommitted ? (
             <p className="flex items-center gap-1.5 px-1 pt-1 text-[11px] text-destructive" data-testid="react-frame-error">
               运行报错：{frameError}

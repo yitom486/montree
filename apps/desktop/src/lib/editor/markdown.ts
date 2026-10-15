@@ -18,6 +18,7 @@ import { buildCodeBlockCopyButtonHtml, escapeCodeBlockLangLabel } from '@/lib/pr
 import { markdownItWikilinks } from '@/lib/editor/markdown-it-wikilinks'
 import { markdownItPageMarker } from '@/lib/editor/markdown-it-page-marker'
 import { markdownItAlerts } from '@/lib/editor/markdown-it-alerts'
+import { markdownItArtifacts, markdownArtifactPlaceholder, MARKDOWN_ARTIFACT_KINDS } from './markdown-it-artifacts'
 
 // CJS 包在 Vite ESM 下可能导出为 { default: fn }，需兼容处理
 function resolvePlugin(imported: unknown) {
@@ -93,10 +94,34 @@ function createConfiguredParser(options: { html: boolean }): InstanceType<typeof
     .use(pluginSup)
     .use(pluginMark)
     .use(footnotesWithSourceMaps)
+    .use(markdownItArtifacts)
+
+  // Explicit compatibility: only paired, consistently space-indented fences override indented code.
+  parser.block.ruler.before('code', 'indented_fence', (state, start, end, silent) => {
+    const indent = state.sCount[start]
+    if (indent - state.blkIndent < 4) return false
+    const opening = /^( {4,})(`{3,}|~{3,})(.*)$/.exec(state.src.slice(state.bMarks[start], state.eMarks[start]))
+    if (!opening || (opening[2][0] === '`' && opening[3].includes('`'))) return false
+    for (let line = start + 1; line < end; line++) {
+      if (!state.isEmpty(line) && state.sCount[line] < indent) return false
+      const closing = /^( *)(`{3,}|~{3,})[ \t]*$/.exec(state.src.slice(state.bMarks[line], state.eMarks[line]))
+      if (!closing || closing[1].length < opening[1].length || closing[2][0] !== opening[2][0] || closing[2].length < opening[2].length) continue
+      if (silent) return true
+      const token = state.push('fence', 'code', 0)
+      token.info = opening[3].trim()
+      token.markup = opening[2]
+      token.content = state.getLines(start + 1, line, indent, true)
+      token.map = [start, line + 1]
+      state.line = line + 1
+      return true
+    }
+    return false
+  })
 
   parser.renderer.rules.fence = (tokens, index, _options, _environment, _self) => {
     const token = tokens[index]
     const rawLang = token.info?.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+    if ((MARKDOWN_ARTIFACT_KINDS as readonly string[]).includes(rawLang)) return markdownArtifactPlaceholder(parser, rawLang, token.content)
 
     const isMermaid =
       rawLang === 'mermaid' ||

@@ -562,6 +562,10 @@ export const AgentPanel = memo(function AgentPanel({
         onChapterPlanSelect={handleChapterPlanSelect}
         onGenerativeSubmit={handleGenerativeSubmit}
         onEditMessage={(text) => setDraft(text)}
+        onQuote={(text) => {
+          setDraft((previous) => `${previous.trimEnd()}${previous.trim() ? '\n\n' : ''}> ${text.split('\n').join('\n> ')}\n\n`)
+          useAcpUiStore.getState().requestComposerFocus()
+        }}
       />
 
       <div className="shrink-0 space-y-1.5 p-3 pt-2">
@@ -783,7 +787,7 @@ export const AgentPanel = memo(function AgentPanel({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-1">
                 {suffixFast ? (
                   <label
                     className="inline-flex max-w-[7.5rem] shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground has-disabled:pointer-events-none has-disabled:opacity-40"

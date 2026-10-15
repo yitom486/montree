@@ -40,7 +40,8 @@
 | `markdown-it-page-marker` | OCR 页标记 chip 插件（独立成行 `<!-- Page N -->`→分页 chip，`data-page` 预留跳原图页） |
 | `markdown-it-alerts` / `.test.ts` | 社区 `@mdit/plugin-alert` 接入：GitHub 风格提示卡片与嵌套支持 |
 | `wikilink-completion` | CodeMirror 6 `[[` 实时自动补全源 |
-| `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位 |
+| `markdown-it-artifacts` | Markdown 数据组件入口：montree-diagram/montree-ui 围栏或静态图片＋隐藏 JSON 注释；保留源行映射，64KiB 限制，参数经组件二次校验 |
+| `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位；列表内代码保留容器上下文，成对且一致空格缩进的围栏由共享解析器兼容，原文不改写 |
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
@@ -97,6 +98,8 @@
 `parseQuizJsonl` / `serializeQuizSession` 已下沉 `@montree/contracts`（`packages/contracts/src/types/quiz.ts`）。
 
 ## agent/
+
+生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
 
 Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `../components/markdown/AgentMarkdown.tsx`。
 

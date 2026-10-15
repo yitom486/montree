@@ -6,6 +6,23 @@ vi.mock('@/api/file-api', () => ({ fileApi: { readImage: vi.fn() } }))
 const dataUrl = 'data:image/png;base64,iVBORw0KGgo='
 beforeEach(() => { vi.mocked(fileApi.readImage).mockReset().mockResolvedValue({ ok: true, value: { dataUrl } } as Awaited<ReturnType<typeof fileApi.readImage>>) })
 describe('shared Markdown preview renderer', () => {
+  it('组件元数据经过消毒，静态图片仍解析为宿主读取的本地资源', async () => {
+    const spec = JSON.stringify({ schemaVersion: 1, title: '图解', diagramType: 'flowchart', nodes: [], edges: [] })
+    const html = await renderPreview(`![静态图](./diagram.svg)\n\n<!-- montree-diagram\n${spec}\n-->`, 'D:\\book\\sample.md')
+    const dom = document.createElement('div')
+    dom.innerHTML = html
+    const slot = dom.querySelector('[data-montree-artifact]')!
+    expect(JSON.parse(slot.getAttribute('data-montree-spec')!)).toMatchObject({ title: '图解' })
+    expect(slot.querySelector('img')?.getAttribute('src')).toBe(dataUrl)
+  })
+  it('成对四空格围栏兼容为空代码块，并只移除公共缩进', async () => {
+    const empty = await renderPreview('    ```cpp\n    ```')
+    expect(empty).toContain('code-block')
+    expect(empty).not.toContain('```')
+    const dom = document.createElement('div')
+    dom.innerHTML = await renderPreview('    ```cpp\n    if (ready) {\n        run();\n    }\n    ```')
+    expect(dom.querySelector('code')?.textContent).toBe('if (ready) {\n    run();\n}\n')
+  })
   it('预览片段也能读取完整文档中的引用式图片定义', async () => {
     const html = await renderPreview('![引用][PIC]', 'D:\\book\\sample.md', { references: { PIC: { href: './a.png', title: '图片' } } })
     expect(html).toContain(dataUrl)

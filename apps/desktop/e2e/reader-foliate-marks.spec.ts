@@ -57,7 +57,7 @@ async function e2eListMarks(
 }
 
 test.describe('foliate 标注链路', () => {
-  test('EPUB 划重点→面板→检查器→删除全链路', async () => {
+  test('EPUB 划重点→面板→检查器→删除全链路', async ({}, info) => {
     const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-foliate-marks-'))
     const { epubName } = await writeReaderSmokeWorkspace(workspace)
     const app = await launchBuiltApp({
@@ -83,6 +83,30 @@ test.describe('foliate 标注链路', () => {
       await toolbar.getByRole('button', { name: '划重点 黄' }).click()
       await expect(window.getByText('已添加高亮')).toBeVisible({ timeout: 10_000 })
       await window.locator('#main').screenshot({ path: 'test-results/foliate-highlight.png' })
+      // 从真实 iframe 的文字几何触发悬停（不注入预览状态）。
+      let point: { x: number; y: number } | undefined
+      for (const frame of window.frames()) {
+        if (frame === window.mainFrame()) continue
+        const text = frame.getByText('Montree E2E minimal EPUB paragraph.', { exact: true }).first()
+        if (!(await text.count())) continue
+        point = await text.evaluate((element) => {
+          const range = document.createRange(); range.selectNodeContents(element)
+          const rect = range.getBoundingClientRect()
+          const parent = window.frameElement!.getBoundingClientRect()
+          return { x: parent.left + rect.left + rect.width / 2, y: parent.top + rect.top + rect.height / 2 }
+        })
+        break
+      }
+      expect(point).toBeDefined()
+      await window.mouse.move(point!.x, point!.y)
+      const preview = window.getByRole('tooltip', { name: '重点预览' })
+      await expect(preview).toBeVisible()
+      await expect(preview).toContainText('Montree E2E minimal EPUB paragraph.')
+      await preview.hover()
+      await expect(preview).toBeVisible()
+      await preview.screenshot({ path: info.outputPath('highlight-hover.png') })
+      await window.mouse.move(1, 1)
+      await expect(preview).toBeHidden()
 
       // 面板列出该标记（正文在 closed shadow 内，light DOM 唯一匹配即面板项）
       // 工具栏按钮已改名「批注簿」（旧名「书签与批注」是阶段 9 前的叫法）
@@ -101,6 +125,11 @@ test.describe('foliate 标注链路', () => {
       expect(opened).toBe(true)
       const popover = window.getByRole('dialog', { name: '标记操作' })
       await expect(popover).toBeVisible({ timeout: 10_000 })
+      await popover.screenshot({ path: info.outputPath('mark-actions.png') })
+      await window.keyboard.press('Escape')
+      await expect(popover).toBeHidden()
+      await window.evaluate((id) => window.__montreeE2eReader?.clickMark(id), marks[0]!.id)
+      await expect(popover).toBeVisible()
       await popover.getByRole('button', { name: '删除' }).click()
       await expect(window.getByText('已删除')).toBeVisible({ timeout: 10_000 })
       expect(await e2eListMarks(window)).toHaveLength(0)

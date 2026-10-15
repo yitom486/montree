@@ -420,7 +420,7 @@ export function useWebDocSession({
           if (hoveredMarkIdRef.current === hit.markId) return
 
           const mark = marksRef.current.find((item) => item.id === hit.markId)
-          if (!mark?.note?.trim()) return
+          if (!mark || (!mark.note?.trim() && !mark.excerpt?.trim())) return
 
           hoveredMarkIdRef.current = hit.markId
           const rect = hit.element.getBoundingClientRect()
@@ -440,6 +440,8 @@ export function useWebDocSession({
       doc.addEventListener('mouseup', onMouseUp)
       doc.addEventListener('scroll', onScroll, { passive: true })
       doc.addEventListener('mousemove', onMouseMove, { passive: true })
+      const onMarkLeave = () => { hoveredMarkIdRef.current = null; setHoveredMark(null); setMarkTooltipPos(null) }
+      doc.addEventListener('mouseleave', onMarkLeave)
       syncActiveHeadingFromScroll()
 
       frameCleanupRef.current = () => {
@@ -453,6 +455,7 @@ export function useWebDocSession({
         doc.removeEventListener('mousemove', onMouseMove)
         onSelectionChange()
         if (hoverRaf !== 0) window.cancelAnimationFrame(hoverRaf)
+        doc.removeEventListener('mouseleave', onMarkLeave)
       }
     },
     [documentId, handleWebDocLink, hoveredMarkIdRef, inspectorRef, marksRef, persistScrollProgress, pointerOriginRef, scheduleWebMarkLayout, setHoveredMark, setMarkTooltipPos, setSelectionSnapshot, setSelectionToolbarPos, syncActiveHeadingFromScroll],

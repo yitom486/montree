@@ -26,6 +26,7 @@ import {
 } from '@/lib/agent/stick-to-bottom'
 import { AGENT_CHAT_COL_CLASS } from '@/components/agent/chat/AgentChatItem'
 import { AgentMark } from '@/components/agent/AgentMark'
+import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
 import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
 import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
 
@@ -37,6 +38,7 @@ interface AgentMessageListProps {
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
   onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void
   onEditMessage?: (text: string) => void
+  onQuote?: (text: string) => void
 }
 
 /**
@@ -56,6 +58,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   onChapterPlanSelect,
   onGenerativeSubmit,
   onEditMessage,
+  onQuote,
 }: AgentMessageListProps) {
   const messages = useAcpActiveMessages()
   const pendingPermission = useAcpPendingPermission()
@@ -324,6 +327,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   }, [messages, messagesRef, streamingAny])
 
   return (
+    <AgentContextMenu selectionRoot={messagesRef} onQuote={onQuote} getMessage={(id) => messages.find((message) => message.id === id)} onScrollToBottom={handleScrollToBottom}>
     <div className="relative min-h-0 min-w-0 flex-1">
       <AssistantRuntimeProvider runtime={runtime}>
         <ThreadPrimitive.Root className="flex-1 flex flex-col min-h-0 h-full">
@@ -430,5 +434,6 @@ const ThreadMessageList = memo(function ThreadMessageList({
         </ThreadPrimitive.Root>
       </AssistantRuntimeProvider>
     </div>
+    </AgentContextMenu>
   )
 })

@@ -8,6 +8,7 @@ import {
 import { getReadingMarkStatusLabel } from '@montree/reader-core'
 import type { ReadingMark } from '@montree/contracts'
 import { cn } from '@/lib/utils'
+import { AnchoredSurface } from '@/components/shared/AnchoredSurface'
 
 interface ReadingMarkPopoverProps {
   mark: ReadingMark
@@ -18,6 +19,7 @@ interface ReadingMarkPopoverProps {
   onChangeColor: (color: HighlightColorId) => void
   onEditNote: () => void
   onDelete: () => void
+  onDismiss: () => void
 }
 
 export function ReadingMarkPopover({
@@ -29,18 +31,13 @@ export function ReadingMarkPopover({
   onChangeColor,
   onEditNote,
   onDelete,
+  onDismiss,
 }: ReadingMarkPopoverProps) {
   const currentColor = normalizeHighlightColor(mark.color)
   const hasNote = Boolean(mark.note?.trim())
 
   return (
-    <div
-      className="fixed z-50 min-w-[220px] max-w-xs rounded-md border border-border/80 bg-popover p-1.5 shadow-md"
-      style={{ left: x, top: Math.max(8, y - 8), transform: 'translate(-50%, -100%)' }}
-      role="dialog"
-      aria-label="标记操作"
-      onMouseDown={(event) => event.preventDefault()}
-    >
+    <AnchoredSurface x={x} y={y} label="标记操作" interactive onDismiss={onDismiss}>
       {stack.length > 1 ? (
         <div className="mb-1 flex flex-wrap gap-1 px-1">
           {stack.map((item) => (
@@ -77,7 +74,7 @@ export function ReadingMarkPopover({
               key={item.id}
               type="button"
               className={cn(
-                'size-3.5 rounded-full ring-1 ring-black/25 dark:ring-white/30',
+                'size-6 rounded-full ring-1 ring-black/25 dark:ring-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 currentColor === item.id && 'ring-2 ring-foreground',
               )}
               style={{ backgroundColor: item.swatch }}
@@ -109,6 +106,6 @@ export function ReadingMarkPopover({
           删除
         </Button>
       </div>
-    </div>
+    </AnchoredSurface>
   )
 }

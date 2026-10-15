@@ -27,7 +27,12 @@ let sequence = 0, requestSequence = 1000
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
 const result = (id, value) => send({ id, result: value })
 const text = (sessionId, value) => send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: value } } } })
-const config = (value = 'default') => [{ id: 'mode', name: 'Mode', type: 'select', currentValue: value, options: [{ value: 'default', name: 'Default' }, { value: 'alternate', name: 'Alternate' }] }]
+const config = (value = 'default') => process.env.E2E_ACP_COMPOSER_TEST === '1' ? [
+  { id: 'fast_mode', name: 'Fast mode', type: 'boolean', currentValue: false },
+  { id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: 'auto', options: [{ value: 'auto', name: 'Auto review' }, { value: 'manual', name: 'Manual review' }] },
+  { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'gpt-test', options: [{ value: 'gpt-test', name: '6 Luna' }] },
+  { id: 'reasoning_effort', name: 'Reasoning effort', category: 'thought_level', type: 'select', currentValue: 'medium', options: [{ value: 'medium', name: 'Medium' }, { value: 'high', name: 'High' }] },
+] : [{ id: 'mode', name: 'Mode', type: 'select', currentValue: value, options: [{ value: 'default', name: 'Default' }, { value: 'alternate', name: 'Alternate' }] }]
 const request = (method, params) => new Promise((resolve) => {
   const id = ++requestSequence
   permissions.set(id, resolve)
@@ -65,6 +70,48 @@ async function handle(message) {
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
+    } else if (command.startsWith('diagram:')) {
+      const diagramType = command.slice('diagram:'.length)
+      const { mcp } = sessions.get(sessionId)
+      const guide = await mcpRequest(mcp, 'tools/call', { name: 'montree_diagram_guide', arguments: { diagramType } })
+      if (guide.result?.isError) throw new Error('diagram guide failed')
+      // 模拟模型输出纯参数；MCP 生成 HTML/SVG 的链路与生产一致。
+      let nodes = diagramType === 'flowchart' ? [
+        { id: 'start', label: '开始', kind: 'start', layer: 0 },
+        { id: 'check', label: '内容已准备好？', kind: 'decision', layer: 1, details: '检查文档与工具是否就绪' },
+        { id: 'done', label: '展示图解', kind: 'end', layer: 2 },
+        { id: 'retry', label: '重新加载', layer: 2 },
+      ] : [
+        { id: 'reader', label: '读者', details: '</script><script>window.injected=1</script>' },
+        { id: 'agent', label: '助手' }, { id: 'host', label: 'Montree' },
+      ]
+      let edges = diagramType === 'flowchart' ? [
+        { from: 'start', to: 'check', label: '读取' }, { from: 'check', to: 'done', label: '是' },
+        { from: 'check', to: 'retry', label: '否' }, { from: 'retry', to: 'check', label: '重试' },
+      ] : [{ from: 'reader', to: 'agent', label: '请求图解' }, { from: 'agent', to: 'host', label: '提交参数' }, ...(diagramType === 'sequence' ? [{ from: 'host', to: 'agent', label: '返回 SVG', reply: true }] : [])]
+      let lanes
+      if (diagramType === 'mindmap') {
+        nodes.push({ id: 'reading', label: '阅读方法' }, { id: 'notes', label: '批注整理' })
+        edges = [{ from: 'reader', to: 'agent' }, { from: 'reader', to: 'host' }, { from: 'agent', to: 'reading' }, { from: 'agent', to: 'notes' }]
+      } else if (diagramType === 'swimlane') {
+        lanes = [{ id: 'user', label: '用户' }, { id: 'system', label: '软件' }]
+        nodes = nodes.map((node, i) => ({ ...node, lane: i === 0 ? 'user' : 'system', layer: i }))
+      } else if (diagramType === 'timeline') {
+        nodes = nodes.map((node, i) => ({ ...node, when: ['第一阶段', '第二阶段', '第三阶段'][i] }))
+      } else if (diagramType === 'cycle') {
+        edges.push({ from: 'host', to: 'reader', label: '反馈学习' })
+      } else if (diagramType === 'fishbone') {
+        nodes.push({ id: 'method', label: '阅读方法' }, { id: 'practice', label: '持续练习' })
+        edges = [{ from: 'reader', to: 'host' }, { from: 'agent', to: 'host' }, { from: 'method', to: 'reader' }, { from: 'practice', to: 'agent' }]
+      } else if (diagramType === 'er') {
+        nodes = nodes.map((node, i) => ({ ...node, fields: [{ name: 'id', type: 'UUID', key: 'PK', details: '实体唯一标识' }, ...(i ? [{ name: i === 1 ? 'reader_id' : 'agent_id', type: 'UUID', key: 'FK' }] : [{ name: 'name', type: 'TEXT' }])] }))
+        edges = edges.map((edge, i) => ({ ...edge, fromCardinality: '1', toCardinality: '0..*', fromField: 'id', toField: i === 0 ? 'reader_id' : 'agent_id' }))
+      }
+      const toolCallId = `diagram-${sessionId}-${++sequence}`
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title: 'mcp.montree.montree_present', kind: 'execute', status: 'in_progress' } } })
+      const rpc = await mcpRequest(mcp, 'tools/call', { name: 'montree_present', arguments: { kind: 'preset', preset: 'diagram', diagramType, title: `内置${diagramType}`, nodes, edges, ...(lanes ? { lanes } : {}) } })
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: rpc.result?.isError ? 'failed' : 'completed', rawOutput: { result: rpc.result, error: null } } } })
+      output = `SVG:${sessionId}|${diagramType}`
     } else if (command === 'tools') {
       const { mcp } = sessions.get(sessionId)
       const rpc = await mcpRequest(mcp, 'tools/list')
@@ -76,6 +123,13 @@ async function handle(message) {
     } else if (command === 'permission') {
       const answer = await request('session/request_permission', { sessionId, toolCall: { toolCallId: `tool-${sessionId}`, title: `Permission ${sessionId}` }, options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }, { optionId: 'reject', name: 'Reject', kind: 'reject_once' }] })
       output = `PERMISSION:${sessionId}|${answer.outcome.outcome}|${answer.outcome.optionId || ''}`
+    } else if (command.startsWith('present-raw-echo:')) {
+      const result = JSON.parse(command.slice('present-raw-echo:'.length))
+      const toolCallId = `present-${sessionId}-${++sequence}`
+      // codex-acp 2.2.2：开始含标题，完成仅在 rawOutput.result 返回 MCP 原始结果。
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title: 'mcp.montree.montree_present', kind: 'execute', status: 'in_progress' } } })
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed', rawOutput: { result, error: null } } } })
+      output = `RAW_ECHO:${sessionId}`
     } else if (command.startsWith('present-echo:')) {
       // 回放一次真实工具结果（由测试经 MCP tools/call 取得）：只做透传，不编造。
       const payload = JSON.parse(command.slice('present-echo:'.length))

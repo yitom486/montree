@@ -23,6 +23,11 @@ function result(): PresentHtmlArtifact {
 }
 
 describe('buildArtifactDocument', () => {
+  it('保留内联 SVG 的可访问标题', () => {
+    const doc = buildArtifactDocument('<html><head><title>文档标题</title></head><body><svg role="img" aria-labelledby="label"><title id="label">流程图</title></svg></body></html>', 'test-mount')
+    expect(doc).toContain('<title id="label">流程图</title>')
+    expect(doc).not.toContain('文档标题')
+  })
   it('宿主 CSP 唯一生效，脚本样式保留', () => {
     const doc = buildArtifactDocument(SOURCE, 'mount-1')
     expect(doc).toContain('Content-Security-Policy')

@@ -7,6 +7,7 @@ import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import {
   extractTextFromContent,
   flattenToolContent,
+  toolUpdateContentText,
   isToolActiveStatus,
 } from '@/stores/acp-chat-types'
 import { parseAcpPlanEntries, summarizePlanProgress } from '@/lib/agent/acp-plan'
@@ -159,10 +160,7 @@ function applyToolCallUpdate(
   const title = typeof update.title === 'string' ? update.title : (prev?.toolTitle ?? '工具调用')
   const kind = typeof update.kind === 'string' ? update.kind : (prev?.toolKind ?? 'other')
   const status = typeof update.status === 'string' ? update.status : (prev?.toolStatus ?? 'pending')
-  const contentText =
-    'content' in update
-      ? flattenToolContent(update.content)
-      : (prev?.toolContentText ?? prev?.text ?? '')
+  const contentText = toolUpdateContentText(update) ?? prev?.toolContentText ?? prev?.text ?? ''
   const active = isToolActiveStatus(status)
   const base: AcpChatMessage = {
     id: prev?.id ?? messageId('tool'),

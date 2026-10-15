@@ -269,13 +269,8 @@ export function FoliateReaderViewer({
         ) : null}
       </div>
 
-      {interactions.markTooltipPos && interactions.hoveredMark && !interactions.inspector.active ? (
-        <EpubMarkTooltip
-          mark={interactions.hoveredMark}
-          x={interactions.markTooltipPos.x}
-          y={interactions.markTooltipPos.y}
-        />
-      ) : null}
+      <EpubMarkTooltip key={filePath} disabled={Boolean(interactions.inspector.active)} mark={interactions.hoveredMark}
+        x={interactions.markTooltipPos?.x ?? 0} y={interactions.markTooltipPos?.y ?? 0} />
 
       {interactions.inspector.pos && interactions.inspector.active ? (
         <ReadingMarkPopover
@@ -284,6 +279,7 @@ export function FoliateReaderViewer({
           x={interactions.inspector.pos.x}
           y={interactions.inspector.pos.y}
           onSelect={interactions.inspector.select}
+          onDismiss={interactions.inspector.close}
           onChangeColor={(color) => {
             void updateMark({ id: interactions.inspector.active!.id, color }).then(() =>
               highlights.syncVisualMarks(),

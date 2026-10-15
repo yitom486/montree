@@ -455,7 +455,7 @@ export function useFoliateInteractions({
           const [key] = overlayer.hitTest({ x: event.clientX, y: event.clientY })
           const mark =
             typeof key === 'string' ? findMarkByOverlayerKey(marksRef.current, key) : undefined
-          if (!mark?.note?.trim()) {
+          if (!mark || (!mark.note?.trim() && !mark.excerpt?.trim())) {
             if (hoveredMarkIdRef.current !== null) {
               hoveredMarkIdRef.current = null
               markHoverHandlers().onLeave()

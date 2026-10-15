@@ -6,6 +6,7 @@ import {
   MONTREE_RENDER_HINT_REFRESH,
   MONTREE_STATIC_SKILL,
   MONTREE_TOOL_OVERVIEW,
+  MONTREE_INTERACTIVE_GUIDANCE,
 } from './montree-static-skill'
 import { shouldRefreshRenderHint } from './render-hint-refresh'
 import { beginPromptSelectionCycle } from './reader-selection-registry'
@@ -33,7 +34,8 @@ export function buildMontreePromptPrefix(
   }
   blocks.push({
     type: 'text',
-    text: `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_TOOL_OVERVIEW}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`,
+    // 与逐轮工具概览共用一块，首次/恢复/长会话都能收到，回放仍统一剥离。
+    text: `${MONTREE_BOOTSTRAP_OPEN_TAG}\n${MONTREE_TOOL_OVERVIEW}\n${MONTREE_INTERACTIVE_GUIDANCE}\n${MONTREE_BOOTSTRAP_CLOSE_TAG}`,
   })
 
   // 长会话渲染速览：每隔 N 轮重贴一次（回放清洗据外层标记剥离，不污染时间线）。

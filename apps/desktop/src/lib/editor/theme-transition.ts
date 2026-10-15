@@ -1,5 +1,25 @@
 export type ThemeTransitionTarget = 'light' | 'dark' | 'sepia'
 
+const themeParticipants = new Set<(theme: ThemeTransitionTarget) => Promise<void>>()
+let themeRevision = 0
+
+/** 隔离帧参与同一次截图；缺失确认最多等待 160ms，不阻塞主题切换。 */
+export function registerThemeParticipant(apply: (theme: ThemeTransitionTarget) => Promise<void>): () => void {
+  themeParticipants.add(apply)
+  return () => { themeParticipants.delete(apply) }
+}
+
+async function syncThemeParticipants(theme: ThemeTransitionTarget): Promise<void> {
+  if (!themeParticipants.size) return
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      Promise.all([...themeParticipants].map((apply) => Promise.resolve().then(() => apply(theme)).catch(() => {}))),
+      new Promise<void>((resolve) => { timeout = setTimeout(resolve, 160) }),
+    ])
+  } finally { clearTimeout(timeout) }
+}
+
 /**
  * 驱动 View Transitions 原生主题平滑过渡：
  * 1. 切换瞬间为 root 加上 .theme-transitioning，屏蔽所有局部元素各自的 transition；
@@ -16,6 +36,7 @@ export function applyThemeWithViewTransition(
   }
 
   const root = document.documentElement
+  const revision = ++themeRevision
   const prefersReduced =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -28,6 +49,7 @@ export function applyThemeWithViewTransition(
     applyFn()
     root.classList.remove('light', 'sepia', 'dark')
     root.classList.add(nextTheme)
+    void syncThemeParticipants(nextTheme)
     return
   }
 
@@ -35,9 +57,11 @@ export function applyThemeWithViewTransition(
 
   try {
     const transition = document.startViewTransition(() => {
+      if (revision !== themeRevision) return
       applyFn()
       root.classList.remove('light', 'sepia', 'dark')
       root.classList.add(nextTheme)
+      return syncThemeParticipants(nextTheme)
     })
 
     transition.finished
@@ -47,7 +71,7 @@ export function applyThemeWithViewTransition(
       .finally(() => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            root.classList.remove('theme-transitioning')
+            if (revision === themeRevision) root.classList.remove('theme-transitioning')
           })
         })
       })
@@ -56,6 +80,7 @@ export function applyThemeWithViewTransition(
     applyFn()
     root.classList.remove('light', 'sepia', 'dark')
     root.classList.add(nextTheme)
+    void syncThemeParticipants(nextTheme)
     root.classList.remove('theme-transitioning')
   }
 }

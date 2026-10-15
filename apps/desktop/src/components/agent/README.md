@@ -15,7 +15,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换） |
 | `FloatingAIHud` | 悬浮 AI 伴读浮窗与微型药丸胶囊（支持 docked / floating / capsule 三态切换、四大 Tab 与自由拖拽） |
 | `CompactConfigMenu` | 输入栏旁的紧凑配置下拉（primary 配置项） |
-| `AgentComposer` | 社区 PromptInput 输入/附件预览，Electron 路径/图片/ACP payload 适配；IME 与键盘由社区接管 |
+| `AgentComposer` | BeUI Prompt Input 布局适配：可换行参数与独立 32px 发送/停止；附件、ACP payload、IME/键盘沿用社区内核；输入框右键编辑 |
 | `AgentMark` | Agent 徽标（布局/TitleBar 共用） |
 | `AgentAuthDialog` | 认证方式选择（复用本机 Codex / Google 登录，对齐 VS Code / Zed） |
 | `AgentProviderDialog` | 自定义模型供应商配置（base URL + API Key + 模型，Key 只存主进程） |
@@ -29,6 +29,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | 文件 | 功能 |
 |------|------|
 | `AgentMessageList` | 消息列表容器（`lib/agent/chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新；生成式提交经 `onGenerativeSubmit` 透传面板 `sendPrompt` 链路） |
+| `AgentContextMenu` | 聊天/输入框右键：选区快照、复制原文、引用草稿、剪切/粘贴文本/全选与回底；异步编辑校验线程与当前草稿 |
 | `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条；思考在前，运行中只展示最新普通工具的固定行；完成自动收起一次，手动展开保留完整历史；摘要含真实进度与取消/未知/未加载注记，详情按需展开） |
 | `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（最新工具稳定行、完成收起与手动回看、单次渲染、失败摘要、审批外置） |
 | `AgentResultEntry` | 富业务结果独立入口（紧凑过程行 + 独立业务卡，单次调用只渲染一处，`probe="result"`；component-ui 经 `threadId`/`prompting`/`onGenerativeSubmit` 透传选择提交链） |
@@ -51,9 +52,10 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议/章节比较/HTML Artifact/生成式 UI 卡 + 知识卡片沉淀/原文定位；`compactResults` 下图表默认紧凑预览；component-ui 经 `generative/` 懒加载卡渲染，选择提交与定位回调透传） |
 | `generative/ComponentUiCard` + `.lazy` + `.test.ts` | 生成式 UI 卡（官方 `GenerativeUIRender` + 白名单 Card/Row/Column/Text/Select/Button/Evidence，shadcn/主题复用；本地选择态按结果 ID 隔离；提交/定位只经宿主回调；未知组件 Fallback + 卡内错误边界；懒加载约 7KB，首屏不进包。详见 `generative/README.md`） |
 | `ChapterComparisonCard` / `.test.ts` | 章节比较卡（章节筛选、证据展开、原文定位；按结果 ID 隔离局部状态） |
+| `tools/ArtifactZoomSurface` | 居中放大预览；同一 portal 容器以原子移动保留 iframe/组件状态，关闭返回原位置，Esc 与焦点恢复；不创建第二个 iframe |
 | `tools/ArtifactFrame` / `.test.ts` | 隔离 iframe 共享宿主（内联 React 与 HTML 对话框共用 srcDoc 组装、来源+挂载 ID+2KiB 白名单消息、高度钳制/限频/微差忽略；sandbox 仅 allow-scripts） |
-| `HtmlArtifactCard` / `.test.ts` | HTML Artifact 卡与隔离预览（对话框经 `ArtifactFrame` 挂载，行为不变：allow-scripts 沙箱、宿主 CSP/postMessage 校验、查看源码、宿主导出） |
-| `generative/ReactArtifactCard` / `.test.ts` | React 内联卡（同卡构建→编译→加载→就绪/失败真实状态；成功直接挂内联 iframe，ready 仅认 React commit 确认；失败重试/重跑；源码视图为模型源码，导出离线 HTML；无预览对话框，单实例。详见 `generative/README.md`） |
+| `HtmlArtifactCard` / `.test.ts` | HTML Artifact 卡与隔离预览；内置 SVG 图解直接内联、同步主题且不重建帧；普通 HTML 仍以对话框经 `ArtifactFrame` 挂载，行为不变：allow-scripts 沙箱、宿主 CSP/postMessage 校验、查看源码、宿主导出） |
+| `generative/ReactArtifactCard` / `.test.ts` | React 内联卡（同卡构建→编译→加载→就绪/失败真实状态；成功直接挂内联 iframe，ready 仅认 React commit 确认；失败重试/重跑；源码视图为模型源码，导出离线 HTML；支持居中放大，仍为同一 iframe 单实例。详见 `generative/README.md`） |
 | `DiagramViewerCard` | 交互式图表卡（结果入口默认紧凑：标题+短摘要+至多 3 步+完整入口；展开后为时序步骤流 / 实体概览 / Mermaid 原生出图 / 正文穿透 / 钉入；紧凑态隐藏 Tab，内部展开态随 key 稳定） |
 | `CrossReferenceCard` | 跨章节实体概念流转轨迹卡（章节分布热力权重条 / 证据折叠 / 跨章定位） |
 | `ContentAuditCard` | 深度内容审计探针卡（命中条目来源标识 / 原文取证高亮 / 一键正文穿透定位） |

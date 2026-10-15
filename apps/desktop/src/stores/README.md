@@ -7,7 +7,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 
 | 文件 | 功能 |
 |------|------|
-| `editor-ui-store.ts` | 主题、视图模式、侧栏、各文件滚动位置等编辑器 UI |
+| `editor-ui-store.ts` | 主题、视图模式、侧栏、各文件滚动位置等编辑器 UI；目录定位请求仅驻内存，不持久化 |
 | `app-settings-store.ts` / `.test.ts` | 用户设置（自动保存间隔、verbose 日志等）；Markdown 默认所见即所得，源码切换不持久化，兼容旧设置迁移 |
 | `active-document-store.ts` | 当前打开文档路径/类型（供 Agent turn-context 等） |
 | `draft-store.ts` | 未保存草稿（localStorage；键按 workspaceId 隔离，local 沿用裸键） |
@@ -21,7 +21,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `annotation-agent-store.ts` | 批注 AI 助手：按书线程、独立 agentSessionIds（按运行时分桶）、pendingDraft |
 | `tts-store.ts` | 语音朗读听书：Google Gemini / Azure Speech / Local OpenAI / 系统语音；接收段号、排队、缓冲等待与播放完成分别维护，云端确认结束且播放队列耗尽才完成。主备容灾由主进程处理；接收中断后缓冲音频继续播放，耗尽后保留位置并暂停，按服务端额度恢复时间保护重试。未接收完的进度条显示已验证、可播放音频进度。按正文与语音配置指纹持久保存最近 100 章的实际播放秒数（每 2 秒、暂停/关闭/退出时保存），恢复时跳过已经听过的缓存 PCM，完整播放后清除位置。悬浮播放器、章节进度记忆。回归测试见 `tts-store-stream.test.ts`。 |
 | `subsession-progress-store.ts` | 独立副会话（目录 AI 整理等）流式进度与实时看板状态（步骤计数、当前工具、思考摘要） |
-| `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store） |
+| `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store）；兼容 ACP `content` 与 MCP `rawOutput.result.content/structuredContent`，主聊天与批注助手共用 |
 | `acp/` | ACP 智能体交互与次世代伴读 HUD 专职子状态（见 `acp/README.md`） |
 
 协议/传输/认证纯逻辑已独立至 `@yitom/acp-client`；本目录仅存 UI 与会话展示状态，不放 IPC 数据。

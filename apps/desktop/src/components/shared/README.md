@@ -11,3 +11,4 @@
 | `UnsavedChangesDialog` / `DraftRecoveryDialog` | 未保存确认、草稿恢复 |
 | `ErrorLogDialog` / `ErrorBanner` | 错误日志与横幅 |
 | `AppErrorBoundary` / `PaneErrorBoundary` | 应用级 / 分栏级错误边界 |
+| `AnchoredSurface` | BeUI Morph 风格浮层壳：Radix 虚拟锚点、碰撞避让、焦点与关闭管理，供阅读标记预览和操作共用 |

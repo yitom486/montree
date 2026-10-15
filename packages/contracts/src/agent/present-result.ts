@@ -84,11 +84,13 @@ export interface PresentHtmlArtifact extends PresentResultBase {
   kind: 'html-artifact'
   /** 完整 HTML 源码片段（宿主负责套壳、CSP 与隔离，不在此校验脚本语义） */
   html: string
+  /** 内置 SVG 图表直接在聊天中展示；不改变隔离策略。 */
+  inline?: boolean
 }
 
 export interface PresentComponentUi extends PresentResultBase {
   kind: 'component-ui'
-  /** 证据绑定章节（2–6 章，与比较卡同规则，先读后呈，不编造摘录） */
+  /** 证据绑定章节（1–6 章，先读后呈，不编造摘录） */
   chapters: PresentChapterRef[]
   /**
    * 生成式 UI 树（与官方 GenerativeUISpec 同形，仅白名单组件）。
@@ -245,14 +247,15 @@ export function parsePresentResult(value: unknown): MontreePresentResult | null 
   if (input.kind === 'html-artifact') {
     if (typeof input.html !== 'string' || !input.html.trim()) return null
     if (presentUtf8Bytes(input.html) > PRESENT_MAX_HTML_BYTES) return null
-    return { ...base, kind: 'html-artifact', html: input.html }
+    if (input.inline !== undefined && typeof input.inline !== 'boolean') return null
+    return { ...base, kind: 'html-artifact', html: input.html, ...(input.inline !== undefined ? { inline: input.inline } : {}) }
   }
 
   if (input.kind === 'component-ui') {
     if (base.documentFingerprint === undefined) return null
     if (!Array.isArray(input.chapters)) return null
     if (
-      input.chapters.length < PRESENT_COMPARE_MIN_CHAPTERS ||
+      input.chapters.length < 1 ||
       input.chapters.length > PRESENT_COMPARE_MAX_CHAPTERS
     ) {
       return null

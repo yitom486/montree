@@ -299,21 +299,22 @@ function buildArtifact(args: Record<string, unknown>, title: string): string {
   const result: MontreePresentResult = {
     schemaVersion: 1,
     kind: 'html-artifact',
-    id: presentResultId('html-artifact', `${bound.fingerprint ?? ''}${title}${cleaned}`),
+    id: presentResultId('html-artifact', `${bound.fingerprint ?? ''}${title}${cleaned}${args.inline === true ? '|inline' : ''}`),
     title,
     ...(summary !== undefined ? { summary } : {}),
     ...(bound.fingerprint !== undefined ? { documentFingerprint: bound.fingerprint } : {}),
     ...(bound.label !== undefined ? { documentLabel: bound.label } : {}),
     html: cleaned,
+    ...(args.inline === true ? { inline: true } : {}),
   }
   return finalizePresentResult(result)
 }
 
 function buildComponentUi(args: Record<string, unknown>, title: string): Promise<string> {
   const rawChapters = args.chapters
-  if (!Array.isArray(rawChapters)) fail('component-ui 需要 chapters 数组（2–6 章，先读后呈）')
-  if (rawChapters.length < PRESENT_COMPARE_MIN_CHAPTERS || rawChapters.length > PRESENT_COMPARE_MAX_CHAPTERS) {
-    fail(`chapters 须 ${PRESENT_COMPARE_MIN_CHAPTERS}–${PRESENT_COMPARE_MAX_CHAPTERS} 章，收到 ${rawChapters.length}`)
+  if (!Array.isArray(rawChapters)) fail('component-ui 需要 chapters 数组（1–6 章，先读后呈）')
+  if (rawChapters.length < 1 || rawChapters.length > PRESENT_COMPARE_MAX_CHAPTERS) {
+    fail(`chapters 须 1–${PRESENT_COMPARE_MAX_CHAPTERS} 章，收到 ${rawChapters.length}`)
   }
   const pinned = pinComparisonSource()
   return (async () => {
@@ -408,6 +409,10 @@ function optionalArtifactFingerprint(): { fingerprint?: string; label?: string }
  * 只做展示声明，不写文件、不改文档；非法输入抛中文 Error（主进程包成 isError）。
  */
 export async function buildPresentResult(args: Record<string, unknown>): Promise<string> {
+  if (args.kind === 'preset') {
+    const { expandPresentPreset } = await import('./present-presets')
+    return buildPresentResult(expandPresentPreset(args))
+  }
   const kind = args.kind
   const title = requiredTitle(args.title)
   if (kind === 'chapter-comparison') return buildComparison(args, title)
@@ -424,5 +429,5 @@ export async function buildPresentResult(args: Record<string, unknown>): Promise
     if (!compiled.ok) fail(`React 编译失败：${compiled.error.message}`)
     return finalizePresentResult(result)
   }
-  fail('kind 须为 chapter-comparison、html-artifact 或 component-ui')
+  fail('kind 须为 preset、chapter-comparison、html-artifact、component-ui 或 react-artifact')
 }

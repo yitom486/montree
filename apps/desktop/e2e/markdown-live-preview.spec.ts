@@ -12,7 +12,8 @@ const source = [
   '<img src=\'./assets/image.svg\' alt="HTML 本地图片" width="240" height="80">', '',
   '![Markdown 本地图片][pic]', '',
   '行内公式 $a+b$ 。', '', '$$', '\\frac{1}{2} + x^2', '$$', '',
-  '```python', '# 这不是目录标题', 'print("hello")', '```', '',
+  '    ```python', '    # 这不是目录标题', '    print("hello")', '    ```', '',
+  '- 列表代码示例', '', '  ```js', '  const indentedCode = 42', '  ```', '',
   '```mermaid', 'graph LR', 'A[输入] --> B[输出]', '```', '',
   '> 普通引用', '>', '> > 嵌套引用', '> > - 引用列表 `code`', '',
   '> [!NOTE]', '> **提示内容**', '', '> [!WARNING]', '> 公式 $x>0$', '',
@@ -22,6 +23,10 @@ const source = [
   '</details>', '', '折叠外部正文', '',
   '<div onclick="window.__liveXss=1"><script>window.__liveXss=2</script><img src="x" onerror="window.__liveXss=3"><a href="javascript:window.__liveXss=4">危险链接</a></div>', '',
   '## 文档结尾', '', '末尾正文', '', '[pic]: ./assets/image.svg',
+  '', '![图解静态版本](./assets/image.svg)', '', '<!-- montree-diagram',
+  JSON.stringify({ schemaVersion: 1, title: '文档交互流程', diagramType: 'er', nodes: [{ id: 'read', label: '读原文', details: '保留文档中的图解参数', fields: [{ name: 'id', type: 'UUID', key: 'PK' }] }, { id: 'note', label: '整理知识', fields: [{ name: 'id', type: 'UUID', key: 'PK' }, { name: 'book_id', type: 'UUID', key: 'FK' }] }], edges: [{ from: 'read', to: 'note', fromCardinality: '1', toCardinality: '0..*', fromField: 'id', toField: 'book_id' }] }), '-->', '',
+  '```montree-ui', JSON.stringify({ schemaVersion: 1, title: '文档本地选择', ui: { root: { component: 'Column', children: [{ component: 'Select', props: { id: 'focus', label: '关注方向', options: [{ value: 'idea', label: '关注观点' }, { value: 'evidence', label: '关注证据' }] } }, { component: 'Button', props: { label: '汇总文档选择', action: 'submit-selection' } }] } } }), '```', '',
+  '```montree-ui', JSON.stringify({ schemaVersion: 1, title: '拒绝脚本', source: 'window.__liveXss=5' }), '```', '',
 ].join('\n')
 
 test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题切换和安全清理', async ({}, testInfo) => {
@@ -112,6 +117,13 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await code.getByRole('button', { name: '复制代码' }).click()
     await expect.poll(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())).replace(/\r\n/g, '\n')).toBe('# 这不是目录标题\nprint("hello")\n')
     await page.screenshot({ path: testInfo.outputPath('live-preview-blocks.png') })
+    const listCode = editor.locator('[data-preview-kind="bullet_list_open"]').filter({ hasText: 'indentedCode' })
+    await reveal(listCode)
+    await expect(listCode.locator('ul .code-block code')).toContainText('const indentedCode = 42')
+    await listCode.getByRole('button', { name: '编辑源码', exact: true }).click()
+    await expect(content).toContainText('```js')
+    await editor.getByRole('button', { name: '完成编辑并预览' }).click()
+    await expect(listCode.locator('code')).toContainText('const indentedCode = 42')
     const scrollBeforeTheme = await editor.locator('.cm-scroller').evaluate((node) => node.scrollTop)
     await page.getByRole('button', { name: '切换主题', exact: true }).click()
     await page.getByRole('button', { name: '切换主题', exact: true }).click()
@@ -168,6 +180,23 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await unsafe.scrollIntoViewIfNeeded()
     await expect(unsafe.locator('script, [onclick], [onerror], a[href^="javascript:"]')).toHaveCount(0)
     expect(await page.evaluate(() => (window as unknown as { __liveXss?: number }).__liveXss)).toBeUndefined()
+    const documentDiagram = editor.getByTestId('html-artifact-card').filter({ hasText: '文档交互流程' })
+    await reveal(documentDiagram)
+    await expect(documentDiagram.frameLocator('iframe').getByRole('img', { name: '文档交互流程' })).toBeVisible()
+    await expect(documentDiagram.frameLocator('iframe').locator('.entity')).toHaveCount(2)
+    await expect(documentDiagram.frameLocator('iframe').locator('svg')).toContainText('book_id')
+    await documentDiagram.frameLocator('iframe').getByRole('button', { name: '读原文', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await expect(documentDiagram.frameLocator('iframe').getByRole('status', { name: '节点详情' })).toContainText('保留文档中的图解参数')
+    const documentUi = editor.getByTestId('markdown-component-ui')
+    await reveal(documentUi)
+    await documentUi.getByRole('radio', { name: '关注观点', exact: true }).click()
+    await documentUi.getByRole('button', { name: '汇总文档选择', exact: true }).click()
+    await expect(documentUi.getByRole('status')).toContainText('=idea')
+    const invalidComponent = editor.getByRole('alert').filter({ hasText: '组件包含未支持的属性' })
+    await reveal(invalidComponent)
+    await expect(invalidComponent).toContainText('可切回源码修正')
+    expect(await page.evaluate(() => (window as unknown as { __liveXss?: number }).__liveXss)).toBeUndefined()
 
     // Mode switching is a decoration-only operation; source and history survive it.
     await toggle.click()
@@ -188,6 +217,12 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
 
     // Source is reachable from reading preview too; new documents always start in live preview.
     await page.keyboard.press('Control+3')
+    const readingUi = page.locator('.markdown-preview').getByTestId('markdown-component-ui')
+    await readingUi.scrollIntoViewIfNeeded()
+    await readingUi.getByRole('radio', { name: '关注证据', exact: true }).click()
+    await readingUi.getByRole('button', { name: '汇总文档选择', exact: true }).click()
+    await expect(readingUi.getByRole('status')).toContainText('=evidence')
+    await expect(page.locator('.markdown-preview').getByTestId('html-artifact-card').filter({ hasText: '文档交互流程' }).locator('iframe')).toHaveCount(1)
     const readingDetails = page.locator('.markdown-preview details').first()
     await readingDetails.scrollIntoViewIfNeeded()
     await expect(readingDetails.locator('.code-block')).toBeHidden()

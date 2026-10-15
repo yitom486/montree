@@ -17,6 +17,36 @@ function state(doc = source, cursor = 0): EditorState {
   return EditorState.create({ doc, selection: { anchor: cursor }, extensions: [EditorState.allowMultipleSelections.of(true), markdown({ extensions: [GFM] }), livePreviewExtension()] })
 }
 describe('live preview block integration', () => {
+  it('图片与隐藏组件参数使用同一原文范围，所见即所得可切回源码', () => {
+    const text = '![静态图](./diagram.svg)\n\n<!-- montree-diagram\n{"schemaVersion":1}\n-->\n\n末尾'
+    const blocks = parsePreviewBlocks(state(text, text.length))
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].kind).toBe('montree_artifact')
+    expect(blocks[0].source).toBe(text.slice(0, text.indexOf('\n\n末尾')))
+  })
+  it.each([0, 1, 2, 3, 4, 8])('保留 %i 空格缩进的围栏代码块及原始编辑范围', (indent) => {
+    const pad = ' '.repeat(indent)
+    const code = `${pad}\`\`\`js\n${pad}const answer = 42\n${pad}\`\`\``
+    const text = `前文\n\n${code}\n\n末尾`
+    const blocks = parsePreviewBlocks(state(text, text.length))
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toMatchObject({ kind: 'fence', source: code, from: text.indexOf(code), to: text.indexOf(code) + code.length })
+  })
+  it.each([
+    ['bullet_list_open', '- 说明\n\n  ```js\n  const answer = 42\n  ```'],
+    ['ordered_list_open', '3. 说明\n\n   ```js\n   const answer = 42\n   ```'],
+    ['bullet_list_open', '- 外层\n  - 内层\n\n    ~~~js\n    const answer = 42\n    ~~~'],
+  ])('列表内的缩进围栏保留 %s 上下文预览', (kind, source) => {
+    const text = `${source}\n\n末尾`
+    const blocks = parsePreviewBlocks(state(text, text.length))
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toMatchObject({ kind, source: `${source}\n` })
+  })
+  it('普通列表继续行内编辑，未成对的四空格缩进保留缩进代码语义', () => {
+    expect(parsePreviewBlocks(state('- 普通列表\n- 第二项\n\n末尾', 0))).toHaveLength(0)
+    const code = '    ```js\n    const answer = 42'
+    expect(parsePreviewBlocks(state(`${code}\n\n末尾`, 0))[0]).toMatchObject({ kind: 'code_block', source: code })
+  })
   it('嵌套引用和社区提示块整体渲染，包含提示标记的完整原文可编辑', () => {
     const text = '# 文档\n\n> 普通引用\n>\n> > 嵌套引用\n> > - 列表 `code`\n\n> [!NOTE]\n> **提示内容**\n\n> [!WARNING]\n> 公式 $x>0$\n\n末尾'
     const current = state(text, text.length)

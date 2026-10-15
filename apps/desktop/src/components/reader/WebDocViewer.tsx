@@ -351,9 +351,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           {dockedAgentVisible ? <DockedAgentPane workspaceRoot={workspaceRoot} /> : null}
         </div>
 
-        {markTooltipPos && hoveredMark && !inspector.active ? (
-          <EpubMarkTooltip mark={hoveredMark} x={markTooltipPos.x} y={markTooltipPos.y} />
-        ) : null}
+        <EpubMarkTooltip key={pageUrl} disabled={Boolean(inspector.active)} mark={hoveredMark} x={markTooltipPos?.x ?? 0} y={markTooltipPos?.y ?? 0} />
 
         {inspector.pos && inspector.active ? (
           <ReadingMarkPopover
@@ -362,6 +360,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             x={inspector.pos.x}
             y={inspector.pos.y}
             onSelect={inspector.select}
+            onDismiss={inspector.close}
             onChangeColor={(color) => {
               void updateMark({ id: inspector.active!.id, color })
             }}

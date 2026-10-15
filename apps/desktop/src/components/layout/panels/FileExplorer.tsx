@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
 import {
   BookMarked,
@@ -21,9 +21,11 @@ import {
 import type { FileTreeNode } from '@montree/contracts'
 import { isWslPath } from '@montree/contracts'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { writeWorkspacePathsToDataTransfer } from '@/lib/agent/acp-composer'
 import { getParentDir, isAncestorOrSelf, isAncestorPath, isMarkdownPath } from '@/lib/workspace/file-tree-ops'
 import { cn } from '@/lib/utils'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
 import type { useFileTreeActions } from '@/hooks/workspace/useFileTreeActions'
 import { FileExplorerOverflowMenu } from '@/components/layout/panels/FileExplorerOverflowMenu'
 
@@ -130,26 +132,19 @@ function MenuItem({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
+    <DropdownMenuItem
       disabled={disabled}
-      className={cn(
-        'flex w-full items-center rounded-sm px-2 py-1.5 text-left text-xs outline-none',
-        disabled
-          ? 'cursor-not-allowed text-muted-foreground/50'
-          : danger
-            ? 'text-destructive hover:bg-destructive/10'
-            : 'hover:bg-accent hover:text-accent-foreground',
-      )}
-      onClick={onClick}
+      variant={danger ? 'destructive' : 'default'}
+      className="rounded-lg px-2.5 py-2 text-xs transition-colors motion-reduce:transition-none"
+      onSelect={onClick}
     >
       {label}
-    </button>
+    </DropdownMenuItem>
   )
 }
 
 function MenuSeparator() {
-  return <div className="my-1 h-px bg-border/70" />
+  return <DropdownMenuSeparator />
 }
 
 /**
@@ -227,7 +222,7 @@ const TreeNode = memo(function TreeNode({
   /** 新建目标父目录：其自身及祖先自动展开（仅展开不折叠） */
   revealPath?: string | null
   onSelectFile: (path: string) => void
-  onContextMenu: (event: ReactMouseEvent, node: FileTreeNode) => void
+  onContextMenu: (event: ReactMouseEvent | ReactKeyboardEvent, node: FileTreeNode) => void
   renamePath: string | null
   renameInitial: string
   createParentDir: string | null
@@ -237,6 +232,8 @@ const TreeNode = memo(function TreeNode({
   onInlineCancel: () => void
 }) {
   const [expanded, setExpanded] = useState(depth < 2)
+  const directoryReveal = useEditorUiStore((state) => state.directoryReveal)
+  const directoryRowRef = useRef<HTMLDivElement>(null)
   const isDirectory = node.type === 'directory'
   const isActive = node.path === activeFilePath
   const renaming = renamePath === node.path
@@ -246,10 +243,16 @@ const TreeNode = memo(function TreeNode({
   // 只展开不折叠，手动折叠不受已挂载 effect 干扰（deps 未变不重触发）。
   useEffect(() => {
     if (!isDirectory) return
-    if (isAncestorPath(node.path, activeFilePath) || isAncestorOrSelf(node.path, revealPath)) {
+    if (isAncestorPath(node.path, activeFilePath) || isAncestorOrSelf(node.path, revealPath) || isAncestorOrSelf(node.path, directoryReveal?.path)) {
       setExpanded(true)
     }
-  }, [isDirectory, node.path, activeFilePath, revealPath])
+  }, [isDirectory, node.path, activeFilePath, revealPath, directoryReveal])
+
+  useEffect(() => {
+    if (isDirectory && node.path === directoryReveal?.path) {
+      directoryRowRef.current?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [isDirectory, node.path, directoryReveal])
 
   const rowPadding = { paddingLeft: `${depth * 12 + (isDirectory ? 8 : 24)}px` }
 
@@ -257,13 +260,17 @@ const TreeNode = memo(function TreeNode({
     return (
       <div>
         <div
-          className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+          ref={directoryRowRef}
+          data-directory-path={node.path}
+          className={cn('flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground', node.path === directoryReveal?.path && 'bg-accent text-accent-foreground')}
           style={rowPadding}
           onContextMenu={(e) => onContextMenu(e, node)}
+          onKeyDown={(e) => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) onContextMenu(e, node) }}
         >
           <button
             type="button"
             className="inline-flex items-center gap-1 min-w-0 flex-1 text-left"
+            aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
           >
             {expanded ? (
@@ -352,6 +359,7 @@ const TreeNode = memo(function TreeNode({
       }}
       onKeyDown={(e) => {
         if (renaming) return
+        if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) { onContextMenu(e, node); return }
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onSelectFile(node.path)
@@ -411,7 +419,7 @@ export function FileExplorer({
   const [menu, setMenu] = useState<MenuState>(null)
   const [inlineEdit, setInlineEdit] = useState<InlineEdit>(null)
   const [pinnedReveal, setPinnedReveal] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuOriginRef = useRef<HTMLElement | null>(null)
   // latest-ref：保持传给 memo 子树的回调恒稳，App 重渲染不打破 memo
   const inlineEditRef = useRef(inlineEdit)
   const treeActionsRef = useRef(treeActions)
@@ -425,27 +433,12 @@ export function FileExplorer({
     onSelectFileRef.current = onSelectFile
   })
 
-  useEffect(() => {
-    if (!menu) return
-    const close = (event: MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return
-      setMenu(null)
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenu(null)
-    }
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menu])
-
-  const openMenu = useCallback((event: ReactMouseEvent, target: FileTreeNode | 'root') => {
+  const openMenu = useCallback((event: ReactMouseEvent | ReactKeyboardEvent, target: FileTreeNode | 'root') => {
     event.preventDefault()
     event.stopPropagation()
-    setMenu({ x: event.clientX, y: event.clientY, target })
+    const rect = event.currentTarget.getBoundingClientRect()
+    menuOriginRef.current = event.currentTarget as HTMLElement
+    setMenu({ x: 'clientX' in event ? event.clientX : rect.left + 12, y: 'clientY' in event ? event.clientY : rect.bottom, target })
   }, [])
 
   const handleSelectFile = useCallback((path: string) => {
@@ -680,6 +673,8 @@ export function FileExplorer({
             <div
               className="mb-2 truncate px-2 text-xs font-medium text-foreground/80"
               onContextMenu={(e) => openMenu(e, 'root')}
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openMenu(e, 'root') }}
             >
               {rootName}
             </div>
@@ -731,12 +726,11 @@ export function FileExplorer({
     )}
 
     {menu && treeActions && workspaceRoot ? (
-        <div
-          ref={menuRef}
-          className="fixed z-50 min-w-44 rounded-md border border-border/80 bg-popover p-1 text-popover-foreground shadow-md"
-          style={{ left: menu.x, top: menu.y }}
-          role="menu"
-        >
+        <DropdownMenu open modal={false} onOpenChange={(open) => { if (!open) setMenu(null) }}>
+        <DropdownMenuTrigger asChild><span aria-hidden="true" style={{ position: 'fixed', left: menu.x, top: menu.y, width: 1, height: 1, pointerEvents: 'none' }} /></DropdownMenuTrigger>
+        <DropdownMenuContent aria-label="文件操作" aria-labelledby={undefined} align="start" sideOffset={0} collisionPadding={8}
+          onCloseAutoFocus={(event) => { event.preventDefault(); if (!inlineEditRef.current && document.activeElement === document.body) menuOriginRef.current?.focus({ preventScroll: true }) }}
+          className="min-w-48 rounded-xl border-border/70 p-1.5 shadow-xl origin-[var(--radix-dropdown-menu-content-transform-origin)] data-[state=open]:animate-[surface-in_160ms_ease-out] motion-reduce:animate-none">
           {menuTarget === 'root' || !nodeTarget ? (
             <>
               <MenuItem
@@ -856,7 +850,8 @@ export function FileExplorer({
               ) : null}
             </>
           )}
-        </div>
+        </DropdownMenuContent>
+        </DropdownMenu>
       ) : null}
     </div>
   )

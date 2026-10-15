@@ -14,6 +14,7 @@ files:
   - apps/desktop/src/components/agent/LICENSE.beautiful-ui
   - apps/desktop/src/components/agent/LICENSE.beui
   - apps/desktop/resources/LICENSE.react-artifact.txt
+  - apps/desktop/resources/LICENSE.diagram-design.txt
   - node_modules/electron-updater/**/*
   - node_modules/builder-util-runtime/**/*
   - node_modules/fs-extra/**/*

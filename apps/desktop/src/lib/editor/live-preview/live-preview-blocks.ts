@@ -99,11 +99,13 @@ export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
     const blockTokens = tokens.slice(index, detailsEnd ?? blockEnd(tokens, index))
     const refs = footnoteRefs(blockTokens)
     let kind = token.type
+    // Nested fences need their list indentation and numbering when rendered independently.
+    const codeList = ['bullet_list_open', 'ordered_list_open'].includes(kind) && blockTokens.some((part) => ['fence', 'code_block'].includes(part.type))
     if (kind === 'paragraph_open') {
       const children = tokens[index + 1]?.children ?? []
       if (!refs.length && !children.some((child) => ['image', 'html_inline', 'math_inline', 'math_inline_double'].includes(child.type))) continue
       kind = 'rich-paragraph'
-    } else if (!refs.length && !['table_open', 'fence', 'code_block', 'html_block', 'math_block', 'blockquote_open', 'alert_open'].includes(kind)) continue
+    } else if (!refs.length && !codeList && !['table_open', 'fence', 'code_block', 'html_block', 'montree_artifact', 'math_block', 'blockquote_open', 'alert_open'].includes(kind)) continue
     let [start, end] = token.map
     // The plugin maps alert_open to its body; alert_title maps the marker line.
     if (kind === 'alert_open') start = tokens[index + 1]?.map?.[0] ?? start

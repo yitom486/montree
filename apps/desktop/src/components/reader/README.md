@@ -15,7 +15,7 @@
 | `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲 |
 | `FloatingTtsPlayer` | 自由拖拽微晶悬浮球与轻量展开控制面板（主体小球稳固锚定、紧凑卡片智能停靠侧翼展开收起、本章第0秒从头完整合成与自由拉动进度条、快退快进15秒与从头重播、无冗余文字干扰、纯净沉浸听书） |
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
-| `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层 |
+| `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层（共享 Morph 壳、边缘避让、键盘关闭） |
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
 | `SelectionToolbar` | 划选工具条（划重点、问 Agent、从此句朗读、批注、AI 制卡预设菜单等） |
 | `SelectionBubble` | 就地划选悬浮微晶气泡（解释/摘要/制卡/对比/追问五大动作、莫兰迪柔光高亮与复制） |
@@ -33,6 +33,7 @@
 | `PdfZoomControls` | PDF 顶栏一体化微晶缩放胶囊（步进缩小/放大、百分比下拉预设菜单与一键适合宽度，支持 Ctrl+滚轮与快捷键联动） |
 | `PdfToolbarMoreMenu` | PDF 工具栏“更多工具”下拉菜单 + 罗盘徽章判定（`resolvePdfIndexBadge`：未入库提示仅扫描版；缩放/适合宽度/单页识别/目录重识/识别印刷目录/清缓存/建索引/重新建索引/水印预览等低频操作收进菜单，工具栏只留导航/搜索/徽章；`resolveRosettaIndexMenuAction`：未入库建、已入库重建，两按钮互斥，导入中都不出现） |
 | `ProposeMarkChatBlock`（经 Agent 气泡内嵌） | 正式 Agent / 批注助手会话内批注提议 |
-| `EpubMarkTooltip` / `ReadingProgressRing` | EPUB 批注提示、进度环 |
+| `EpubMarkTooltip` / `ReadingProgressRing` | EPUB/PDF/网页批注和重点预览（延迟打开、鼠标移入保持、离开收起）、进度环 |
+| `EpubMarkTooltip.test.ts` | 悬停延迟、纯重点预览、移入保持与操作浮层互斥回归 |
 
 导航状态在 `reader-navigation-store`；纯逻辑在 `src/lib/reader/`（按域分子目录）与 `@montree/reader-core`（`packages/reader-core/src/`，导航/选区/标记/排版等 27 模块已迁入）。

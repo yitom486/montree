@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { bindAcpContext, currentAcpContext } from './acp-context'
+import { bindAcpContext, currentAcpContext, type AcpContext } from './acp-context'
 import {
   APP_TITLE,
   findBuiltinAcpRuntime,
@@ -232,20 +232,46 @@ async function openSessionAfterAuth(
     })
   } catch (error) {
     if (!options?.keepAliveOnFailure) {
-      await disconnectAcp()
+      await disconnectAcpNow()
     }
     return err(toProtocolError(error, '创建或恢复会话失败'))
   }
 }
 
-export async function connectAcp(payload: {
+type ConnectPayload = {
   runtimeId: string
   cwd?: string
   resumeSessionId?: string
   /** 渲染端激活线程是否有本地实质消息（空线程例外用，缺省按非空处理） */
   hasLocalHistory?: boolean
-}): Promise<Result<AcpConnectResult, AppError>> {
+}
+
+const connectionQueues = new WeakMap<AcpContext, Promise<unknown>>()
+const pendingConnections = new WeakMap<AcpContext, { key: string; promise: Promise<Result<AcpConnectResult, AppError>> }>()
+
+function enqueueConnection<T>(operation: () => Promise<T>): Promise<T> {
+  const context = currentAcpContext()
+  const next = (connectionQueues.get(context) ?? Promise.resolve()).catch(() => undefined).then(operation)
+  connectionQueues.set(context, next)
+  void next.finally(() => { if (connectionQueues.get(context) === next) connectionQueues.delete(context) }).catch(() => undefined)
+  return next
+}
+
+export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectResult, AppError>> {
+  const context = currentAcpContext()
+  const key = JSON.stringify([payload.runtimeId, payload.cwd, payload.resumeSessionId, payload.hasLocalHistory])
+  const pending = pendingConnections.get(context)
+  if (pending?.key === key) return pending.promise
+  const gen = ++acpState.connectGeneration
+  const promise = enqueueConnection(() => connectAcpAttempt(payload, gen))
+  pendingConnections.set(context, { key, promise })
+  void promise.finally(() => { if (pendingConnections.get(context)?.promise === promise) pendingConnections.delete(context) }).catch(() => undefined)
+  return promise
+}
+
+async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm = true): Promise<Result<AcpConnectResult, AppError>> {
   if (currentAcpContext().closed) return err({ code: 'ACP_NOT_CONNECTED', message: 'Agent 所属窗口已关闭' })
+  if (gen !== acpState.connectGeneration) return err({ code: 'ACP_PROTOCOL_ERROR', message: '连接已被更新的请求取代' })
   // spawn 模板一律取自 findBuiltinAcpRuntime（经 resolveRuntimeTemplate），
   // 禁写死 codex bunx；command/args 缺失即判错，不触达 spawn。
   let runtime = resolveRuntimeTemplate(payload.runtimeId)
@@ -253,7 +279,6 @@ export async function connectAcp(payload: {
     return err({ code: 'ACP_SPAWN_ERROR', message: `未知运行时: ${payload.runtimeId}` })
   }
 
-  const gen = ++acpState.connectGeneration
   // 新连接开始即 disarm：旧 load 的定居窗口到此结束，后续 updates 均为新连接的真实增量
   disarmSuppressSettle()
   console.info('[acp] connect start', {
@@ -264,15 +289,16 @@ export async function connectAcp(payload: {
 
   // 常驻复用：同 runtime 有存活温进程时跳过冷启动（省掉解压 + 导包）。
   // 温进程是否健康由后面的
-  // initialize 握手验证；若握手失败，catch 会杀掉毒进程，下次点击走冷启动自愈。
-  const warmHandle = getLiveAcpProcess(runtime.id, payload.cwd)
+  // 温进程握手失败时，同一次请求仅回落冷启动一次。
+  const warmHandle = allowWarm ? getLiveAcpProcess(runtime.id, payload.cwd) : undefined
+  let initialized = false
   logAcpDiagnostic('acp.connect.started', { runtime: runtime.id, environment: payload.cwd && isWslPath(payload.cwd) ? 'wsl' : 'native', reused: Boolean(warmHandle) })
   if (warmHandle) {
     // 剥离旧会话状态但保温进程：旧 SDK 连接只关闭，不断 stdio。
-    await disconnectAcp()
+    await disconnectAcpNow(undefined, { preserveStatus: true })
     acpState.processHandle = warmHandle
   } else {
-    await disconnectAcp(undefined, { killProcess: true })
+    await disconnectAcpNow(undefined, { killProcess: true, preserveStatus: true })
     // 给旧进程/stdio 一点时间收尾，降低连接竞态
     await new Promise((resolve) => setTimeout(resolve, 80))
   }
@@ -478,6 +504,7 @@ export async function connectAcp(payload: {
       },
     )
 
+    initialized = true
     const negotiated =
       typeof initResult.protocolVersion === 'number' ? initResult.protocolVersion : PROTOCOL_VERSION
     if (currentAcpContext().closed || gen !== acpState.connectGeneration) {
@@ -485,7 +512,7 @@ export async function connectAcp(payload: {
     }
     if (negotiated !== PROTOCOL_VERSION) {
       // 协议对不上：该进程服务不了我们，杀掉避免温复用毒进程
-      await disconnectAcp(`协议版本不兼容: Agent=${negotiated}`, { killProcess: true })
+      await disconnectAcpNow(`协议版本不兼容: Agent=${negotiated}`, { killProcess: true })
       return err({
         code: 'ACP_PROTOCOL_ERROR',
         message: `协议版本不兼容（需要 ${PROTOCOL_VERSION}，得到 ${negotiated}）`,
@@ -554,7 +581,7 @@ export async function connectAcp(payload: {
       // The auth gate collapses every session error to needs_auth; preserve non-auth failures.
       if (directSessionError && !isAuthenticationRequired(directSessionError.message)) {
         const failure = directSessionError
-        await disconnectAcp(undefined, { killProcess: true })
+        await disconnectAcpNow(undefined, { killProcess: true })
         setStatus('error', failure.message)
         return err(failure)
       }
@@ -581,6 +608,12 @@ export async function connectAcp(payload: {
     if (gen !== acpState.connectGeneration) {
       return err({ code: 'ACP_PROTOCOL_ERROR', message: '连接已被更新的请求取代' })
     }
+    if (warmHandle && !initialized && !currentAcpContext().closed) {
+      logAcpDiagnostic('acp.connect.cold-retry', { runtime: runtime.id, reason: 'warm-handshake-failed' })
+      await disconnectAcpNow(undefined, { killProcess: true, preserveStatus: true })
+      setStatus('connecting', '正在重新连接…')
+      return connectAcpAttempt(payload, gen, false)
+    }
     // 连接失败自诊断（去窗口化）：进程已死且连接失败时，一律把 stderr 尾部
     // 拼进失败错误供 UI 显示，替代裸 `ACP connection closed`。
     // dsh 自解析依赖慢退曾因旧 3s 窗口漏归因，故慢退/长会话失败同样带尾；
@@ -589,7 +622,7 @@ export async function connectAcp(payload: {
     const failedHandle = acpState.processHandle
     const earlyDetail = getAcpEarlyExitStderrDetail(failedHandle)
     // 未知异常：进程状态不可信，杀掉避免下次复用毒进程
-    await disconnectAcp(undefined, { killProcess: true })
+    await disconnectAcpNow(undefined, { killProcess: true })
     const protoError = toProtocolError(error, '连接 ACP Agent 失败')
     const messageWithTail = withAcpEarlyExitDetail(protoError.message, earlyDetail)
     const finalError = { ...protoError, message: messageWithTail }
@@ -624,9 +657,20 @@ export async function authenticateAcp(payload: {
   }
 }
 
-export async function disconnectAcp(
+export function disconnectAcp(
   reason?: string,
   opts?: { killProcess?: boolean },
+): Promise<Result<void, AppError>> {
+  // 立即取消在途连接；实际清理排在它之后，避免拆掉下一条新连接。
+  ++acpState.connectGeneration
+  pendingConnections.delete(currentAcpContext())
+  try { acpState.sdkConn?.close() } catch { /* 立即取消在途请求；完整清理仍按队列顺序执行 */ }
+  return enqueueConnection(() => disconnectAcpNow(reason, opts))
+}
+
+async function disconnectAcpNow(
+  reason?: string,
+  opts?: { killProcess?: boolean; preserveStatus?: boolean },
 ): Promise<Result<void, AppError>> {
   acpState.terminalManager.releaseAll()
 
@@ -674,6 +718,6 @@ export async function disconnectAcp(
   disarmSuppressSettle()
   acpState.cachedAgentName = undefined
   acpState.cachedAgentVersion = undefined
-  setStatus('disconnected', reason)
+  if (!opts?.preserveStatus) setStatus('disconnected', reason)
   return ok(undefined)
 }

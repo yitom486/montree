@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { Component } from 'react'
+import { ArtifactZoomSurface } from '../tools/ArtifactZoomSurface'
 import { ArrowRight, Send } from 'lucide-react'
 import { GenerativeUIRender } from '@assistant-ui/react'
 import { cn } from '@/lib/utils'
@@ -353,6 +354,7 @@ export function ComponentUiCard({ result, threadId, prompting, onSubmit, onLocat
         </div>
       </div>
       <div className="min-w-0 space-y-2 p-2">
+        <ArtifactZoomSurface title={result.title}>
         {submitError ? <p role="alert" className="text-xs text-destructive">{submitError}</p> : null}
         <ComponentUiErrorBoundary>
           <InteractionContext.Provider value={{ result, selections, disabled: Boolean(prompting) || submitting, canSubmit: Boolean(onSubmit), submit: () => { void handleSubmit() }, setSingle, toggleMulti, locate: onLocateChapter }}>
@@ -363,6 +365,7 @@ export function ComponentUiCard({ result, threadId, prompting, onSubmit, onLocat
           />
           </InteractionContext.Provider>
         </ComponentUiErrorBoundary>
+        </ArtifactZoomSurface>
       </div>
     </div>
   )

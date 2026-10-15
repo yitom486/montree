@@ -1,3 +1,4 @@
+// Layout reference: beui.dev/components/agents/prompt-input (MIT © 2026 Saurabh Chauhan), see LICENSE.beui.
 import { PromptInput, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputAttachmentBridge, PromptInputAttachments, PromptInputAttachment } from '@/components/ai-elements/prompt-input'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
@@ -25,6 +26,8 @@ import { cn } from '@/lib/utils'
 import { isOk } from '@montree/contracts'
 import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
 import { toast } from 'sonner'
+import { ArrowUp, Square } from 'lucide-react'
+import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
 
 export interface AgentComposerSubmitPayload {
   text: string
@@ -310,9 +313,11 @@ export function AgentComposer({
   const canSend = !disabled && !prompting && canSendComposer(draft, attachments)
 
   return (
+    <AgentContextMenu textareaRef={textareaRef} onDraftChange={onDraftChange}>
     <PromptInput onSubmit={() => submit()}
+      data-slot="agent-composer"
       className={cn(
-        'relative [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-background',
+        'relative min-w-0 [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-background [&_[data-slot=input-group]]:shadow-sm',
         dragOver && 'border-emerald-500/60 ring-2 ring-emerald-500/20',
       )}
       onDragEnter={(e) => {
@@ -367,13 +372,14 @@ export function AgentComposer({
         </PromptInputAttachments>
       <PromptInputTextarea
         ref={textareaRef}
-        className="min-h-[72px] w-full resize-none bg-transparent px-3 py-2.5 text-xs leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-50"
+        className="min-h-16 max-h-40 w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-[13px] leading-relaxed outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
+        aria-label="输入消息，Enter 发送，Shift+Enter 换行"
         placeholder={
           disabled
             ? '暂不可发送（等待连接或认证完成）'
             : workspaceRoot?.trim()
-              ? '输入消息，Enter 发送 · 未连接时将自动连接 · 可拖入文件或粘贴图片'
-              : '输入消息，Enter 发送 · 网页会话可直接提问当前页 · 附加本地文件需先打开文件夹'
+              ? '发送消息… 可拖入文件或粘贴图片'
+              : '发送消息… 可直接提问当前网页'
         }
         value={draft}
         disabled={disabled}
@@ -388,19 +394,20 @@ export function AgentComposer({
         }}
       />
 
-      <PromptInputFooter className="min-h-11 border-t border-border/40 px-1.5 py-1">
-        {toolbarStart}
+      <PromptInputFooter className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 px-2 py-2">
+        <div data-slot="agent-composer-controls" className="flex min-w-0 flex-wrap items-center gap-1">{toolbarStart}</div>
         <PromptInputSubmit
           type={prompting ? 'button' : 'submit'}
           status={prompting ? 'streaming' : 'ready'}
           aria-label={prompting ? '停止' : '发送'}
           title={prompting ? '停止' : '发送'}
-          className="size-11 shrink-0 rounded-full"
+          className="size-8 shrink-0 self-end rounded-lg bg-foreground text-background transition-colors hover:bg-foreground/85 disabled:opacity-30 motion-reduce:transition-none"
           disabled={!prompting && !canSend}
           onClick={prompting ? onCancel : undefined}
-        />
+        >{prompting ? <Square className="size-3.5" /> : <ArrowUp className="size-4" />}</PromptInputSubmit>
       </PromptInputFooter>
       </PromptInputAttachmentBridge>
     </PromptInput>
+    </AgentContextMenu>
   )
 }

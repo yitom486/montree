@@ -159,6 +159,7 @@ export function AgentChatItem({
         ref={rootRef}
         from={isUser ? 'user' : 'assistant'}
         data-acp-probe={probe ?? (isUser ? 'user' : 'agent')}
+        data-agent-message-id={messageId}
         className={cn(AGENT_CHAT_COL_CLASS, 'max-w-full animate-fade-slide-in', align === 'end' && 'items-end')}
       >
         {bare ? children : (

@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { isOk } from '@montree/contracts'
 import type { PresentHtmlArtifact } from '@montree/contracts'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { ArtifactZoomSurface } from './ArtifactZoomSurface'
 
 // 既有单测经此入口引用构建函数，保持路径不变。
 export { buildArtifactDocument }
@@ -107,6 +109,10 @@ export function HtmlArtifactCard({ result, className, sourceText }: HtmlArtifact
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewNonce, setPreviewNonce] = useState(0)
   const [showSource, setShowSource] = useState(false)
+  const theme = useEditorUiStore((state) => state.theme)
+  const inlineMountId = useMemo(() => newArtifactMountId(), [result.id, result.html])
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  useEffect(() => setInlineError(null), [result.id, result.html])
 
   const handleExport = async () => {
     const saved = await fileApi.exportHtml({
@@ -140,11 +146,24 @@ export function HtmlArtifactCard({ result, className, sourceText }: HtmlArtifact
           </p>
         </div>
       </div>
+      {result.inline ? (
+        <div className="min-w-0 p-2">
+          <ArtifactZoomSurface title={result.title}>
+          <ArtifactFrame key={inlineMountId} title={result.title} html={result.html} mountId={inlineMountId}
+            frameTestId="svg-diagram-frame" initialHeight={360} maxHeight={560} className="w-full min-w-0 rounded-lg border border-border/50"
+            colorScheme={theme}
+            onBridgeMessage={(message) => { if (message.kind === 'error') setInlineError(message.message) }} />
+          </ArtifactZoomSurface>
+          {inlineError ? <p role="alert" className="text-xs text-destructive">图表运行失败：{inlineError}</p> : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-1.5 p-2">
+        {!result.inline ? (
         <Button type="button" size="sm" variant="default" className="h-7 px-2.5 text-[11px]" onClick={() => { setPreviewNonce((n) => n + 1); setPreviewOpen(true) }}>
           <ExternalLink className="size-3.5" />
           打开预览
         </Button>
+        ) : null}
         <Button
           type="button"
           size="sm"
@@ -171,13 +190,13 @@ export function HtmlArtifactCard({ result, className, sourceText }: HtmlArtifact
           </pre>
         </div>
       ) : null}
-      <ArtifactPreviewDialog
+      {!result.inline ? <ArtifactPreviewDialog
         result={result}
         open={previewOpen}
         nonce={previewNonce}
         onOpenChange={setPreviewOpen}
         onExport={() => void handleExport()}
-      />
+      /> : null}
     </div>
   )
 }

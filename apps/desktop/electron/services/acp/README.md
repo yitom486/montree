@@ -2,13 +2,15 @@
 
 ACP Agent 主进程侧 wiring：拉起 `codex-acp`、连接生命周期、权限/回调路由、会话开启、fs/终端、窗口文档服务与 stdio MCP 接入。
 ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`；渲染端零直接引用（`tsconfig.web` include 已剔除 acp）。
+`montree_diagram_guide` 返回 `packages/contracts/src/agent/diagram-design.ts` 的按需图解规范；`montree_present(kind=preset,preset=diagram)` 沿用 present 快照链路生成参数化 SVG，不启动额外 Agent 或执行 skill 脚本。
+连接与断连按窗口串行，相同在途连接请求合并；断连立即取消在途 SDK 请求。温进程 initialize 失败时同一次连接仅冷启动回退一次，沿用原会话恢复参数，最终失败才报错。`acp-connection.test.ts` 覆盖自动回退、快速断连重连与重试上限。
 渲染端入口：`apps/desktop/src/api/acp-api.ts` + `AgentPanel`。设计备忘见本地 `.plan/`（若不在仓库中）。
 
 | 组 | 文件 | 功能 |
 |----|------|------|
 | 入口 | `acp-client.ts` 门面（仅 re-export，学 `apps/desktop/src/stores/acp-ui-store.ts` 先例）+ `acp-state.ts` / `acp-bridges.ts` / `acp-connection.ts` / `acp-session-ops.ts` + `process-manager.ts` / `sdk-client.ts` 留守；手搓传输已删，协议走官方 `@agentclientprotocol/sdk`（ACP v1 稳定入口） | 连接生命周期、子进程、SDK 长驻 `ClientConnection`（`client({name:"montree"}).connect()`，stdio 经 toWeb→`ndJsonStream` 桥接，垫层保温进程 fd；`connectSdkClient` 增可选 `runtimeId` 参，仅日志/隔离）；spawn 模板一律经 `findBuiltinAcpRuntime`（`resolveRuntimeTemplate` 防御性回落），禁写死 codex bunx；adapter 调用全防御（`probeAuth`/`getSpawnEnv`/`orderAuthMethods`/`canSkipInteractiveAuth`/`beforeSpawn`/`onColdStart`/`resolveSpawnCommand`/`resolveSpawnBlocker` 抛错回落中性；`resolveSpawnCommand` 回 `null` 时 spawn 前判停并返回带安装指引的 `ACP_SPAWN_ERROR`；`resolveSpawnBlocker` 回非空文案时同样 spawn 前判停，如 deepseek 缺 key；连接失败时拼 stderr 尾部（去窗口化，慢退同样带尾），替代裸 `connection closed`）；温进程按窗口与 `runtime.id` 分键，并核对 native/WSL 发行版环境后复用，禁止跨 Windows/WSL 串用；WSL 加载用户 SHELL 的登录环境（`listLiveAcpRuntimeIds` 可查），冷启动经通用 `onColdStart` 钩子；`acp-state.ts` 最底层（窗口上下文代理 `acpState` + `setStatus`/订阅/getter，禁 import 其他 `acp-*` 拆分模块），`acp-bridges.ts` 依赖 state，`acp-connection.ts` / `acp-session-ops.ts` 依赖 state+bridges（session-ops 另依赖 connection 的 `disconnectAcp`），无循环依赖 |
 | 隔离 | `acp-context.ts` / `acp-context.test.ts` | AsyncLocalStorage 绑定可信窗口身份；独立状态、SDK 回调、温进程及 MCP 端点；无窗口调用仅用于兼容与单测 |
-| cwd | `agent-sandbox-cwd.ts` | 无用户工作区时 ACP 沙箱 cwd（`userData/agent-sandbox/<窗口>`） |
+| cwd | `agent-sandbox-cwd.ts` | 仅接受现存绝对目录；无工作区、旧缓存相对路径或不可用目录回落 ACP 沙箱 cwd（`userData/agent-sandbox/<窗口>`），记录回落原因 |
 | 注册 | `@yitom/acp-client`（注册表） | 可用运行时（默认 `codex-acp`） |
 | 运行时 | `runtimes/`（`codex/` `claude/` `gemini/` `copilot/` `opencode/` `cursor/` `deepseek/` `agy/`；核心适配器矩阵已沉淀至 `@yitom/acp-client`，此处保留门面与兼容桥接） | 接线层仅消费 `GenericRuntimeAdapter`（`probeAuth`/`getSpawnEnv`/`orderAuthMethods`/`canSkipInteractiveAuth`/`resolveSpawnCommand`/`resolveSpawnBlocker` 可选），未知运行时回落中性空 adapter；Codex 自定义供应商/隔离、各家登录探测与 Cursor 安装路径解析、agy 经 bunx 直调（版本跟随 bunx，新鲜度不再逐次 `npm view`）及认证守门员（Antigravity 已淘汰，目录与桥接代码已删） |
 | 认证 | `codex-auth-preflight.ts` 留守（实现已归拢至 `runtimes/codex/`；类型单一源 `@montree/contracts`）；认证守门员已迁 `@yitom/acp-client`；接线层保留非认证会话失败的真实错误，禁止统一误报为需要登录 | 连接前探活、authMethods 顺序、`~/.codex` |
@@ -25,3 +27,5 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 标记提议模型 `mark-proposal`（单条·批量）与章级建议 `chapter-mark-plan` 已归 `@montree/annotations`（与渲染 `ChapterMarkPlanCard` / `ProposeMarkCard` 对接），不在本包。
 
 `mcp/document-tools.ts` 为宿主文档编辑扩展：`montree_table_read/edit`、`montree_ppt_read/edit/edit_text/delete/chart_edit/design_edit/animation_edit`、`montree_document_undo/save`，通过快照桥接操作当前内存模型；工具使用文档路径、revision、选区 ID 和匹配数量校验，不自行解析用户文件。`edit_text` 支持段落、片段与 UTF-16 字符范围及组合内部，替换前核对原文，保留范围外样式。高级查询先返回能力/影响范围/样式/效果 ID；图表与内嵌 XLSX 同步，设计工具核对共享影响页，动画工具核对旧列表，复杂内容保留并拒绝覆盖。`montree_present` 另含展示声明（`chapter-comparison` / `html-artifact` / `component-ui` 生成式 UI 树，后者经 `present-result-builder.buildComponentUi` 验章节归属与白名单后由渲染 `generative/ComponentUiCard` 经官方 `GenerativeUIRender` 呈现）。
+
+montree_markdown_guide 按需返回 Markdown 文档图解/本地交互组件格式及静态降级规则；模型须走当前正文 revision 与 text-edit 插入，不以聊天 present 代替写入。

@@ -9,6 +9,26 @@ import {
 } from '@/stores/acp-ui-store'
 
 describe('acp-ui-store history + plan', () => {
+  it.each(['content', 'structuredContent'])('接收 codex-acp rawOutput.result.%s 并生成交互卡数据', (field) => {
+    const store = useAcpUiStore.getState()
+    const payload = { schemaVersion: 1, kind: 'react-artifact', id: 'raw-result', title: '交互组件', source: 'export default ()=> <button>点击</button>' }
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'raw-tool', title: 'mcp.montree.montree_present', status: 'in_progress' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call_update', toolCallId: 'raw-tool', status: 'completed', content: [], rawOutput: { result: field === 'content' ? { content: [{ type: 'text', text: JSON.stringify(payload) }] } : { structuredContent: payload }, error: null } })
+    const state = useAcpUiStore.getState()
+    const tools = state.threads.find((t) => t.id === state.activeThreadId)!.messages.filter((m) => m.toolCallId === 'raw-tool')
+    expect(tools).toHaveLength(1)
+    expect(tools[0]!.presentResult).toEqual(payload)
+    expect(tools[0]!.streaming).toBe(false)
+  })
+
+  it('rawOutput 不绕过呈现协议校验，错误结果不生成组件', () => {
+    useAcpUiStore.getState().applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'bad-raw', title: 'montree_present', status: 'completed', rawOutput: { result: { structuredContent: { schemaVersion: 2, kind: 'react-artifact' } }, error: null } })
+    const state = useAcpUiStore.getState()
+    const tool = state.threads.find((t) => t.id === state.activeThreadId)!.messages.find((m) => m.toolCallId === 'bad-raw')!
+    expect(tool.presentResult).toBeUndefined()
+    expect(tool.toolContentText).toContain('schemaVersion')
+  })
+
   beforeEach(() => {
     const fresh = useAcpUiStore.getState().createThread()
     useAcpUiStore.setState({

@@ -35,6 +35,7 @@ export * from "./agent/content-audit";
 export * from "./agent/present-result";
 export * from "./agent/react-artifact-actions";
 export * from "./agent/component-ui";
+export * from "./agent/diagram-design";
 export * from "./constants/app";
 export * from "./constants/extensions";
 export * from "./constants/images";

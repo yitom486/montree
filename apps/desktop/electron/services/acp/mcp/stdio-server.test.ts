@@ -6,13 +6,19 @@ import { once } from 'node:events'
 import { createPackage } from '@electron/asar'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { afterAll, beforeAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { stripTypeScriptTypes } from 'node:module'
 import { getAcpContext, runInAcpContext, forgetAcpContext } from '../acp-context'
 import { startWindowMcpServer, stopWindowMcpServers } from './stdio-server'
 import { configureAcpDiagnostics } from './diagnostics'
 import type { MontreeMcpServerHandle } from './montree-mcp-server'
 import { windowMcpEntry } from './session-config'
+import { resolveAgentCwd } from '../agent-sandbox-cwd'
+
+vi.mock('electron', async () => {
+  const { tmpdir } = await import('node:os')
+  return { app: { getPath: () => tmpdir() } }
+})
 
 const children: ChildProcessWithoutNullStreams[] = []
 const scopes: ReturnType<typeof getAcpContext>[] = []
@@ -28,9 +34,9 @@ afterAll(() => {
   rmSync(join(runtimeDirectory, 'package.json'), { force: true })
   rmdirSync(runtimeDirectory)
 })
-function client(handle: MontreeMcpServerHandle, entry = runtimeEntry) {
+function client(handle: MontreeMcpServerHandle, entry = runtimeEntry, cwd?: string) {
   const electron = resolve('node_modules/electron', readFileSync('node_modules/electron/path.txt', 'utf8').trim().replace(/^/, 'dist/'))
-  const child = spawn(electron, [entry], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', MONTREE_MCP_PIPE: handle.url, MONTREE_MCP_TOKEN: handle.authToken }, stdio: 'pipe', windowsHide: true })
+  const child = spawn(electron, [entry], { cwd, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', MONTREE_MCP_PIPE: handle.url, MONTREE_MCP_TOKEN: handle.authToken }, stdio: 'pipe', windowsHide: true })
   children.push(child)
   const lines = createInterface({ input: child.stdout })
   const iterator = lines[Symbol.asyncIterator]()
@@ -56,6 +62,23 @@ afterEach(async () => {
 })
 
 describe('window MCP stdio', () => {
+  it.runIf(process.env.MONTREE_TEST_BUILT_MCP === '1')('真实构建入口在旧相对目录恢复后完成握手与工具调用', async () => {
+    const scope = getAcpContext(`stdio-built-${process.pid}`)
+    scopes.push(scope)
+    const cwd = runInAcpContext(scope, () => resolveAgentCwd('out/main'))
+    expect(cwd.source).toBe('sandbox')
+    try {
+      const handle = await runInAcpContext(scope, () => startWindowMcpServer({ readSnapshot: async () => 'built entry context' }))
+      const c = client(handle, resolve('out/main/mcp-stdio.js'), cwd.cwd)
+      expect((await c.request('initialize', { protocolVersion: '2025-03-26' })).result.capabilities.tools).toBeDefined()
+      expect((await c.request('tools/list')).result.tools.map((tool: { name: string }) => tool.name)).toContain('montree_present')
+      expect((await c.request('tools/call', { name: 'montree_read', arguments: { scope: 'viewport' } })).result.content[0].text).toBe('built entry context')
+      const exited = once(c.child, 'exit')
+      c.child.kill()
+      await exited
+    } finally { rmdirSync(cwd.cwd) }
+  }, 15000)
+
   it('WSL uses the mounted executable, forward-slash Windows script path and explicit environment propagation', () => {
     if (process.platform !== 'win32') return
     const entry = windowMcpEntry({ url: 'test-pipe', authToken: 'test-token', close: async () => undefined }, 'montree', '\\\\wsl.localhost\\Ubuntu\\home\\tomy')[0]!
@@ -90,7 +113,7 @@ describe('window MCP stdio', () => {
     }
   }, 15000)
 
-  it('built Electron Node entry discovers tools, reads the correct window, and reconnects to the same broker', async () => {
+  it('Electron Node source entry discovers tools, reads the correct window, and reconnects to the same broker', async () => {
     const a = getAcpContext('stdio-a'), b = getAcpContext('stdio-b')
     scopes.push(a, b)
     const ha = await runInAcpContext(a, () => startWindowMcpServer({ readSnapshot: async () => 'window A' }))

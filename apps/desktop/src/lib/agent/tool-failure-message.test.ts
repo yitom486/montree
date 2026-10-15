@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { explainToolFailure } from './tool-failure-message'
 
 describe('explainToolFailure', () => {
+  it('MCP 启动目录错误不误报为文档未加载', () => {
+    const r = explainToolFailure('MCP startup failed: 目录名称无效。 (os error 267)', 'mcp__montree__startup')
+    expect(r.headline).toBe('工具启动目录无效')
+    expect(r.body).toContain('重新连接')
+    expect(r.body).not.toMatch(/换.*说法|加载|稍等/)
+  })
+
+  it('MCP 启动超时优先于阅读内容超时', () => {
+    expect(explainToolFailure('MCP startup failed: timeout', 'mcp__montree__startup').headline).toBe('工具服务启动失败')
+  })
   it('章节参数缺失 → 业务说明', () => {
     const r = explainToolFailure(
       'montree_read(scope=chapter) 需要 flatIndex 或 title 之一',

@@ -36,6 +36,130 @@ afterEach(() => {
   })
 })
 
+describe('内置 present presets', () => {
+  const chapters = [{ key: 'c1', label: '第一章', flatIndex: 0 }]
+  it('单章引用导航验证原文、生成定位入口及稳定 id', async () => {
+    const dispose = setupBook()
+    try {
+      const args = { kind: 'preset', preset: 'citation-guide', title: '关键引用', chapters, citations: [{ label: '论点甲', chapterKey: 'c1', excerpt: '论点甲' }] }
+      const result = await buildPresentResult(args)
+      expect(result).toBe(await buildPresentResult(args))
+      const parsed = parsePresentResult(result)
+      expect(parsed?.kind).toBe('component-ui')
+      expect(result).toContain('Evidence')
+      await expect(buildPresentResult({ ...args, citations: [{ label: '伪引用', chapterKey: 'c1', excerpt: '不存在的原文' }] })).rejects.toThrow('原文')
+    } finally { dispose() }
+  })
+  it('阅读测验生成选择及真实提交动作，拒绝重复选项与混入任意 ui', async () => {
+    const dispose = setupBook()
+    try {
+      const args = { kind: 'preset', preset: 'reading-quiz', title: '理解检查', chapters, questions: [{ question: '第一章提出什么？', options: ['论点甲', '论点乙'] }] }
+      const json = await buildPresentResult(args)
+      expect(parsePresentResult(json)?.kind).toBe('component-ui')
+      expect(json).toContain('submit-selection')
+      expect(json).toContain('不会在本地自动判分')
+      await expect(buildPresentResult({ ...args, questions: [{ question: '问题', options: ['甲', '甲'] }] })).rejects.toThrow('重复')
+      await expect(buildPresentResult({ ...args, ui: { root: {} } })).rejects.toThrow('不接受 ui')
+    } finally { dispose() }
+  })
+  it('章节对比模板复用比较卡，仍要求至少两章', async () => {
+    const dispose = setupBook()
+    try {
+      const args = { kind: 'preset', preset: 'chapter-comparison', title: '比较', chapters, items: [] }
+      await expect(buildPresentResult(args)).rejects.toThrow('2')
+      const json = await buildPresentResult({ ...args, chapters: [...chapters, { key: 'c2', label: '第二章', flatIndex: 1 }] })
+      expect(parsePresentResult(json)?.kind).toBe('chapter-comparison')
+    } finally { dispose() }
+  })
+})
+
+describe('内置 SVG 参数模板', () => {
+  const nodes = [{ id: 'client', label: '读者', details: '</script><script>window.injected=1</script>' }, { id: 'server', label: '文档服务' }]
+  const er = { kind: 'preset', preset: 'diagram', diagramType: 'er', title: '书籍与批注', nodes: [
+    { id: 'book', label: '书籍', fields: [{ name: 'id', type: 'UUID', key: 'PK', details: '书籍主键' }, { name: 'name', type: 'TEXT' }] },
+    { id: 'note', label: '批注', fields: [{ name: 'id', type: 'UUID', key: 'PK' }, { name: 'book_id', type: 'UUID', key: 'FK' }] },
+  ], edges: [{ from: 'book', to: 'note', label: '拥有', fromCardinality: '1', toCardinality: '0..*', fromField: 'id', toField: 'book_id' }] }
+  it('ER 展示字段、键、关系基数与字段说明，同样输出可重放的离线信封', async () => {
+    const json = await buildPresentResult(er)
+    expect(await buildPresentResult(er)).toBe(json)
+    const result = parsePresentResult(json)
+    if (result?.kind !== 'html-artifact') throw new Error('缺少 ER 图信封')
+    expect(result.inline).toBe(true)
+    for (const text of ['entity-field', 'book_id', 'PK', 'FK', '0..*', '书籍主键']) expect(result.html).toContain(text)
+    expect(result.html).not.toMatch(/NaN|Infinity/)
+  })
+  it('ER 拒绝重复字段、非法键/基数、悬空字段引用与不支持的自关联', async () => {
+    await expect(buildPresentResult({ ...er, nodes: [{ ...er.nodes[0], fields: [] }, er.nodes[1]] })).rejects.toThrow('fields')
+    await expect(buildPresentResult({ ...er, nodes: [{ ...er.nodes[0], fields: [er.nodes[0].fields[0], er.nodes[0].fields[0]] }, er.nodes[1]] })).rejects.toThrow('字段名不得重复')
+    await expect(buildPresentResult({ ...er, nodes: [{ ...er.nodes[0], fields: [{ name: 'id', type: 'UUID', key: 'PRIMARY' }] }, er.nodes[1]] })).rejects.toThrow('field.key')
+    await expect(buildPresentResult({ ...er, edges: [{ ...er.edges[0], toCardinality: '*' }] })).rejects.toThrow('合法基数')
+    await expect(buildPresentResult({ ...er, edges: [{ ...er.edges[0], fromCardinality: 1 }] })).rejects.toThrow('合法基数')
+    await expect(buildPresentResult({ ...er, edges: [{ ...er.edges[0], toField: 'missing' }] })).rejects.toThrow('不存在的字段')
+    await expect(buildPresentResult({ ...er, edges: [{ ...er.edges[0], fromField: undefined }] })).rejects.toThrow('同时提供')
+    await expect(buildPresentResult({ ...er, edges: [{ ...er.edges[0], to: 'book' }] })).rejects.toThrow('自关联')
+    await expect(buildPresentResult({ ...er, edges: [er.edges[0], er.edges[0]] })).rejects.toThrow('一条关系')
+  })
+  it.each(['timeline', 'fishbone', 'cycle'])('%s 参数生成稳定的隔离 SVG 信封', async (diagramType) => {
+    const args = { kind: 'preset', preset: 'diagram', diagramType, title: '知识图解', nodes: [...nodes, { id: 'result', label: '学习成果' }], edges: diagramType === 'fishbone' ? [{ from: 'client', to: 'result' }, { from: 'server', to: 'result' }] : [{ from: 'client', to: 'server' }, { from: 'server', to: 'result' }, ...(diagramType === 'cycle' ? [{ from: 'result', to: 'client' }] : [])] }
+    const json = await buildPresentResult(args)
+    expect(json).toBe(await buildPresentResult(args))
+    const result = parsePresentResult(json)
+    if (result?.kind !== 'html-artifact') throw new Error('缺少图解信封')
+    expect(result.inline).toBe(true)
+    expect(result.html).toContain('<svg')
+    expect(result.html).not.toContain('</script><script>window.injected')
+    expect(result.html).not.toMatch(/NaN|Infinity/)
+    if (diagramType === 'timeline') expect(result.html).toContain('不代表实际时间间隔')
+  })
+  it('时间线拒绝跳跃，循环图拒绝未闭合或多个环，鱼骨图拒绝多归属及过深原因', async () => {
+    const graphNodes = [...nodes, { id: 'result', label: '结果' }, { id: 'extra', label: '额外原因' }]
+    const base = { kind: 'preset', preset: 'diagram', title: '非法结构', nodes: graphNodes }
+    await expect(buildPresentResult({ ...base, diagramType: 'timeline', edges: [{ from: 'client', to: 'result' }, { from: 'result', to: 'extra' }, { from: 'extra', to: 'server' }] })).rejects.toThrow('nodes 顺序')
+    await expect(buildPresentResult({ ...base, diagramType: 'cycle', edges: [{ from: 'client', to: 'server' }, { from: 'server', to: 'client' }, { from: 'result', to: 'extra' }, { from: 'extra', to: 'result' }] })).rejects.toThrow('nodes 顺序')
+    await expect(buildPresentResult({ ...base, diagramType: 'cycle', nodes, edges: [{ from: 'client', to: 'server' }] })).rejects.toThrow('3–8')
+    await expect(buildPresentResult({ ...base, diagramType: 'fishbone', edges: [{ from: 'client', to: 'result' }, { from: 'server', to: 'result' }, { from: 'extra', to: 'client' }, { from: 'extra', to: 'server' }] })).rejects.toThrow('一个结果')
+    await expect(buildPresentResult({ ...base, diagramType: 'fishbone', nodes: [...graphNodes, { id: 'deep', label: '过深' }], edges: [{ from: 'client', to: 'result' }, { from: 'server', to: 'result' }, { from: 'extra', to: 'client' }, { from: 'deep', to: 'extra' }] })).rejects.toThrow('最多两级')
+  })
+  it.each(['flowchart', 'sequence', 'architecture', 'mindmap'])('%s 生成可直接展示的离线 SVG，不需要文档或 JSX', async (diagramType) => {
+    const args = { kind: 'preset', preset: 'diagram', diagramType, title: '中文图解', nodes, edges: [{ from: 'client', to: 'server', label: '读取' }] }
+    const json = await buildPresentResult(args)
+    expect(json).toBe(await buildPresentResult(args))
+    const result = parsePresentResult(json)
+    expect(result?.kind).toBe('html-artifact')
+    if (result?.kind !== 'html-artifact') throw new Error('缺少 HTML 信封')
+    expect(result.inline).toBe(true)
+    expect(result.html).toContain('<svg')
+    expect(result.html).not.toContain('</script><script>window.injected')
+    expect(result.html).not.toMatch(/fonts.googleapis|https:\/\//)
+    expect(result.html).toContain('查看详情')
+  })
+  it('未知端点、无标签决策、超限与未支持分组整单拒绝', async () => {
+    const base = { kind: 'preset', preset: 'diagram', diagramType: 'flowchart', title: '测试', nodes, edges: [{ from: 'client', to: 'server', label: '读取' }] }
+    await expect(buildPresentResult({ ...base, edges: [{ from: 'missing', to: 'server' }] })).rejects.toThrow('不存在')
+    await expect(buildPresentResult({ ...base, nodes: [{ ...nodes[0], kind: 'decision' }, nodes[1]], edges: [{ from: 'client', to: 'server' }] })).rejects.toThrow('label')
+    await expect(buildPresentResult({ ...base, nodes: Array.from({ length: 13 }, (_, i) => ({ id: `n${i}`, label: '节点' })) })).rejects.toThrow('拆分')
+    await expect(buildPresentResult({ ...base, nodes: [{ ...nodes[0], group: '未知分组' }, nodes[1]] })).rejects.toThrow('未支持')
+  })
+  it('思维导图拒绝多父节点、循环、孤立节点及手动层级', async () => {
+    const base = { kind: 'preset', preset: 'diagram', diagramType: 'mindmap', title: '主题', nodes: [...nodes, { id: 'other', label: '分支' }], edges: [{ from: 'client', to: 'server' }, { from: 'client', to: 'other' }] }
+    expect(parsePresentResult(await buildPresentResult(base))?.kind).toBe('html-artifact')
+    await expect(buildPresentResult({ ...base, edges: [{ from: 'client', to: 'other' }, { from: 'server', to: 'other' }] })).rejects.toThrow('连通树')
+    await expect(buildPresentResult({ ...base, edges: [{ from: 'server', to: 'other' }, { from: 'other', to: 'server' }] })).rejects.toThrow('循环或孤立')
+    await expect(buildPresentResult({ ...base, edges: [{ from: 'client', to: 'server' }] })).rejects.toThrow('连通树')
+    await expect(buildPresentResult({ ...base, nodes: [{ ...nodes[0], layer: 0 }, nodes[1]] })).rejects.toThrow('layer/kind')
+  })
+  it('泳道图验证角色和阶段，拒绝重叠与未知泳道', async () => {
+    const base = { kind: 'preset', preset: 'diagram', diagramType: 'swimlane', title: '协作', lanes: [{ id: 'user', label: '用户' }, { id: 'app', label: '软件' }], nodes: [{ ...nodes[0], lane: 'user', layer: 0 }, { ...nodes[1], lane: 'app', layer: 1 }], edges: [{ from: 'client', to: 'server', label: '读取' }] }
+    const result = parsePresentResult(await buildPresentResult(base))
+    if (result?.kind !== 'html-artifact') throw new Error('缺少泳道图信封')
+    expect(result.html).toContain('aria-label="软件"')
+    await expect(buildPresentResult({ ...base, nodes: [base.nodes[0], { ...base.nodes[1], lane: 'unknown' }] })).rejects.toThrow('有效 lane')
+    await expect(buildPresentResult({ ...base, nodes: [base.nodes[0], { ...base.nodes[1], lane: 'user', layer: 0 }] })).rejects.toThrow('只能一个节点')
+    await expect(buildPresentResult({ ...base, lanes: [base.lanes[0], base.lanes[0]] })).rejects.toThrow('不得重复')
+    await expect(buildPresentResult({ ...base, nodes: [nodes[0], base.nodes[1]] })).rejects.toThrow('lane 与 layer')
+  })
+})
+
 describe('buildPresentResult chapter-comparison', () => {
   it('验证摘录并组装稳定信封', async () => {
     const dispose = setupBook()

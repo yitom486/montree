@@ -1,7 +1,7 @@
 import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import {
   type AcpChatMessage,
-  flattenToolContent,
+  toolUpdateContentText,
   isToolActiveStatus,
   parseToolDiffs,
   parseToolLocations,
@@ -266,8 +266,9 @@ export function applyToolCallUpdate(
 
   let contentText = prev?.toolContentText ?? prev?.text ?? ''
   let toolDiffs = prev?.toolDiffs
+  const receivedText = toolUpdateContentText(update)
+  if (receivedText !== undefined) contentText = receivedText
   if ('content' in update) {
-    contentText = flattenToolContent(update.content)
     toolDiffs = parseToolDiffs(update.content)
   }
 

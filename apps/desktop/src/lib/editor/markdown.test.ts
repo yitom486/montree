@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { markdownParser, renderMarkdown } from './markdown'
+import MarkdownIt from 'markdown-it'
 
 describe('markdownParser', () => {
+  it('文档组件围栏保存 JSON 数据，隐藏参数合并相邻静态图片并保留行映射', () => {
+    const spec = JSON.stringify({ schemaVersion: 1, title: '<script>不执行</script>', diagramType: 'flowchart', nodes: [{ id: 'a', label: '甲' }, { id: 'b', label: '乙' }], edges: [{ from: 'a', to: 'b' }] })
+    const html = markdownParser.render(['```montree-diagram', spec, '```'].join('\n'))
+    expect(html).toContain('data-montree-artifact="montree-diagram"')
+    expect(html).not.toContain('<script>')
+    const text = `![静态图](./diagram.svg)\n\n<!-- montree-diagram\n${spec}\n-->`
+    const token = markdownParser.parse(text, {})[0]
+    expect(token.type).toBe('montree_artifact')
+    expect(token.map).toEqual([0, 5])
+    expect(markdownParser.render(text)).toContain('<img src="./diagram.svg"')
+    const portable = new MarkdownIt({ html: true }).render(text)
+    expect(portable).toContain('<img src="./diagram.svg"')
+    expect(portable).not.toContain('data-montree-artifact')
+    expect(markdownParser.render(`正文不应丢失\n\n<!-- montree-diagram\n${spec}\n-->`)).toContain('<p>正文不应丢失</p>')
+  })
   it('渲染行内与块级 KaTeX 公式', () => {
     const inlineHtml = markdownParser.render('质能方程：$E = mc^2$')
     const blockHtml = markdownParser.render('$$\\frac{a}{b}$$')

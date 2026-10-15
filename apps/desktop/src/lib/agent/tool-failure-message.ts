@@ -18,6 +18,16 @@ interface Rule {
 
 const RULES: Rule[] = [
   {
+    test: (raw, title) => /mcp.*startup/i.test(title) && /os error 267|目录名称无效|invalid.*directory/i.test(raw),
+    headline: '工具启动目录无效',
+    body: 'Montree 工具未能启动：会话的工作目录无效。请重新连接助手；也可以重新打开有效的工作区后连接。',
+  },
+  {
+    test: (raw, title) => /mcp.*startup/i.test(title) || /MCP server.*failed to start|MCP startup failed/i.test(raw),
+    headline: '工具服务启动失败',
+    body: '助手已连接，但 Montree 工具服务未能启动。请重新连接助手；若仍失败，请检查工具启动日志。',
+  },
+  {
     test: (raw) => /快照桥未就绪|稍后重试/.test(raw),
     headline: '阅读上下文未就绪',
     body: '暂时还连不上当前阅读内容，请稍等片刻后再问，或重新打开一下文档。',

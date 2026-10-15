@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyThemeWithViewTransition } from './theme-transition'
+import { applyThemeWithViewTransition, registerThemeParticipant } from './theme-transition'
 
 describe('applyThemeWithViewTransition', () => {
   beforeEach(() => {
@@ -17,6 +17,33 @@ describe('applyThemeWithViewTransition', () => {
     expect(applyFn).toHaveBeenCalledTimes(1)
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.classList.contains('light')).toBe(false)
+  })
+  it('新画面等待隔离帧确认，缺失确认限时降级', async () => {
+    vi.useFakeTimers()
+    let callback: (() => void | Promise<void>) | undefined
+    document.startViewTransition = vi.fn().mockImplementation((cb) => {
+      callback = cb
+      return { finished: new Promise(() => {}) }
+    })
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false })
+    let confirm!: () => void
+    const participant = vi.fn(() => new Promise<void>((resolve) => { confirm = resolve }))
+    const unregister = registerThemeParticipant(participant)
+    try {
+      applyThemeWithViewTransition('sepia', vi.fn())
+      let settled = false
+      const update = Promise.resolve(callback!()).then(() => { settled = true })
+      await Promise.resolve()
+      expect(participant).toHaveBeenCalledWith('sepia')
+      expect(settled).toBe(false)
+      confirm()
+      await update
+      expect(settled).toBe(true)
+      applyThemeWithViewTransition('dark', vi.fn())
+      const timeoutUpdate = Promise.resolve(callback!())
+      await vi.advanceTimersByTimeAsync(160)
+      await timeoutUpdate
+    } finally { unregister(); vi.useRealTimers() }
   })
 
   it('开启 prefers-reduced-motion 时降级为即时切换', () => {

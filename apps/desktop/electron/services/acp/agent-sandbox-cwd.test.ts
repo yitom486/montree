@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolve } from 'node:path'
 
 vi.mock('electron', () => ({
   app: {
@@ -8,15 +9,29 @@ vi.mock('electron', () => ({
 
 vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
 }))
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, statSync } from 'node:fs'
 import { resolveAgentCwd, ensureAgentSandboxCwd } from './agent-sandbox-cwd'
 
 describe('resolveAgentCwd', () => {
+  beforeEach(() => { vi.mocked(statSync).mockReset(); vi.mocked(statSync).mockReturnValue({ isDirectory: () => true } as ReturnType<typeof statSync>) })
   it('优先使用用户工作区', () => {
-    const resolved = resolveAgentCwd('D:\\books')
-    expect(resolved).toEqual({ cwd: 'D:\\books', source: 'workspace' })
+    const cwd = resolve('books')
+    expect(resolveAgentCwd(cwd)).toEqual({ cwd, source: 'workspace' })
+  })
+
+  it('旧缓存的相对构建目录回落沙箱，不按子进程目录重复拼接', () => {
+    expect(resolveAgentCwd('out/main').source).toBe('sandbox')
+    expect(statSync).not.toHaveBeenCalled()
+  })
+
+  it('不存在或普通文件的绝对路径回落沙箱', () => {
+    vi.mocked(statSync).mockImplementationOnce(() => { throw new Error('ENOENT') })
+    expect(resolveAgentCwd(resolve('missing')).source).toBe('sandbox')
+    vi.mocked(statSync).mockReturnValueOnce({ isDirectory: () => false } as ReturnType<typeof statSync>)
+    expect(resolveAgentCwd(resolve('file.md')).source).toBe('sandbox')
   })
 
   it('空白时回落到沙箱并确保目录存在', () => {
