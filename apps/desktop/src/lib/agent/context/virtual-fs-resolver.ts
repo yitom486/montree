@@ -96,6 +96,7 @@ function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload 
 export const TOC_ENTRY_LIMIT = 600
 
 export interface MontreeTocEntry {
+  href?: string
   index: number
   level: number
   label: string
@@ -117,6 +118,7 @@ export interface MontreeFocusedSnapshot {
 }
 
 interface TocSourceUnit {
+  href?: string
   label: string
   level?: number
 }
@@ -129,6 +131,7 @@ export function buildTocEntries(
     index,
     level: unit.level ?? 0,
     label: unit.label,
+    ...(unit.href ? { href: unit.href } : {}),
   }))
   return { entries, truncated: units.length > limit }
 }

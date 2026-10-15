@@ -1,3 +1,4 @@
+import { webDocFixtureDir, welcomeWebDocUrlField } from './helpers/web-doc-fixture'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -618,5 +619,45 @@ test.describe('富结果生产链路 S2', () => {
       await rm(workspace, { recursive: true, force: true })
     }
   })
+  test('网页跨章节：统一 MCP 目录与后台读取→原文比较卡，不切换当前文章', async () => {
+    const url='https://e2e.montree.test/docs/agent-chapters'
+    const app=await launchBuiltApp({...MOCK_ENV,E2E_DOCUMENT_TOOLS:'1',E2E_WEB_DOC_FIXTURE_DIR:webDocFixtureDir()})
+    try {
+      const window=await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await welcomeWebDocUrlField(window).fill(url)
+      await welcomeWebDocUrlField(window).press('Enter')
+      const frame=window.frameLocator('.web-doc-viewer-host iframe')
+      await expect(frame.getByRole('heading',{name:'Chapter Overview'})).toBeVisible()
+      const panel=await openPanel(window)
+      const sid=await connect(window)
+      const endpoint=await app.evaluate(async()=>(globalThis as any).__montreeE2eMcpEndpoint()) as McpEndpoint
+      let toc:any
+      await expect.poll(async()=>{
+        const response=await mcpCall(window,endpoint,'montree_read',{scope:'toc'})
+        if(response.result?.isError) return false
+        toc=JSON.parse(response.result.content[0].text)
+        return toc.entries?.some((e:any)=>e.href==='https://e2e.montree.test/docs/installation')
+      }).toBe(true)
+      const first=toc.entries.find((e:any)=>e.href===url)
+      const second=toc.entries.find((e:any)=>e.href==='https://e2e.montree.test/docs/installation')
+      expect(first).toBeTruthy()
+      const read=await mcpCall(window,endpoint,'montree_read',{scope:'chapter',flatIndex:second.index})
+      expect(read.result.isError,JSON.stringify(read)).toBeFalsy()
+      expect(read.result.content[0].text).toContain('Montree E2E fixture second page content.')
+      const comparison=await mcpCall(window,endpoint,'montree_present',{kind:'chapter-comparison',title:'Web chapter comparison',chapters:[
+        {key:'overview',label:first.label,flatIndex:first.index},{key:'install',label:second.label,flatIndex:second.index}],items:[
+        {dimension:'Evidence',chapterKey:'overview',excerpt:'Original overview evidence for chapter comparison.'},
+        {dimension:'Evidence',chapterKey:'install',excerpt:'Montree E2E fixture second page content.'}]})
+      expect(comparison.result.isError,JSON.stringify(comparison)).toBeFalsy()
+      const result=JSON.parse(comparison.result.content[0].text)
+      expect(result.items.filter((item:any)=>item.verified)).toHaveLength(2)
+      await prompt(window,sid,'present-echo:'+JSON.stringify(result))
+      await expect(panel.getByTestId('chapter-comparison-card')).toBeVisible()
+      await expect(frame.getByRole('heading',{name:'Chapter Overview'})).toBeVisible()
+      await expect(window.locator('#main input[placeholder="https://"]')).toHaveValue(url)
+    } finally {await app.close()}
+  })
+
 })
 

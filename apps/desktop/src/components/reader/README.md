@@ -37,3 +37,5 @@
 | `EpubMarkTooltip.test.ts` | 悬停延迟、纯重点预览、移入保持与操作浮层互斥回归 |
 
 导航状态在 `reader-navigation-store`；纯逻辑在 `src/lib/reader/`（按域分子目录）与 `@montree/reader-core`（`packages/reader-core/src/`，导航/选区/标记/排版等 27 模块已迁入）。
+
+WebDoc 的 Agent provider 以 documentId 注册（与目录/批注一致），提供 getUnits/getCurrentUnitIndex；跨文章读取复用 web-doc-agent-content，不导航当前阅读页，不吞取文错误。

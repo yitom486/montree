@@ -60,7 +60,7 @@ interface PinnedSource {
   provider: ReaderContentProvider
   filePath: string
   label: string
-  units: Array<{ label: string; level?: number }>
+  units: Array<{ label: string; level?: number; href?: string }>
   labels: string[]
 }
 
@@ -70,7 +70,7 @@ interface PinnedSource {
  */
 function readDirectorySnapshot(
   provider: ReaderContentProvider,
-): { units: Array<{ label: string; level?: number }>; labels: string[] } | null {
+): { units: Array<{ label: string; level?: number; href?: string }>; labels: string[] } | null {
   const fromProvider = provider.getUnits?.()
   if (fromProvider) {
     return { units: fromProvider, labels: fromProvider.map((u) => u.label) }
@@ -82,8 +82,8 @@ function readDirectorySnapshot(
   return null
 }
 
-function sameLabels(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((label, i) => label === b[i])
+function sameDirectory(a: PinnedSource['units'], b: PinnedSource['units']): boolean {
+  return a.length === b.length && a.every((unit, i) => unit.label === b[i]?.label && unit.level === b[i]?.level && unit.href === b[i]?.href)
 }
 
 /**
@@ -105,7 +105,7 @@ function pinComparisonSource(): PinnedSource {
     provider,
     filePath: clean,
     label: clean.replace(/\\/g, '/').split('/').pop() || clean,
-    units: snapshot.units.map((u) => ({ label: u.label, ...(u.level !== undefined ? { level: u.level } : {}) })),
+    units: snapshot.units.map((u) => ({ label: u.label, ...(u.level !== undefined ? { level: u.level } : {}), ...(u.href ? { href: u.href } : {}) })),
     labels: snapshot.labels,
   }
 }
@@ -123,7 +123,7 @@ function assertSameSource(pinned: PinnedSource, stage: string): void {
   if (!latest || latest.units.length === 0) {
     fail(`文档目录在${stage}尚未就绪（来源：${pinned.label}），已拒绝生成旧快照的比较结果，请稍后重试`)
   }
-  if (!sameLabels(latest.labels, pinned.labels)) {
+  if (!sameDirectory(latest.units, pinned.units)) {
     fail(`文档目录在${stage}发生了变化（来源：${pinned.label}），已拒绝生成混合来源的比较结果，请重新调用`)
   }
 }

@@ -17,12 +17,14 @@ export interface ReaderUnitText {
   /** 人类可读定位：章节标题或「第 N 页」 */
   label: string
   text: string
+  /** Original chapter link, when available. */
+  href?: string
 }
 
 export interface ReaderContentProvider {
   /** Optional document navigation; text documents use their editor/preview unit bridge. */
   navigateToFlatIndex?: (flatIndex: number, excerpt?: string) => Promise<boolean>
-  getUnits?: () => Array<{ label: string; level?: number }>
+  getUnits?: () => Array<{ label: string; level?: number; href?: string }>
   getCurrentUnitIndex?: () => number
   /** 图片地址只是引用；像素由截图工具按需读取。 */
   getImages?: (scope: 'current' | 'viewport') => ReaderImageReference[] | Promise<ReaderImageReference[]>

@@ -25,3 +25,5 @@ PPT 的 `montree_ppt_edit_text` 使用读取结果中的段落/片段编号及 U
 `present-presets.ts` 提供 `kind=preset` 的固定模板：`chapter-comparison` 复用比较卡（2–6 章），`citation-guide` 和 `reading-quiz` 组装既有白名单组件（1–6 章）。引用逐条验证原文并定位；测验选择通过原会话提交给助手点评，无本地自动判分。工具仍只有 `montree_present`，模型填数据即可，无需生成 JSX 或 UI 树。
 
 `present-diagram.ts` 把 `preset=diagram` 的节点/连线参数生成流程图、时序图、架构图、思维导图、泳道图、时间线、鱼骨图、循环图或 ER 图 HTML+SVG，经 `HtmlArtifactCard` 的内联隔离帧展示；支持缩放、紧凑节点详情、键盘与宿主主题同步（浅色/深色/纸色）；隔离帧绘制后确认，参与页面统一 View Transition，等待上限 160ms，不重建 iframe。思维导图只接收连通树；泳道图要求角色泳道与阶段，同一泳道同一阶段不能重叠节点。时间线按输入事件顺序等距排列并可加 when；鱼骨图限制一个结果、2–4 类原因及每类最多两个子原因；循环图限制 3–8 个节点并按输入顺序闭合。ER 实体有 1–8 个字段与 PK/FK/UK 标记，关系两端显式基数，可引用已有字段；首版不支持自关联或同对实体多关系。`montree_diagram_guide` 按需提供适配规范（`packages/contracts/src/agent/diagram-design.ts`），不在用户 Agent 环境安装 skill。参考 cathrynlavery/diagram-design 的图表设计规范，模板为 Montree 独立实现，不含完整上游 skill/脚本/全部图型；许可见 `apps/desktop/resources/LICENSE.diagram-design.txt`。
+
+网页目录与本地章节共用 `montree_read(scope=toc/chapter)`：provider 使用文档 ID 并显式提供目录，toc/章节结果保留 href；网页跨页在后台读取，章节失败携带 URL/原因。比较卡固定目录快照同时检查标题、层级和 href，防止同标题换链接后混用原文。

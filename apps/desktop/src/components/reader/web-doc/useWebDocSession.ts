@@ -532,7 +532,7 @@ export function useWebDocSession({
 
       const text = extractDocumentText(iframe.contentDocument)
       if (text.trim()) {
-        primeWebDocAgentTextCache(pageUrl, text)
+        primeWebDocAgentTextCache(pageUrl, text, iframe.contentDocument?.body.innerHTML)
       }
     }
 
@@ -564,25 +564,26 @@ export function useWebDocSession({
   // Agent content registry
   useEffect(() => {
     return registerReaderContent({
-      filePath: pageUrl,
+      filePath: documentId,
+      getUnits: () => unitsRef.current,
+      getCurrentUnitIndex: () => {
+        const reader = useReaderNavigationStore.getState()
+        return reader.filePath === documentId && reader.ready ? reader.nav.flatIndex : -1
+      },
       getImages: (scope) => collectDomImages(iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : [], scope, pageUrl),
       getImageCount: () => collectDomImages(iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : [], 'current', pageUrl).length,
       getCurrentText: () => extractDocumentText(iframeRef.current?.contentDocument),
       getViewportText: () => extractViewportText(iframeRef.current?.contentDocument),
       getUnitByIndex: async (flatIndex) => {
         if (unitsRef.current.length === 0) return null
-        try {
-          return await readWebDocUnitByIndex(unitsRef.current, flatIndex)
-        } catch {
-          return null
-        }
+        return readWebDocUnitByIndex(unitsRef.current, flatIndex)
       },
       iterateUnits: async function* () {
         if (unitsRef.current.length === 0) return
         yield* iterateWebDocUnits(unitsRef.current)
       },
     })
-  }, [iframeRef, pageUrl, unitsRef])
+  }, [documentId, iframeRef, pageUrl, unitsRef])
 
   // Agent marks registry
   useEffect(() => {

@@ -18,6 +18,7 @@ export interface ReadChapterArgs {
 }
 
 export interface ReadChapterResult {
+  href?: string
   index: number
   label: string
   text: string
@@ -86,10 +87,10 @@ export async function readChapterByRef(args: ReadChapterArgs): Promise<ReadChapt
   }
 
   if (!unit?.text.trim()) {
-    const unitHref = (units[index] as { href?: string } | undefined)?.href
+    const unitHref = units[index]?.href
     if (unitHref && /^https?:\/\//i.test(unitHref)) {
       throw new Error(
-        `未能读取「${label}」（index=${index}）的正文：该章节为未在阅读器中加载的在线网页（${unitHref}）。建议直接使用 Web Fetch 或 Web Search 访问该链接。`,
+        `未能读取「${label}」（index=${index}）的正文：目标网页为 ${unitHref}；请检查页面是否可访问或需要登录，不要将本错误当作章节正文。`,
       )
     }
     throw new Error(`未能读取「${label}」（index=${index}）的正文`)
@@ -98,6 +99,7 @@ export async function readChapterByRef(args: ReadChapterArgs): Promise<ReadChapt
   return {
     index,
     label: unit.label || label,
+    ...((unit.href ?? units[index]?.href) ? { href: unit.href ?? units[index]?.href } : {}),
     text: normalizeReaderText(unit.text, {
       maxChars: args.maxChars ?? READER_TEXT_MAX_CHARS,
       offset: args.offset,

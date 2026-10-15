@@ -4,5 +4,6 @@
   "https://e2e.montree.test/docs/start": "start.html",
   "https://e2e.montree.test/docs/card": "installation.html",
   "https://e2e.montree.test/docs/installation": "installation.html",
-  "https://e2e.montree.test/docs/xss": "xss.html"
+  "https://e2e.montree.test/docs/xss": "xss.html",
+  "https://e2e.montree.test/docs/agent-chapters": "agent-chapters.html"
 }
