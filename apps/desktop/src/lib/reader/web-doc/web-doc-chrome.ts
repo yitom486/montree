@@ -220,6 +220,7 @@ export function normalizeWebDocCards(root: HTMLElement): void {
       if (arrow.querySelector('svg')) arrow.classList.add('web-doc-card-arrow')
     }
   })
+  stripHiddenCardHoverChrome(root)
 }
 
 /** MkDocs Material / 常见 docs：「编辑此页」等站点控件，非正文插图 */
@@ -468,6 +469,252 @@ export function normalizeWebDocStandaloneFigures(root: HTMLElement): void {
   }
 }
 /**
+ * 卡片网格归一化（通用模式，非站点专用）：现代文档站（Mintlify Card、
+ * Docusaurus 特性块）常用“网格容器 + 标题+正文子块”表达卡片，原站靠
+ * Tailwind 网格/边框类成形。阅读模式没有这些类，卡片会塌成纵向裸文本。
+ * 这里按形状识别（标题 + 实质正文），与 figure-row 同族：
+ * - 容器（div/section/main，非 figure 内）：≥2 个卡形子块，且容器有网格语义
+ *   类（grid/grid-cols-N/flex-row/row/card-group/cards/features）或子块个个
+ *   自带强信号（链接卡/`.card` 类），则容器挂 `.web-doc-card-grid`、
+ *   子块挂 `.web-doc-card`；
+ * - 落单的强信号卡（链接卡/`.card` 类，标题+正文）直接挂 `.web-doc-card`；
+ * - 纯结构单个 div 从不单独成卡（避免把章节节、术语表刷成卡片）；
+ * - 导航/目录（无标题子块）天然排除；figure 内的不动。
+ * 交互诚实性：JS 路由的整卡点击无法静态恢复（目标地址只存在于 JS 里），
+ * 只恢复布局与卡面；卡内原有链接照常可点；死掉的 role=link/tabindex 摘除，
+ * 不给无障碍留谎言。
+ */
+const CARD_GRID_CONTAINER_TAGS = new Set(['DIV', 'SECTION', 'MAIN'])
+const CARD_GRID_SIGNALS =
+  /(?:^|\s)(?:[a-z0-9_-]+:)?(?:card-group|cards|card-grid|features|row|grid|grid-cols-[2-9]|flex-row)(?:$|\s)/i
+const CARD_LIKE_MIN_TEXT = 40
+// 强信号卡（div.card/链接卡）本身已链死是卡片，标题加一句话即足；
+// 纯结构 div 才需要 40 字符的形状证据。Cursor/Kilo/Poolside 三张短卡（37~38 字符）
+// 曾因此整体漏标，裸 div 直接裸奔（无边框、无点击、图文全散）。
+const CARD_LIKE_STRONG_MIN_TEXT = 20
+
+function cardShapedChild(el: Element): boolean {
+  if (el.tagName !== 'A' && el.tagName !== 'DIV') return false
+  if (el.closest('figure')) return false
+  if (!el.querySelector('h1, h2, h3, h4, h5, h6')) return false
+  const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+  if (text.length >= CARD_LIKE_MIN_TEXT) return true
+  return cardStrongSignal(el) && text.length >= CARD_LIKE_STRONG_MIN_TEXT
+}
+
+function cardStrongSignal(el: Element): boolean {
+  if (el.classList.contains('card')) return true
+  return el.tagName === 'A' && (el.getAttribute('href') ?? '').trim() !== ''
+}
+
+function stripDeadCardInteraction(card: Element): void {
+  // 无 href 却 role=link 的卡是 JS 路由残留：摘掉，避免聚焦陷阱与读屏谎言；
+  // tabindex=0 同理（原生可聚焦元素不需要它，-1 程序化锚点保留）。
+  if (card.getAttribute('role') === 'link') card.removeAttribute('role')
+  if (card.getAttribute('tabindex') === '0') card.removeAttribute('tabindex')
+}
+
+/**
+ * 摘除卡内永久隐藏的悬停箭头：Mintlify 卡的右上箭头带 `hidden` 类，
+ * 原站永不显示（hover 只改颜色不动显隐）；阅读模式没有 Tailwind，
+ * `hidden`/`absolute` 全失效，箭头会以裸块挤进卡面甚至飞出卡外。
+ * 只动无文本纯 svg 的绝对定位隐藏块，可见箭头（变体 A 的链接箭头）不动。
+ */
+function stripHiddenCardHoverChrome(root: HTMLElement): void {
+  for (const card of Array.from(root.querySelectorAll('.web-doc-card'))) {
+    for (const dead of Array.from(card.querySelectorAll('div.absolute.hidden, div.absolute[hidden]'))) {
+      if ((dead.textContent ?? '').trim()) continue
+      if (!dead.querySelector('svg')) continue
+      dead.remove()
+    }
+  }
+}
+
+export function normalizeWebDocCardGrids(root: HTMLElement): void {
+  // 先成组：容器挂网格，成员挂卡
+  for (const container of Array.from(root.querySelectorAll('div, section, main'))) {
+    if (container.closest('figure')) continue
+    const kids = Array.from(container.children).filter(
+      (child): child is HTMLElement => child.tagName !== 'STYLE' && child.tagName !== 'SCRIPT',
+    )
+    if (kids.length < 2) continue
+    const shaped = kids.filter(cardShapedChild)
+    if (shaped.length < 2) continue
+    const containerSignal = CARD_GRID_SIGNALS.test(String(container.className ?? ''))
+    const allStrong = shaped.every(cardStrongSignal)
+    if (!containerSignal && !allStrong) continue
+    container.classList.add('web-doc-card-grid')
+    for (const item of shaped) {
+      item.classList.add('web-doc-card')
+      stripDeadCardInteraction(item)
+    }
+  }
+  // 再落单：仅强信号（链接卡/`.card` 类）成卡，纯结构单个不动
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>('a[href], div.card'))) {
+    if (el.closest('figure') || el.closest('.web-doc-card-grid') || el.classList.contains('web-doc-card')) continue
+    if (!cardShapedChild(el)) continue
+    el.classList.add('web-doc-card')
+    stripDeadCardInteraction(el)
+  }
+  stripHiddenCardHoverChrome(root)
+}
+/**
+ * Next.js flight 整卡跳转回填（Mintlify Card 变体 B，非站点专用写法、通用解析）。
+ * DOM 层面卡片根是裸 div：HTML 禁止 a 嵌套 a，而卡内往往已有独立链接
+ * （如 GitHub 图标），外层不敢渲染成 a，只能 div 加 JS 跳转，所以静态 DOM
+ * 里天然没有 href。但同一份 HTML 的 self.__next_f 载荷里躺着 Card 的
+ * title 与 href 属性，是同一信息换了个频道。消毒会扔掉 script，所以必须
+ * 在原始 HTML 字符串上先提取出映射，再按标题回填。
+ * 诚实性规则：只回填标题全局唯一的映射（重名直接放弃，拒绝猜测）；
+ * DOM 变体 A（包住整卡的 a）已有的 source-href 优先，flight 不覆盖；
+ * 非 http(s) 与站内相对路径之外的目标拒绝，回填后复用既有
+ * neutralize 提升管线做最终校验与点击委托，不新增机制。
+ */
+const FLIGHT_CARD_SCAN_LIMIT = 3000
+
+function unescapeFlightTemplateLiteral(raw: string): string {
+  return raw.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g, (m, seq: string) => {
+    switch (seq) {
+      case 'n': return '\n'
+      case 'r': return '\r'
+      case 't': return '\t'
+      case 'b': return '\b'
+      case 'f': return '\f'
+      case 'v': return '\v'
+      case '0': return '\0'
+      case '`':
+      case '$':
+      case '\\':
+        return seq
+      default: {
+        const hex = seq[0] === 'u' && seq[1] === '{' ? seq.slice(2, -1) : seq.slice(1)
+        const code = Number.parseInt(hex, 16)
+        return Number.isFinite(code) ? String.fromCodePoint(code) : m
+      }
+    }
+  })
+}
+
+function skipFlightString(html: string, start: number, end: number): number {
+  const quote = html[start]
+  let i = start + 1
+  while (i < end) {
+    if (html[i] === '\\') {
+      i += 2
+      continue
+    }
+    if (html[i] === quote) return i + 1
+    i += 1
+  }
+  return end
+}
+
+function readFlightBraceProps(html: string, braceIndex: number, limit: number): Map<string, string> | null {
+  const props = new Map<string, string>()
+  const end = Math.min(html.length, braceIndex + limit)
+  let i = braceIndex
+  let depth = 0
+  while (i < end) {
+    const ch = html[i]
+    if (depth === 0) {
+      if (ch !== '{') return null
+      depth = 1
+      i += 1
+      continue
+    }
+    if (ch === '{' || ch === '(' || ch === '[') {
+      depth += 1
+      i += 1
+      continue
+    }
+    if (ch === '}' || ch === ')' || ch === ']') {
+      depth -= 1
+      i += 1
+      if (depth === 0) return props
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i = skipFlightString(html, i, end)
+      continue
+    }
+    // 载荷整体包在外层 JS 字符串里：裸反斜杠恒为转义（如 \"），必须整体跳过，
+    // 否则会把转义引号误判成字符串边界，配对错位后深度追踪全崩。
+    if (ch === '\\') {
+      i += 2
+      continue
+    }
+    if (depth === 1 && /[A-Za-z_$]/.test(ch)) {
+      const key = /^[A-Za-z_$][\w$]*/.exec(html.slice(i, end))?.[0]
+      if (!key) {
+        i += 1
+        continue
+      }
+      const rest = html.slice(i + key.length, end)
+      const head = /^\s*:\s*`/.exec(rest)
+      if (!head) {
+        i += 1
+        continue
+      }
+      const literalStart = i + key.length + head[0].length
+      const literalEnd = skipFlightString(html, literalStart - 1, end) - 1
+      props.set(key, unescapeFlightTemplateLiteral(html.slice(literalStart, literalEnd)))
+      i = literalEnd + 1
+      continue
+    }
+    i += 1
+  }
+  // 扫描超限（如图标是巨型内联 SVG）：title/href 在头部已拿到的话照样返回，
+  // 调用方缺哪个字段自会跳过；配对是同层括号的结构关系，不因截断错位。
+  return props
+}
+
+export function extractNextFlightCardHrefs(rawHtml: string): ReadonlyMap<string, string> {
+  const byTitle = new Map<string, string>()
+  const ambiguous = new Set<string>()
+  let from = 0
+  for (;;) {
+    const at = rawHtml.indexOf('(Card,', from)
+    if (at < 0) break
+    from = at + 6
+    let brace = at + 6
+    while (brace < rawHtml.length && /\s/.test(rawHtml[brace])) brace += 1
+    if (rawHtml[brace] !== '{') continue
+    const props = readFlightBraceProps(rawHtml, brace, FLIGHT_CARD_SCAN_LIMIT)
+    const title = props?.get('title')?.replace(/\s+/g, ' ').trim()
+    const href = props?.get('href')?.trim()
+    if (!title || !href) continue
+    if (ambiguous.has(title)) continue
+    const prev = byTitle.get(title)
+    if (prev === undefined) byTitle.set(title, href)
+    else if (prev !== href) {
+      byTitle.delete(title)
+      ambiguous.add(title)
+    }
+  }
+  return byTitle
+}
+
+function isSafeFlightCardHref(href: string): boolean {
+  const trimmed = href.trim()
+  if (!trimmed || /[\s"'<>]/.test(trimmed)) return false
+  if (/^(javascript|data|vbscript|file):/i.test(trimmed)) return false
+  return /^(https?:\/\/|\/)/i.test(trimmed)
+}
+
+export function backfillWebDocCardHrefs(root: HTMLElement, hrefByTitle: ReadonlyMap<string, string>): void {
+  if (hrefByTitle.size === 0) return
+  for (const card of Array.from(root.querySelectorAll<HTMLElement>('.web-doc-card'))) {
+    if (card.hasAttribute(MONTREE_SOURCE_HREF_ATTR)) continue
+    if (card.tagName === 'A' && (card.getAttribute('href') ?? '').trim()) continue
+    const titleEl = card.querySelector('[data-component-part="card-title"], h1, h2, h3, h4, h5, h6')
+    const title = (titleEl?.textContent ?? '').replace(/\s+/g, ' ').trim()
+    if (!title) continue
+    const href = hrefByTitle.get(title)
+    if (!href || !isSafeFlightCardHref(href)) continue
+    card.setAttribute(MONTREE_SOURCE_HREF_ATTR, href)
+  }
+}
+/**
  * 现代技术文档（如 React.dev、Vite、Docusaurus）常使用 Flex/Grid 将多张对比插图并排展示。
  * 原站依赖 Tailwind 的 `flex-row` / `grid-cols-2` 等类；若不加处理在阅读模式下会退化为纵向堆叠。
  * 这里识别包含 2 个及以上 figure 的行级容器，归一化为 `.web-doc-figure-row`。
@@ -661,6 +908,7 @@ function stripGenericChrome(root: HTMLElement): void {
   normalizeWebDocCards(root)
   normalizeWebDocCallouts(root)
   normalizeWebDocFigureRows(root)
+  normalizeWebDocCardGrids(root)
   normalizeWebDocStandaloneFigures(root)
   normalizeWebDocSandpackPlaygrounds(root)
   stripCodeBlockLineNumbers(root)

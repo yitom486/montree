@@ -559,8 +559,7 @@ describe('web-doc-html', () => {
     expect(root.querySelector('p > figure')).toBeNull()
   })
 
-  it('纯图链接整体装进 figure，追踪像素跳过', () => {
-    const html = `<!DOCTYPE html><html><body><article>
+  it('纯图链接整体装进 figure，追踪像素跳过', () => {    const html = `<!DOCTYPE html><html><body><article>
       <p>下面这张架构图值得细看，它展示了客户端与服务端的关系。</p>
       <p><a href="https://example.com/big"><img src="/big.png" alt="big" /></a></p>
       <p>看完图之后，我们继续讨论剩下的文本内容，保证段落足够长。</p>
@@ -575,6 +574,92 @@ describe('web-doc-html', () => {
     // 链接不断：figure 包住整个 a
     expect(figure.querySelector('a[href="https://example.com/big"]')).not.toBeNull()
     expect(root.querySelector('img[src*="px.gif"]')!.closest('figure')).toBeNull()
+  })
+
+  it('Mintlify 卡片矩阵归一化为网格卡片（role/tabindex 死交互摘除）', () => {
+    const card = (name: string, desc: string) => `
+      <div class="card block font-normal group relative my-2 ring-2 ring-transparent rounded-2xl bg-white border overflow-hidden w-full cursor-pointer" aria-labelledby="t-${name}" tabindex="0" role="link">
+        <div class="px-6 py-5 relative" data-component-part="card-content-container">
+          <div class="size-6" data-component-part="card-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"></circle></svg></div>
+          <div class="w-full"><h2 data-component-part="card-title">${name}</h2>
+          <div data-component-part="card-content"><span data-as="p">${desc}</span>
+          <span data-as="p"><a href="https://github.com/example/${name}">GitHub</a></span></div></div>
+        </div>
+      </div>`
+    const html = `<!DOCTYPE html><html><body><article>
+      <h2>Available Agents</h2>
+      <p>下面是两个已经接入的智能体卡片，每张卡片都有标题与较长的描述文字。</p>
+      <div class="columns prose grid max-w-none gap-4 card-group" style="--cols:2">${card('Agoragentic', 'Agent marketplace with 174 plus AI capabilities, browse invoke and pay for agent services. Coffee.')} ${card('Amp', 'ACP wrapper for Amp, the frontier coding agent with a long description text here.')}</div>
+      <p>看完卡片之后继续阅读正文内容，保证段落文本足够长以便提取器保留。</p>
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/registry')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const grid = root.querySelector('.web-doc-card-grid')!
+    expect(grid).not.toBeNull()
+    const cards = Array.from(grid.querySelectorAll(':scope > .web-doc-card'))
+    expect(cards).toHaveLength(2)
+    // 死交互摘除：无 href 的 role=link 与 tabindex=0 不留给读屏
+    for (const item of cards) {
+      expect(item.getAttribute('role')).toBeNull()
+      expect(item.getAttribute('tabindex')).toBeNull()
+    }
+    // 卡内原有链接照常可点
+    expect(grid.querySelector('a[href*="github.com/example/Agoragentic"]')).not.toBeNull()
+    expect(grid.textContent).toContain('Agoragentic')
+
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://example.com/' }, 'dark')
+    expect(doc).toContain('.web-doc-card-grid')
+    expect(doc).toContain('grid-template-columns')
+  })
+
+  it('通用形态：他站网格类加标题正文分组同样成网格（Docusaurus row 式）', () => {
+    // 注：刻意不用 Mintlify 专有类；但完全无布局信号的裸 div 原站本身也是
+    // 纵向堆叠，此时不恢复才是保真（见下“纯结构单个不动”用例）。
+    const html = `<!DOCTYPE html><html><body><article>
+      <h2>Features</h2>
+      <p>以下两个特性块没有任何站点专有类名，只靠 row 容器加标题正文结构识别。</p>
+      <div class="row"><div class="col col--6"><h3>Fast refresh</h3><p>Edit files and see updates instantly without losing component state or data fetching progress.</p></div><div class="col col--6"><h3>Type safety</h3><p>End to end types from the database layer all the way to the rendered user interface components.</p></div></div>
+      <p>特性介绍完毕，后面还有很长很长的正文段落用来保证提取器正常工作。</p>
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/features')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    expect(root.querySelector('.web-doc-card-grid')).not.toBeNull()
+    expect(root.querySelectorAll('.web-doc-card-grid > .web-doc-card')).toHaveLength(2)
+  })
+
+  it('非卡片不误伤：导航菜单、纯结构单块、figure 原样', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Manual</h1>
+      <nav><ul><li><a href="/a">Getting started guide</a></li><li><a href="/b">Installation steps here</a></li></ul></nav>
+      <div><h2>第一章</h2><p>这是很长很长的章节正文内容，用来验证纯结构单个区块不会被刷成卡片。</p></div>
+      <figure><img src="/kept.png" alt="kept" /><figcaption>原有图注</figcaption></figure>
+      <div><div><h3>无信号甲</h3><p>没有任何布局类名的裸分组，原站同样纵向堆叠，此处不恢复才是保真。</p></div><div><h3>无信号乙</h3><p>没有任何布局类名的裸分组，原站同样纵向堆叠，此处不恢复才是保真。</p></div></div>
+      <p>尾部还有很长很长的正文段落，保证提取器认为这是一篇值得保留的文章。</p>
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/manual')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    expect(root.querySelector('.web-doc-card-grid')).toBeNull()
+    expect(root.querySelector('.web-doc-card')).toBeNull()
+    // figure 原样（不套卡）
+    expect(root.querySelector('figure figcaption')?.textContent).toBe('原有图注')
+  })
+
+  it('落单强信号卡（链接 teasers）独立成卡', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Blog</h1>
+      <p>下面是一篇独立的文章推荐卡片，它不在任何网格容器里面但是自身是链接。</p>
+      <a href="https://example.com/posts/deep-dive"><h3>Deep dive into rendering pipelines</h3><p>A thorough walkthrough of how documents flow from raw HTML through extraction and normalization.</p></a>
+      <p>推荐之后还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/blog')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const card = root.querySelector('a.web-doc-card')!
+    expect(card).not.toBeNull()
+    expect(card.getAttribute('href')).toBe('https://example.com/posts/deep-dive')
   })
 
   it('React 官方文档 Sandpack 交互沙箱转换为 web-doc-playground 并提供代码与预览', () => {
@@ -653,5 +738,183 @@ describe('web-doc-html', () => {
     } finally {
       pg.remove()
     }
+  })
+
+  it('Next flight Card 映射回填整卡跳转（变体 B：裸 div 卡）', () => {
+    const html = `<!DOCTYPE html><html><head><title>Registry</title>
+      <script>self.__next_f.push([1,"1:_jsxs(Card,{title:\`Alpha\`,href:\`https://alpha.example\`,icon:0}),_jsxs(Card,{title:\`Beta\`,href:\`https://beta.example\`,icon:0})"])</script>
+    </head><body><article>
+      <h1>Registry</h1>
+      <p>下面是两个智能体卡片，每个都有标题与较长的描述文字，保证提取器保留正文。</p>
+      <div class="card-group grid gap-4" style="--cols:2">
+        <div class="card block group relative my-2 rounded-2xl border overflow-hidden w-full cursor-pointer" aria-labelledby="t-a" tabindex="0" role="link"><div class="px-6 py-5 relative" data-component-part="card-content-container">
+          <div class="size-6" data-component-part="card-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"></circle></svg></div>
+          <h2 data-component-part="card-title">Alpha</h2>
+          <div data-component-part="card-content"><span data-as="p">Alpha is an agent framework with a long description text for testing.</span><span data-as="p"><a href="https://github.com/example/alpha">GitHub</a></span></div>
+        </div></div>
+        <div class="card block group relative my-2 rounded-2xl border overflow-hidden w-full cursor-pointer" aria-labelledby="t-b" tabindex="0" role="link"><div class="px-6 py-5 relative" data-component-part="card-content-container">
+          <div class="size-6" data-component-part="card-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"></circle></svg></div>
+          <h2 data-component-part="card-title">Beta</h2>
+          <div data-component-part="card-content"><span data-as="p">Beta is another agent framework with a long description text for testing.</span><span data-as="p"><a href="https://github.com/example/beta">GitHub</a></span></div>
+        </div></div>
+      </div>
+      <p>卡片之后还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/registry')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const cards = Array.from(root.querySelectorAll('.web-doc-card'))
+    expect(cards).toHaveLength(2)
+    // 回填的是 source-href（提升由最终文档的 neutralize 完成）；死的 role 先摘掉
+    expect(cards[0].getAttribute('data-montree-source-href')).toBe('https://alpha.example')
+    expect(cards[1].getAttribute('data-montree-source-href')).toBe('https://beta.example')
+    expect(cards[0].getAttribute('role')).toBeNull()
+
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://example.com/' }, 'dark')
+    // 整卡可点：官网（URL 规范化补尾斜杠）；卡内图标仍指向各自仓库，两者不混淆
+    expect(doc).toContain('data-montree-href="https://alpha.example/"')
+    expect(doc).toContain('data-montree-href="https://beta.example/"')
+    expect(doc).toContain('data-montree-href="https://github.com/example/alpha"')
+    expect(doc).toContain('data-montree-href="https://github.com/example/beta"')
+  })
+
+  it('flight 重名标题不回填（拒绝猜测目的地）', () => {
+    const html = `<!DOCTYPE html><html><head><title>Dup</title>
+      <script>self.__next_f.push([1,"1:_jsxs(Card,{title:\`Alpha\`,href:\`https://a-one.example\`,icon:0}),_jsxs(Card,{title:\`Alpha\`,href:\`https://a-two.example\`,icon:0})"])</script>
+    </head><body><article>
+      <h1>Dup</h1>
+      <p>下面是两个同名卡片，flight 给了两个不同目的地，此时一个都不该回填。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><h2 data-component-part="card-title">Alpha</h2><div data-component-part="card-content"><span data-as="p">First alpha card with a sufficiently long description text here.</span></div></div></div>
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><h2 data-component-part="card-title">Alpha</h2><div data-component-part="card-content"><span data-as="p">Second alpha card with a sufficiently long description text here.</span></div></div></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/dup')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const cards = Array.from(root.querySelectorAll('.web-doc-card'))
+    expect(cards).toHaveLength(2)
+    for (const card of cards) {
+      expect(card.getAttribute('data-montree-source-href')).toBeNull()
+    }
+    // 布局仍在（网格恢复不受影响），只是不可整卡点击
+    expect(root.querySelector('.web-doc-card-grid')).not.toBeNull()
+  })
+
+  it('flight 非 http(s) 目标不回填', () => {
+    const html = `<!DOCTYPE html><html><head><title>X</title>
+      <script>self.__next_f.push([1,"1:_jsx(Card,{title:\`Sneaky\`,href:\`javascript:alert(1)\`,icon:0})"])</script>
+    </head><body><article>
+      <h1>X</h1>
+      <p>下面是单张卡片与一个对照组，flight 给了非法目标，必须被拒绝回填。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><h2 data-component-part="card-title">Sneaky</h2><div data-component-part="card-content"><span data-as="p">Sneaky card with a sufficiently long description text for testing.</span></div></div></div>
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><h2 data-component-part="card-title">Plain</h2><div data-component-part="card-content"><span data-as="p">Plain card with a sufficiently long description text for testing.</span></div></div></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/x')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    expect(root.querySelector('[data-montree-source-href]')).toBeNull()
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://example.com/' }, 'dark')
+    expect(doc).not.toContain('javascript:')
+  })
+
+  it('DOM 包裹锚优先于 flight（变体 A 已有明确目标不覆盖）', () => {
+    const html = `<!DOCTYPE html><html><head><title>DomFirst</title>
+      <script>self.__next_f.push([1,"1:_jsx(Card,{title:\`Alpha\`,href:\`https://flight.example/alpha\`,icon:0})"])</script>
+    </head><body><article>
+      <h1>DomFirst</h1>
+      <p>下面两张卡是整卡被锚包裹的变体，DOM 目标明确，flight 不得覆盖。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><a href="/docs/alpha-dom" aria-hidden="true" style="display: contents"><div data-component-part="card-content"><h2 data-component-part="card-title">Alpha</h2><span data-as="p">Alpha DOM variant with a sufficiently long description text.</span></div></a></div></div>
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div data-component-part="card-content-container"><a href="/docs/beta-dom" aria-hidden="true" style="display: contents"><div data-component-part="card-content"><h2 data-component-part="card-title">Beta</h2><span data-as="p">Beta DOM variant with a sufficiently long description text here.</span></div></a></div></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/dom')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const alpha = Array.from(root.querySelectorAll('.web-doc-card')).find((el) =>
+      el.textContent?.includes('Alpha DOM'),
+    )!
+    expect(alpha.getAttribute('data-montree-source-href')).toBe('/docs/alpha-dom')
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://example.com/' }, 'dark')
+    expect(doc).toContain('data-montree-href="https://example.com/docs/alpha-dom"')
+    expect(doc).not.toContain('flight.example')
+  })
+
+  it('短卡成卡且隐藏箭头摘除（Cursor 37 字符形态）', () => {
+    const html = `<!DOCTYPE html><html><head><title>Short</title>
+      <script>self.__next_f.push([1,"1:_jsx(Card,{title:\`Cursor\`,href:\`https://cursor.com\`,icon:0}),_jsx(Card,{title:\`Kilo\`,href:\`https://kilo.example\`,icon:0})"])</script>
+    </head><body><article>
+      <h1>Short</h1>
+      <p>下面两张都是标题加一句话的短卡，曾经因不足 40 字符整体漏标裸奔。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div class="px-6 py-5 relative" data-component-part="card-content-container"><div class="absolute top-5 right-5 hidden"><svg viewBox="0 0 18 18"><path d="M1 1h16v16"></path></svg></div><div class="size-6" data-component-part="card-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"></circle></svg></div><h2 data-component-part="card-title">Cursor</h2><div data-component-part="card-content"><span data-as="p">Cursor's coding agent</span><span data-as="p"><strong>2026.10.14</strong></span></div></div></div>
+        <div class="card block my-2 rounded-2xl border" role="link" tabindex="0"><div class="px-6 py-5 relative" data-component-part="card-content-container"><div class="absolute top-5 right-5 hidden"><svg viewBox="0 0 18 18"><path d="M1 1h16v16"></path></svg></div><div class="size-6" data-component-part="card-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"></circle></svg></div><h2 data-component-part="card-title">Kilo</h2><div data-component-part="card-content"><span data-as="p">Kilo is a short card description here.</span></div></div></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/short')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const cards = Array.from(root.querySelectorAll('.web-doc-card'))
+    expect(cards).toHaveLength(2)
+    // 有边框（不再是裸 div）、有回填跳转
+    expect(cards[0].getAttribute('data-montree-source-href')).toBe('https://cursor.com')
+    // 永久隐藏的悬停箭头已摘除（原站 hidden，阅读模式无 Tailwind 会裸奔）
+    expect(root.querySelector('.web-doc-card div.hidden')).toBeNull()
+    // 卡图标与标题保留，只死了箭头
+    expect(cards[0].querySelector('[data-component-part="card-icon"]')).not.toBeNull()
+    expect(cards[0].querySelector('[data-component-part="card-title"]')?.textContent).toBe('Cursor')
+
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://example.com/' }, 'dark')
+    // data-as 段落按块渲染（不再粘成一行），规则随文档下发
+    expect(doc).toContain('span[data-as="p"]')
+    expect(doc).toContain('display: block !important')
+  })
+
+  it('可见箭头保留（变体 A 无 hidden 不误删）', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Arr</h1>
+      <p>下面两张是整卡被锚包裹的变体，箭头可见，不能被隐藏清理误伤。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border" role="link"><div data-component-part="card-content-container"><div class="absolute top-5 right-5"><svg viewBox="0 0 18 18"><path d="M1 1h16v16"></path></svg></div><a href="/docs/a1" aria-hidden="true" style="display: contents"><div data-component-part="card-content"><h2 data-component-part="card-title">AlphaOne</h2><span data-as="p">Alpha one variant A card with a long description text here.</span></div></a></div></div>
+        <div class="card block my-2 rounded-2xl border" role="link"><div data-component-part="card-content-container"><div class="absolute top-5 right-5"><svg viewBox="0 0 18 18"><path d="M1 1h16v16"></path></svg></div><a href="/docs/a2" aria-hidden="true" style="display: contents"><div data-component-part="card-content"><h2 data-component-part="card-title">AlphaTwo</h2><span data-as="p">Alpha two variant A card with a long description text here.</span></div></a></div></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/arr')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const arrows = Array.from(root.querySelectorAll('.web-doc-card .web-doc-card-arrow'))
+    expect(arrows).toHaveLength(2)
+  })
+
+  it('超短强信号不成卡（标题加几个字，防把按钮刷成卡）', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Tiny</h1>
+      <p>下面两个只是带标题的短链接，内容太少，成卡反而是误伤。</p>
+      <div class="card-group grid gap-4">
+        <div class="card block my-2 rounded-2xl border"><h3>Go</h3><p>Hi</p></div>
+        <div class="card block my-2 rounded-2xl border"><h3>Back</h3><p>Yo</p></div>
+      </div>
+      <p>尾部还有很长很长的正文段落，保证整篇文章的结构完整可以被提取。</p>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://example.com/tiny')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    expect(root.querySelector('.web-doc-card-grid')).toBeNull()
+    expect(root.querySelector('.web-doc-card')).toBeNull()
   })
 })

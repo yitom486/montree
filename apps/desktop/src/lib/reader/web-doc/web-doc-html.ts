@@ -3,10 +3,13 @@ import { Readability } from '@mozilla/readability'
 import type { WebDocPageContent, WebDocSiteId } from '@montree/contracts'
 import {
   normalizeWebDocCallouts,
+  normalizeWebDocCardGrids,
   normalizeWebDocCards,
   normalizeWebDocFigureRows,
   normalizeWebDocSandpackPlaygrounds,
   normalizeWebDocStandaloneFigures,
+  backfillWebDocCardHrefs,
+  extractNextFlightCardHrefs,
   stripWebDocChrome,
 } from '@/lib/reader/web-doc/web-doc-chrome'
 import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@montree/reader-core'
@@ -265,6 +268,16 @@ function buildWebDocInlineCodeCss(theme: EpubThemeMode): string {
     body .web-doc-card-content-wrap {
       flex: 1 1 auto !important;
       min-width: 0 !important;
+    }
+    /* Mintlify 用 span[data-as="p"] 表达段落（ hydration 占位），原站 prose 按块
+       渲染；阅读模式默认 inline 会导致相邻两段粘成一行（如 Cursor 卡的
+       描述与版本号）。注意 p 内若出现则浏览器自动断段，与原站行为一致。 */
+    body .web-doc-card span[data-as="p"] {
+      display: block !important;
+      margin: 0.375rem 0 !important;
+    }
+    body .web-doc-card span[data-as="p"]:first-child {
+      margin-top: 0 !important;
     }
     body .web-doc-card-arrow {
       position: absolute !important;
@@ -721,6 +734,8 @@ export function extractWebDocArticle(
   const clone = root.cloneNode(true) as HTMLElement
   normalizeWebDocImageObjects(clone, pageUrl)
   stripWebDocChrome(clone, siteId)
+  // flight 回填必须在消毒（扔 script）之前从原始 HTML 提取，在归一化之后落到卡上
+  backfillWebDocCardHrefs(clone, extractNextFlightCardHrefs(html))
   rewriteRelativeUrls(clone, pageUrl)
   const sanitized = sanitizeWebDocBodyHtml(clone.innerHTML)
   const { bodyHtml } = ensureWebDocHeadingIds(sanitized)
@@ -731,6 +746,60 @@ export function extractWebDocArticle(
     title,
     bodyHtml,
   }
+}
+
+/**
+ * 卡片网格排版（配 `normalizeWebDocCardGrids`）：还原文档站的链接卡片矩阵
+ * （Mintlify Card、Docusaurus 特性块）。列数不读站点的自定义属性，
+ * 用 auto-fill 自适应列（窄栏自动单列）；卡面取中性面色，与主题 palette 对齐。
+ */
+export function buildWebDocCardGridCss(theme: EpubThemeMode): string {
+  const palette = READER_PALETTE[theme]
+  const isDark = theme === 'dark'
+  const surface = isDark ? '#27272a' : '#f4f4f5'
+  const border = isDark ? '#3f3f46' : '#e4e4e7'
+
+  return `
+    /* 卡片矩阵（通用模式归一化产出，见 normalizeWebDocCardGrids） */
+    body .web-doc-reader-content .web-doc-card-grid {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)) !important;
+      gap: 1rem !important;
+      margin: 1.25em 0 !important;
+    }
+    body .web-doc-reader-content .web-doc-card {
+      display: flex !important;
+      flex-direction: column !important;
+      border: 1px solid ${border} !important;
+      border-radius: 0.75rem !important;
+      background: ${surface} !important;
+      padding: 1rem 1.25rem !important;
+      color: ${palette.text} !important;
+      text-decoration: none !important;
+    }
+    body .web-doc-reader-content a.web-doc-card:hover {
+      border-color: ${palette.link} !important;
+    }
+    body .web-doc-reader-content .web-doc-card h1,
+    body .web-doc-reader-content .web-doc-card h2,
+    body .web-doc-reader-content .web-doc-card h3,
+    body .web-doc-reader-content .web-doc-card h4,
+    body .web-doc-reader-content .web-doc-card h5,
+    body .web-doc-reader-content .web-doc-card h6 {
+      margin-top: 0 !important;
+      margin-bottom: 0.375rem !important;
+      font-size: 1.05em !important;
+    }
+    body .web-doc-reader-content .web-doc-card p {
+      margin-block: 0.375rem !important;
+    }
+    body .web-doc-reader-content .web-doc-card img {
+      display: block !important;
+      margin-inline: auto !important;
+      max-width: 100% !important;
+      height: auto !important;
+    }
+  `
 }
 
 export function buildWebDocPlaygroundCss(theme: EpubThemeMode): string {
@@ -1054,6 +1123,7 @@ export function buildWebDocReaderDocument(
   const codeBlockCss = buildWebDocCodeBlockCss(theme)
   const inlineCodeCss = buildWebDocInlineCodeCss(theme)
   const calloutCss = buildWebDocCalloutCss(theme)
+  const cardGridCss = buildWebDocCardGridCss(theme)
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss()
   const playgroundCss = buildWebDocPlaygroundCss(theme)
@@ -1070,6 +1140,7 @@ export function buildWebDocReaderDocument(
     normalizeWebDocCards(root)
     normalizeWebDocCallouts(root)
     normalizeWebDocFigureRows(root)
+    normalizeWebDocCardGrids(root)
     normalizeWebDocStandaloneFigures(root)
     normalizeWebDocSandpackPlaygrounds(root)
     root.querySelectorAll('table').forEach((table) => {
@@ -1101,6 +1172,7 @@ export function buildWebDocReaderDocument(
   <style>${codeBlockCss}</style>
   <style>${inlineCodeCss}</style>
   <style>${calloutCss}</style>
+  <style>${cardGridCss}</style>
   <style>${mathCss}</style>
   <style>${embedCss}</style>
   <style>${playgroundCss}</style>
