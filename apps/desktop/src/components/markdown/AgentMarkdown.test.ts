@@ -80,6 +80,50 @@ describe('AgentMarkdown（Streamdown 接入）', () => {
     expect(el.querySelectorAll('h1')).toHaveLength(1)
   })
 
+  it('长文流式风暴：120 帧增量渲染有界 + 首段节点稳定', async () => {
+    // 性能冒烟（非基准）：Streamdown 内置块缓存接住增量复用后，
+    // 120 帧 × 11k 字应远低于阈值；若退化为全文重解析/整树重挂，
+    // 总耗时与节点 churn 会立刻超标。happy-dom 无布局，测的是解析+调和成本。
+    // 阈值取实测 12 倍（CI 机器按 4 倍慢仍有 3 倍余量），只抓退化不卡优化。
+    const paras: string[] = ['# 长文性能冒烟']
+    for (let i = 0; i < 120; i += 1) {
+      paras.push(`第${i + 1}段：` + '内容填充文字。'.repeat(12))
+    }
+    const full =
+      `${paras.join('\n\n')}\n\n\`\`\`ts\nconst answer = 42\n\`\`\`\n\n| 甲 | 乙 |\n|---|---|\n| 1 | 2 |`
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      const chunks = 120
+      const step = Math.ceil(full.length / chunks)
+      let firstParagraph: Element | null = null
+      const startedAt = performance.now()
+      for (let n = 1; n <= chunks; n += 1) {
+        const text = full.slice(0, n * step)
+        act(() => {
+          root.render(createElement(AgentMarkdown, { text, streaming: true }))
+        })
+        if (n === 12) firstParagraph = container.querySelector('p')
+      }
+      const elapsedMs = performance.now() - startedAt
+      await act(async () => {})
+      expect(elapsedMs).toBeLessThan(3000)
+      // 首段节点贯穿风暴不重挂（重挂=整树抖动，体感即闪烁）
+      expect(firstParagraph).not.toBeNull()
+      expect(container.querySelector('p')).toBe(firstParagraph)
+      // 尾部到达的块一次成形、无复份（120 编号段 + 表格行文；标题为 h1 不计入）
+      expect(container.querySelectorAll('p')).toHaveLength(120)
+      expect(container.querySelector('[data-streamdown=code-block] code')?.textContent).toContain('const answer = 42')
+      expect(container.querySelector('table')).not.toBeNull()
+    } finally {
+      act(() => {
+        root.unmount()
+      })
+      container.remove()
+    }
+  })
+
   it('流式状态经 data-status 暴露（tip 光标的 CSS 开关）', async () => {    const running = await render('正在输出', true)
     expect(running.querySelector('[data-status="running"]')).not.toBeNull()
     const done = await render('正在输出', false)
