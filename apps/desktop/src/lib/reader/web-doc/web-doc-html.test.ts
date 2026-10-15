@@ -510,6 +510,73 @@ describe('web-doc-html', () => {
     expect(doc).toContain('display: flex !important')
   })
 
+  it('Mintlify 透明链单图提升为独立 figure（ACP 架构图形态）', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h2>Setup</h2>
+      <span data-as="p">Each connection can support several concurrent sessions.</span>
+      <div class="mdx-content"><span data-ramka-trigger="" class="zoom-image-trigger contents cursor-zoom-in"><span class="contents"><picture class="contents"><img data-path="images/server-client.svg" src="https://mintcdn.com/x/server-client.svg" alt="Server Client setup" class="object-contain" width="579" height="455" /></picture></span></span></div>
+      <span data-as="p">ACP makes heavy use of JSON-RPC notifications.</span>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://agentclientprotocol.com/get-started/architecture')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const img = root.querySelector('img[src*="server-client"]')!
+    expect(img).not.toBeNull()
+    // 链整体装进 figure，缩放触发器与 picture 原样保留在内
+    const figure = img.closest('figure.web-doc-figure')
+    expect(figure).not.toBeNull()
+    expect(figure!.querySelector('[data-ramka-trigger]')).not.toBeNull()
+    expect(figure!.querySelector('picture')).not.toBeNull()
+    expect(img.getAttribute('width')).toBe('579')
+    expect(img.getAttribute('alt')).toBe('Server Client setup')
+    // 前后正文仍在 figure 之外（图不再跟文字缠在一起）
+    expect(root.textContent).toContain('several concurrent sessions')
+    expect(root.textContent).toContain('JSON-RPC notifications')
+
+    const doc = buildWebDocReaderDocument({ title: 'T', bodyHtml: result.bodyHtml, baseUrl: 'https://agentclientprotocol.com/' }, 'dark')
+    expect(doc).toContain('figure.web-doc-figure img')
+  })
+
+  it('行内小图不动，已有 figure 不套娃', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <p>点击 <img src="/icon.png" alt="icon" /> 继续阅读下文。</p>
+      <figure><img src="/real.png" alt="real" /><figcaption>实图</figcaption></figure>
+      <p><img src="/solo.png" alt="solo" /></p>
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/a')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    // 行内图标：无 figure 祖先
+    expect(root.querySelector('img[src*="icon.png"]')!.closest('figure')).toBeNull()
+    // 已有 figure：不嵌套
+    const real = root.querySelector('img[src*="real.png"]')!
+    expect(real.closest('figure')!.querySelectorAll('figure')).toHaveLength(0)
+    expect(real.closest('figure')!.querySelector('figcaption')?.textContent).toBe('实图')
+    // p 独占图：p 被替换为 figure（id 保留逻辑见实现）
+    const solo = root.querySelector('img[src*="solo.png"]')!
+    expect(solo.closest('figure.web-doc-figure')).not.toBeNull()
+    expect(root.querySelector('p > figure')).toBeNull()
+  })
+
+  it('纯图链接整体装进 figure，追踪像素跳过', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <p>下面这张架构图值得细看，它展示了客户端与服务端的关系。</p>
+      <p><a href="https://example.com/big"><img src="/big.png" alt="big" /></a></p>
+      <p>看完图之后，我们继续讨论剩下的文本内容，保证段落足够长。</p>
+      <img src="/px.gif" alt="" width="1" height="1" />
+    </article></body></html>`
+    const result = extractWebDocArticle(html, 'https://example.com/a')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    const big = root.querySelector('img[src*="big.png"]')!
+    const figure = big.closest('figure.web-doc-figure')!
+    expect(figure).not.toBeNull()
+    // 链接不断：figure 包住整个 a
+    expect(figure.querySelector('a[href="https://example.com/big"]')).not.toBeNull()
+    expect(root.querySelector('img[src*="px.gif"]')!.closest('figure')).toBeNull()
+  })
+
   it('React 官方文档 Sandpack 交互沙箱转换为 web-doc-playground 并提供代码与预览', () => {
     const html = `<!DOCTYPE html><html><body><article>
       <h1>Counters that update together</h1>

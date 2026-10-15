@@ -6,6 +6,7 @@ import {
   normalizeWebDocCards,
   normalizeWebDocFigureRows,
   normalizeWebDocSandpackPlaygrounds,
+  normalizeWebDocStandaloneFigures,
   stripWebDocChrome,
 } from '@/lib/reader/web-doc/web-doc-chrome'
 import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@montree/reader-core'
@@ -1069,6 +1070,7 @@ export function buildWebDocReaderDocument(
     normalizeWebDocCards(root)
     normalizeWebDocCallouts(root)
     normalizeWebDocFigureRows(root)
+    normalizeWebDocStandaloneFigures(root)
     normalizeWebDocSandpackPlaygrounds(root)
     root.querySelectorAll('table').forEach((table) => {
       if (table.parentElement?.classList.contains('web-doc-table-scroll') || table.parentElement?.closest('table')) return
@@ -1128,6 +1130,13 @@ export function buildWebDocReaderDocument(
       }
     `}
     body .web-doc-reader-content figure { margin: 1.5em 0; max-width: 100%; }
+    body .web-doc-reader-content figure.web-doc-figure img,
+    body .web-doc-reader-content figure.web-doc-figure picture {
+      display: block !important;
+      margin-inline: auto !important;
+      max-width: 100% !important;
+    }
+    body .web-doc-reader-content figure.web-doc-figure img { height: auto !important; }
     body .web-doc-reader-content figcaption,
     body .web-doc-reader-content caption,
     body .web-doc-reader-content .ltx_figure_panel,

@@ -396,6 +396,78 @@ export function normalizeWebDocCallouts(root: HTMLElement): void {
 }
 
 /**
+ * 独立插图归一化：现代文档站（Mintlify 的 span.contents/picture.contents 链、
+ * MDX 裸图）常把单图放在透明内联包装里，原站靠 `display:contents` + prose
+ * 图片块样式撑成独立图块。阅读模式没有这些站点样式，图会退化成行内元素、
+ * 与正文缠在一起（如 ACP 架构图的 server-client.svg）。
+ * 这里把“实质独占一块”的图片链提升为 <figure class="web-doc-figure">；
+ * 行内小图（表情、图标、文内配图）、已有 figure、交互容器内的图原样不动。
+ */
+const STANDALONE_FIGURE_WRAPPERS = new Set(['SPAN', 'PICTURE', 'A'])
+/** figure 可直接落位的块容器（P 单独处理：替换而非内嵌，避免 p>figure 非法嵌套） */
+const STANDALONE_FIGURE_PARENTS = new Set([
+  'DIV', 'SECTION', 'ARTICLE', 'MAIN', 'ASIDE', 'LI', 'TD', 'TH',
+  'BLOCKQUOTE', 'DD', 'HEADER', 'FOOTER', 'DETAILS',
+])
+
+function nodeHasSignificantContent(node: Element, except: Element | null): boolean {
+  for (const child of Array.from(node.childNodes)) {
+    if (child === except) continue
+    if (child.nodeType === 3) {
+      if ((child.textContent ?? '').trim()) return true
+    } else if (child.nodeType === 1 && (child as Element).tagName !== 'SOURCE') {
+      // picture 内 <source> 无文本无盒，不计入
+      return true
+    }
+  }
+  return false
+}
+
+export function normalizeWebDocStandaloneFigures(root: HTMLElement): void {
+  const doc = root.ownerDocument
+  for (const img of Array.from(root.querySelectorAll('img'))) {
+    if (img.closest('figure')) continue
+    // 追踪像素跳过（宽高俱全且 ≤2px）
+    const w = Number(img.getAttribute('width') ?? NaN)
+    const h = Number(img.getAttribute('height') ?? NaN)
+    if (Number.isFinite(w) && Number.isFinite(h) && w <= 2 && h <= 2) continue
+    // 向上穿过透明包装（span/picture/纯图链接），要求每层除本链外无实质内容
+    let top: Element = img
+    let parent = img.parentElement
+    while (
+      parent && parent !== root &&
+      STANDALONE_FIGURE_WRAPPERS.has(parent.tagName) &&
+      !nodeHasSignificantContent(parent, top)
+    ) {
+      top = parent
+      parent = parent.parentElement
+    }
+    const figure = doc.createElement('figure')
+    figure.className = 'web-doc-figure'
+    if (top !== img) {
+      // 链顶在交互容器内（a/button）则不动，避免拆散链接与按钮
+      if (!parent || parent === root || (parent.tagName !== 'A' && parent.tagName !== 'BUTTON')) {
+        top.replaceWith(figure)
+        figure.appendChild(top)
+      }
+      continue
+    }
+    // img 直挂非透明容器：仅独占且父为块容器时提升；P 则整体替换（保留 id，不断站内锚点）
+    if (!parent || parent === root) {
+      img.replaceWith(figure)
+      figure.appendChild(img)
+    } else if (parent.tagName === 'P' && !nodeHasSignificantContent(parent, img)) {
+      if (parent.id) figure.id = parent.id
+      parent.replaceWith(figure)
+      figure.appendChild(img)
+    } else if (STANDALONE_FIGURE_PARENTS.has(parent.tagName) && !nodeHasSignificantContent(parent, img)) {
+      img.replaceWith(figure)
+      figure.appendChild(img)
+    }
+    // 其余（行内文图等）保持原样
+  }
+}
+/**
  * 现代技术文档（如 React.dev、Vite、Docusaurus）常使用 Flex/Grid 将多张对比插图并排展示。
  * 原站依赖 Tailwind 的 `flex-row` / `grid-cols-2` 等类；若不加处理在阅读模式下会退化为纵向堆叠。
  * 这里识别包含 2 个及以上 figure 的行级容器，归一化为 `.web-doc-figure-row`。
@@ -589,6 +661,7 @@ function stripGenericChrome(root: HTMLElement): void {
   normalizeWebDocCards(root)
   normalizeWebDocCallouts(root)
   normalizeWebDocFigureRows(root)
+  normalizeWebDocStandaloneFigures(root)
   normalizeWebDocSandpackPlaygrounds(root)
   stripCodeBlockLineNumbers(root)
 }
