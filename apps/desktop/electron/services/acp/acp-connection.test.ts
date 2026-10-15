@@ -1,4 +1,7 @@
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SpawnedAcpProcess } from './process-manager'
 import { getAcpContext, runInAcpContext, forgetAcpContext } from './acp-context'
@@ -6,10 +9,11 @@ import { getAcpState } from './acp-state'
 
 const mocks = vi.hoisted(() => ({
   live: null as SpawnedAcpProcess | null,
-  spawn: vi.fn(), initialize: vi.fn(), restore: vi.fn(),
+  spawn: vi.fn(), initialize: vi.fn(), restore: vi.fn(), sessionRequest: vi.fn(),
   active: 0, maximum: 0,
 }))
-vi.mock('electron', () => ({ app: { getVersion: () => '0.4.12' } }))
+vi.mock('electron', () => ({ app: { getVersion: () => '0.4.12', getAppPath: () => process.cwd(), getPath: () => 'D:/test-home' } }))
+vi.mock('./agent-resources', () => ({ initializeAgentResources: async () => process.cwd()+'/apps/desktop/resources/agent', montreeAgentResourceDir: () => process.cwd()+'/apps/desktop/resources/agent' }))
 vi.mock('./agent-sandbox-cwd', () => ({ resolveAgentCwd: () => ({ cwd: 'D:\\books', source: 'workspace' }) }))
 vi.mock('../bun-runtime', async (original) => ({ ...await original<typeof import('../bun-runtime')>(), ensureBunForCommand: async () => ({ ok: true }) }))
 vi.mock('./acp-proxy-service', () => ({ readAcpProxySettings: async () => ({}), buildAcpProxySpawnEnv: () => ({ env: {}, envRemove: [] }) }))
@@ -21,7 +25,8 @@ vi.mock('./acp-bridges', async (original) => ({
 }))
 vi.mock('./process-manager', async (original) => ({
   ...await original<typeof import('./process-manager')>(),
-  getLiveAcpProcess: () => mocks.live,
+  getLiveAcpProcess: (_runtimeId: string, _cwd?: string, tag?: string | null) =>
+    tag !== undefined && (mocks.live?.profileTag ?? null) !== tag ? undefined : mocks.live,
   isSpawnedAcpProcessAlive: () => true,
   spawnAcpProcess: (...args: unknown[]) => mocks.spawn(...args),
 }))
@@ -35,13 +40,14 @@ vi.mock('./sdk-client', () => ({
     let closed = false
     return { app: {}, connection: { agent: { label: child.label }, close: () => { if (!closed) { mocks.active--; closed = true } } }, streamHandle: { dispose: vi.fn() } }
   },
-  sdkRequest: (agent: { label: string }, method: string) => {
+  sdkRequest: (agent: { label: string }, method: string, params:unknown) => {
     if (method === 'initialize') return mocks.initialize(agent.label)
-    return Promise.resolve({})
+    return mocks.sessionRequest(method,params)
   },
 }))
 
 import { connectAcp, disconnectAcp } from './acp-connection'
+import { createAcpSession, loadAcpSession } from './acp-session-ops'
 
 function processHandle(label: string): SpawnedAcpProcess {
   const child = Object.assign(new EventEmitter(), { label, stdout: {}, stdin: {} })
@@ -51,6 +57,7 @@ const initialized = { protocolVersion: 1, agentCapabilities: { loadSession: true
 let scope: ReturnType<typeof getAcpContext>
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.sessionRequest.mockResolvedValue({sessionId:'secondary',configOptions:[]})
   scope = getAcpContext(`reconnect-${Math.random()}`)
   mocks.active = 0; mocks.maximum = 0
   mocks.live = processHandle('warm')
@@ -65,6 +72,39 @@ afterEach(async () => {
 const payload = { runtimeId: 'codex-acp', resumeSessionId: 'old-session', hasLocalHistory: true }
 
 describe('ACP reconnect', () => {
+  it('规则标签变化时不取消仍在回答的旧会话', async () => {
+    const old = mocks.live!
+    old.profileTag = 'old-native-binding'
+    const state = getAcpState(scope)
+    state.processHandle = old
+    state.activePromptSessionId = 'busy-session'
+    const result = await runInAcpContext(scope, () => connectAcp(payload))
+    expect(result.ok).toBe(false)
+    expect(old.kill).not.toHaveBeenCalled()
+    expect(mocks.initialize).not.toHaveBeenCalled()
+    expect(mocks.spawn).not.toHaveBeenCalled()
+    expect(state.activePromptSessionId).toBe('busy-session')
+  })
+
+  it('新会话回显 native 必须对应真实 spawn 中的追加配置，恢复仍兼容', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'montree-connect-rules-'))
+    vi.stubEnv('CODEX_HOME', home)
+    try {
+      mocks.initialize.mockResolvedValue({ ...initialized, agentInfo: { name: 'codex-acp', version: '2.2.2' } })
+      mocks.restore.mockResolvedValue({ sessionId: 'fresh', sessionRestored: false, restoreMethod: 'new', restoreAttempts: [], configOptions: [] })
+      const result = await runInAcpContext(scope, () => connectAcp({ runtimeId: 'codex-acp' }))
+      expect(result.ok && result.value.phase === 'ready' && result.value.promptMode).toBe('native')
+      const env = mocks.spawn.mock.calls[0]![0].env
+      expect(JSON.parse(env.CODEX_CONFIG).developer_instructions).toContain('montree_present')
+      mocks.restore.mockResolvedValue({ sessionId: 'fresh', sessionRestored: true, restoreMethod: 'resume', restoreAttempts: [], configOptions: [] })
+      const resumed = await runInAcpContext(scope, () => connectAcp({ runtimeId: 'codex-acp', resumeSessionId: 'fresh' }))
+      expect(resumed.ok && resumed.value.phase === 'ready' && resumed.value.promptMode).toBe('compatibility')
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('温进程握手失败后自动冷启动一次，继续恢复原会话且不发中间错误状态', async () => {
     const statuses: string[] = []
     getAcpState(scope).statusListeners.add((event) => statuses.push(event.status))
@@ -105,4 +145,44 @@ describe('ACP reconnect', () => {
     expect(mocks.initialize).toHaveBeenCalledTimes(2)
     expect(getAcpState(scope).status).toBe('error')
   })
+  it('正常断开先等待会话 close 确认，再摘桥和结束进程', async () => {
+    const state=getAcpState(scope)
+    const handle=mocks.live!
+    const order:string[]=[]
+    let release!:()=>void
+    let entered!:()=>void
+    const started=new Promise<void>(r=>{entered=r})
+    const acknowledged=new Promise<void>(r=>{release=r})
+    state.runtimeId='agy';state.closeSessionSupported=true;state.processHandle=handle
+    state.ownedSessionIds.set('agy',new Set(['owned']))
+    state.sdkConn={agent:{request:async(method:string,params:{sessionId:string})=>{
+      expect(method).toBe('session/close');expect(params.sessionId).toBe('owned')
+      order.push('request');entered();await acknowledged;order.push('ack');return {}
+    }},close:()=>{order.push('transport')}} as unknown as NonNullable<typeof state.sdkConn>
+    const pending=runInAcpContext(scope,()=>disconnectAcp(undefined,{killProcess:true}))
+    await started
+    expect(handle.kill).not.toHaveBeenCalled()
+    expect(order).toEqual(['request'])
+    release();await pending
+    expect(order).toEqual(['request','ack','transport'])
+    expect(handle.kill).toHaveBeenCalledOnce()
+  })
+
+  it('主会话与批注副会话下发 SDK 原生参数，目录副会话不携带完整宿主规则', async () => {
+    mocks.initialize.mockResolvedValue({...initialized,agentInfo:{name:'claude',version:'0.91.0'}})
+    mocks.restore.mockResolvedValue({sessionId:'main',restoreMethod:'resume',sessionRestored:true,restoreAttempts:[],nativeSessionAccepted:true})
+    const result=await runInAcpContext(scope,()=>connectAcp({runtimeId:'claude',resumeSessionId:'main'}))
+    expect(result.ok && result.value.phase==='ready' && result.value.promptMode).toBe('native')
+    const meta=mocks.restore.mock.calls[0]![0].sessionMeta
+    expect(meta.systemPrompt.append).toContain('montree_present')
+    expect(meta.claudeCode.options.plugins[0].path).toContain('resources')
+    await runInAcpContext(scope,()=>createAcpSession())
+    expect(mocks.sessionRequest.mock.lastCall).toEqual(['session/new',expect.objectContaining({_meta:meta})])
+    await runInAcpContext(scope,()=>loadAcpSession({sessionId:'secondary',secondary:true}))
+    expect(mocks.sessionRequest.mock.lastCall).toEqual(['session/load',expect.objectContaining({_meta:meta})])
+    await runInAcpContext(scope,()=>createAcpSession(undefined,'toc'))
+    expect(mocks.sessionRequest.mock.lastCall![1]).not.toHaveProperty('_meta')
+    expect(getAcpState(scope).sessionId).toBe('main')
+  })
+
 })

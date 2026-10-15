@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { isOk } from '@montree/contracts'
 import { acpApi } from '@/api/acp-api'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
@@ -67,6 +67,7 @@ export function useAnnotationAgentAssist(options: {
   const [composeHint, setComposeHint] = useState(false)
   const [awaitingDirection, setAwaitingDirection] = useState(false)
 
+  const sessionModes = useRef(new Map<string, 'native' | 'compatibility'>())
   const fileKey = annotationFileKey(options.fileFingerprint, options.filePath)
   /** 只需 Agent 进程已连接；不必占用右侧主 session */
   const agentReady = status === 'connected'
@@ -104,6 +105,7 @@ export function useAnnotationAgentAssist(options: {
         secondary: true,
       })
       if (isOk(loaded)) {
+        sessionModes.current.set(loaded.value.sessionId,loaded.value.promptMode ?? 'compatibility')
         useAnnotationAgentStore
           .getState()
           .bindSessionId(loaded.value.sessionId, runtimeId)
@@ -120,6 +122,7 @@ export function useAnnotationAgentAssist(options: {
       return null
     }
 
+    sessionModes.current.set(created.value.sessionId,created.value.promptMode ?? 'compatibility')
     useAnnotationAgentStore
       .getState()
       .bindSessionId(created.value.sessionId, runtimeId)
@@ -166,7 +169,11 @@ export function useAnnotationAgentAssist(options: {
       store.beginAgentReply()
 
       const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
+      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, {
+        includeBootstrap,
+        // Only this secondary session's response confirms native delivery.
+        mode: sessionModes.current.get(sid) ?? 'compatibility',
+      })
       const result = await acpApi.prompt({
         sessionId: sid,
         prompt: [...prefix, { type: 'text', text: promptText }],
@@ -353,7 +360,11 @@ export function useAnnotationAgentAssist(options: {
       store.beginAgentReply()
 
       const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, { includeBootstrap })
+      const prefix = buildMontreePromptPrefix(`annotation:${fileKey}`, {
+        includeBootstrap,
+        // Only this secondary session's response confirms native delivery.
+        mode: sessionModes.current.get(sid) ?? 'compatibility',
+      })
       const result = await acpApi.prompt({
         sessionId: sid,
         prompt: [...prefix, { type: 'text', text: built.promptText }],

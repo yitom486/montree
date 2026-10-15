@@ -1,6 +1,7 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { agent, client, methods, RequestError } from '@agentclientprotocol/sdk'
 import {
+  requestSessionWithResources,
   isTransientAcpTransportError,
   isAuthenticationRequired,
   restoreOrCreateAcpSession,
@@ -360,5 +361,31 @@ describe('restoreOrCreateAcpSession（SDK 内存对接）', () => {
     const { parseAcpConfigOptions } = await import("@yitom/acp-client")
     const parsed = parseAcpConfigOptions(result.configOptions)
     expect(parsed.find((o) => o.configId === 'model')?.currentValue).toBe('a')
+  })
+})
+
+
+describe('原生资源正式会话接线', () => {
+  it.each(['new','resume','load'] as const)('%s 携带同源资源参数并回显确认', async kind => {
+    const meta={appResources:{directory:'D:/application/resources/agent'}}
+    const mcpServers=[{name:'montree',command:'node',args:['server.cjs'],env:[]}]
+    const request=vi.fn().mockResolvedValue({sessionId:'confirmed'})
+    const result=await restoreOrCreateAcpSession({request,cwd:'D:/books',resumeSessionId:kind==='new'?null:'old',
+      resumeSupported:kind==='resume',loadSupported:kind==='load',mcpServers,sessionMeta:meta,retryDelayMs:0,log:()=>{}})
+    expect(request).toHaveBeenCalledWith('session/'+kind,expect.objectContaining({_meta:meta,mcpServers}))
+    expect(result.nativeSessionAccepted).toBe(true)
+    expect(result.restoreMethod).toBe(kind)
+  })
+  it('拒绝原生参数只移除扩展，仍然保留全部 MCP',async()=>{
+    const mcpServers=[{name:'montree',command:'node',args:[],env:[]}]
+    const request=vi.fn().mockRejectedValueOnce(new RequestError(-32602,'unsupported meta')).mockResolvedValue({sessionId:'fallback'})
+    const result=await requestSessionWithResources(request,'session/new',{cwd:'D:/books',mcpServers},{appResources:{directory:'D:/app'}})
+    expect(result.nativeSessionAccepted).toBe(false)
+    expect(request.mock.calls[1]).toEqual(['session/new',{cwd:'D:/books',mcpServers}])
+  })
+  it('传输超时不作为原生参数拒绝重发',async()=>{
+    const request=vi.fn().mockRejectedValue(new Error('request timeout'))
+    await expect(requestSessionWithResources(request,'session/new',{cwd:'D:/books'},{appResources:{directory:'D:/app'}})).rejects.toThrow('timeout')
+    expect(request).toHaveBeenCalledOnce()
   })
 })

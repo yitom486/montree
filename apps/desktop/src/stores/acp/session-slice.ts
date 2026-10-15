@@ -4,6 +4,7 @@ import type {
   AcpConfigOption,
   AcpConnectionStatus,
   AcpPromptCapabilities,
+  AcpPromptMode,
   AppErrorCode,
 } from '@montree/contracts'
 import {
@@ -24,6 +25,14 @@ export interface SessionSlice {
   promptCapabilities: AcpPromptCapabilities
   preferredConfigByRuntime: AcpPreferredConfigMap
   /**
+   * 当前连接确认的 prompt 模式（内存态，不持久化）：
+   * native = 静态规则已由原生 developer_instructions 下发，本轮只发动态上下文；
+   * compatibility = 默认值，未确认前一律按原有每轮静态前缀发送。
+   * connect 成功由 finalizeConnected 写入，disconnect/切换运行时清空。
+   */
+  sessionPromptMode: AcpPromptMode
+  sessionPromptModeReason?: string
+  /**
    * Cursor 横杠 canonical 模型目录（内存态，不持久化）：
    * connect 成功由渲染端写入，disconnect/切换清空。无目录=现状行为一字不改，
    * dash 受控尝试仅在有目录时作为 listed 门槛后的最后候补。
@@ -33,6 +42,7 @@ export interface SessionSlice {
   setSelectedRuntimeId: (id: string) => void
   setStatus: (status: AcpConnectionStatus, errorMessage?: string, errorCode?: AppErrorCode) => void
   setSession: (sessionId: string | null, configOptions?: AcpConfigOption[]) => void
+  setPromptMode: (mode: AcpPromptMode, reason?: string) => void
   setConfigOptions: (options: AcpConfigOption[]) => void
   setPromptCapabilities: (caps: AcpPromptCapabilities) => void
   setPrompting: (prompting: boolean) => void
@@ -69,6 +79,8 @@ export const createSessionSlice: StateCreator<
   promptCapabilities: {},
   preferredConfigByRuntime: {},
   modelCatalogByRuntime: {},
+  sessionPromptMode: 'compatibility',
+  sessionPromptModeReason: undefined,
   connectRequestedAt: 0,
   runtimeSwitchRequestedAt: 0,
   requestedRuntimeId: null,
@@ -106,6 +118,9 @@ export const createSessionSlice: StateCreator<
         configOptions: [],
         promptCapabilities: {},
         modelCatalogByRuntime: {},
+        // 连接模式随新连接重裁，未确认前回落兼容（防旧 native 标记串到新会话）
+        sessionPromptMode: 'compatibility',
+        sessionPromptModeReason: undefined,
       }
     }),
 
@@ -124,6 +139,8 @@ export const createSessionSlice: StateCreator<
             promptCapabilities: {},
             configOptions: [],
             modelCatalogByRuntime: {},
+            sessionPromptMode: 'compatibility' as AcpPromptMode,
+            sessionPromptModeReason: undefined,
           }
         : {}),
     }),
@@ -146,6 +163,11 @@ export const createSessionSlice: StateCreator<
     })),
 
   setConfigOptions: (options) => set({ configOptions: options }),
+  setPromptMode: (mode, reason) =>
+    set((s) => {
+      if (s.sessionPromptMode === mode && s.sessionPromptModeReason === reason) return s
+      return { sessionPromptMode: mode, sessionPromptModeReason: reason }
+    }),
   setPromptCapabilities: (caps) => set({ promptCapabilities: caps }),
   setPrompting: (prompting) => set({ prompting }),
   setModelCatalog: (runtimeId, catalog) =>

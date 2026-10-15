@@ -1,3 +1,5 @@
+import { initializeAgentResources, montreeAgentResourceDir } from './agent-resources'
+import { closeAcpSessions } from '@yitom/acp-client'
 import { app } from 'electron'
 import { bindAcpContext, currentAcpContext, type AcpContext } from './acp-context'
 import {
@@ -35,6 +37,15 @@ import { restoreOrCreateAcpSession, isAuthenticationRequired } from './session-o
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
 import { ensureBunForCommand } from '../bun-runtime'
+import {
+  describeBindingForLog,
+  agentResourceTemplateDir,
+  isSupportedBridgeVersion,
+  materializeBindingManifest,
+  prepareNativeBinding,
+  resolvePromptMode,
+  type PreparedNativeBinding,
+} from './native-binding'
 import { buildCursorMissingCliMessage, getCursorCatalogIds } from './runtimes/cursor'
 import { buildAgyMissingCliMessage } from './runtimes/agy'
 import { acpState, claimAcpSession, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
@@ -174,6 +185,7 @@ async function openSessionAfterAuth(
     const opened = await restoreOrCreateAcpSession({
       request: (method, params) => sdkRequest<unknown, unknown>(a.value, method, params),
       cwd: sessionCwd,
+      sessionMeta:acpState.connectionBinding?.sessionMeta,
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
@@ -212,6 +224,19 @@ async function openSessionAfterAuth(
       console.debug('[acp] cursor model catalog 拉取失败，继续连接', error)
     }
 
+    // prompt 模式裁决：仅「资格 + 版本 + 绑定就绪 + 新会话」四齐才 native；
+    // 恢复/重载旧线程一律 compatibility；摘要变更遇忙沿用旧进程同样兼容。
+    const cb = acpState.connectionBinding
+    const modeDecision = cb?.deferredBusy
+      ? { mode: 'compatibility' as const, reason: 'rules-updated-deferred-busy' as const }
+      : resolvePromptMode({
+        eligible: cb?.eligible ?? false,
+        versionSupported: cb?.versionSupported ?? false,
+        bindingReady: Boolean(cb?.profileTag) && (!cb?.sessionMeta || opened.nativeSessionAccepted),
+        nativeSessionAccepted:opened.nativeSessionAccepted,
+        restoreMethod: opened.restoreMethod,
+      })
+
     return ok({
       phase: 'ready',
       runtimeId: acpState.runtimeId,
@@ -229,6 +254,9 @@ async function openSessionAfterAuth(
       restoreAttempts:
         opened.restoreAttempts.length > 0 ? opened.restoreAttempts : undefined,
       ...(modelCatalog ? { modelCatalog } : {}),
+      promptMode: modeDecision.mode,
+      ...(modeDecision.reason ? { promptModeReason: modeDecision.reason } : {}),
+      ...(cb?.profileHash ? { profileHash: cb.profileHash } : {}),
     })
   } catch (error) {
     if (!options?.keepAliveOnFailure) {
@@ -287,10 +315,61 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
     resumeSessionId: payload.resumeSessionId,
   })
 
+  const adapter = safeGetAdapter(runtime.id)
+  let customProviderEnv: NodeJS.ProcessEnv = {}
+  if (adapter.getCustomProvider) {
+    try {
+      const custom = await adapter.getCustomProvider()
+      customProviderEnv = custom?.customEnv ?? {}
+    } catch {
+      console.warn('[acp] getCustomProvider 异常，忽略自定义供应商')
+    }
+  }
+
   // 常驻复用：同 runtime 有存活温进程时跳过冷启动（省掉解压 + 导包）。
-  // 温进程是否健康由后面的
-  // 温进程握手失败时，同一次请求仅回落冷启动一次。
-  const warmHandle = allowWarm ? getLiveAcpProcess(runtime.id, payload.cwd) : undefined
+  // 规则摘要纳入匹配（见 getLiveAcpProcess 的标签比对）：要求绑定标签时
+  // 不一致即视为无温进程。摘要变更但旧进程正忙（prompt 在途）：不强杀、
+  // 不建新、不清历史，沿用旧进程并整体降级兼容，新摘要下次冷启动生效。
+  const homeDirectory = app.getPath('home')
+  const resourceDir = montreeAgentResourceDir(homeDirectory)
+  try {
+    await initializeAgentResources(agentResourceTemplateDir(app.getAppPath(), app.isPackaged), homeDirectory)
+  } catch (error) {
+    console.warn('[acp] 无法初始化用户规则目录，保留用户目录并按资源可用情况降级', { code: (error as NodeJS.ErrnoException).code })
+  }
+  const nativeBinding: PreparedNativeBinding = await prepareNativeBinding({
+    runtimeId: runtime.id,
+    command:runtime.command,
+    resourceDir,
+    env: { ...process.env, ...customProviderEnv },
+    cwd: payload.cwd,
+    executionVerified: !(payload.cwd && isWslPath(payload.cwd)) && Object.keys(customProviderEnv).length === 0,
+  })
+  let warmHandle = allowWarm
+    ? getLiveAcpProcess(runtime.id, payload.cwd, nativeBinding.profileTag)
+    : undefined
+  const bindingDeferredBusy = false
+  if (!warmHandle && allowWarm) {
+    // 标签原因 miss 才可能命中：无标签复查确认旧进程存活且执行上下文一致
+    const stale = getLiveAcpProcess(runtime.id, payload.cwd)
+    if (stale && acpState.processHandle === stale && acpState.activePromptSessionId !== null) {
+      logAcpDiagnostic('acp.binding.deferred-busy', describeBindingForLog({
+        runtimeId: runtime.id,
+        mode: 'compatibility',
+        reason: 'rules-updated-deferred-busy',
+        profileHash: nativeBinding.profileHash ?? undefined,
+      }))
+      // 不能为了“延后规则”关闭 SDK：disconnect 仍会取消正在进行的请求。
+      return err({ code: 'ACP_PROTOCOL_ERROR', message: 'Agent 正在回答，规则更新将在回答结束后重新连接时应用' })
+    }
+  }
+  logAcpDiagnostic('acp.binding.prepared', describeBindingForLog({
+    runtimeId: runtime.id,
+    mode: 'compatibility',
+    reason: nativeBinding.eligible ? undefined : nativeBinding.reason,
+    profileHash: nativeBinding.profileHash ?? undefined,
+    rulesChars: nativeBinding.rulesChars,
+  }))
   let initialized = false
   logAcpDiagnostic('acp.connect.started', { runtime: runtime.id, environment: payload.cwd && isWslPath(payload.cwd) ? 'wsl' : 'native', reused: Boolean(warmHandle) })
   if (warmHandle) {
@@ -312,8 +391,6 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
   acpState.pendingHasLocalHistory =
     typeof payload.hasLocalHistory === 'boolean' ? payload.hasLocalHistory : null
   setStatus('connecting')
-
-  const adapter = safeGetAdapter(runtime.id)
 
   // 预 spawn 接线：adapter 自报 CLI 未安装（resolveSpawnCommand → null）时
   // 直接回带安装指引的 ACP_SPAWN_ERROR，不触达 spawn。
@@ -394,17 +471,6 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
     proxyResult = buildAcpProxySpawnEnv(proxySettings)
   }
 
-  // 自定义供应商模式（Codex 等）：隔离 CODEX_HOME + 注入 Key；非 codex 走空 env
-  let customProviderEnv: NodeJS.ProcessEnv = {}
-  if (adapter.getCustomProvider) {
-    try {
-      const custom = await adapter.getCustomProvider()
-      customProviderEnv = custom?.customEnv ?? {}
-    } catch (error) {
-      console.warn('[acp] getCustomProvider 异常，忽略自定义供应商', error)
-    }
-  }
-
   try {
     // 冷启动才做 runtime 级副作用；温进程复用路径跳过，追求毫秒级重连。
     if (!warmHandle && adapter.onColdStart) {
@@ -426,8 +492,11 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
       env: {
         ...customProviderEnv,
         ...proxyResult.env,
+        // Runtime-specific configuration is prepared by the SDK.
+        ...nativeBinding.resourceEnv,
       },
       envRemove: proxyResult.envRemove,
+      profileTag: nativeBinding.profileTag,
       onExit: () => {
         if (gen !== acpState.connectGeneration) return
         if (
@@ -525,7 +594,56 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
     acpState.cachedAgentName = typeof agentInfo?.name === 'string' ? agentInfo.name : undefined
     acpState.cachedAgentVersion = typeof agentInfo?.version === 'string' ? agentInfo.version : undefined
 
+    // 原生绑定确认（证据门）：版本未知/不在白名单 → 整体兼容，不冒充 native；
+    // 版本记录到进程句柄（同进程内不变），审计 manifest 带最终模式。
+    const versionCheck = isSupportedBridgeVersion(runtime.id, acpState.cachedAgentVersion)
+    if (acpState.processHandle) {
+      acpState.processHandle.bridgeVersion = acpState.cachedAgentVersion
+    }
+    acpState.connectionBinding = {
+      eligible: nativeBinding.eligible,
+      versionSupported: versionCheck.eligible,
+      profileTag: nativeBinding.profileTag,
+      profileHash: nativeBinding.profileHash,
+      bridgeVersion: acpState.cachedAgentVersion,
+      deferredBusy: bindingDeferredBusy,
+      sessionMeta:versionCheck.eligible ? nativeBinding.sessionMeta : undefined,
+    }
+    logAcpDiagnostic('acp.binding.confirmed', describeBindingForLog({
+      runtimeId: runtime.id,
+      mode: 'compatibility',
+      reason: bindingDeferredBusy
+        ? 'rules-updated-deferred-busy'
+        : (!nativeBinding.eligible
+          ? nativeBinding.reason
+          : (!versionCheck.eligible ? versionCheck.reason : undefined)),
+      profileHash: nativeBinding.profileHash ?? undefined,
+      bridgeVersion: acpState.cachedAgentVersion,
+      rulesChars: nativeBinding.rulesChars,
+    }))
+    if (nativeBinding.profileHash) {
+      // 审计 manifest（best-effort；userData 不可用如单测 mock 时跳过，绝不写相对路径）
+      let userDataDir = ''
+      try {
+        userDataDir = app.getPath('userData') || ''
+      } catch {
+        userDataDir = ''
+      }
+      if (userDataDir) {
+        void materializeBindingManifest(userDataDir, {
+          profileHash: nativeBinding.profileHash,
+          runtimeId: runtime.id,
+          bridgeVersion: acpState.cachedAgentVersion,
+          eligible: nativeBinding.eligible,
+          versionSupported: versionCheck.eligible,
+          rulesChars: nativeBinding.rulesChars,
+          createdAt: new Date().toISOString(),
+        })
+      }
+    }
+
     const caps = (initResult.agentCapabilities ?? {}) as unknown as Record<string, unknown>
+    acpState.closeSessionSupported = Boolean((caps.sessionCapabilities as Record<string, unknown> | undefined)?.close)
     acpState.loadSessionSupported = parseLoadSessionSupported(caps)
     acpState.resumeSessionSupported = parseResumeSessionSupported(caps)
     // 多模态图片能力裁决：服务端显式声明优先；未显式禁用时默认开启并自动检测大模型/多模态证据
@@ -664,7 +782,9 @@ export function disconnectAcp(
   // 立即取消在途连接；实际清理排在它之后，避免拆掉下一条新连接。
   ++acpState.connectGeneration
   pendingConnections.delete(currentAcpContext())
-  try { acpState.sdkConn?.close() } catch { /* 立即取消在途请求；完整清理仍按队列顺序执行 */ }
+  if (!acpState.closeSessionSupported || acpState.status === 'connecting') {
+    try { acpState.sdkConn?.close() } catch { /* 取消握手；已连接且支持 close 时交给队列先清理会话 */ }
+  }
   return enqueueConnection(() => disconnectAcpNow(reason, opts))
 }
 
@@ -672,6 +792,10 @@ async function disconnectAcpNow(
   reason?: string,
   opts?: { killProcess?: boolean; preserveStatus?: boolean },
 ): Promise<Result<void, AppError>> {
+  if (acpState.closeSessionSupported && acpState.sdkConn?.agent) {
+    const ids = acpState.ownedSessionIds.get(acpState.runtimeId ?? '') ?? new Set<string>()
+    await closeAcpSessions(acpState.sdkConn.agent, ids)
+  }
   acpState.terminalManager.releaseAll()
 
   // SDK 长驻连接关闭：在途请求一并取消（无待决 Map，直返 bridge 结果）
@@ -709,6 +833,7 @@ async function disconnectAcpNow(
   acpState.sessionId = null
   acpState.runtimeId = null
   acpState.workspaceRoot = null
+  acpState.closeSessionSupported = false
   acpState.loadSessionSupported = false
   acpState.resumeSessionSupported = false
   acpState.cachedPromptCapabilities = {}
@@ -718,6 +843,7 @@ async function disconnectAcpNow(
   disarmSuppressSettle()
   acpState.cachedAgentName = undefined
   acpState.cachedAgentVersion = undefined
+  acpState.connectionBinding = null
   if (!opts?.preserveStatus) setStatus('disconnected', reason)
   return ok(undefined)
 }

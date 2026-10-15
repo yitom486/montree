@@ -1,3 +1,5 @@
+import { initializeAgentResources } from './services/acp/agent-resources'
+import { agentResourceTemplateDir } from './services/acp/native-binding'
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { existsSync, statSync } from 'node:fs'
@@ -86,7 +88,12 @@ app.on('open-url', (event, url) => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await initializeAgentResources(agentResourceTemplateDir(app.getAppPath(), app.isPackaged), app.getPath('home'))
+  } catch (error) {
+    console.warn('[agent] 无法初始化 .montree 规则与技能目录', { code: (error as NodeJS.ErrnoException).code })
+  }
   configureAcpDiagnostics(path.join(app.getPath('userData'), 'logs'))
   installAppMenu()
   registerIpcHandlers()

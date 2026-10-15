@@ -18,6 +18,7 @@ export interface RestoreOrCreateSessionInput {
   loadSupported: boolean
   /** 客户端自带的窗口 MCP stdio 配置 */
   mcpServers?: unknown[]
+  sessionMeta?: Record<string, unknown>
   /** session/load 回放期间回调（主进程用来压制 UI 更新） */
   onSuppressUpdates?: (suppress: boolean) => void
   /** 测试可设为 0 */
@@ -26,6 +27,7 @@ export interface RestoreOrCreateSessionInput {
 }
 
 export interface RestoreOrCreateSessionResult {
+  nativeSessionAccepted: boolean
   sessionId: string
   configOptions: unknown
   restoreMethod: AcpSessionRestoreMethod
@@ -73,6 +75,12 @@ export function isTransientAcpTransportError(error: unknown): boolean {
 export async function restoreOrCreateAcpSession(
   input: RestoreOrCreateSessionInput,
 ): Promise<RestoreOrCreateSessionResult> {
+  let nativeSessionAccepted=false
+  const request=async(method:string,params:Record<string,unknown>)=>{
+    const opened=await requestSessionWithResources(input.request,method,params,input.sessionMeta)
+    nativeSessionAccepted=opened.nativeSessionAccepted
+    return opened.result
+  }
   const resumeId = input.resumeSessionId?.trim() || null
   const restoreAttempts: AcpSessionRestoreAttempt[] = []
   const delayMs = input.retryDelayMs ?? 250
@@ -111,7 +119,7 @@ export async function restoreOrCreateAcpSession(
         maxTries,
       })
       try {
-        const result = (await input.request(rpcMethod, {
+        const result = (await request(rpcMethod, {
           sessionId: resumeId,
           cwd: input.cwd,
           mcpServers: input.mcpServers ?? [],
@@ -152,14 +160,14 @@ export async function restoreOrCreateAcpSession(
       mcpServers: input.mcpServers ?? [],
     }
     try {
-      return (await input.request('session/new', baseParams)) as Record<string, unknown>
+      return (await request('session/new', baseParams)) as Record<string, unknown>
     } catch (firstError) {
       if ((input.mcpServers ?? []).length === 0) throw firstError
       log('warn', 'session/new failed, retry with mcpServers', {
         error: errorMessage(firstError),
       })
       try {
-        return (await input.request('session/new', {
+        return (await request('session/new', {
           cwd: input.cwd,
           mcpServers: input.mcpServers ?? [],
         })) as Record<string, unknown>
@@ -178,6 +186,7 @@ export async function restoreOrCreateAcpSession(
       const id = typeof resumed.sessionId === 'string' ? resumed.sessionId : resumeId
       return {
         sessionId: id,
+        nativeSessionAccepted,
         configOptions: withModelsFallback(resumed),
         restoreMethod: 'resume',
         sessionRestored: true,
@@ -197,6 +206,7 @@ export async function restoreOrCreateAcpSession(
         const id = typeof loaded.sessionId === 'string' ? loaded.sessionId : resumeId
         return {
           sessionId: id,
+        nativeSessionAccepted,
           configOptions: withModelsFallback(loaded),
           restoreMethod: 'load',
           sessionRestored: true,
@@ -221,10 +231,24 @@ export async function restoreOrCreateAcpSession(
 
   return {
     sessionId: newSessionId,
+    nativeSessionAccepted,
     configOptions: withModelsFallback(sessionResult),
     restoreMethod: 'new',
     sessionRestored: false,
     requestedSessionId: resumeId ?? undefined,
     restoreAttempts,
+  }
+}/** Preserve MCP when a bridge rejects only its optional native resource extension. */
+export async function requestSessionWithResources(
+  request:AcpRpcRequest, method:string, params:Record<string,unknown>, sessionMeta?:Record<string,unknown>,
+):Promise<{result:Record<string,unknown>;nativeSessionAccepted:boolean}> {
+  if (!sessionMeta) return {result:await request(method,params) as Record<string,unknown>,nativeSessionAccepted:false}
+  try {
+    return {result:await request(method,{...params,_meta:sessionMeta}) as Record<string,unknown>,nativeSessionAccepted:true}
+  } catch(error) {
+    const rejected=error instanceof RequestError && error.code===-32602
+      || /native.*meta.*reject|unsupported.*(meta|systemPrompt)|unknown.*(meta|systemPrompt)/i.test(errorMessage(error))
+    if (!rejected || isTransientAcpTransportError(error)) throw error
+    return {result:await request(method,params) as Record<string,unknown>,nativeSessionAccepted:false}
   }
 }

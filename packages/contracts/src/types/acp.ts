@@ -152,7 +152,24 @@ export interface AcpConnectReadyResult {
    * 有则 listed 未命中时可精确匹配 dash 对应一试，无则保持现状行为一字不改。
    */
   modelCatalog?: string[]
+  /**
+   * 本次连接确认的 prompt 模式：native 会话只发用户问题与动态文档上下文，
+   * 静态规则已由原生 developer_instructions 下发；compatibility 保持原有
+   * 每轮静态前缀。缺席一律按 compatibility 处理。
+   */
+  promptMode?: AcpPromptMode
+  /** prompt 模式降级原因（native 时缺席）；脱敏短码，不含指令与配置正文 */
+  promptModeReason?: string
+  /** 原生规则内容摘要（短哈希；compatibility 时缺席） */
+  profileHash?: string
 }
+
+/**
+ * 原生规则 prompt 模式（主进程裁决、渲染端执行）：
+ * native = 静态规则已原生下发，本轮只发动态上下文；
+ * compatibility = 未验证/降级路径，保持原有每轮静态前缀。
+ */
+export type AcpPromptMode = 'native' | 'compatibility'
 
 /** 进程已起、协议已握手，但必须先 authenticate，还没有可 prompt 的 session */
 export interface AcpConnectNeedsAuthResult {
@@ -233,6 +250,7 @@ export interface AcpSessionNewPayload {
 
 export interface AcpSessionNewResult {
   sessionId: string
+  promptMode?: AcpPromptMode
   configOptions?: AcpConfigOption[]
 }
 

@@ -1,3 +1,5 @@
+import { requestSessionWithResources } from './session-open'
+import { resolvePromptMode } from './native-binding'
 import type { AppError } from '@montree/contracts'
 import { err, ok, type Result, isWslPath, windowsToLinuxPath } from '@montree/contracts'
 import type {
@@ -25,6 +27,13 @@ import {
 import { disconnectAcp } from './acp-connection'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
+function sessionPromptMode(nativeSessionAccepted:boolean, restored:boolean) {
+  const binding=acpState.connectionBinding
+  return resolvePromptMode({eligible:binding?.eligible ?? false,versionSupported:binding?.versionSupported ?? false,
+    bindingReady:Boolean(binding?.profileTag) && (!binding?.sessionMeta || nativeSessionAccepted),
+    restoreMethod:restored ? 'load' : 'new',nativeSessionAccepted}).mode
+}
+
 function mcpServerEntry(handle: MontreeMcpServerHandle, name: string, cwd?: string): unknown[] {
   return windowMcpEntry(handle, name, cwd)
 }
@@ -41,7 +50,7 @@ export async function loadAcpSession(payload: {
   cwd?: string
   secondary?: boolean
 }): Promise<
-  Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions> }, AppError>
+  Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@montree/contracts').AcpPromptMode }, AppError>
 > {
   const a = requireAgent()
   if (!a.ok) return err(a.error)
@@ -58,15 +67,17 @@ export async function loadAcpSession(payload: {
   if (secondary) acpState.suppressSessionUpdates = true
 
   try {
-    const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
-      a.value,
+    const opened = await requestSessionWithResources(
+      (method,params)=>sdkRequest(a.value,method,params),
       methods.agent.session.load,
       {
         sessionId: payload.sessionId,
         cwd,
         mcpServers: acpState.montreeMcp ? mcpServerEntry(acpState.montreeMcp, 'montree', cwd) : [],
       },
+      acpState.connectionBinding?.sessionMeta,
     )
+    const result=opened.result
     const id =
       typeof result.sessionId === 'string' ? result.sessionId : payload.sessionId
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
@@ -81,6 +92,7 @@ export async function loadAcpSession(payload: {
     return ok({
       sessionId: id,
       configOptions: parseAcpConfigOptions(result.configOptions),
+      promptMode:sessionPromptMode(opened.nativeSessionAccepted, true),
     })
   } catch (error) {
     return err(toProtocolError(error, '加载会话失败'))
@@ -98,7 +110,7 @@ export async function loadAcpSession(payload: {
 export async function createAcpSession(
   cwd?: string,
   toolScope: 'full' | 'toc' = 'full',
-): Promise<Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions> }, AppError>> {
+): Promise<Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@montree/contracts').AcpPromptMode }, AppError>> {
   const a = requireAgent()
   if (!a.ok) return err(a.error)
 
@@ -112,14 +124,16 @@ export async function createAcpSession(
           ? mcpServerEntry(acpState.montreeMcp, 'montree', resolvedCwd)
           : []
     const sessionCwd = isWslPath(resolvedCwd) ? windowsToLinuxPath(resolvedCwd) : resolvedCwd
-    const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
-      a.value,
+    const opened = await requestSessionWithResources(
+      (method,params)=>sdkRequest(a.value,method,params),
       methods.agent.session.new,
       {
         cwd: sessionCwd,
         mcpServers,
       },
+      toolScope === 'full' ? acpState.connectionBinding?.sessionMeta : undefined,
     )
+    const result=opened.result
     const id = typeof result.sessionId === 'string' ? result.sessionId : null
     if (!id) {
       return err({ code: 'ACP_PROTOCOL_ERROR', message: 'session/new 未返回 sessionId' })
@@ -130,6 +144,7 @@ export async function createAcpSession(
     return ok({
       sessionId: id,
       configOptions: parseAcpConfigOptions(result.configOptions),
+      promptMode:toolScope === 'full' ? sessionPromptMode(opened.nativeSessionAccepted,false) : 'compatibility',
     })
   } catch (error) {
     return err(toProtocolError(error, '创建会话失败'))

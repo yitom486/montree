@@ -90,6 +90,7 @@ export function useAcpSession(workspaceRoot?: string) {
   const beginAgentReply = useAcpUiStore((s) => s.beginAgentReply)
   const setPrompting = useAcpUiStore((s) => s.setPrompting)
   const setPromptCapabilities = useAcpUiStore((s) => s.setPromptCapabilities)
+  const setPromptMode = useAcpUiStore((s) => s.setPromptMode)
   const clearMessagesInStore = useAcpUiStore((s) => s.clearMessages)
   const sessionId = useAcpUiStore((s) => s.sessionId)
   const prompting = useAcpUiStore((s) => s.prompting)
@@ -145,6 +146,8 @@ export function useAcpSession(workspaceRoot?: string) {
       })
       setSession(result.sessionId, options)
       setPromptCapabilities(result.promptCapabilities ?? {})
+      // 原生绑定模式随连接确认写入（缺席=兼容）；断开/切换由 slice 清零
+      setPromptMode(result.promptMode ?? 'compatibility', result.promptModeReason)
       // 横杠目录写入内存态（无目录=后续逻辑一律跳过，行为与现状一致）
       try {
         const ridForCatalog =
@@ -255,7 +258,7 @@ export function useAcpSession(workspaceRoot?: string) {
         })
       }
     },
-    [appendSystemMessage, setConfigOptions, setPromptCapabilities, setSession, setStatus],
+    [appendSystemMessage, setConfigOptions, setPromptCapabilities, setPromptMode, setSession, setStatus],
   )
 
   const connect = useCallback(async (explicitRuntimeId?: string) => {
@@ -651,6 +654,7 @@ export function useAcpSession(workspaceRoot?: string) {
       const includeBootstrap = shouldSendSessionBootstrap(sid)
       const prefix = buildMontreePromptPrefix(useAcpUiStore.getState().activeThreadId, {
         includeBootstrap,
+        mode: useAcpUiStore.getState().sessionPromptMode,
       })
       const result = await acpApi.prompt({
         sessionId: sid,

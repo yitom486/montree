@@ -727,3 +727,22 @@ describe('cursor load 回放清洗（user-chunk 第二道网）', () => {
     expect(activeReplayMessages().filter((m) => m.role === 'user')[0]?.text).toBe(raw)
   })
 })
+
+describe('会话 prompt 模式（native/compatibility）', () => {
+  it('缺省兼容：写入 native 后断开回落', () => {
+    expect(useAcpUiStore.getState().sessionPromptMode).toBe('compatibility')
+    useAcpUiStore.getState().setPromptMode('native')
+    expect(useAcpUiStore.getState().sessionPromptMode).toBe('native')
+    // 断开清空（沿用 setStatus 现有清位语义）
+    useAcpUiStore.getState().setStatus('disconnected')
+    expect(useAcpUiStore.getState().sessionPromptMode).toBe('compatibility')
+    expect(useAcpUiStore.getState().sessionPromptModeReason).toBeUndefined()
+  })
+
+  it('setPromptMode 同值不重设（遵 zustand action 规范）', () => {
+    useAcpUiStore.getState().setPromptMode('native', 'new-session')
+    const before = useAcpUiStore.getState()
+    useAcpUiStore.getState().setPromptMode('native', 'new-session')
+    expect(useAcpUiStore.getState()).toBe(before)
+  })
+})

@@ -3,6 +3,7 @@ import type {
   AcpConfigOption,
   AcpConnectionStatus,
   AcpPromptCapabilities,
+  AcpPromptMode,
   AppErrorCode,
 } from '@montree/contracts'
 import type { AcpPermissionOptionView } from '@/lib/agent/acp-permission'
@@ -61,6 +62,13 @@ export interface AcpUiStore {
    * connect 成功写入，disconnect/切换清空。见 session-slice。
    */
   modelCatalogByRuntime: Record<string, string[]>
+  /**
+   * 当前连接确认的 prompt 模式（内存态，不持久化）：
+   * native = 静态规则已原生下发，本轮只发动态上下文；
+   * compatibility = 默认值。connect 成功写入，disconnect/切换清空。
+   */
+  sessionPromptMode: AcpPromptMode
+  sessionPromptModeReason?: string
   /** 当前绑定的工作区根目录（本地路径或 WSL UNC 路径） */
   currentWorkspaceRoot?: string
   threads: AcpChatThread[]
@@ -120,6 +128,7 @@ export interface AcpUiStore {
   setSelectedRuntimeId: (id: string) => void
   setStatus: (status: AcpConnectionStatus, errorMessage?: string, errorCode?: AppErrorCode) => void
   setSession: (sessionId: string | null, configOptions?: AcpConfigOption[]) => void
+  setPromptMode: (mode: AcpPromptMode, reason?: string) => void
   setConfigOptions: (options: AcpConfigOption[]) => void
   setPromptCapabilities: (caps: AcpPromptCapabilities) => void
   setPrompting: (prompting: boolean) => void

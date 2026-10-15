@@ -6,6 +6,10 @@ import { logAcpDiagnostic } from './mcp/diagnostics'
 export interface SpawnedAcpProcess {
   runtimeId: string
   executionContext?: string
+  /** 原生规则绑定标签（rules 摘要 + 运行时；缺席=旧进程或未绑定，按旧语义复用） */
+  profileTag?: string | null
+  /** 握手后记录的桥版本（同一进程内不变，供诊断与模式裁决） */
+  bridgeVersion?: string
   child: ChildProcessWithoutNullStreams
   kill: () => void
   /** spawn 时间戳（保留供诊断/排序，stderr 归因已去窗口化，不再参与判定） */
@@ -30,6 +34,8 @@ export interface SpawnAcpOptions {
   env?: NodeJS.ProcessEnv
   /** 需要从继承环境里剔除的变量名（如关闭代理时清理 HTTP(S)_PROXY） */
   envRemove?: string[]
+  /** 原生规则绑定标签（与温进程标签一致才复用；缺席=不要求绑定） */
+  profileTag?: string | null
   onStderrLine?: (line: string) => void
   onExit?: (code: number | null, signal: NodeJS.Signals | null) => void
 }
@@ -200,6 +206,7 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
   const handle: SpawnedAcpProcess = {
     runtimeId: options.runtime.id,
     executionContext: acpExecutionContext(options.cwd),
+    profileTag: options.profileTag ?? null,
     child,
     spawnedAt: Date.now(),
     stderrTail,
@@ -294,8 +301,14 @@ export function listLiveAcpRuntimeIds(): string[] {
 /**
  * 取同 runtime 下仍存活的常驻进程（复用时用）。已退出或被外部杀掉的返回 undefined，
  * 调用方应走冷启动并顺手清扫其残留临时目录。
+ * 规则摘要绑定：要求绑定标签时不一致即视为无温进程（调用方决定杀旧或忙时延后），
+ * 不要求时沿旧语义复用（含升级前无标签的老进程）。
  */
-export function getLiveAcpProcess(runtimeId: string, cwd?: string): SpawnedAcpProcess | undefined {
+export function getLiveAcpProcess(
+  runtimeId: string,
+  cwd?: string,
+  expectedTag?: string | null,
+): SpawnedAcpProcess | undefined {
   const key = processKey(runtimeId)
   const handle = active.get(key)
   if (!handle) return undefined
@@ -304,6 +317,7 @@ export function getLiveAcpProcess(runtimeId: string, cwd?: string): SpawnedAcpPr
     return undefined
   }
   if ((handle.executionContext ?? 'native') !== acpExecutionContext(cwd)) return undefined
+  if (expectedTag !== undefined && (handle.profileTag ?? null) !== expectedTag) return undefined
   return handle
 }
 

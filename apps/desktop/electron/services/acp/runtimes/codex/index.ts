@@ -1,10 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CodexAuthPreflight } from '@montree/contracts'
 import {
   buildCustomProviderConfigToml,
   buildCustomProviderSpawnEnv,
 } from "@yitom/acp-client"
+import { mergeCodexConfigToml } from '../../native-binding'
 import { probeCodexAuth } from './codex-auth-preflight'
 import {
   getAcpProviderCodexHome,
@@ -21,9 +22,17 @@ export async function provisionCustomProviderCodexHome(
 ): Promise<boolean> {
   try {
     await mkdir(codexHome, { recursive: true })
+    // 手术式合并而非整文件覆写：隔离目录里可能已有用户规则
+    // （如 developer_instructions），只替换本应用管理的供应商键。
+    let existing: string | null = null
+    try {
+      existing = await readFile(join(codexHome, 'config.toml'), 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
     await writeFile(
       join(codexHome, 'config.toml'),
-      buildCustomProviderConfigToml(provider),
+      mergeCodexConfigToml(existing, buildCustomProviderConfigToml(provider)),
       'utf8',
     )
     return true

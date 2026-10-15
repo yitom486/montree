@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ACP_EARLY_EXIT_STDERR_TAIL_LINES,
   getAcpEarlyExitStderrDetail,
+  getLiveAcpProcess,
+  isSpawnedAcpProcessAlive,
+  spawnAcpProcess,
   withAcpEarlyExitDetail,
 } from './process-manager'
 
@@ -120,6 +123,35 @@ describe('resolveAcpExecution', () => {
     expect(execution.file).toBe('bunx')
     expect(execution.args).toEqual(['@yitom/codex-acp@latest'])
     expect(execution.cwd).toBe('D:\\notes')
+  })
+
+  it('温复用认规则标签：一致命中、不一致拒绝、无要求沿旧语义', async () => {
+    const tagA = 'codex-acp:rules@aaa'
+    const tagB = 'codex-acp:rules@bbb'
+    const runtime = {
+      id: `tag-probe-${Date.now()}`,
+      name: 'Tag Test Runtime',
+      description: 'tag match probe',
+      command: process.execPath,
+      args: ['-e', 'setInterval(() => {}, 60000)'],
+      requiredEnvKeys: [],
+    }
+    const handle = spawnAcpProcess({ runtime, cwd: process.cwd(), profileTag: tagA })
+    try {
+      expect(isSpawnedAcpProcessAlive(handle)).toBe(true)
+      expect(handle.profileTag).toBe(tagA)
+      // 标签一致命中；不一致拒绝；不要求标签时沿旧语义命中
+      expect(getLiveAcpProcess(runtime.id, undefined, tagA)).toBe(handle)
+      expect(getLiveAcpProcess(runtime.id, undefined, tagB)).toBeUndefined()
+      expect(getLiveAcpProcess(runtime.id)).toBe(handle)
+      expect(getLiveAcpProcess(runtime.id, undefined, null)).toBeUndefined()
+    } finally {
+      handle.kill()
+      // kill 经 taskkill/信号异步落定：同步断言会撞中间态，等 exit 回填
+      await vi.waitFor(() => expect(isSpawnedAcpProcessAlive(handle)).toBe(false), {
+        timeout: 8000,
+      })
+    }
   })
 })
 

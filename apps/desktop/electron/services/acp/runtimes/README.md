@@ -4,7 +4,7 @@
 
 | 运行时 | 目录 | 核心职能 |
 |--------|------|----------|
-| `codex-acp` | `codex/` | 本机 `~/.codex/auth.json` 登录探测、自定义供应商 (API Key) 与隔离 `CODEX_HOME` 生成 |
+| `codex-acp` | `codex/` | 本机 `~/.codex/auth.json` 登录探测、自定义供应商 (API Key) 与隔离 `CODEX_HOME` 生成（`provisionCustomProviderCodexHome` 写 `config.toml` 时手术合并，只替换本应用管理的供应商键，用户规则如 `developer_instructions` 原样保留）；原生规则经 `CODEX_CONFIG` 追加入口下发（合并用户配置，不覆写默认 `CODEX_HOME`） |
 | `claude` | `claude/` | 本机 Claude Code 登录（`~/.claude.json`）/`ANTHROPIC_API_KEY` 探测 |
 | `gemini` | `gemini/` | Gemini CLI 登录（`~/.gemini/oauth_creds.json`）/`GEMINI_API_KEY` 探测 |
 | `copilot` | `copilot/` | Copilot CLI 登录（`~/.copilot/config.json` 的 `loggedInUsers`，`COPILOT_HOME` 可改目录）/ `GH_TOKEN` 系探测 |

@@ -7,7 +7,7 @@
 
 | 目录 / 文件 | 职责 |
 |-------------|------|
-| `main.ts` | 应用生命周期、注册 IPC、创建窗口、退出时释放 ACP / 工作区监听 |
+| `main.ts` | 应用生命周期、初始化用户 `~/.montree` 规则/Skills（已有文件不覆盖）、注册 IPC、创建窗口、退出时释放 ACP / 工作区监听 |
 | `mcp-stdio.ts` | Agent 启动的 MCP stdio 子进程入口；经窗口专属命名管道/Unix socket 访问主进程文档服务，stdout 仅输出协议消息 |
 | `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI` |
 | [`ipc/`](./ipc/) | `ipcMain` 处理器注册 |

@@ -53,6 +53,7 @@ export interface AcpState {
   sessionId: string | null
   runtimeId: string | null
   workspaceRoot: string | null
+  closeSessionSupported: boolean
   loadSessionSupported: boolean
   resumeSessionSupported: boolean
   cachedPromptCapabilities: AcpPromptCapabilities
@@ -101,6 +102,21 @@ export interface AcpState {
   statusListeners: Set<AcpStatusListener>
   activePromptSessionId: string | null
   ownedSessionIds: Map<string, Set<string>>
+  /**
+   * 本次连接周期的原生规则绑定裁决（握手后写入，disconnect 清除）：
+   * eligible = 运行时资格；versionSupported = 桥版本门；
+   * profileTag/Hash = 温进程匹配与审计摘要；deferredBusy = 摘要变更但旧进程
+   * 正忙，沿用旧进程并降级兼容（不强杀、不建新、不清历史）。
+   */
+  connectionBinding: {
+    eligible: boolean
+    versionSupported: boolean
+    profileTag: string | null
+    profileHash: string | null
+    bridgeVersion?: string
+    deferredBusy: boolean
+    sessionMeta?: Record<string, unknown>
+  } | null
 }
 
 function createAcpState(): AcpState {
@@ -113,6 +129,7 @@ function createAcpState(): AcpState {
     sessionId: null,
     runtimeId: null,
     workspaceRoot: null,
+    closeSessionSupported: false,
     loadSessionSupported: false,
     resumeSessionSupported: false,
     cachedPromptCapabilities: {},
@@ -138,6 +155,7 @@ function createAcpState(): AcpState {
     statusListeners: new Set<AcpStatusListener>(),
     activePromptSessionId: null,
     ownedSessionIds: new Map<string, Set<string>>(),
+    connectionBinding: null,
   }
 }
 
