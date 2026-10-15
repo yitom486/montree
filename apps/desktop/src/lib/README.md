@@ -126,7 +126,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
 | `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议） |
-| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich（落定/收尾标记后解析，非法保持原样；含 component-ui）；严格工具标识判定，读取同名 schema 文件不误报呈现失败 |
+| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史 |
 | `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线） |
 | `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文） |
 | `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标） |

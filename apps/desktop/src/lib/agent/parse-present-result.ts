@@ -6,6 +6,23 @@ export function isPresentToolTitle(title?: string): boolean {
   return /(?:^|[.:]|__)montree_present$/i.test(title?.trim() ?? '')
 }
 
+export function presentRecoveryToolCallIds(messages: AcpChatMessage[]): string[] {
+  return messages.filter(m => m.role === 'tool' && m.toolStatus === 'completed' && !m.presentResult && m.toolCallId &&
+    (!m.toolContentText || m.toolContentText === m.toolTitle || m.toolContentText.includes('The output was large and was saved to:'))
+  ).map(m => m.toolCallId!).slice(-20)
+}
+
+/** 只补当前线程已有的成功工具消息；不新增消息，不替换已验证结果。 */
+export function recoverPresentToolMessages(messages: AcpChatMessage[], outputs: Array<{toolCallId: string; text: string}>): AcpChatMessage[] {
+  const byId = new Map(outputs.map(row => [row.toolCallId, row.text]))
+  return messages.map(message => {
+    const text = message.toolCallId ? byId.get(message.toolCallId) : undefined
+    if (!text || message.role !== 'tool' || message.toolStatus !== 'completed' || message.presentResult) return message
+    const result = parsePresentResult(text)
+    return result ? {...message, text, toolContentText: text, presentResult: result, streaming: false} : message
+  })
+}
+
 /**
  * `montree_present` 结果 enrich：工具文本 JSON → `presentResult` 挂载。
  * 与提议/章计划 enrich 同形：流式未完成且回合未收尾时跳过；

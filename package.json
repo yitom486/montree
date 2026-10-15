@@ -67,7 +67,7 @@
     "@univerjs/preset-sheets-core": "^1.0.3",
     "@univerjs/presets": "^1.0.3",
     "@vscode/markdown-it-katex": "^1.1.2",
-    "@yitom/acp-client": "0.1.10",
+    "@yitom/acp-client": "0.1.11",
     "ai": "^7.0.137",
     "codemirror": "^6.0.2",
     "docx-preview": "^0.4.1",

@@ -6,6 +6,8 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 连接与断连按窗口串行，相同在途连接请求合并；断连立即取消在途 SDK 请求。温进程 initialize 失败时同一次连接仅冷启动回退一次，沿用原会话恢复参数，最终失败才报错。`acp-connection.test.ts` 覆盖自动回退、快速断连重连与重试上限。
 渲染端入口：`apps/desktop/src/api/acp-api.ts` + `AgentPanel`。设计备忘见本地 `.plan/`（若不在仓库中）。
 
+重连可携带当前线程至多 20 个缺失结果的 `recoverToolCallIds`，经可选会话 `_meta.toolOutputRecovery` 扩展由支持的桥接补偿。`session-open.ts` 限制响应条数/字节数并返回 `recoveredToolOutputs`；仅成功恢复同一会话时交回渲染，渲染只更新匹配的已有成功工具消息并重新校验呈现契约，不重放/新增历史、不重新调用模型。该扩展非 ACP 标准要求，不支持的运行时沿用现有恢复路径。
+
 | 组 | 文件 | 功能 |
 |----|------|------|
 | 入口 | `acp-client.ts` 门面（仅 re-export，学 `apps/desktop/src/stores/acp-ui-store.ts` 先例）+ `acp-state.ts` / `acp-bridges.ts` / `acp-connection.ts` / `acp-session-ops.ts` + `process-manager.ts` / `sdk-client.ts` 留守；手搓传输已删，协议走官方 `@agentclientprotocol/sdk`（ACP v1 稳定入口） | 连接生命周期、子进程、SDK 长驻 `ClientConnection`（`client({name:"montree"}).connect()`，stdio 经 toWeb→`ndJsonStream` 桥接，垫层保温进程 fd；`connectSdkClient` 增可选 `runtimeId` 参，仅日志/隔离）；spawn 模板一律经 `findBuiltinAcpRuntime`（`resolveRuntimeTemplate` 防御性回落），禁写死 codex bunx；adapter 调用全防御（`probeAuth`/`getSpawnEnv`/`orderAuthMethods`/`canSkipInteractiveAuth`/`beforeSpawn`/`onColdStart`/`resolveSpawnCommand`/`resolveSpawnBlocker` 抛错回落中性；`resolveSpawnCommand` 回 `null` 时 spawn 前判停并返回带安装指引的 `ACP_SPAWN_ERROR`；`resolveSpawnBlocker` 回非空文案时同样 spawn 前判停，如 deepseek 缺 key；连接失败时拼 stderr 尾部（去窗口化，慢退同样带尾），替代裸 `connection closed`）；温进程按窗口与 `runtime.id` 分键，并核对 native/WSL 发行版环境后复用，禁止跨 Windows/WSL 串用；WSL 加载用户 SHELL 的登录环境（`listLiveAcpRuntimeIds` 可查），冷启动经通用 `onColdStart` 钩子；`acp-state.ts` 最底层（窗口上下文代理 `acpState` + `setStatus`/订阅/getter，禁 import 其他 `acp-*` 拆分模块），`acp-bridges.ts` 依赖 state，`acp-connection.ts` / `acp-session-ops.ts` 依赖 state+bridges（session-ops 另依赖 connection 的 `disconnectAcp`），无循环依赖 |

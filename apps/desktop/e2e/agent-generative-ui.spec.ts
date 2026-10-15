@@ -114,6 +114,50 @@ function componentUiArgs() {
 }
 
 test.describe('生成式 UI 生产链路 G4', () => {
+  test('历史图表恢复：原工具补正文、内联交互、重载保留且不重复', async ({}, info) => {
+    test.setTimeout(90_000)
+    const directory = await mkdtemp(join(tmpdir(), 'montree-recovery-'))
+    const recoveryFile = join(directory, 'outputs.json')
+    const app = await launchBuiltApp({...MOCK_ENV, E2E_DOCUMENT_TOOLS: '1', E2E_ACP_TOOL_RECOVERY_FILE: recoveryFile})
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await window.evaluate(()=>localStorage.setItem('montree-acp-ui',JSON.stringify({version:0,state:{panelOpen:true,hudDisplayMode:'docked',selectedRuntimeId:'mock-window'}})))
+      await window.reload()
+      const panel = await openPanel(window)
+      const floating = window.getByTestId('floating-ai-hud')
+      if (await floating.isVisible()) await floating.getByTitle('停靠到侧栏').click()
+      await expect(panel).toContainText('mock-window')
+      await panel.evaluate(el => { const host=el.closest('[data-panel]') as HTMLElement; host.style.flex='none'; host.style.width='480px' })
+      await panel.getByRole('button',{name:'连接',exact:true}).click()
+      await expect(panel.getByRole('button',{name:'断开',exact:true})).toBeVisible()
+      const endpoint = await app.evaluate(async () => (globalThis as any).__montreeE2eMcpEndpoint()) as McpEndpoint
+      const response = await mcpCall(window, endpoint, 'montree_present', {kind:'preset',preset:'diagram',diagramType:'flowchart',title:'恢复的历史流程图',nodes:[{id:'start',label:'开始',kind:'start',layer:0,details:'恢复后仍可交互'},{id:'end',label:'结束',kind:'end',layer:1}],edges:[{from:'start',to:'end'}]})
+      expect(response.result.isError).not.toBe(true)
+      const text = response.result.content[0].text
+      await writeFile(recoveryFile, JSON.stringify([{toolCallId:'agy-t1-s17',text}]))
+      await panel.getByRole('textbox',{name:'输入消息，Enter 发送，Shift+Enter 换行'}).fill('recover-empty-tool')
+      await panel.getByRole('button',{name:'发送',exact:true}).click()
+      await expect(panel).toContainText('EMPTY_TOOL_SAVED')
+      await expect(panel.getByTestId('html-artifact-card')).toHaveCount(0)
+      await panel.getByRole('button',{name:'断开',exact:true}).click()
+      await panel.getByRole('button',{name:'连接',exact:true}).click()
+      const card = panel.getByTestId('html-artifact-card')
+      await expect(card).toHaveCount(1)
+      await expect(card).toBeVisible()
+      const frame = card.frameLocator('[data-testid="svg-diagram-frame"]')
+      await expect(frame.getByRole('img',{name:'恢复的历史流程图'})).toBeVisible()
+      await frame.getByRole('button',{name:'开始',exact:true}).focus()
+      await window.keyboard.press('Enter')
+      await expect(frame.getByRole('status',{name:'节点详情'})).toContainText('恢复后仍可交互')
+      await expect.poll(()=>window.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('montree-acp-ui')).some(k=>JSON.parse(localStorage.getItem(k)!).state?.threads?.some((t:any)=>t.messages.some((m:any)=>m.toolCallId==='agy-t1-s17' && m.presentResult))))).toBe(true)
+      await card.screenshot({path:info.outputPath('recovered-chart.png')})
+      await window.reload()
+      await expect(window.getByTestId('html-artifact-card')).toHaveCount(1)
+      await expect(window.getByTestId('html-artifact-card').frameLocator('[data-testid="svg-diagram-frame"]').getByRole('img',{name:'恢复的历史流程图'})).toBeVisible()
+    } finally { await app.close(); await rm(directory,{recursive:true,force:true}) }
+  })
+
   test('SVG 图解：模拟模型纯参数→真实 MCP→固定区与浮窗交互', async ({}, info) => {
     test.setTimeout(120_000)
     const app = await launchBuiltApp({ ...MOCK_ENV, E2E_DOCUMENT_TOOLS: '1' })

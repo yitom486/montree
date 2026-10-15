@@ -58,6 +58,8 @@ export interface AcpConnectPayload {
    * 若 Agent 支持 resume/load，连接时优先恢复，避免重连后失忆。
    */
   resumeSessionId?: string
+  /** 恢复当前线程已有工具结果；由支持的桥接扩展按原会话读取，最多 20 项。 */
+  recoverToolCallIds?: string[]
   /**
    * 当前激活线程是否有本地实质消息（user/agent 任一即 true，纯系统消息/空线程为 false）。
    * load 定居窗口用它区分：false → 仅监视不限流，让回放重建时间线；
@@ -141,6 +143,7 @@ export interface AcpConnectReadyResult {
   promptCapabilities?: AcpPromptCapabilities
   /** 是否成功恢复到请求的旧 session */
   sessionRestored?: boolean
+  recoveredToolOutputs?: Array<{ toolCallId: string; text: string }>
   restoreMethod?: AcpSessionRestoreMethod
   /** 本想恢复的旧 id（若有） */
   requestedSessionId?: string

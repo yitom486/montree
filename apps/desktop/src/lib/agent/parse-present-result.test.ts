@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { isToolActiveStatus } from '@/stores/acp-chat-types'
-import { enrichToolMessageWithPresentResult } from './parse-present-result'
+import { enrichToolMessageWithPresentResult, presentRecoveryToolCallIds, recoverPresentToolMessages } from './parse-present-result'
 
 function tool(overrides: Partial<AcpChatMessage> = {}): AcpChatMessage {
   return {
@@ -31,6 +31,17 @@ const ENVELOPE = JSON.stringify({
 })
 
 describe('enrichToolMessageWithPresentResult', () => {
+  it('只恢复同线程已有成功工具，保持 ID，不接受非法结果或新增消息', () => {
+    const previous = tool({toolTitle: 'Call Mcp Tool', toolContentText: '', text: 'Call Mcp Tool'})
+    const ids = presentRecoveryToolCallIds([previous])
+    expect(ids).toEqual([previous.toolCallId])
+    const messages = recoverPresentToolMessages([previous], [{toolCallId: previous.toolCallId!, text: ENVELOPE}, {toolCallId:'other-thread', text: ENVELOPE}])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]!.id).toBe(previous.id)
+    expect(messages[0]!.presentResult?.kind).toBe('chapter-comparison')
+    expect(presentRecoveryToolCallIds(messages)).toEqual([])
+    expect(recoverPresentToolMessages([previous], [{toolCallId:previous.toolCallId!,text:'{"schemaVersion":2}'}])[0]).toBe(previous)
+  })
   it('落定工具挂载呈现结果', () => {
     const enriched = enrichToolMessageWithPresentResult(
       tool({ toolContentText: ENVELOPE, text: ENVELOPE }),

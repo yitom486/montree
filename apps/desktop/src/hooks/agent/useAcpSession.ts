@@ -8,6 +8,7 @@ import type {
 } from '@montree/contracts'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import { acpApi } from '@/api/acp-api'
+import { presentRecoveryToolCallIds, recoverPresentToolMessages } from '@/lib/agent/parse-present-result'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {
   markSessionBootstrapSent,
@@ -145,6 +146,10 @@ export function useAcpSession(workspaceRoot?: string) {
         options,
       })
       setSession(result.sessionId, options)
+      if (result.sessionRestored && result.requestedSessionId === result.sessionId && result.recoveredToolOutputs?.length) {
+        const outputs = result.recoveredToolOutputs
+        useAcpUiStore.setState(s => ({threads: s.threads.map(t => t.id === s.activeThreadId ? {...t, messages: recoverPresentToolMessages(t.messages, outputs)} : t)}))
+      }
       setPromptCapabilities(result.promptCapabilities ?? {})
       // 原生绑定模式随连接确认写入（缺席=兼容）；断开/切换由 slice 清零
       setPromptMode(result.promptMode ?? 'compatibility', result.promptModeReason)
@@ -284,6 +289,7 @@ export function useAcpSession(workspaceRoot?: string) {
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
+        recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
     })
     // 滞后响应：连接期间用户已切走（新流程 bump 了 epoch），一律丢弃
     if (epoch !== connectionEpochRef.current) return
@@ -418,6 +424,7 @@ export function useAcpSession(workspaceRoot?: string) {
           cwd,
           resumeSessionId,
           hasLocalHistory: activeThreadHasLocalHistory(),
+        recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
         })
         if (epoch !== connectionEpochRef.current) return
         if (!isOk(result)) {
@@ -533,6 +540,7 @@ export function useAcpSession(workspaceRoot?: string) {
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
+        recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
     })
     if (epoch !== connectionEpochRef.current) return false
     if (!isOk(result)) {

@@ -1,7 +1,7 @@
 // Deterministic ACP peer. No model/network calls except this window's local MCP endpoint.
 const readline = require('node:readline')
 const { spawn } = require('node:child_process')
-const { existsSync } = require('node:fs')
+const { existsSync, readFileSync } = require('node:fs')
 async function mcpRequest(mcp, method, params) {
   if (mcp.type === 'http') {
     const response = await fetch(mcp.url, { method: 'POST', headers: Object.fromEntries([...mcp.headers.map((header) => [header.name, header.value]), ['Content-Type', 'application/json']]), body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })
@@ -46,7 +46,10 @@ async function handle(message) {
   } else if (method === 'session/new' || method === 'session/load' || method === 'session/resume') {
     const sessionId = params.sessionId || `mock-${process.pid}-${++sequence}`
     sessions.set(sessionId, { cwd: params.cwd, mcp: params.mcpServers?.[0] })
-    result(id, { sessionId, configOptions: config() })
+    const recoveryFile = process.env.E2E_ACP_TOOL_RECOVERY_FILE
+    const ids = params._meta?.toolOutputRecovery?.toolCallIds
+    const outputs = recoveryFile && existsSync(recoveryFile) && Array.isArray(ids) ? JSON.parse(readFileSync(recoveryFile, 'utf8')).filter(row => ids.includes(row.toolCallId)) : []
+    result(id, { sessionId, configOptions: config(), ...(outputs.length ? {_meta:{toolOutputRecovery:{outputs}}} : {}) })
   } else if (method === 'session/prompt') {
     const sessionId = params.sessionId
     // 产品 sendPrompt 会在用户块前拼接 bootstrap/turn-context 块（真实模型透明）；
@@ -67,6 +70,11 @@ async function handle(message) {
       return
     }
     let output = command
+    if (command === 'recover-empty-tool') {
+      send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'agy-t1-s17',title:'Call Mcp Tool',status:'in_progress'}}})
+      send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'agy-t1-s17',status:'completed',content:[]}}})
+      output = 'EMPTY_TOOL_SAVED'
+    }
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`

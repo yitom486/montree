@@ -59,6 +59,7 @@ export interface AcpState {
   cachedPromptCapabilities: AcpPromptCapabilities
   /** 本次连接周期内希望恢复的旧 session（来自 UI thread.agentSessionId） */
   pendingResumeSessionId: string | null
+  pendingRecoverToolCallIds: string[]
   /**
    * 本次连接周期内激活线程是否有本地实质消息（来自 connect.hasLocalHistory）：
    * false = 空线程（仅系统消息/空白），load 回放仅监视不限流，由回放重建时间线；
@@ -134,6 +135,7 @@ function createAcpState(): AcpState {
     resumeSessionSupported: false,
     cachedPromptCapabilities: {},
     pendingResumeSessionId: null,
+    pendingRecoverToolCallIds: [],
     pendingHasLocalHistory: null,
     suppressSessionUpdates: false,
     suppressSettleUntil: 0,

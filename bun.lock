@@ -34,7 +34,7 @@
         "@univerjs/preset-sheets-core": "^1.0.3",
         "@univerjs/presets": "^1.0.3",
         "@vscode/markdown-it-katex": "^1.1.2",
-        "@yitom/acp-client": "0.1.10",
+        "@yitom/acp-client": "0.1.11",
         "ai": "^7.0.137",
         "codemirror": "^6.0.2",
         "docx-preview": "^0.4.1",
@@ -1006,7 +1006,7 @@
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.9.12", "", {}, "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A=="],
 
-    "@yitom/acp-client": ["@yitom/acp-client@0.1.10", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" }, "bin": { "acp-engine": "dist/sidecar.cjs" } }, "sha512-YgOchzVKFx6Rre47lw4GV6Ee+bykh4iW8FfKJ8n8kZ644EScddjAE39Ss6HmcZx4uUx6MMa6KUVDY/kAXeb0Hw=="],
+    "@yitom/acp-client": ["@yitom/acp-client@0.1.11", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" }, "bin": { "acp-engine": "dist/sidecar.cjs" } }, "sha512-BX3MK+npV0LMiHnbAzWpXD6GUrwfJbqy4ZgjUwTZ4wasPsDfoTJNrO0X7d8pRX83XyRFtVErgqWotXbMLSaV0A=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 

@@ -27,6 +27,7 @@ export interface RestoreOrCreateSessionInput {
 }
 
 export interface RestoreOrCreateSessionResult {
+  recoveredToolOutputs?: Array<{ toolCallId: string; text: string }>
   nativeSessionAccepted: boolean
   sessionId: string
   configOptions: unknown
@@ -76,9 +77,20 @@ export async function restoreOrCreateAcpSession(
   input: RestoreOrCreateSessionInput,
 ): Promise<RestoreOrCreateSessionResult> {
   let nativeSessionAccepted=false
+  let recoveredToolOutputs: RestoreOrCreateSessionResult['recoveredToolOutputs']
   const request=async(method:string,params:Record<string,unknown>)=>{
     const opened=await requestSessionWithResources(input.request,method,params,input.sessionMeta)
     nativeSessionAccepted=opened.nativeSessionAccepted
+    const meta = opened.result._meta as { toolOutputRecovery?: { outputs?: unknown } } | undefined
+    const outputs = meta?.toolOutputRecovery?.outputs
+    let total = 0
+    recoveredToolOutputs = Array.isArray(outputs) ? outputs.slice(0, 20).filter((row): row is { toolCallId: string; text: string } => {
+      if (!row || typeof row.toolCallId !== 'string' || row.toolCallId.length > 120 || typeof row.text !== 'string') return false
+      const bytes = Buffer.byteLength(row.text)
+      if (bytes > 128 * 1024 || total + bytes > 256 * 1024) return false
+      total += bytes
+      return true
+    }) : undefined
     return opened.result
   }
   const resumeId = input.resumeSessionId?.trim() || null
@@ -186,6 +198,7 @@ export async function restoreOrCreateAcpSession(
       const id = typeof resumed.sessionId === 'string' ? resumed.sessionId : resumeId
       return {
         sessionId: id,
+        recoveredToolOutputs,
         nativeSessionAccepted,
         configOptions: withModelsFallback(resumed),
         restoreMethod: 'resume',
@@ -206,6 +219,7 @@ export async function restoreOrCreateAcpSession(
         const id = typeof loaded.sessionId === 'string' ? loaded.sessionId : resumeId
         return {
           sessionId: id,
+          recoveredToolOutputs,
         nativeSessionAccepted,
           configOptions: withModelsFallback(loaded),
           restoreMethod: 'load',

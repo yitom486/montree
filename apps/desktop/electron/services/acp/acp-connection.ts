@@ -185,7 +185,10 @@ async function openSessionAfterAuth(
     const opened = await restoreOrCreateAcpSession({
       request: (method, params) => sdkRequest<unknown, unknown>(a.value, method, params),
       cwd: sessionCwd,
-      sessionMeta:acpState.connectionBinding?.sessionMeta,
+      sessionMeta: acpState.pendingRecoverToolCallIds.length ? {
+        ...acpState.connectionBinding?.sessionMeta,
+        toolOutputRecovery: { toolCallIds: acpState.pendingRecoverToolCallIds },
+      } : acpState.connectionBinding?.sessionMeta,
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
@@ -249,6 +252,7 @@ async function openSessionAfterAuth(
       resumeSessionSupported: acpState.resumeSessionSupported,
       promptCapabilities: acpState.cachedPromptCapabilities,
       sessionRestored: opened.sessionRestored,
+      recoveredToolOutputs: opened.sessionRestored ? opened.recoveredToolOutputs : undefined,
       restoreMethod: opened.restoreMethod,
       requestedSessionId: opened.requestedSessionId,
       restoreAttempts:
@@ -267,6 +271,7 @@ async function openSessionAfterAuth(
 }
 
 type ConnectPayload = {
+  recoverToolCallIds?: string[]
   runtimeId: string
   cwd?: string
   resumeSessionId?: string
@@ -387,6 +392,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
 
   acpState.runtimeId = runtime.id
   acpState.pendingResumeSessionId = payload.resumeSessionId?.trim() || null
+  acpState.pendingRecoverToolCallIds = (payload.recoverToolCallIds ?? []).filter(id => typeof id === 'string' && id.length <= 120).slice(-20)
   // 空线程提示直达 openSessionAfterAuth 的 arm 决策（缺省 null = 未知，按非空照常压制）
   acpState.pendingHasLocalHistory =
     typeof payload.hasLocalHistory === 'boolean' ? payload.hasLocalHistory : null
