@@ -21,6 +21,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-streamdown.spec.ts` | Streamdown 正文链路：真实 mock 流式中间态占位与完成态（表格/代码/数字公式/Mermaid/链接）、脚注引用和返回实际点击、社区代码复制、代码头标签与动作浮层无重叠、Shiki token 高亮生效、无面板溢出截图；不调用真实模型 |
 | `agent-bubble-scrollbar.spec.ts` | 流式正文与工作记录的真实界面回归：浅/深色、320/480/800px 及小数宽度下无多余内部纵向滚动条，光环启停不挤压正文，列表正常滚动；不调用真实模型 |
 | `agent-rich-check.spec.ts` | 富文本核验单：mock `rich-check` 台本一次回放 mark/上标/脚注成对/行内公式/原生 details 点开展示/只读任务列表/kbd 键帽；附截图；不调用真实模型 |
+| `agent-details-anchor.spec.ts` | 折叠锚定回归：mock `details-anchor` 台本回放消息末尾长折叠块，贴底展开 summary 零位移（assistant-ui 展开暂停经 `data-message-id` 生效），底部“收起”按钮直接关闭；不调用真实模型 |
 | `agent-mermaid.spec.ts` | Mermaid 双修：深色主题节点深底（相对亮度断言）+ 深→亮切换旧图重绘（themeKey remount）+ 普通滚轮不劫持列表滚动（合成滚轮缩放纹丝不动、且不被 preventDefault）+ ±按钮缩放可用；附深/浅截图；不调用真实模型 |
 | `agent-rich-result.spec.ts` | 富结果生产链路：真实 MCP `montree_present` 调用→回放→章节比较卡筛选/证据（Markdown 编辑/预览实际章节滚动与原文选区、跨文档禁止）；EPUB 目录就绪、真实跨章节滚动及选区可见；HTML 预览交互/隔离探针（前置脚本禁网、脚本与链接/改名自导航阻止）、静默取消及真实点击导出逐字回读、深色壳截图和主题变化保持 iframe；发现/复放/拒绝回归；不调用真实模型 |
 | `agent-generative-ui.spec.ts` | 生成式 UI 生产链路：SVG 图解（真实输入框→模拟模型参数→真实 MCP→内联 SVG，流程/时序/架构/思维导图/泳道图/时间线/鱼骨图/循环图/ER、缩放/节点键盘、亮暗主题不重建、320/390/480 容纳、固定区/浮窗、居中放大同一 iframe、输入拒绝与隔离）+ React artifact 内联（真实工具结果经 codex-acp rawOutput.result→同卡构建→聊天内直接 iframe 可交互，计数/输入状态在宿主更新及放大弹窗中保持，iframe 内 Esc 关闭后状态保留，同一镜像单实例，固定区与悬浮窗均验证点击；编译/运行错误卡内降级，晚到 ready 不覆盖失败；伪造挂载/超高钳制 640/320-390-480 无溢出/超高内部滚动/亮暗截图）+ component-ui 全流程（选维度提交→原 session 回显→证据定位；内置章节对比、单章引用导航与阅读测验经真实工具生成，定位/选择提交均实测）+ 线程隔离；不调用真实模型 |

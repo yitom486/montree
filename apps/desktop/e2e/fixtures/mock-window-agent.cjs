@@ -192,6 +192,11 @@ async function handle(message) {
       // 富文本核验单：高亮/上标/脚注/公式/折叠/任务列表/kbd，一次回放，不编造。
       text(sessionId, '高亮 ==标记== 与 ^上标^。\n\n注脚[^7]\n\n[^7]: 注脚正文\n\n行内公式 $E=mc^2$。\n\n<details><summary>点我展开</summary>里面是细节</details>\n\n- [x] 已做\n- [ ] 待做\n\n按 <kbd>Ctrl</kbd>+<kbd>K</kbd>')
       output = `RICH:${sessionId}|done`
+    } else if (command === 'details-anchor') {
+      // 折叠锚定回归：折叠块在消息末尾，贴底点开展示长内容，summary 不得被跟滚顶走。
+      const body = Array.from({ length: 12 }, (_, i) => `展开后的第${i + 1}段详细内容，文字足够多以产生显著的高度变化。`).join('\n\n')
+      text(sessionId, `首段引言。\n\n<details><summary>点击展开查看详细分析过程</summary>\n\n${body}\n\n</details>\n\n尾段收束。`)
+      output = `ANCHOR:${sessionId}|done`
     }
     text(sessionId, output)
     result(id, { stopReason: 'end_turn' })

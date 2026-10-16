@@ -102,4 +102,12 @@ describe('AgentMessageBubble BUI 壳回归', () => {
     expect(node!.querySelector('button[aria-label="复制正文"]')).not.toBeNull()
     expect(container.querySelectorAll('.bg-secondary')).toHaveLength(1)
   })
+
+  it('气泡根带 data-message-id：跟滚库展开暂停只认它（防“向上展开”回归）', () => {
+    render({ id: 'a-anchor', role: 'agent', text: '含折叠的回答', createdAt: Date.now() } as AcpChatMessage)
+    const agent = container.querySelector('[data-acp-probe="agent"]')
+    expect(agent?.getAttribute('data-message-id')).toBe('a-anchor')
+    render({ id: 'th-anchor', role: 'thought', text: '想一想', streaming: false } as AcpChatMessage)
+    expect(container.querySelector('[data-acp-probe="thought"]')?.getAttribute('data-message-id')).toBe('th-anchor')
+  })
 })

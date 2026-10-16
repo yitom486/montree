@@ -1,4 +1,4 @@
-import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, type JSX, type ReactNode } from 'react'
+import { createContext, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { Children, isValidElement } from 'react'
 import { Block, Streamdown, defaultComponents, defaultRehypePlugins, useIsCodeFenceIncomplete, type BlockProps } from 'streamdown'
 import { code } from '@streamdown/code'
@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import { normalizeLatexDelimiters, normalizeRawSvgDataUriImages } from './md-normalize'
+import { ChevronUp } from 'lucide-react'
 import { sanitizeAgentUrl } from '@montree/chat-core'
 import {
   ALERT_TAG,
@@ -182,7 +183,37 @@ function AgentAlert({ children }: { children?: ReactNode }) {
 // 注意 plain() 只透传已知语义属性；需透传布尔属性的标签（如 details/open）
 // 用专用组件，避免 ...rest 把 node 等非 DOM 属性漏到 React 上。
 function AgentDetails({ children, open }: { children?: ReactNode; open?: boolean | string }) {
-  return <details open={open !== undefined && open !== false}>{children}</details>
+  const initialOpen = open !== undefined && open !== false
+  const [expanded, setExpanded] = useState(initialOpen)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  // 展开锚定不归这里管：assistant-ui 视口在点击捕获期识别 summary/
+  // aria-expanded 并暂停跟底（pauseFollowOnExpand），前提是气泡根带
+  // data-message-id（见 AgentChatItem）。这里只跟 expanded 显隐底部收起钮。
+  const onToggle = useCallback((event: React.SyntheticEvent<HTMLDetailsElement>) => {
+    setExpanded(event.currentTarget.open)
+  }, [])
+  const collapse = useCallback(() => {
+    // 经 DOM 关（触发 toggle，state 与锚定走同一路径）；
+    // 无 toggle 实现的环境兜底直设 state，保证按钮立即可用。
+    detailsRef.current?.removeAttribute('open')
+    setExpanded(false)
+  }, [])
+  return (
+    <details ref={detailsRef} open={initialOpen} onToggle={onToggle}>
+      {children}
+      {expanded ? (
+        <button
+          type="button"
+          onClick={collapse}
+          aria-label="收起折叠内容"
+          className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-border/60 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <ChevronUp className="size-3.5" />
+          收起
+        </button>
+      ) : null}
+    </details>
+  )
 }
 function plain(tag: keyof JSX.IntrinsicElements) {
   const Plain = ({ children, id, className, ...semantic }: SemanticProps) => {

@@ -164,6 +164,9 @@ export function AgentChatItem({
         from={isUser ? 'user' : 'assistant'}
         data-acp-probe={probe ?? (isUser ? 'user' : 'agent')}
         data-agent-message-id={messageId}
+        // assistant-ui 跟滚库的展开暂停（pauseFollowOnExpand）只认 data-message-id：
+        // 缺之点击 summary/aria-expanded 折叠时照常跟底，summary 被顶出鼠标（“向上展开”）。
+        data-message-id={messageId}
         className={cn(AGENT_CHAT_COL_CLASS, 'max-w-full animate-fade-slide-in', align === 'end' && 'items-end')}
       >
         {bare ? children : (
@@ -188,6 +191,7 @@ export function AgentChatItem({
     <div
       ref={rootRef}
       data-acp-probe={probe ?? tone}
+      data-message-id={messageId}
       className={cn(
         AGENT_CHAT_COL_CLASS,
         'rounded-xl border transition-colors',

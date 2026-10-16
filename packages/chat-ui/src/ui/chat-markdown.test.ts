@@ -409,4 +409,30 @@ describe('ChatMarkdown（Streamdown 接入）', () => {
     })
     container.remove()
   })
+
+  it('details 展开出现底部收起按钮，点击收起关闭', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(createElement(ChatMarkdown, {
+        text: '<details><summary>标题</summary>正文</details>',
+        streaming: false,
+      })))
+      const details = container.querySelector('details')!
+      // 收起态无按钮
+      expect(container.querySelector('details > button')).toBeNull()
+      await act(async () => {
+        details.setAttribute('open', '')
+        details.dispatchEvent(new Event('toggle'))
+      })
+      const button = container.querySelector('details > button')
+      expect(button?.textContent).toContain('收起')
+      await act(async () => {
+        button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      expect(details.hasAttribute('open')).toBe(false)
+      expect(container.querySelector('details > button')).toBeNull()
+    } finally { act(() => root.unmount()); container.remove() }
+  })
 })

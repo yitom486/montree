@@ -223,7 +223,7 @@ export function ChatMessageBubble({
       : '已思考'
 
     return (
-      <div data-acp-probe="thought" className="mb-0 min-w-0">
+      <div data-acp-probe="thought" data-message-id={message.id} className="mb-0 min-w-0">
         <BuiThinking
           state={message.streaming ? 'running' : 'done'}
           titleActive="思考中"
