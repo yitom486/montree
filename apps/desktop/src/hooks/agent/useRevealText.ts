@@ -10,7 +10,7 @@ export interface RevealOptions {
   /**
    * backlog 很短时每字最大间隔（即最慢揭示速度），保证一直在动，
    * 尾部保持小步着陆。过大会拖尾。
-   * @default 3
+   * @default 5
    */
   maxCharIntervalMs?: number
   /**
