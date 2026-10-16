@@ -10,9 +10,18 @@ export function currentRunStatus(messages: AcpChatMessage[], awaitingApproval: b
   if (awaitingApproval) return { phase: 'approval', label: '等待批准' }
   const tool = current.findLast(message => message.role === 'tool' && !message.turnEnded &&
     (message.streaming || isToolActiveStatus(message.toolStatus)))
-  if (tool) return { phase: 'tool', label: toToolDisplayModel(tool).title }
+  if (tool) return { phase: 'tool', label: `正在调用${toToolDisplayModel(tool).title}` }
   if (current.some(message => message.role === 'thought' && message.streaming)) {
     return { phase: 'thinking', label: '思考中' }
+  }
+  // 本回合已有实质进展（落定的文本/思考/工具/计划）但当前无进行中事件：
+  // 模型在组织下一段输出，而非空等首包。空占位（无文本 agent）不算进展。
+  if (current.some(message =>
+    (message.role === 'agent' && message.text.trim()) ||
+    message.role === 'thought' ||
+    message.role === 'tool' ||
+    message.role === 'plan')) {
+    return { phase: 'composing', label: '正在组织回答' }
   }
   return { phase: 'waiting', label: '等待响应' }
 }
