@@ -20,9 +20,13 @@ import {
   selectAnnotationActiveMessages,
   useAnnotationAgentStore,
 } from '@/stores/annotation-agent-store'
-import { ProposeMarkChatBlock } from '@/components/agent/propose/ProposeMarkChatBlock'
-import { groupChatTimeline } from '@/lib/agent/chat-timeline'
-import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
+import { ProposeMarkChatBlock } from '@montree/chat-ui'
+import { groupChatTimeline } from '@montree/chat-core'
+import { ChatMessageBubble } from '@montree/chat-ui'
+import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
+import { respondPermissionRequest } from '@/lib/agent/permission-respond'
+import { useAcpPendingPermission } from '@/stores/acp-ui-store'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
@@ -75,6 +79,8 @@ export function AnnotationNoteDialog({
     useShallow((s) => selectAnnotationActiveMessages(s)),
   )
   const resolveMarkProposal = useAnnotationAgentStore((s) => s.resolveMarkProposal)
+  const pendingPermission = useAcpPendingPermission()
+  const theme = useEditorUiStore((s) => s.theme)
 
   const hasDraft = Boolean(assist.pendingDraft)
   const canPolish = aiAssist && note.trim().length > 0
@@ -376,18 +382,30 @@ export function AnnotationNoteDialog({
                               className="space-y-1 opacity-80"
                             >
                               {item.messages.map((message) => (
-                                <AgentMessageBubble
+                                <ChatMessageBubble
                                   key={message.id}
                                   message={message}
                                   resolveMarkProposal={resolveMarkProposal}
+                                  pendingPermission={pendingPermission}
+                                  onDismissProposedMark={dismissProposedMark}
+                                  onPermissionRespond={(optionId) => {
+                                    if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
+                                  }}
+                                  theme={theme}
                                 />
                               ))}
                             </div>
                           ) : (
-                            <AgentMessageBubble
+                            <ChatMessageBubble
                               key={item.message.id}
                               message={item.message}
                               resolveMarkProposal={resolveMarkProposal}
+                              pendingPermission={pendingPermission}
+                              onDismissProposedMark={dismissProposedMark}
+                              onPermissionRespond={(optionId) => {
+                                if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
+                              }}
+                              theme={theme}
                             />
                           ),
                         )

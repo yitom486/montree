@@ -5,6 +5,8 @@ import {
   permissionSummaryFromToolCall,
   toolCallIdFromPermission,
 } from '@/lib/agent/acp-permission'
+import { mirrorPermissionRequestToPackageStore } from '@/lib/agent/chat-store-mirror'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
 /**
@@ -39,6 +41,12 @@ export function useAcpPermissionIngest(): void {
         options,
         toolCall,
       })
+      // P4a 对账：同一原始请求再喂包 store（只加法，不影响主链路）
+      mirrorPermissionRequestToPackageStore(
+        getOwnedChatSessionStore(),
+        event,
+        useAcpUiStore.getState().activeThreadId,
+      )
     })
   }, [ingestPermissionRequest])
 

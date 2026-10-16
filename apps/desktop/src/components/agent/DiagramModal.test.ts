@@ -3,9 +3,12 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DiagramModal } from './DiagramModal'
-import type { DiagramPayload } from './tools/DiagramViewerCard'
+import type { DiagramPayload } from '@montree/chat-ui'
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
-vi.mock('./tools/DiagramViewerCard', () => ({ DiagramViewerCard: ({ payload }: { payload: DiagramPayload }) => createElement('div', { 'data-testid': 'mock-diagram-viewer' }, payload.title) }))
+vi.mock('@montree/chat-ui', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@montree/chat-ui')>()
+  return { ...mod, DiagramViewerCard: ({ payload }: { payload: DiagramPayload }) => createElement('div', { 'data-testid': 'mock-diagram-viewer' }, payload.title) }
+})
 describe('Radix DiagramModal', () => {
   let host: HTMLDivElement, root: Root
   const diagram: DiagramPayload = { diagramId: 'd1', diagramType: 'sequence', title: '握手流程', mermaidCode: 'sequenceDiagram\n A->>B: init' }

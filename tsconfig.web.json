@@ -10,9 +10,13 @@
       "@montree/pdf": ["./packages/pdf/src/index.ts"],
       "@montree/ocr-core": ["./packages/ocr-core/src/index.ts"],
       "@montree/annotations": ["./packages/annotations/src/index.ts"],
-      "@montree/web-doc": ["./packages/web-doc/src/index.ts"]
+      "@montree/web-doc": ["./packages/web-doc/src/index.ts"],
+      "@montree/chat-core": ["./packages/chat-core/src/index.ts"],
+      "@montree/chat-ui": ["./packages/chat-ui/src/index.ts"],
+      "@montree/chat-session": ["./packages/chat-session/src/index.ts"],
+      "@montree/chat-ui/lazy": ["./packages/chat-ui/src/ui/chat-markdown.lazy.tsx"]
     },
     "types": ["vite/client"]
   },
-  "include": ["apps/desktop/src/**/*", "packages/contracts/src/**/*", "packages/reader-core/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/annotations/src/**/*", "packages/web-doc/src/**/*"]
+  "include": ["apps/desktop/src/**/*", "packages/contracts/src/**/*", "packages/reader-core/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/annotations/src/**/*", "packages/web-doc/src/**/*", "packages/chat-core/src/**/*", "packages/chat-ui/src/**/*", "packages/chat-session/src/**/*"]
 }

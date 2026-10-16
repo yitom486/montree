@@ -296,6 +296,14 @@ test.describe('生成式 UI 生产链路 G4', () => {
       expect(await enlargedDiagram.locator('iframe').evaluate((el) => el === (window as any).__svgFrame)).toBe(true)
       await settleFrame(window, enlargedDiagram.locator('iframe'))
       await enlargedDiagram.frameLocator('iframe').getByRole('button', { name: '适应宽度' }).click()
+      await expect.poll(async () => {
+        const layout = await enlargedDiagram.frameLocator('iframe').locator('body').evaluate((el) => {
+          const details = el.querySelector('#details')!.getBoundingClientRect()
+          const viewport = el.querySelector('#viewport')!.getBoundingClientRect()
+          return { detailsHeight: details.height, bottomGap: el.clientHeight - details.bottom, viewportHeight: viewport.height, height: el.clientHeight }
+        })
+        return layout.detailsHeight <= 80 && layout.bottomGap <= 16 && layout.viewportHeight > layout.height * 0.6
+      }, { timeout: 15_000 }).toBe(true)
       const diagramLayout = await enlargedDiagram.frameLocator('iframe').locator('body').evaluate((el) => {
         const details = el.querySelector('#details')!.getBoundingClientRect()
         const viewport = el.querySelector('#viewport')!.getBoundingClientRect()
@@ -322,8 +330,9 @@ test.describe('生成式 UI 生产链路 G4', () => {
       await settleFrame(window, floatingCard.locator('[data-testid="svg-diagram-frame"]'))
       await floatingFrame.getByRole('button', { name: '适应宽度' }).click()
       await settleFrame(window, floatingCard.locator('[data-testid="svg-diagram-frame"]'))
-      await floatingFrame.getByRole('button', { name: '读者', exact: true }).click()
-      await expect(floatingFrame.getByRole('status', { name: '节点详情' })).toContainText('</script><script>window.injected=1</script>')
+      await floatingFrame.getByRole('button', { name: '读者', exact: true }).focus()
+      await window.keyboard.press('Enter')
+      await expect(floatingFrame.getByRole('status', { name: '节点详情' })).toContainText('</script><script>window.injected=1</script>', { timeout: 15_000 })
       await expect(floatingCard.locator('iframe')).toHaveCount(1)
       await expect(window.getByText('呈现结果无法解析')).toHaveCount(0)
       await floatingCard.screenshot({ path: info.outputPath('svg-floating.png') })

@@ -1,28 +1,20 @@
 import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
-import {
-  type AcpChatMessage,
-  toolUpdateContentText,
-  isToolActiveStatus,
-  parseToolDiffs,
-  parseToolLocations,
-} from '@/stores/acp-chat-types'
-import { enrichAcpToolMessage } from '@/lib/agent/enrich-tool-message'
+import { type AcpChatMessage } from '@/stores/acp-chat-types'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import {
-  promoteChapterMarkPlansToLastAgent,
-} from '@/lib/agent/promote-chapter-mark-plans'
-import {
-  promoteMarkProposalsToLastAgent,
-} from '@/lib/agent/promote-mark-proposals'
-import {
-  isProposeMarkToolTitle,
-  parseMarkProposalsFromTool,
-} from '@/lib/agent/parse-mark-proposal'
+  attachMarkProposalsToCurrentTurn as attachMarkProposalsToCurrentTurnCore,
+  attachPendingMarkProposals as attachPendingMarkProposalsCore,
+} from '@montree/chat-core'
 import {
   MAX_MESSAGES_PER_THREAD,
   type AcpChatThread,
   type AcpUiStore,
 } from './acp-types'
+
+// 快照旁路已整搬至 core（E1b）：宿主保留薄转发，防外部调用方 churn。
+export type { MarkProposalAttachResult } from '@montree/chat-core'
+export const attachMarkProposalsToCurrentTurn = attachMarkProposalsToCurrentTurnCore
+export const attachPendingMarkProposals = attachPendingMarkProposalsCore
 
 export function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
@@ -45,13 +37,6 @@ export function createEmptyThread(
   }
 }
 
-export function finalizeThreadMessages(messages: AcpChatMessage[]): AcpChatMessage[] {
-  return promoteChapterMarkPlansToLastAgent(
-    promoteMarkProposalsToLastAgent(
-      messages.map((m) => (m.role === 'tool' ? enrichAcpToolMessage(m) : m)),
-    ),
-  )
-}
 
 export function titleFromMessages(messages: AcpChatMessage[]): string {
   const user = messages.find(
@@ -151,161 +136,4 @@ export function patchActiveThread(
     return { threads, activeThreadId: ensured.activeThreadId }
   }
   return { threads }
-}
-
-export interface MarkProposalAttachResult {
-  messages: AcpChatMessage[]
-  attached: boolean
-  toolCallId?: string
-  proposalCount?: number
-}
-
-export function attachMarkProposalsToCurrentTurn(
-  messages: AcpChatMessage[],
-  content: string,
-): MarkProposalAttachResult {
-  let turnStart = -1
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === 'user') {
-      turnStart = i
-      break
-    }
-  }
-
-  let index = -1
-  for (let i = messages.length - 1; i > turnStart; i -= 1) {
-    const message = messages[i]
-    if (
-      message?.role === 'tool' &&
-      !message.markProposal &&
-      !message.markProposals?.length &&
-      isProposeMarkToolTitle(message.toolTitle)
-    ) {
-      index = i
-      break
-    }
-  }
-  if (index < 0) return { messages, attached: false }
-
-  const tool = messages[index]!
-  const proposals = parseMarkProposalsFromTool(tool.toolTitle, content, tool.toolCallId)
-  if (proposals.length === 0) return { messages, attached: false, toolCallId: tool.toolCallId }
-
-  const next = [...messages]
-  next[index] =
-    proposals.length === 1
-      ? {
-          ...tool,
-          toolContentText: content,
-          text: content,
-          markProposal: proposals[0],
-          markProposalStatus: 'pending',
-        }
-      : {
-          ...tool,
-          toolContentText: content,
-          text: content,
-          markProposals: proposals.map((proposal) => ({
-            proposal,
-            status: 'pending' as const,
-          })),
-        }
-  return {
-    messages: next,
-    attached: true,
-    toolCallId: tool.toolCallId,
-    proposalCount: proposals.length,
-  }
-}
-
-export function attachPendingMarkProposals(
-  messages: AcpChatMessage[],
-  contents: string[],
-): { messages: AcpChatMessage[]; remaining: string[]; attachedCount: number } {
-  let next = messages
-  const remaining: string[] = []
-  let attachedCount = 0
-  for (const content of contents) {
-    const attached = attachMarkProposalsToCurrentTurn(next, content)
-    if (!attached.attached) {
-      remaining.push(content)
-      continue
-    }
-    next = attached.messages
-    attachedCount += attached.proposalCount ?? 0
-  }
-  return { messages: next, remaining, attachedCount }
-}
-
-export function applyToolCallUpdate(
-  messages: AcpChatMessage[],
-  update: Record<string, unknown>,
-): AcpChatMessage[] {
-  const toolCallId =
-    typeof update.toolCallId === 'string'
-      ? update.toolCallId
-      : typeof update.tool_call_id === 'string'
-        ? update.tool_call_id
-        : ''
-  if (!toolCallId) return messages
-
-  const next = [...messages]
-  const idx = next.findIndex((m) => m.role === 'tool' && m.toolCallId === toolCallId)
-  const prev = idx >= 0 ? next[idx] : undefined
-
-  const status =
-    typeof update.status === 'string'
-      ? update.status
-      : (prev?.toolStatus ?? 'pending')
-  const title =
-    typeof update.title === 'string'
-      ? update.title
-      : (prev?.toolTitle ?? '工具调用')
-  const kind =
-    typeof update.kind === 'string' ? update.kind : (prev?.toolKind ?? 'other')
-
-  let contentText = prev?.toolContentText ?? prev?.text ?? ''
-  let toolDiffs = prev?.toolDiffs
-  const receivedText = toolUpdateContentText(update)
-  if (receivedText !== undefined) contentText = receivedText
-  if ('content' in update) {
-    toolDiffs = parseToolDiffs(update.content)
-  }
-
-  let locations = prev?.toolLocations
-  if ('locations' in update) {
-    locations = parseToolLocations(update.locations)
-  }
-
-  const active = isToolActiveStatus(status)
-  const base: AcpChatMessage = {
-    id: prev?.id ?? newId('tool'),
-    role: 'tool',
-    toolCallId,
-    toolKind: kind,
-    toolStatus: status,
-    toolTitle: title,
-    toolContentText: contentText,
-    toolDiffs: toolDiffs && toolDiffs.length > 0 ? toolDiffs : undefined,
-    toolLocations: locations,
-    text: contentText || title,
-    createdAt: prev?.createdAt ?? Date.now(),
-    updatedAt: Date.now(),
-    streaming: active,
-    markProposal: prev?.markProposal,
-    markProposalStatus: prev?.markProposalStatus,
-    markProposals: prev?.markProposals,
-    chapterMarkPlan: prev?.chapterMarkPlan,
-  }
-  const message = enrichAcpToolMessage(base)
-
-  if (idx >= 0) next[idx] = message
-  else {
-    const emptyAgentIdx = next.findIndex(
-      (m) => m.role === 'agent' && m.streaming && !m.text.trim(),
-    )
-    if (emptyAgentIdx >= 0) next.splice(emptyAgentIdx, 0, message)
-    else next.push(message)
-  }
-  return next
 }

@@ -3,11 +3,11 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AgentMessageBubble } from './AgentMessageBubble'
+import { ChatMessageBubble } from '@montree/chat-ui'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
-vi.mock('@/components/agent/propose/ProposeMarkChatBlock', () => ({
+vi.mock('../../../../../../packages/chat-ui/src/ui/propose-mark-chat-block', () => ({
   ProposeMarkChatBlock: () => createElement('div', null, 'proposal-result'),
   ProposeMarkBlockList: () => null,
 }))
@@ -57,7 +57,11 @@ describe('AgentMessageBubble 提议分支审批外挂', () => {
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(AgentMessageBubble, { message }),
+          createElement(ChatMessageBubble, {
+            message,
+            resolveMarkProposal: useAcpUiStore.getState().resolveMarkProposal,
+            pendingPermission: useAcpUiStore.getState().pendingPermission,
+          }),
         ),
       )
     })

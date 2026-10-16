@@ -3,6 +3,7 @@ import {
   IMAGE_MIME_BY_EXTENSION,
 } from '@montree/contracts'
 import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
+import type { ComposerAttachmentKind } from '@montree/chat-core'
 
 /** 侧栏 → Agent 输入区拖拽的自定义 MIME（JSON 绝对路径数组） */
 export const MONTREE_WORKSPACE_PATHS_MIME = 'application/x-montree-workspace-paths'
@@ -10,7 +11,7 @@ export const MONTREE_WORKSPACE_PATHS_MIME = 'application/x-montree-workspace-pat
 /** 单张图片上限（发送前） */
 export const ACP_MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
-export type ComposerAttachmentKind = 'file' | 'image'
+export type { ComposerAttachmentKind }
 
 /** 输入区 chip；不把 base64 写入持久化历史 */
 export interface ComposerAttachment {

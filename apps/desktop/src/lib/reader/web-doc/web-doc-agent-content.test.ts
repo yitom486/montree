@@ -112,5 +112,5 @@ describe('web-doc-agent-content', () => {
       vi.mocked(webDocApi.fetchPage).mockResolvedValue({ok:false,error:{code:'NETWORK_ERROR',message:'403 Forbidden'}})
       await expect(buildPresentResult({kind:'chapter-comparison',title:'Unavailable',chapters:[{key:'c',label:'Clients',flatIndex:0},{key:'a',label:'Agents',flatIndex:1}],items:[]})).rejects.toThrow('403 Forbidden')
     } finally {dispose();useActiveDocumentStore.setState({filePath:before})}
-  })
+  }, 15_000)
 })

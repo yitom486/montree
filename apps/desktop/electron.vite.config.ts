@@ -16,6 +16,12 @@ const foliateAlias = {
 }
 
 const workspaceAlias: Array<{ find: string | RegExp; replacement: string }> = [
+  // chat-ui 轻入口（仅 react + cn）：Bubble 首屏静态引用，精确优先，
+  // 避免被下方泛别名拼成 index.ts/lazy 坏路径；重模块走 React.lazy 动态进分块
+  {
+    find: /^@montree\/chat-ui\/lazy$/,
+    replacement: resolve(appDir, '../../packages/chat-ui/src/ui/chat-markdown.lazy.tsx'),
+  },
   // contracts 子路径（core/*、types/*）精确优先：远端 bundle 须直引子模块，
   // 不得经 barrel 拖入无关运行时；对象形式前缀改写会拼出 index.ts/types/* 坏路径
   {
@@ -30,6 +36,9 @@ const workspaceAlias: Array<{ find: string | RegExp; replacement: string }> = [
     '@montree/annotations': resolve(appDir, '../../packages/annotations/src/index.ts'),
     '@montree/web-doc': resolve(appDir, '../../packages/web-doc/src/index.ts'),
     '@montree/workspace-core': resolve(appDir, '../../packages/workspace-core/src/index.ts'),
+    '@montree/chat-core': resolve(appDir, '../../packages/chat-core/src/index.ts'),
+    '@montree/chat-ui': resolve(appDir, '../../packages/chat-ui/src/index.ts'),
+    '@montree/chat-session': resolve(appDir, '../../packages/chat-session/src/index.ts'),
     '@montree/remote-server': resolve(appDir, '../../packages/remote-server/src/index.ts'),
   }).map(([find, replacement]) => ({ find, replacement })),
 ]

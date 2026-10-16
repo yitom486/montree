@@ -6,11 +6,12 @@ import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useWebDocStore } from '@/stores/web-doc-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { toast } from 'sonner'
+import { MermaidBlock } from '@/components/markdown/MermaidBlock'
 import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import {
   DiagramViewerCard,
   type DiagramPayload,
-} from '@/components/agent/tools/DiagramViewerCard'
+} from '@montree/chat-ui'
 import {
   CrossReferenceCard,
   type CrossReferencePayload,
@@ -25,24 +26,24 @@ import {
 } from '@/components/agent/tools/ChapterSuggestionCard'
 import {
   ChapterComparisonCard,
-} from '@/components/agent/tools/ChapterComparisonCard'
-import {
   HtmlArtifactCard,
-} from '@/components/agent/tools/HtmlArtifactCard'
-import {
   ComponentUiCardLazy,
+  sanitizeArtifactFileName,
   type GenerativeSubmitPayload,
-} from '@/components/agent/generative/ComponentUiCard.lazy'
+} from '@montree/chat-ui'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { checkPresentDocument } from '@/lib/agent/present-locate'
-import { isPresentToolTitle } from '@/lib/agent/parse-present-result'
+import { isPresentToolTitle } from '@montree/chat-core'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
-import { parsePresentResult, type MontreePresentResult } from '@montree/contracts'
+import { isOk, parsePresentResult, type MontreePresentResult } from '@montree/contracts'
 import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
 import { normalizeLoadKey } from '@montree/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { fileApi } from '@/api/file-api'
+import { compileReactArtifact } from '@/api/react-artifact-api'
 
-const ReactArtifactCardLazy = lazy(() => import('../generative/ReactArtifactCard').then(module => ({ default: module.ReactArtifactCard })))
+const ReactArtifactCardLazy = lazy(() => import('@montree/chat-ui').then(module => ({ default: module.ReactArtifactCard })))
 
 export function buildNoteFromDiagram(payload: DiagramPayload): string {
   const lines: string[] = []
@@ -296,6 +297,21 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
   )
   const queryClient = useQueryClient()
   const activeFilePath = useActiveDocumentStore((s) => s.filePath)
+  // M3d present 宿主实现：主题直传 + 导出（原卡内 `fileApi.exportHtml+toast` 下沉，取消静默）+ 编译直传主进程。
+  const colorScheme = useEditorUiStore((s) => s.theme)
+  const handleArtifactExport = async (html: string, title: string) => {
+    const saved = await fileApi.exportHtml({
+      html,
+      suggestedName: sanitizeArtifactFileName(title),
+    })
+    if (isOk(saved)) {
+      toast.success(`已导出：${saved.value.filePath}`)
+      return
+    }
+    if (saved.error.code !== 'CANCELLED') {
+      toast.error(`导出失败：${saved.error.message}`)
+    }
+  }
   const [savedDiagramIds, setSavedDiagramIds] = useState<Set<string>>(new Set())
 
   const handleSaveAsKnowledgeCard = async (payload: DiagramPayload): Promise<boolean> => {
@@ -365,6 +381,7 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
           <DiagramViewerCard
             payload={diagramPayload}
             defaultCompact={compactResults}
+            renderMermaid={(source) => <MermaidBlock source={source} />}
             isSavedAsCard={savedDiagramIds.has(diagramPayload.diagramId)}
             onSaveAsKnowledgeCard={handleSaveAsKnowledgeCard}
             onHighlightAnchor={(anchor: string) => {
@@ -481,10 +498,10 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
       ) : null}
       {presentPayload?.kind === 'html-artifact' ? (
         <div className="mt-1">
-          <HtmlArtifactCard key={presentPayload.id} result={presentPayload} />
+          <HtmlArtifactCard key={presentPayload.id} result={presentPayload} colorScheme={colorScheme} onExport={() => void handleArtifactExport(presentPayload.html, presentPayload.title)} />
         </div>
       ) : null}
-      {presentPayload?.kind === 'react-artifact' ? <Suspense fallback={<p role="status">正在加载交互界面…</p>}><ReactArtifactCardLazy key={presentPayload.id} result={presentPayload} toolStreaming={message.streaming} toolStatus={message.toolStatus} threadId={threadId} prompting={prompting} onSubmit={onGenerativeSubmit} /></Suspense> : null}
+      {presentPayload?.kind === 'react-artifact' ? <Suspense fallback={<p role="status">正在加载交互界面…</p>}><ReactArtifactCardLazy key={presentPayload.id} result={presentPayload} toolStreaming={message.streaming} toolStatus={message.toolStatus} threadId={threadId} prompting={prompting} onSubmit={onGenerativeSubmit} onCompile={compileReactArtifact} onExport={(html, title) => void handleArtifactExport(html, title)} /></Suspense> : null}
       {presentPayload?.kind === 'component-ui' ? (
         <div className="mt-1">
           <ComponentUiCardLazy

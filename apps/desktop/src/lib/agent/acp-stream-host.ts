@@ -1,6 +1,11 @@
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
 import { acpApi } from '@/api/acp-api'
 import { STREAM_FLUSH_MS, StreamCoalescer, isCoalescableAgentChunk } from '@/lib/agent/stream-coalescer'
+import {
+  mirrorConnectionStatusToPackageStore,
+  mirrorSessionUpdateToPackageStore,
+} from '@/lib/agent/chat-store-mirror'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import { useAcpUiStore, selectActiveThreadAgentSessionId } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore, annotationOwnsSessionId } from '@/stores/annotation-agent-store'
 import { subsessionOwnsSessionId, accumulateSubsessionUpdate, isSubsessionPrompting } from '@/lib/agent/acp-subsession'
@@ -49,10 +54,14 @@ export function flushAcpStreamBuffer(): void {
   }
   const text = buf.coalescer.flush()
   if (text) {
-    useAcpUiStore.getState().applySessionUpdate({
+    const update = {
       sessionUpdate: 'agent_message_chunk',
       content: [{ type: 'text', text }],
-    })
+    }
+    const hostThreadId = useAcpUiStore.getState().activeThreadId
+    useAcpUiStore.getState().applySessionUpdate(update)
+    // P4a 对账：同一合成增量再喂包 store（只加法，不影响主链路）
+    mirrorSessionUpdateToPackageStore(getOwnedChatSessionStore(), update, undefined, hostThreadId)
   }
 }
 
@@ -73,6 +82,8 @@ export function startAcpStreamHost(): () => void {
 
   const offStatus = acpApi.onStatusChanged((event) => {
     const store = useAcpUiStore.getState()
+    // P4a 对账：同一状态事件再喂包 store（只加法，不影响主链路）
+    mirrorConnectionStatusToPackageStore(getOwnedChatSessionStore(), event.status)
     store.setStatus(event.status, event.errorMessage)
     if (event.sessionId) store.setSession(event.sessionId)
     if (event.status === 'disconnected') {
@@ -92,7 +103,10 @@ export function startAcpStreamHost(): () => void {
       typeof event.update?.sessionUpdate === 'string' ? event.update.sessionUpdate : ''
     if (updateKind === MONTREE_SETTLE_COMPLETE_KIND) {
       flushAcpStreamBuffer()
+      const hostThreadId = useAcpUiStore.getState().activeThreadId
       useAcpUiStore.getState().freezeSettledStreaming()
+      // P4a 对账：定居收尾同样进包（包侧映射为 finish-turn；只加法）
+      mirrorSessionUpdateToPackageStore(getOwnedChatSessionStore(), event.update, undefined, hostThreadId)
       return
     }
     const ann = useAnnotationAgentStore.getState()
@@ -129,6 +143,13 @@ export function startAcpStreamHost(): () => void {
     }
     flushAcpStreamBuffer()
     mainStore.applySessionUpdate(event.update)
+    // P4a 对账：同一增量再喂包 store（只加法，不影响主链路）
+    mirrorSessionUpdateToPackageStore(
+      getOwnedChatSessionStore(),
+      event.update,
+      undefined,
+      mainStore.activeThreadId,
+    )
   })
 
   const stop = () => {

@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
-import { collectEvidenceRefs, validateComponentUiSpec, type ComponentUiSpec, type PresentComponentUi } from '@montree/contracts'
+import { collectEvidenceRefs, isOk, validateComponentUiSpec, type ComponentUiSpec, type PresentComponentUi } from '@montree/contracts'
 import { buildDiagramHtml } from '@/lib/agent/context/present-diagram'
-import { HtmlArtifactCard } from '@/components/agent/tools/HtmlArtifactCard'
-import { ComponentUiCard } from '@/components/agent/generative/ComponentUiCard'
+import { HtmlArtifactCard, ComponentUiCard, sanitizeArtifactFileName } from '@montree/chat-ui'
 import { Button } from '@/components/ui/button'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { fileApi } from '@/api/file-api'
+import { toast } from 'sonner'
 
 /** Documents have local interactions, never a hidden ACP session or automatic host actions. */
 export function MarkdownArtifact({ kind, source, fallback = '' }: { kind: string; source: string; fallback?: string }) {
   const [selection, setSelection] = useState({ source: '', text: '' })
+  // M3d present 宿主实现：主题直传 + 导出（原卡内 `fileApi.exportHtml+toast` 下沉，取消静默）。
+  const colorScheme = useEditorUiStore((s) => s.theme)
   const prepared = useMemo(() => {
     try {
       if (new TextEncoder().encode(source).length > 64 * 1024) throw new Error('声明超过 64KiB')
@@ -31,7 +35,16 @@ export function MarkdownArtifact({ kind, source, fallback = '' }: { kind: string
   }, [kind, source])
   if ('error' in prepared) return <div><p role="alert" className="rounded border border-destructive/40 p-3 text-sm">文档组件无法显示：{prepared.error}。可切回源码修正。</p><div dangerouslySetInnerHTML={{ __html: fallback }} /></div>
   if ('html' in prepared) return <div>
-    <HtmlArtifactCard result={{ schemaVersion: 1, kind: 'html-artifact', id: 'document-diagram', title: prepared.title, html: prepared.html!, inline: true }} />
+    <HtmlArtifactCard result={{ schemaVersion: 1, kind: 'html-artifact', id: 'document-diagram', title: prepared.title, html: prepared.html!, inline: true }} colorScheme={colorScheme} onExport={() => {
+      void (async () => {
+        const saved = await fileApi.exportHtml({ html: prepared.html!, suggestedName: sanitizeArtifactFileName(prepared.title) })
+        if (isOk(saved)) {
+          toast.success(`已导出：${saved.value.filePath}`)
+          return
+        }
+        if (saved.error.code !== 'CANCELLED') toast.error(`导出失败：${saved.error.message}`)
+      })()
+    }} />
     <Button size="sm" variant="outline" className="mt-2" onClick={() => {
       const doc = new DOMParser().parseFromString(prepared.html!, 'text/html')
       const svg = doc.querySelector('svg')!

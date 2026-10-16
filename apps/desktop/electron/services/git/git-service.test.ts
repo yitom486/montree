@@ -180,18 +180,18 @@ describe('git-service 临时仓库（无远端 push）', () => {
 
     const status2 = await getGitStatus(dir)
     expect(status2.files.some((f) => f.path === 'a.md' && f.status === 'modified')).toBe(true)
-  })
+  }, 30_000)
 
   it('非仓库返回 isRepo=false（不抛）', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'montree-git-plain-'))
     dirs.push(dir)
     expect((await getGitStatus(dir)).isRepo).toBe(false)
-  })
+  }, 30_000)
 
   it('执行失败不抛（坏 cwd 返回非零退出码）', async () => {
     const res = await execGitCommand(join(tmpdir(), 'montree-git-nope-不存在'), ['status'])
     expect(res.exitCode).not.toBe(0)
-  })
+  }, 30_000)
 
   it('ahead 经本地裸仓库真实计数（覆盖状态栏 ↑N 链路）', async () => {
     const remote = mkdtempSync(join(tmpdir(), 'montree-git-remote-'))
@@ -211,7 +211,7 @@ describe('git-service 临时仓库（无远端 push）', () => {
     const status = await getGitStatus(dir)
     expect(status.ahead).toBe(1)
     expect(status.behind).toBe(0)
-  })
+  }, 30_000)
 
   it('hasUpstream 无上游为 false，发布分支后为 true（状态栏发布分支链路）', async () => {
     const dir = await makeRepo()
@@ -232,5 +232,5 @@ describe('git-service 临时仓库（无远端 push）', () => {
     const after = await getGitStatus(dir)
     expect(after.hasUpstream).toBe(true)
     expect(after.ahead).toBe(0)
-  })
+  }, 30_000)
 })

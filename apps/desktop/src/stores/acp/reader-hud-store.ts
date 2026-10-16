@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
-import type { DiagramPayload } from '@/components/agent/tools/DiagramViewerCard'
+import type { DiagramPayload } from '@montree/chat-ui'
 import type { AcpHudDisplayMode } from './acp-types'
 
 export type { AcpHudDisplayMode }

@@ -9,12 +9,19 @@ export function registerThemeParticipant(apply: (theme: ThemeTransitionTarget) =
   return () => { themeParticipants.delete(apply) }
 }
 
+import { notifyArtifactThemeParticipants } from '@montree/chat-ui'
+
 async function syncThemeParticipants(theme: ThemeTransitionTarget): Promise<void> {
-  if (!themeParticipants.size) return
+  // 包内隔离帧集合（M4 主题回执修复）：与宿主集合同一次过渡、同 160ms 上限；
+  // 必须在早退判断之前启动——迁移后帧只注册在包内集合，宿主集为空时不能直接 return
+  const packageSync = Promise.resolve().then(() => notifyArtifactThemeParticipants(theme)).catch(() => {})
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
-      Promise.all([...themeParticipants].map((apply) => Promise.resolve().then(() => apply(theme)).catch(() => {}))),
+      themeParticipants.size
+        ? Promise.all([...themeParticipants].map((apply) => Promise.resolve().then(() => apply(theme)).catch(() => {})))
+        : Promise.resolve(),
+      packageSync,
       new Promise<void>((resolve) => { timeout = setTimeout(resolve, 160) }),
     ])
   } finally { clearTimeout(timeout) }

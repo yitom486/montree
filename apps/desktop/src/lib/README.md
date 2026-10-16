@@ -101,15 +101,17 @@
 
 生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
 
-Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `../components/markdown/AgentMarkdown.tsx`。
+Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `@montree/chat-ui` 包内 `chat-markdown`（M3a 由原 components/markdown 下 `AgentMarkdown` 入口整搬改名）。
 
 | 文件 | 功能 |
 |------|------|
 | `acp-composer` | 输入框附件、工作区路径拖入 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
 | `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
-| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出） |
-| `acp-plan` | 计划条目解析与进度摘要 |
+| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @montree/chat-core，见包内 `permission-ui`） |
+| `permission-respond` | 审批响应宿主实现（跨卡幂等领取 + 清理 + `acpApi.respondPermission` 发送；包内审批卡经 `onRespond` 回调到此） |
+| `chat-transport-port` / `.test.ts` | P0 宿主侧 `ChatTransportPort`（`sendText/cancel/respondPermission` 委托现有 `acpApi` 链路：工作区前缀 + bootstrap 一次语义 + 附件透传位；只 resolve/reject，不写时间线不弹 toast；P1 并跑用，现有调用链不动） |
+| `acp-plan` | 计划条目解析与进度摘要（已迁 @montree/chat-core，见包内 `plan`） |
 | `acp-config-preferences` | Mode/Model 等配置记忆 |
 | `acp-config-menu` | Agent 配置项下拉分类与 primary/secondary 切分（含 boolean 开关直通 secondary；fast 类 boolean 由 `findFastToggle` 单列 `fastToggle` 并从 secondary 摘出，`selectFastDefaultOffTarget` 给首次连接默认关一次） |
 | `acp-model-thinking` | 模型值尾缀思考档提取与只读徽标条件 |
@@ -122,17 +124,19 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `annotation-note-prompts` | 批注 AI 意图/改写 chip 与草稿抽取 |
 | `toc-ai-session` | 目录 AI 整理专用副会话（每次新建防跨书串扰、无头累积、不进时间线） |
 | `acp-stream-host` | ACP 流式推送应用级宿主（单订阅单合并器 + 认证清理回调注册表；`acp-transport` 直连等待） |
+| `chat-store-mirror` / `agent/chat-store-mirror-thread.test.ts` + `agent/chat-store-mirror-p4b.test.ts` + `agent/chat-store-mirror-host-routing.test.ts` | P4a+P4b 宿主→包双写对账镜像（`mirrorSessionUpdate/Permission/ConnectionStatusToPackageStore` + `mirrorThreadActionToPackageStore`（建/切/清/问/开场/收尾，host→包 id 映射（按包隔离） + `hostThreadId` 透传（增量/审批 provision 补齐，其余非 provision 回落） + `resetThreadMirrorForTests`）；只加法，持有口见 `chat-session-owner`） |
+| `chat-session-owner` | P4c 包 store 正式持有单例（`getOwnedChatSessionStore` + localStorage 持久化 `ChatStoragePort`，版本校验 + 缺失回落内存） |
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
-| `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议） |
-| `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护 |
-| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史 |
-| `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线） |
-| `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文） |
-| `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标） |
-| `chat-timeline` / `.test.ts` | 聊天时间线纯分组：按真实 user 回合归属（同一回合普通调用汇总一条工作记录，文本保序；无 user 前缀独立成段，scopeKey 按线程隔离）；整回合计数+窗口适配（未加载注记）；失败/待审批/富结果提升单条；稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组） |
-| `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote |
+| `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议）（已迁 @montree/chat-core，见包内同名模块） |
+| `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护（已迁 @montree/chat-core，见包内同名模块） |
+| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史（已迁 @montree/chat-core，见包内同名模块） |
+| `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线）（已迁 @montree/chat-core，见包内同名模块） |
+| `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文）（已迁 @montree/chat-core，见包内同名模块） |
+| `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标）（已迁 @montree/chat-core，见包内同名模块） |
+| `chat-timeline` / `.test.ts` | 聊天时间线纯分组：按真实 user 回合归属（同一回合普通调用汇总一条工作记录，文本保序；无 user 前缀独立成段，scopeKey 按线程隔离）；整回合计数+窗口适配（未加载注记）；失败/待审批/富结果提升单条；稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组）（已迁 @montree/chat-core，见包内同名模块） |
+| `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote（已迁 @montree/chat-core，见包内 `parse-chapter-mark-plan` / `chapter-mark-plans`） |
 | `mark-proposal-failure` | 提议/采用失败分类与「打开该章 / 去划词」引导 |
 | `acp-workspace-integration.test` | 工作区绑定会话全生命周期集成测试（跨工作区切换隔离、离线无感切换、Resume 对齐、WSL UNC 别名识别与历史菜单分桶） |
 

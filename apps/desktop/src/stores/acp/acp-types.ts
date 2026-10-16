@@ -159,6 +159,11 @@ export interface AcpUiStore {
    * 与收尾冻结配合——取消走 cancelled，未获知结果的残留走展示层“状态未知”。
    */
   cancelActiveTools: () => void
+  /**
+   * 失败回合回滚：prompt 返回失败后，删掉本回合新增的 agent/thought 文本
+   * （如额度/网络失败前流进来的错误正文不再以正常气泡残留），工具记录保留。
+   */
+  rollbackFailedTurn: (keepIds: string[]) => void
   /** MCP 结果不会回传到 ACP session/update 时，由快照响应直接补到对应工具消息。 */
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void

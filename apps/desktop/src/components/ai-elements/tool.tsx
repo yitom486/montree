@@ -6,7 +6,7 @@
  *
  * 与上游的差异（展示边界适配，有意为之）：
  * - 不依赖 AI SDK `ToolUIPart` / `useChat` / Next.js 网关；状态由
- *   `lib/agent/tool-display-model.ts` 从 `AcpChatMessage` 映射后传入。
+ *   `@montree/chat-core` 的 `tool-display-model.ts` 从 `ChatMessage` 映射后传入。
  * - 上游只有 input-streaming / input-available / output-available / output-error
  *   等 AI SDK 状态；Montree 扩展 `awaiting-approval` / `cancelled` / `unknown`
  *   三态并给出中文徽标。取消与未知绝不映射成成功。

@@ -17,9 +17,10 @@ import { AgentHistoryMenu } from '@/components/agent/AgentHistoryMenu'
 import { AgentHeaderOverflowMenu } from '@/components/agent/AgentHeaderOverflowMenu'
 import { CompactConfigMenu } from '@/components/agent/CompactConfigMenu'
 import { AgentMessageList } from '@/components/agent/chat/AgentMessageList'
-import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
-import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
-import { isStaleGenerativeSubmit } from '@/lib/agent/generative-submit'
+import type { AgentMessageSource } from '@/components/agent/chat/AgentMessageList'
+import type { ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
+import type { GenerativeSubmitPayload } from '@montree/chat-ui'
+import { isStaleGenerativeSubmit } from '@montree/chat-core'
 import { Button } from '@/components/ui/button'
 import { appendSelectionChatMarker } from '@/lib/agent/context/selection-chat-marker'
 import { splitConfigOptions, rankPrimary } from '@/lib/agent/acp-config-menu'
@@ -64,6 +65,11 @@ interface AgentPanelProps {
   onMinimizeToCapsule?: () => void
   /** 嵌入阅读器内框行时限定宽度（如 w-[340px] shrink-0），默认占满父容器 */
   className?: string
+  /**
+   * 消息读取源（P4b）：缺省 `host`（现状）；`package-mirror` 时消息与 streaming
+   * 改读包对账镜像，发送/审批/配置动作仍走宿主原链路。挂载面逐个 opt-in。
+   */
+  messageSource?: AgentMessageSource
 }
 
 /**
@@ -83,6 +89,7 @@ export const AgentPanel = memo(function AgentPanel({
   onToggleFloating,
   onMinimizeToCapsule,
   className,
+  messageSource,
 }: AgentPanelProps) {
   const view = useAcpChatShell()
   const setSelectedRuntimeId = useAcpUiStore((s) => s.setSelectedRuntimeId)
@@ -554,6 +561,7 @@ export const AgentPanel = memo(function AgentPanel({
         messagesRef={messagesRef}
         authHint={authHint}
         runtimeName={runtimeName}
+        messageSource={messageSource}
         onChapterPlanSelect={handleChapterPlanSelect}
         onGenerativeSubmit={handleGenerativeSubmit}
         onEditMessage={(text) => setDraft(text)}

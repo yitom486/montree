@@ -10,8 +10,8 @@ import {
   toolUpdateContentText,
   isToolActiveStatus,
 } from '@/stores/acp-chat-types'
-import { parseAcpPlanEntries, summarizePlanProgress } from '@/lib/agent/acp-plan'
-import { enrichAcpToolMessage } from '@/lib/agent/enrich-tool-message'
+import { parseAcpPlanEntries, summarizePlanProgress } from '@montree/chat-core'
+import { enrichAcpToolMessage } from '@montree/chat-core'
 import { promoteMarkProposalsToLastAgent, resolveMarkProposalOnMessages } from '@/lib/agent/promote-mark-proposals'
 import { extractAnnotationDraft } from '@/lib/agent/annotation-note-prompts'
 import type { MarkProposalStatus } from '@montree/annotations'

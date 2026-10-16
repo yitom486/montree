@@ -1,0 +1,37 @@
+{
+  "name": "@montree/chat-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Montree 聊天渲染 UI：无头 hooks + 默认样式组件（ACP/传输零耦合，交互经回调回宿主）",
+  "dependencies": {
+    "@montree/annotations": "workspace:*",
+    "@montree/chat-core": "workspace:*",
+    "@montree/contracts": "workspace:*",
+    "@streamdown/cjk": "^1.0.4",
+    "@streamdown/code": "2.0.0",
+    "@streamdown/math": "^1.0.3",
+    "@streamdown/mermaid": "1.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "katex": "^0.16.47",
+    "lucide-react": "^1.35.0",
+    "mermaid": "^11.17.2",
+    "radix-ui": "^1.6.7",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "streamdown": "^2.7.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./lazy": "./src/ui/chat-markdown.lazy.tsx",
+    "./package.json": "./package.json"
+  }
+}

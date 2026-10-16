@@ -100,6 +100,23 @@ test.describe('Streamdown 正文 S1', () => {
       // 流式气泡挂翡翠光环（落定即卸）；旧顶栏扫光条已删除
       await expect(panel.locator('.agent-beam-ring-emerald').first()).toBeVisible()
       await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
+      // 宽度稳定：流式增长中消息列宽度不应抖动（滚动条出现/消失吃宽度是主因，阈值 3px）
+      const widthSamples: number[] = []
+      const messageList = panel.locator('[data-acp-probe="message-list"]')
+      for (let i = 0; i < 10; i += 1) {
+        widthSamples.push(
+          await messageList.evaluate((el) => el.getBoundingClientRect().width),
+        )
+        await window.waitForTimeout(150)
+      }
+      const widthRange = Math.max(...widthSamples) - Math.min(...widthSamples)
+      expect(widthRange).toBeLessThanOrEqual(3)
+      // 视口必须预留滚动槽：流式增高/工作记录收起导致高度上下穿越阈值时，
+      // 滚动条出现消失不再吃掉内容宽度（根治流式宽度抖动）
+      const gutter = await panel
+        .getByTestId('chat-viewport')
+        .evaluate((el) => getComputedStyle(el).scrollbarGutter)
+      expect(gutter).toContain('stable')
       await panel.screenshot({ path: info.outputPath('stream-mid.png') })
       await info.attach('stream-mid', { path: info.outputPath('stream-mid.png'), contentType: 'image/png' })
       writeFileSync(streamGate, 'continue')

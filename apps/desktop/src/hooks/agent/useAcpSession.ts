@@ -8,7 +8,7 @@ import type {
 } from '@montree/contracts'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import { acpApi } from '@/api/acp-api'
-import { presentRecoveryToolCallIds, recoverPresentToolMessages } from '@/lib/agent/parse-present-result'
+import { presentRecoveryToolCallIds, recoverPresentToolMessages } from '@montree/chat-core'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {
   markSessionBootstrapSent,
@@ -659,6 +659,11 @@ export function useAcpSession(workspaceRoot?: string) {
       appendUserMessage(payload.text, payload.messageAttachments)
       setPrompting(true)
       beginAgentReply()
+      // 回合开始时的已有消息 id 快照：失败回滚只删本回合新增 agent/thought（id 锚定，不用墙钟）
+      const keepIds = useAcpUiStore
+        .getState()
+        .threads.find((t) => t.id === useAcpUiStore.getState().activeThreadId)!
+        .messages.map((m) => m.id)
       const includeBootstrap = shouldSendSessionBootstrap(sid)
       const prefix = buildMontreePromptPrefix(useAcpUiStore.getState().activeThreadId, {
         includeBootstrap,
@@ -679,6 +684,9 @@ export function useAcpSession(workspaceRoot?: string) {
       finishStreaming()
       if (!isOk(result)) {
         reportAppError(result.error)
+        // 失败回合回滚：prompt 失败前流进来的错误正文（如额度报错）不再以
+        // 正常 agent 气泡残留并污染后续回合；工具执行记录保留；再补系统通知。
+        useAcpUiStore.getState().rollbackFailedTurn(keepIds)
         appendSystemMessage(`发送失败：${result.error.message}`)
         return
       }

@@ -6,7 +6,7 @@
  * 规则：
  *   R1 包禁 electron：packages 下禁止 spec === 'electron' 或 'electron/' 前缀
  *   R2 包禁 node:：packages 下禁止 'node:' 前缀（白名单见下）
- *   R3 包禁 react：packages 下禁止 react / react-dom（含子路径）
+ *   R3 包禁 react（chat-ui 例外，见下）：packages 下禁止 react / react-dom（含子路径）
  *   R4 包禁别名：packages 下禁止 '@/' 与 '@shared'（含子路径）
  *   R5 包禁跨界：packages 下禁止 spec 含 'apps/desktop'，禁止相对引入越出所属包目录
  *   R6 渲染/主进程隔离：
@@ -185,6 +185,8 @@ for (const file of allFiles) {
     if (pkgRoot) {
       const pkgName = pkgRoot.split(sep).pop() ?? ''
       const isNodeExemptPkg = pkgName === 'acp' || pkgName === 'remote-server'
+      // chat-ui / chat-session 是 monorepo 内唯一允许 react 的包（聊天渲染 UI 层 / 会话绑定层）；其余包 R3 照旧
+      const isReactExemptPkg = pkgName === 'chat-ui' || pkgName === 'chat-session'
       for (const spec of specs) {
         if (isElectronSpec(spec) && !isAllowed(line, 'R1', spec)) {
           push(file, lineNo, 'R1', `包禁止引用 electron: '${spec}'`)
@@ -198,7 +200,7 @@ for (const file of allFiles) {
             push(file, lineNo, 'R7', `远端服务禁止引用 ${forbidden}: '${spec}'`)
           }
         }
-        if (isReactSpec(spec) && !isAllowed(line, 'R3', spec)) {
+        if (isReactSpec(spec) && !isReactExemptPkg && !isAllowed(line, 'R3', spec)) {
           push(file, lineNo, 'R3', `包禁止引用 react: '${spec}'`)
         }
         if (isAliasSpec(spec) && !isAllowed(line, 'R4', spec)) {

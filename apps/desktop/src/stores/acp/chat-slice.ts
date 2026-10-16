@@ -9,24 +9,34 @@ import {
   type AcpChatRole,
   extractTextFromContent,
   flattenToolContent,
-  isToolActiveStatus,
+  parseToolDiffs,
+  parseToolLocations,
+  toolUpdateContentText,
 } from '@/stores/acp-chat-types'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
-import { parseAcpPlanEntries, summarizePlanProgress } from '@/lib/agent/acp-plan'
-import { pruneIntermediateAgentReplies } from '@/lib/agent/acp-prune-agent-replies'
+import {
+  applyChatEvent,
+  finalizeFeedMessages,
+  parseAcpPlanEntries,
+  summarizePlanProgress,
+  type ChatFeedToolCall,
+} from '@montree/chat-core'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
+import { mirrorThreadActionToPackageStore } from '@/lib/agent/chat-store-mirror'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import {
   hasReplayScaffoldingMarkers,
   stripReplayScaffolding,
 } from '@/lib/agent/context/strip-replay-scaffolding'
 import {
+  collectStoreFallbackProposal,
   resolveMarkProposalOnMessages,
 } from '@/lib/agent/promote-mark-proposals'
 import {
   selectChapterMarkPlanOnMessages,
-} from '@/lib/agent/promote-chapter-mark-plans'
-import { isProposeMarkToolTitle } from '@/lib/agent/parse-mark-proposal'
+} from '@montree/chat-core'
+import { isProposeMarkToolTitle } from '@montree/chat-core'
 import type { MarkProposalStatus } from '@montree/annotations'
 import {
   MAX_THREADS,
@@ -34,15 +44,48 @@ import {
   type AcpUiStore,
 } from './acp-types'
 import {
-  applyToolCallUpdate,
   attachPendingMarkProposals,
   createEmptyThread,
-  finalizeThreadMessages,
-  freezeMessages,
   newId,
   patchActiveThread,
   titleFromMessages,
 } from './chat-helpers'
+
+/**
+ * ACP 线路命名翻译（E1b adapter，就近小函数，纯翻译无 store）：
+ * 宿主把 `toolCallId|tool_call_id` 双拼、`content/rawOutput/locations`
+ * 用 core 解析函数算成干净字段，再组归约器事件。归约器只收干净输入。
+ */
+function toolCallIdFromUpdate(update: Record<string, unknown>): string | undefined {
+  return typeof update.toolCallId === 'string'
+    ? update.toolCallId
+    : typeof update.tool_call_id === 'string'
+      ? update.tool_call_id
+      : undefined
+}
+
+function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | undefined {
+  const toolCallId = toolCallIdFromUpdate(update)
+  if (!toolCallId) return undefined
+  const call: ChatFeedToolCall = { toolCallId }
+  if (typeof update.title === 'string') call.title = update.title
+  if (typeof update.kind === 'string') call.kind = update.kind
+  if (typeof update.status === 'string') call.status = update.status
+  const contentText = toolUpdateContentText(update)
+  if (contentText !== undefined) call.contentText = contentText
+  if ('content' in update) call.diffs = parseToolDiffs(update.content)
+  if ('locations' in update) call.locations = parseToolLocations(update.locations)
+  return call
+}
+
+/** 切线程轻冻（E1b）：只收 streaming + 300 裁剪 + blob 脱钩，行为同旧 freezeMessages。 */
+function freezeLightMessages(
+  messages: AcpChatMessage[],
+  turnSettled: boolean,
+): AcpChatMessage[] {
+  return applyChatEvent({ messages, turnSettled }, { type: 'freeze-light' }, { createId: newId })
+    .messages
+}
 
 export interface ChatScrollState {
   scrollTop: number
@@ -79,6 +122,12 @@ export interface ChatSlice {
    * 与收尾冻结配合——取消走 cancelled，未获知结果的残留走展示层“状态未知”。
    */
   cancelActiveTools: () => void
+  /**
+   * 失败回合回滚：prompt 返回失败后，删掉本回合新增的 agent/thought 文本
+   * （如额度/网络失败前流进来的错误正文不再以正常气泡残留），工具记录保留。
+   * 由发送方传入回合开始时的已有消息 id 快照（id 锚定，不用墙钟）。
+   */
+  rollbackFailedTurn: (keepIds: string[]) => void
   attachMarkProposalsFromSnapshot: (content: string) => void
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
@@ -89,36 +138,6 @@ export interface ChatSlice {
   renameThread: (threadId: string, title: string) => void
   applySessionUpdate: (update: Record<string, unknown>) => void
   setChatScroll: (threadId: string, scroll: ChatScrollState) => void
-}
-
-/**
- * 回合收尾冻结（finishStreaming / freezeSettledStreaming 共用）：
- * 残留 streaming 消息一律 streaming=false + updatedAt=now；工具调用只收敛
- * streaming，不推断执行结果——pending（未执行）随回合取消，in_progress /
- * 未知状态保留原值由展示层标“状态未知”，绝不补成 completed。
- * 随后走常规 finalize + 中间态 agent 气泡规整。
- */
-function freezeSettledTurn(t: AcpChatThread): AcpChatThread {
-  const now = Date.now()
-  const frozen = t.messages.map((m) => {
-    if (!m.streaming) return m
-    if (m.role === 'tool' && isToolActiveStatus(m.toolStatus)) {
-      return {
-        ...m,
-        streaming: false,
-        updatedAt: now,
-        toolStatus: m.toolStatus === 'pending' ? 'cancelled' : m.toolStatus,
-        // 回合收尾标记：内容已落定可解析，但执行结果仍未知（展示不进成功）
-        turnEnded: true,
-      }
-    }
-    return { ...m, streaming: false, updatedAt: now }
-  })
-  return {
-    ...t,
-    updatedAt: now,
-    messages: finalizeThreadMessages(pruneIntermediateAgentReplies(frozen)),
-  }
 }
 
 export const initialThread = createEmptyThread()
@@ -201,22 +220,18 @@ export const createChatSlice: StateCreator<
 
   setHistoryOpen: (open) => set({ historyOpen: open }),
 
-  appendUserMessage: (text, attachments) =>
+  appendUserMessage: (text, attachments) => {
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       // 本地新输入 supersede 未落定的回放悬垂（load 半截时用户直接说话）
       pendingReplayUserText: null,
       ...patchActiveThread(s, (t) => {
-        const messages = [
-          ...t.messages,
-          {
-            id: newId('user'),
-            role: 'user' as const,
-            text,
-            createdAt: Date.now(),
-            ...(attachments && attachments.length > 0 ? { attachments } : {}),
-          },
-        ]
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'user-append', text, attachments },
+          { createId: newId },
+        )
+        const messages = feed.messages
         return {
           ...t,
           messages,
@@ -224,46 +239,53 @@ export const createChatSlice: StateCreator<
           updatedAt: Date.now(),
         }
       }),
-    })),
+    }))
+    // P4b 线程镜像：同一输入再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'appendUser', text },
+      get().activeThreadId,
+    )
+  },
 
-  appendSystemMessage: (text) =>
+  appendSystemMessage: (text) => {
     set((s) =>
-      patchActiveThread(s, (t) => ({
-        ...t,
-        messages: [
-          ...t.messages,
-          { id: newId('sys'), role: 'system', text, createdAt: Date.now() },
-        ],
-        updatedAt: Date.now(),
-      })),
-    ),
+      patchActiveThread(s, (t) => {
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'system-append', text },
+          { createId: newId },
+        )
+        return { ...t, messages: feed.messages, updatedAt: Date.now() }
+      }),
+    )
+    // P4b 镜像：同一系统消息再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'appendSystem', text },
+      get().activeThreadId,
+    )
+  },
 
-  beginAgentReply: () =>
+  beginAgentReply: () => {
     set((s) => {
       const patched = patchActiveThread(s, (t) => {
-        const last = t.messages[t.messages.length - 1]
-        if (last?.role === 'agent' && last.streaming) return t
-        return {
-          ...t,
-          messages: [
-            ...t.messages,
-            {
-              id: newId('agent'),
-              role: 'agent',
-              text: '',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              streaming: true,
-            },
-          ],
-          updatedAt: Date.now(),
-        }
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'begin-reply' },
+          { createId: newId },
+        )
+        if (feed.messages === t.messages) return t
+        return { ...t, messages: feed.messages, updatedAt: Date.now() }
       })
       // 新回合开场：迟到标记清零，后续 chunk 正常点亮流式
       return { ...patched, turnSettled: false }
-    }),
+    })
+    // P4b 线程镜像：同一开场再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'beginReply' }, get().activeThreadId)
+  },
 
-  clearMessages: () =>
+  clearMessages: () => {
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       pendingReplayUserText: null,
@@ -274,39 +296,109 @@ export const createChatSlice: StateCreator<
         title: '新对话',
         updatedAt: Date.now(),
       })),
-    })),
+    }))
+    // P4b 线程镜像：同一清空再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'clear' }, get().activeThreadId)
+  },
 
-  finishStreaming: () =>
-    set((s) => ({
-      prompting: false,
-      turnSettled: true,
-      ...patchActiveThread(s, freezeSettledTurn),
-    })),
+  finishStreaming: () => {
+    set((s) => {
+      const proposalFallback = collectStoreFallbackProposal()
+      return {
+        prompting: false,
+        turnSettled: true,
+        ...patchActiveThread(s, (t) => {
+          const feed = applyChatEvent(
+            { messages: t.messages, turnSettled: s.turnSettled },
+            { type: 'finish-turn', proposalFallback },
+            { createId: newId },
+          )
+          return { ...t, messages: feed.messages, updatedAt: Date.now() }
+        }),
+      }
+    })
+    // P4b 线程镜像：同回合收尾再喂包 store（prompt 成功语义即 finishTurn 无 fallback；只加法）
+    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'finish' }, get().activeThreadId)
+  },
 
   // 定居收尾：复用 finishStreaming 的冻结语义，但不碰 prompting。
   // load 恢复时 prompting 本就 false（断言式保持：prompt 回合的收尾仍走 finishStreaming）。
-  freezeSettledStreaming: () => set((s) => ({ ...patchActiveThread(s, freezeSettledTurn) })),
+  freezeSettledStreaming: () => {
+    set((s) => {
+      const proposalFallback = collectStoreFallbackProposal()
+      return {
+        ...patchActiveThread(s, (t) => {
+          const feed = applyChatEvent(
+            { messages: t.messages, turnSettled: s.turnSettled },
+            { type: 'finish-turn', proposalFallback, settle: false },
+            { createId: newId },
+          )
+          return { ...t, messages: feed.messages, updatedAt: Date.now() }
+        }),
+      }
+    })
+    // P4b 镜像：同一定居冻结再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'freezeSettled' },
+      get().activeThreadId,
+    )
+  },
 
-  cancelActiveTools: () =>
+  cancelActiveTools: () => {
     set((s) =>
       patchActiveThread(s, (t) => {
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'cancel-tools' },
+          { createId: newId },
+        )
         const now = Date.now()
         let changed = false
-        const messages = t.messages.map((m) => {
-          if (m.role === 'tool' && m.streaming && isToolActiveStatus(m.toolStatus)) {
+        const messages = feed.messages.map((m, i) => {
+          if (m !== t.messages[i]) {
             changed = true
-            return { ...m, toolStatus: 'cancelled' as const, updatedAt: now }
+            return { ...m, updatedAt: now }
           }
           return m
         })
-        return changed ? { ...t, messages, updatedAt: now } : t
+        if (!changed) return t
+        return { ...t, messages, updatedAt: now }
       }),
-    ),
+    )
+    // P4b 镜像：同一取消再喂包 store（只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'cancelTools' },
+      get().activeThreadId,
+    )
+  },
 
-  attachMarkProposalsFromSnapshot: (content) =>
+  rollbackFailedTurn: (keepIds) => {
+    set((s) =>
+      patchActiveThread(s, (t) => {
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'rollback-turn', keepIds },
+          { createId: newId },
+        )
+        if (feed.messages.length === t.messages.length) return t
+        return { ...t, messages: feed.messages, updatedAt: Date.now() }
+      }),
+    )
+    // P4b 镜像：同一回滚再喂包 store（host keepIds 跨 id 空间由 mirror 内翻译；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'rollbackFailed', keepIds },
+      get().activeThreadId,
+    )
+  },
+
+  attachMarkProposalsFromSnapshot: (content) => {
     set((s) => {
       let remaining = [...s.pendingMarkProposalSnapshotContents, content]
       let attachedCount = 0
+      const proposalFallback = collectStoreFallbackProposal()
       const patched = patchActiveThread(s, (t) => {
         const attached = attachPendingMarkProposals(t.messages, remaining)
         remaining = attached.remaining.slice(-3)
@@ -318,7 +410,7 @@ export const createChatSlice: StateCreator<
           ...t,
           messages: hasStreamingAgent
             ? attached.messages
-            : finalizeThreadMessages(attached.messages),
+            : finalizeFeedMessages(attached.messages, proposalFallback),
           updatedAt: Date.now(),
         }
       })
@@ -328,25 +420,53 @@ export const createChatSlice: StateCreator<
         queuedCount: remaining.length,
       })
       return { ...patched, pendingMarkProposalSnapshotContents: remaining }
-    }),
+    })
+    // P4b 镜像：同一快照再喂包 store（包内迷你队列同语义；只加法，吞错在 mirror 内）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'attachSnapshot', content },
+      get().activeThreadId,
+    )
+  },
 
-  resolveMarkProposal: (proposalId, status) =>
+  resolveMarkProposal: (proposalId, status) => {
     set((s) =>
       patchActiveThread(s, (t) => ({
         ...t,
         messages: resolveMarkProposalOnMessages(t.messages, proposalId, status),
         updatedAt: Date.now(),
       })),
-    ),
+    )
+    // P4b 镜像：同一决议再喂包 store（提议 id 两侧一致；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      {
+        kind: 'resolveProposal',
+        proposalId,
+        status,
+      },
+      get().activeThreadId,
+    )
+  },
 
-  selectChapterMarkPlan: (entryId) =>
+  selectChapterMarkPlan: (entryId) => {
     set((s) =>
       patchActiveThread(s, (t) => ({
         ...t,
         messages: selectChapterMarkPlanOnMessages(t.messages, entryId),
         updatedAt: Date.now(),
       })),
-    ),
+    )
+    // P4b 镜像：同一选章再喂包 store（条目 id 两侧一致；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      {
+        kind: 'selectChapterPlan',
+        entryId,
+      },
+      get().activeThreadId,
+    )
+  },
 
   createThread: (workspaceRoot, runtimeId) => {
     const ws =
@@ -361,7 +481,7 @@ export const createChatSlice: StateCreator<
     set((s) => {
       const frozen = s.threads.map((t) =>
         t.id === s.activeThreadId
-          ? { ...t, messages: freezeMessages(t.messages), updatedAt: Date.now() }
+          ? { ...t, messages: freezeLightMessages(t.messages, s.turnSettled), updatedAt: Date.now() }
           : t,
       )
       // 新建时丢掉其它空白草稿（含刚离开的空会话）
@@ -384,6 +504,16 @@ export const createChatSlice: StateCreator<
           : {}),
       }
     })
+    // P4b 线程镜像：同一新建再喂包 store（带宿主新线程 id 建映射，包侧 id 分叉由 mirror 内翻译；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      {
+        kind: 'create',
+        threadId: thread.id,
+        runtimeId: rId,
+      },
+      thread.id,
+    )
     return thread.id
   },
 
@@ -405,7 +535,7 @@ export const createChatSlice: StateCreator<
     // 冻结当前正在进行的线程消息
     const frozen = s.threads.map((t) =>
       t.id === s.activeThreadId
-        ? { ...t, messages: freezeMessages(t.messages), updatedAt: Date.now() }
+        ? { ...t, messages: freezeLightMessages(t.messages, s.turnSettled), updatedAt: Date.now() }
         : t,
     )
 
@@ -443,6 +573,18 @@ export const createChatSlice: StateCreator<
       pendingReplayUserText: null,
       pendingPermission: null,
     })
+    // P4b 镜像：同一工作区切换再喂包 store（旧线程 id 取入口快照 s.activeThreadId，
+    // 结果 active 取 targetThreadId；旧线程 freezeLight + 新线程 switch/同建由 mirror 内路由；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      {
+        kind: 'switchWorkspace',
+        fromThreadId: s.activeThreadId,
+        toThreadId: targetThreadId,
+        runtimeId: currentRuntimeId,
+      },
+      targetThreadId,
+    )
 
     return targetThreadId
   },
@@ -456,7 +598,7 @@ export const createChatSlice: StateCreator<
     if (!target) return
     const frozen = s.threads.map((t) =>
       t.id === s.activeThreadId
-        ? { ...t, messages: freezeMessages(t.messages), updatedAt: Date.now() }
+        ? { ...t, messages: freezeLightMessages(t.messages, s.turnSettled), updatedAt: Date.now() }
         : t,
     )
     // 切走时若原会话空白则删除；目标会话即使空白也保留
@@ -480,9 +622,15 @@ export const createChatSlice: StateCreator<
         ? { configOptions: [], promptCapabilities: {}, pendingPermission: null }
         : {}),
     })
+    // P4b 线程镜像：同一切换再喂包 store（host→包 id 经 mirror 内映射翻译；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'switch', threadId },
+      threadId,
+    )
   },
 
-  deleteThread: (threadId) =>
+  deleteThread: (threadId) => {
     set((s) => {
       let threads = s.threads.filter((t) => t.id !== threadId)
       const chatScrollByThread = { ...s.chatScrollByThread }
@@ -504,16 +652,34 @@ export const createChatSlice: StateCreator<
       const activeThreadId =
         s.activeThreadId === threadId ? runtimeThreads[0]!.id : s.activeThreadId
       return { threads, activeThreadId, prompting: false, chatScrollByThread }
-    }),
+    })
+    // P4b 镜像：同一删除再喂包 store（host→包 id 经 mirror 内映射翻译并清映射；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      { kind: 'deleteThread', threadId },
+      threadId,
+    )
+  },
 
-  renameThread: (threadId, title) =>
+  renameThread: (threadId, title) => {
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId
           ? { ...t, title: title.trim() || '新对话', updatedAt: Date.now() }
           : t,
       ),
-    })),
+    }))
+    // P4b 镜像：同一重命名再喂包 store（host→包 id 经 mirror 内映射翻译；只加法）
+    mirrorThreadActionToPackageStore(
+      getOwnedChatSessionStore(),
+      {
+        kind: 'renameThread',
+        threadId,
+        title,
+      },
+      threadId,
+    )
+  },
 
   applySessionUpdate: (update) => {
     const kind =
@@ -548,46 +714,35 @@ export const createChatSlice: StateCreator<
       const summary = summarizePlanProgress(entries)
       set((s) =>
         patchActiveThread(s, (t) => {
-          const messages = [...t.messages]
-          const idx = messages.findIndex((m) => m.role === 'plan')
-          const prev = idx >= 0 ? messages[idx] : undefined
-          const next: AcpChatMessage = {
-            id: prev?.id ?? newId('plan'),
-            role: 'plan',
-            text: entries.map((e) => e.content).join('\n'),
-            planEntries: entries,
-            createdAt: prev?.createdAt ?? Date.now(),
-            updatedAt: Date.now(),
-            streaming: summary.active,
-          }
-          if (idx >= 0) messages[idx] = next
-          else {
-            const emptyAgentIdx = messages.findIndex(
-              (m) => m.role === 'agent' && m.streaming && !m.text.trim(),
-            )
-            if (emptyAgentIdx >= 0) messages.splice(emptyAgentIdx, 0, next)
-            else messages.push(next)
-          }
-          return { ...t, messages, updatedAt: Date.now() }
+          const feed = applyChatEvent(
+            { messages: t.messages, turnSettled: s.turnSettled },
+            { type: 'plan', entries, active: summary.active },
+            { createId: newId },
+          )
+          return { ...t, messages: feed.messages, updatedAt: Date.now() }
         }),
       )
       return
     }
 
     if (kind === 'tool_call' || kind === 'tool_call_update') {
+      const call = buildToolFeedCall(update)
+      const toolCallId = call?.toolCallId
+      // 无 id 时归约器 no-op，但仍需消费快照旁路并按 quiet 收尾（保原语义）
       set((s) => {
         let remaining = s.pendingMarkProposalSnapshotContents
         let attachedCount = 0
         let proposalToolTitle: string | undefined
-        const toolCallId =
-          typeof update.toolCallId === 'string'
-            ? update.toolCallId
-            : typeof update.tool_call_id === 'string'
-              ? update.tool_call_id
-              : undefined
+        const proposalFallback = collectStoreFallbackProposal()
         const patched = patchActiveThread(s, (t) => {
-          const updated = applyToolCallUpdate(t.messages, update)
-          const currentTool = [...updated]
+          const base = call
+            ? applyChatEvent(
+                { messages: t.messages, turnSettled: s.turnSettled },
+                { type: 'tool-call', call, proposalFallback },
+                { createId: newId },
+              ).messages
+            : t.messages
+          const currentTool = [...base]
             .reverse()
             .find(
               (message) =>
@@ -595,9 +750,11 @@ export const createChatSlice: StateCreator<
                 message.toolCallId === toolCallId,
             )
           proposalToolTitle = currentTool?.toolTitle
-          const attached = attachPendingMarkProposals(updated, remaining)
+          const attached = attachPendingMarkProposals(base, remaining)
           remaining = attached.remaining
           attachedCount = attached.attachedCount
+          // 归约器已内聚 tool 更新的 finalize-if-quiet；此处仅为快照挂载后的
+          // 增量收尾（幂等， streaming agent 存在则延迟）。
           const hasStreamingAgent = attached.messages.some(
             (message) => message.role === 'agent' && message.streaming,
           )
@@ -605,7 +762,7 @@ export const createChatSlice: StateCreator<
             ...t,
             messages: hasStreamingAgent
               ? attached.messages
-              : finalizeThreadMessages(attached.messages),
+              : finalizeFeedMessages(attached.messages, proposalFallback),
             updatedAt: Date.now(),
           }
         })
@@ -632,49 +789,17 @@ export const createChatSlice: StateCreator<
         update.content !== undefined ? [update.content] : update.content,
       )
       if (!chunkText) return
-      set((s) =>
-        patchActiveThread(s, (t) => {
-          const messages = [...t.messages]
-          const idx = messages.findIndex(
-            (m) => m.role === 'tool' && m.toolCallId === toolCallId,
+      set((s) => {
+        const proposalFallback = collectStoreFallbackProposal()
+        return patchActiveThread(s, (t) => {
+          const feed = applyChatEvent(
+            { messages: t.messages, turnSettled: s.turnSettled },
+            { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback },
+            { createId: newId },
           )
-          if (idx < 0) {
-            messages.push({
-              id: newId('tool'),
-              role: 'tool',
-              toolCallId,
-              toolTitle: '工具调用',
-              toolKind: 'other',
-              toolStatus: 'in_progress',
-              toolContentText: chunkText,
-              text: chunkText,
-              createdAt: Date.now(),
-              streaming: true,
-            })
-          } else {
-            const prev = messages[idx]!
-            const merged = `${prev.toolContentText ?? prev.text ?? ''}${chunkText}`
-            messages[idx] = {
-              ...prev,
-              toolContentText: merged,
-              text: merged,
-              // 回合已收尾标记的工具：迟到内容落定合入，不再点亮流式
-              // （解析经 turnEnded 放行，结果状态仍由展示层如实表达）
-              streaming: prev.turnEnded === true ? false : isToolActiveStatus(prev.toolStatus),
-              updatedAt: Date.now(),
-              toolStatus: prev.toolStatus ?? 'in_progress',
-            }
-          }
-          const hasStreamingAgent = messages.some(
-            (message) => message.role === 'agent' && message.streaming,
-          )
-          return {
-            ...t,
-            messages: hasStreamingAgent ? messages : finalizeThreadMessages(messages),
-            updatedAt: Date.now(),
-          }
-        }),
-      )
+          return { ...t, messages: feed.messages, updatedAt: Date.now() }
+        })
+      })
       return
     }
 
@@ -729,49 +854,12 @@ export const createChatSlice: StateCreator<
     set((s) => ({
       ...(role === 'user' ? { pendingReplayUserText: null } : {}),
       ...patchActiveThread(s, (t) => {
-        const messages = [...t.messages]
-        const last = messages[messages.length - 1]
-        if (last && last.role === role && last.streaming) {
-          messages[messages.length - 1] = {
-            ...last,
-            text: last.text + effectiveText,
-            updatedAt: Date.now(),
-          }
-          return { ...t, messages, updatedAt: Date.now() }
-        }
-
-        const emptyAgentIdx = messages.findIndex(
-          (m) => m.role === 'agent' && m.streaming && !m.text.trim(),
+        const feed = applyChatEvent(
+          { messages: t.messages, turnSettled: s.turnSettled },
+          { type: 'text-chunk', role, text: effectiveText },
+          { createId: newId },
         )
-
-        if (role === 'agent' && emptyAgentIdx >= 0) {
-          messages[emptyAgentIdx] = {
-            ...messages[emptyAgentIdx]!,
-            text: effectiveText,
-            updatedAt: Date.now(),
-            streaming: true,
-          }
-          return { ...t, messages, updatedAt: Date.now() }
-        }
-
-        const nextMsg: AcpChatMessage = {
-          id: newId(role),
-          role,
-          text: effectiveText,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          // 冻结后到达的迟到 chunk（prompt 结果先于文本通知的竞态）：
-          // 正文照常合入，但不再点亮 streaming——否则另起一条永不落定的
-          // 流式气泡。回放重建走通路（turnSettled 为 false）不受影响。
-          streaming: !s.turnSettled,
-        }
-
-        if (role === 'thought' && emptyAgentIdx >= 0) {
-          messages.splice(emptyAgentIdx, 0, nextMsg)
-        } else {
-          messages.push(nextMsg)
-        }
-        return { ...t, messages, updatedAt: Date.now() }
+        return { ...t, messages: feed.messages, updatedAt: Date.now() }
       }),
     }))
   },

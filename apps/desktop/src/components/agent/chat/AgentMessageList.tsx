@@ -11,13 +11,21 @@ import {
   useAcpPendingPermission,
   useAcpUiStore,
 } from '@/stores/acp-ui-store'
+import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
-import { planInlinePresent } from '@/lib/agent/inline-present'
-import { groupChatTimeline } from '@/lib/agent/chat-timeline'
-import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
-import { AgentPermissionCard } from '@/components/agent/permission/AgentPermissionCard'
-import { AgentLoadingState, currentRunStatus } from '@/components/agent/chat/AgentLoadingState'
-import { timelineRendersInlineApproval } from '@/lib/agent/acp-permission-ui'
+import { planInlinePresent } from '@montree/chat-core'
+import { groupChatTimeline } from '@montree/chat-core'
+import { ChatMessageBubble } from '@montree/chat-ui'
+import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
+import { AgentPermissionCard } from '@montree/chat-ui'
+import { respondPermissionRequest } from '@/lib/agent/permission-respond'
+import { openChapterForMarkRecovery, promptSelectTextForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
+import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
+import { AgentLoadingState, currentRunStatus } from '@montree/chat-ui'
+import { timelineRendersInlineApproval } from '@montree/chat-core'
 import { logAcpLayoutProbe } from '@/lib/agent/acp-layout-probe'
 import {
   CHAT_HISTORY_INITIAL_COUNT,
@@ -25,17 +33,33 @@ import {
   resolveScrollViewport,
   sliceChatWindow,
 } from '@/lib/agent/stick-to-bottom'
-import { AGENT_CHAT_COL_CLASS } from '@/components/agent/chat/AgentChatItem'
+import { AGENT_CHAT_COL_CLASS } from '@montree/chat-ui'
 import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
-import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
-import type { GenerativeSubmitPayload } from '@/components/agent/generative/ComponentUiCard.lazy'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
+import { useChatSessionStore } from '@montree/chat-session'
+import type { ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
+import type { GenerativeSubmitPayload } from '@montree/chat-ui'
+
+/**
+ * 消息读取源（P4b 壳收敛第一步，只切 docked 面）：
+ * - `host`（缺省）：沿用宿主 `useAcpActiveMessages`，行为与现状逐字一致；
+ * - `package-mirror`：消息数组改读包对账镜像 `getOwnedChatSessionStore()` 的 active
+ *   线程 feed（经 `useChatSessionStore` 订阅），streaming 标记随消息同切；
+ *   其余一律走宿主现有：`prompting`（动作驱动，P4c 才换）、`pendingPermission`、
+ *   主题、滚动快照、全部回调与发送/审批/配置动作。
+ */
+export type AgentMessageSource = 'host' | 'package-mirror'
+
+/** 包镜像 active 为空时的稳定空数组（避免每渲染新建数组抖动 memo）。 */
+const EMPTY_PACKAGE_MIRROR_MESSAGES: AcpChatMessage[] = []
 
 interface AgentMessageListProps {
   bottomRef: RefObject<HTMLDivElement | null>
   messagesRef: RefObject<HTMLDivElement | null>
   authHint: string | null
   runtimeName?: string
+  messageSource?: AgentMessageSource
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
   onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void
   onEditMessage?: (text: string) => void
@@ -56,15 +80,30 @@ const ThreadMessageList = memo(function ThreadMessageList({
   messagesRef,
   authHint,
   runtimeName,
+  messageSource = 'host',
   onChapterPlanSelect,
   onGenerativeSubmit,
   onEditMessage,
   onQuote,
 }: AgentMessageListProps) {
-  const messages = useAcpActiveMessages()
+  const hostMessages = useAcpActiveMessages()
+  // P4b 包镜像订阅：host 模式下同样订阅（hooks 禁条件调用），但渲染不用其消息；
+  // 输出与现状一致，仅多一次无害订阅（输出仍由 hostMessages 决定）。
+  const packageMirrorState = useChatSessionStore(getOwnedChatSessionStore())
+  const packageMirrorThread =
+    packageMirrorState.activeThreadId != null
+      ? packageMirrorState.threads.find((t) => t.id === packageMirrorState.activeThreadId)
+      : undefined
+  const messages =
+    messageSource === 'package-mirror'
+      ? (packageMirrorThread?.feed.messages ?? EMPTY_PACKAGE_MIRROR_MESSAGES)
+      : hostMessages
   const pendingPermission = useAcpPendingPermission()
+  const resolveMarkProposal = useAcpUiStore((s) => s.resolveMarkProposal)
   const prompting = useAcpUiStore((s) => s.prompting)
   const threadId = useAcpUiStore((s) => s.activeThreadId)
+  const navFlatIndex = useReaderNavigationStore((s) => s.nav.flatIndex)
+  const theme = useEditorUiStore((s) => s.theme)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const streamingAny = messages.some((m) => m.streaming) || prompting
   const runStatus = currentRunStatus(messages, pendingPermission != null)
@@ -336,12 +375,13 @@ const ThreadMessageList = memo(function ThreadMessageList({
         <ThreadPrimitive.Root className="flex-1 flex flex-col min-h-0 h-full">
           <ThreadPrimitive.Viewport
             ref={viewportRef}
+            data-testid="chat-viewport"
             autoScroll
             scrollToBottomOnInitialize={false}
             scrollToBottomOnRunStart={false}
             scrollToBottomOnThreadSwitch={false}
             onScroll={checkNearBottom}
-            className="flex-1 overflow-y-auto overflow-x-hidden p-3"
+            className="flex-1 overflow-y-auto overflow-x-hidden p-3 [scrollbar-gutter:stable]"
           >
             <div
               ref={messagesRef}
@@ -395,17 +435,39 @@ const ThreadMessageList = memo(function ThreadMessageList({
                     onEditMessage={onEditMessage}
                   />
                 ) : (
-                  <AgentMessageBubble
+                  <ChatMessageBubble
                     key={item.key}
                     message={item.message}
                     inlinePresentSlots={inlinePresent.slotsByMessage.get(item.message.id)}
                     suppressPresentResult={inlinePresent.claimedToolIds.has(item.message.id)}
                     runStatus={runStatus}
+                    resolveMarkProposal={resolveMarkProposal}
+                    pendingPermission={pendingPermission}
+                    onDismissProposedMark={dismissProposedMark}
+                    onPermissionRespond={(optionId) => {
+                      if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
+                    }}
+                    onRecoverChapter={(flatIndex) => {
+                      void openChapterForMarkRecovery(flatIndex)
+                    }}
+                    onPromptSelectText={() => promptSelectTextForMarkRecovery()}
+                    navFlatIndex={navFlatIndex}
+                    renderBusinessResult={(message, opts) => (
+                      <ToolBusinessResult
+                        message={message}
+                        threadId={opts.threadId}
+                        prompting={opts.prompting}
+                        onGenerativeSubmit={opts.onGenerativeSubmit}
+                        compactResults={opts.compactResults}
+                      />
+                    )}
+                    renderPlanCard={(message) => <AgentPlanCard message={message} />}
                     onChapterPlanSelect={onChapterPlanSelect}
                     threadId={threadId}
                     prompting={prompting}
                     onGenerativeSubmit={onGenerativeSubmit}
                     onEditMessage={onEditMessage}
+                    theme={theme}
                   />
                 ),
               )}
@@ -415,7 +477,10 @@ const ThreadMessageList = memo(function ThreadMessageList({
               ) : null}
 
               {pendingOrphan && pendingPermission ? (
-                <AgentPermissionCard pending={pendingPermission} />
+                <AgentPermissionCard
+                  pending={pendingPermission}
+                  onRespond={(optionId) => respondPermissionRequest(pendingPermission, optionId)}
+                />
               ) : null}
 
               <div ref={bottomRef} />

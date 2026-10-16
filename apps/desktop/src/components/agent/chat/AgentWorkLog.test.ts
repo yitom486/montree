@@ -4,9 +4,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AgentActivityGroup, type WorkLogItem } from './AgentActivityGroup'
-import { AgentResultEntry } from '@/components/agent/tools/AgentResultEntry'
-import { AgentMessageBubble } from './AgentMessageBubble'
-import { groupChatTimeline } from '@/lib/agent/chat-timeline'
+import { AgentResultEntry } from '@montree/chat-ui'
+import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { ChatMessageBubble } from '@montree/chat-ui'
+import { groupChatTimeline } from '@montree/chat-core'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
@@ -203,7 +204,10 @@ describe('AgentResultEntry 结果独立入口（U3）', () => {
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(AgentResultEntry, { message }),
+          createElement(AgentResultEntry, {
+            message,
+            businessResultSlot: createElement(ToolBusinessResult, { message, compactResults: true }),
+          }),
         ),
       )
     })
@@ -244,7 +248,11 @@ describe('AgentResultEntry 结果独立入口（U3）', () => {
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(AgentMessageBubble, { message: failed }),
+          createElement(ChatMessageBubble, {
+            message: failed,
+            resolveMarkProposal: useAcpUiStore.getState().resolveMarkProposal,
+            pendingPermission: useAcpUiStore.getState().pendingPermission,
+          }),
         ),
       )
     })
@@ -276,7 +284,11 @@ describe('AgentResultEntry 结果独立入口（U3）', () => {
           createElement(
             QueryClientProvider,
             { client: queryClient },
-            createElement(AgentMessageBubble, { message }),
+            createElement(ChatMessageBubble, {
+              message,
+              resolveMarkProposal: useAcpUiStore.getState().resolveMarkProposal,
+              pendingPermission: useAcpUiStore.getState().pendingPermission,
+            }),
           ),
         )
       })

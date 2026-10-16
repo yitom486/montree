@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { BeuiAgentActivity, BeuiActivityRow } from './BeuiAgentActivity'
+import { BeuiAgentActivity, BeuiActivityRow } from '@montree/chat-ui'
 import {
   AgentChatItem,
   AgentChatItemBody,
-} from '@/components/agent/chat/AgentChatItem'
-import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
-import { AgentToolCallCard } from '@/components/agent/tools/AgentToolCallCard'
+} from '@montree/chat-ui'
+import { ChatMessageBubble } from '@montree/chat-ui'
+import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
+import { respondPermissionRequest } from '@/lib/agent/permission-respond'
+import { openChapterForMarkRecovery, promptSelectTextForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
+import { useAcpPendingPermission, useAcpUiStore } from '@/stores/acp-ui-store'
+import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
+import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { AgentToolCallCard } from '@montree/chat-ui'
+import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
 import { ToolStateIcon } from '@/components/ai-elements/tool'
-import type { ChatTimelineItem } from '@/lib/agent/chat-timeline'
+import type { ChatTimelineItem } from '@montree/chat-core'
 import { formatDuration, type AcpChatMessage } from '@/stores/acp-chat-types'
-import { toToolDisplayModel } from '@/lib/agent/tool-display-model'
-import type { ChapterMarkPlanSelectPayload } from '@/components/agent/propose/ChapterMarkPlanCard'
+import { toToolDisplayModel } from '@montree/chat-core'
+import type { ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
 import { cn } from '@/lib/utils'
 
 export type WorkLogItem = Extract<ChatTimelineItem, { kind: 'work-log' }>
@@ -25,6 +33,8 @@ interface AgentActivityGroupProps {
 /** 轻量工具行：标题+目标+状态，一行；按需展开单个调用的完整详情。 */
 function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
   const [open, setOpen] = useState(false)
+  const pendingPermission = useAcpPendingPermission()
+  const navFlatIndex = useReaderNavigationStore((s) => s.nav.flatIndex)
   useEffect(() => setOpen(false), [message.id])
   const display = toToolDisplayModel(message)
   const aiState =
@@ -46,7 +56,21 @@ function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
       stateLabel={{ 'in-progress': '执行中', pending: '待执行', completed: '已完成', failed: '失败', cancelled: '已取消', unknown: '未知', 'awaiting-approval': '等待批准' }[display.state]}
       icon={<ToolStateIcon state={aiState} />} meta={display.durationMs != null ? formatDuration(display.durationMs) : undefined}
       open={open} onToggle={() => setOpen(value => !value)} failure={display.errorHeadline}>
-      <AgentToolCallCard message={message} bare detailsOnly />
+      <AgentToolCallCard
+        message={message}
+        bare
+        detailsOnly
+        pending={pendingPermission}
+        onRespond={(optionId) => {
+          if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
+        }}
+        onRecoverChapter={(flatIndex) => {
+          void openChapterForMarkRecovery(flatIndex)
+        }}
+        onPromptSelectText={() => promptSelectTextForMarkRecovery()}
+        navFlatIndex={navFlatIndex}
+        businessResultSlot={<ToolBusinessResult message={message} />}
+      />
     </BeuiActivityRow>
   )
 }
@@ -57,6 +81,10 @@ function WorkLogToolRow({ message }: { message: AcpChatMessage }) {
  * 摘要只说真实操作与状态计数；无可信时间省略历时，不估算耗时。
  */
 export function AgentActivityGroup({ group, running, onChapterPlanSelect, onEditMessage }: AgentActivityGroupProps) {
+  const resolveMarkProposal = useAcpUiStore((s) => s.resolveMarkProposal)
+  const pendingPermission = useAcpPendingPermission()
+  const navFlatIndex = useReaderNavigationStore((s) => s.nav.flatIndex)
+  const theme = useEditorUiStore((s) => s.theme)
   const isRunning = running ?? group.isActive
   const liveThought = group.messages.some(message => message.role === 'thought' && message.streaming)
   const latestTool = group.messages.findLast(message => message.role === 'tool')
@@ -112,11 +140,33 @@ export function AgentActivityGroup({ group, running, onChapterPlanSelect, onEdit
             msg.role === 'tool' ? (
               <WorkLogToolRow key={isRunning ? 'latest-tool' : msg.id} message={msg} />
             ) : (
-              <AgentMessageBubble
+              <ChatMessageBubble
                 key={msg.id}
                 message={msg}
+                resolveMarkProposal={resolveMarkProposal}
+                pendingPermission={pendingPermission}
+                onDismissProposedMark={dismissProposedMark}
+                onPermissionRespond={(optionId) => {
+                  if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
+                }}
+                onRecoverChapter={(flatIndex) => {
+                  void openChapterForMarkRecovery(flatIndex)
+                }}
+                onPromptSelectText={() => promptSelectTextForMarkRecovery()}
+                navFlatIndex={navFlatIndex}
+                renderBusinessResult={(message, opts) => (
+                  <ToolBusinessResult
+                    message={message}
+                    threadId={opts.threadId}
+                    prompting={opts.prompting}
+                    onGenerativeSubmit={opts.onGenerativeSubmit}
+                    compactResults={opts.compactResults}
+                  />
+                )}
+                renderPlanCard={(message) => <AgentPlanCard message={message} />}
                 onChapterPlanSelect={onChapterPlanSelect}
                 onEditMessage={onEditMessage}
+                theme={theme}
               />
             ),
           )}

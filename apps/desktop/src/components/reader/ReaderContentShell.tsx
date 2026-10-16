@@ -28,7 +28,7 @@ import { isOk, toChapterKey } from '@montree/contracts'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { narrowChapterScopeMarks } from '@/lib/reader/marks/chapter-scope'
 import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
-import type { DiagramVisualStep } from '@/components/agent/tools/DiagramViewerCard'
+import type { DiagramVisualStep } from '@montree/chat-ui'
 import { toast } from 'sonner'
 
 interface ReaderContentShellProps {

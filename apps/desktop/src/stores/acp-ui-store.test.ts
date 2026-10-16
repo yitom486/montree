@@ -746,3 +746,68 @@ describe('会话 prompt 模式（native/compatibility）', () => {
     expect(useAcpUiStore.getState()).toBe(before)
   })
 })
+
+describe('失败回合回滚（额度/网络报错不粘气泡）', () => {
+  beforeEach(() => {
+    const fresh = useAcpUiStore.getState().createThread()
+    useAcpUiStore.setState({
+      prompting: false,
+      sessionId: null,
+      status: 'disconnected',
+      pendingMarkProposalSnapshotContents: [],
+    })
+    const thread = useAcpUiStore.getState().threads.find((t) => t.id === fresh)
+    useAcpUiStore.setState({
+      threads: thread ? [thread] : useAcpUiStore.getState().threads.slice(0, 1),
+      activeThreadId: fresh,
+    })
+  })
+
+  it('prompt 失败回滚掉本回合 agent 文本，工具记录与用户消息保留', () => {
+    const store = useAcpUiStore.getState()
+    // 历史回合先落定一条正常回答（回滚不得误删）
+    store.appendUserMessage('old q')
+    store.beginAgentReply()
+    store.applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: [{ type: 'text', text: 'old a' }],
+    })
+    store.finishStreaming()
+    // 首回合落定：旧回答在位（prune 只在后续回合压缩，见下）
+    expect(
+      useAcpUiStore
+        .getState()
+        .threads.find((t) => t.id === useAcpUiStore.getState().activeThreadId)!
+        .messages.map((m) => m.role),
+    ).toEqual(['user', 'agent'])
+    const keepIds = useAcpUiStore
+      .getState()
+      .threads.find((t) => t.id === useAcpUiStore.getState().activeThreadId)!
+      .messages.map((m) => m.id)
+    // 新回合：用户提问 → 占位 → 流进来额度报错文本 → 工具执行记录 → prompt 返回失败
+    store.appendUserMessage('new q')
+    store.beginAgentReply()
+    store.applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: [{ type: 'text', text: 'Individual quota reached. Please upgrade.' }],
+    })
+    store.applySessionUpdate({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'tk-1',
+      title: '搜索文档',
+      status: 'completed',
+      content: [{ type: 'text', text: 'done' }],
+    })
+    store.finishStreaming()
+    store.rollbackFailedTurn(keepIds)
+    const messages = useAcpUiStore
+      .getState()
+      .threads.find((t) => t.id === useAcpUiStore.getState().activeThreadId)!.messages
+    // prune 只压缩当前回合内中间气泡，旧回合真实回答保留；关键是：
+    // 额度报错文本消失、新回合结构正确、工具记录保留
+    expect(messages.map((m) => m.role)).toEqual(['user', 'agent', 'user', 'tool'])
+    expect(messages.map((m) => m.text)).toEqual(['old q', 'old a', 'new q', 'done'])
+    expect(messages.some((m) => m.text.includes('quota'))).toBe(false)
+    expect(messages.find((m) => m.toolCallId === 'tk-1')?.toolStatus).toBe('completed')
+  })
+})

@@ -10,7 +10,7 @@ import {
   Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@/components/agent/tools/result-card'
+import { RESULT_CARD_HEADER, RESULT_CARD_ICON, RESULT_CARD_SUMMARY, resultCardClassName } from '@montree/chat-ui'
 import { cn } from '@/lib/utils'
 
 export interface CrossReferenceChapter {

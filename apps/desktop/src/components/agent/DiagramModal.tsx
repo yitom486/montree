@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { DiagramViewerCard, type DiagramPayload } from './tools/DiagramViewerCard'
+import { DiagramViewerCard, type DiagramPayload } from '@montree/chat-ui'
+import { MermaidBlock } from '@/components/markdown/MermaidBlock'
 
 export interface DiagramModalProps {
   isOpen: boolean
@@ -19,7 +20,12 @@ export function DiagramModal({ isOpen, onClose, diagram, onHighlightAnchor, onPi
           <DialogTitle>{diagram.title || '交互图表'}</DialogTitle>
           <DialogDescription>{diagram.diagramType} · {diagram.diagramId}</DialogDescription>
         </DialogHeader>
-        <DiagramViewerCard payload={diagram} onHighlightAnchor={onHighlightAnchor} onPinToDoc={onPinToDoc} />
+        <DiagramViewerCard
+          payload={diagram}
+          onHighlightAnchor={onHighlightAnchor}
+          onPinToDoc={onPinToDoc}
+          renderMermaid={(source) => <MermaidBlock source={source} />}
+        />
       </DialogContent>
     </Dialog>
   )
