@@ -221,7 +221,7 @@ function buildWebDocInlineCodeCss(theme: EpubThemeMode): string {
        保留自己的定位上下文，否则内部绝对定位箭头会跑到正文左上角。 */
     /* Mintlify 的真实卡片还有一层 content-container；卡片边框/点击区域
        应在外层，内部容器只负责承载图标、正文和悬停箭头。 */
-    body .web-doc-card.web-doc-card-with-container {
+    body .web-doc-reader-content .web-doc-card.web-doc-card-with-container {
       display: block !important;
       padding: 0 !important;
     }

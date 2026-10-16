@@ -36,7 +36,7 @@ test.describe('阅读器冒烟（自研最小 fixture）', () => {
       await window.getByRole('button', { name: '独立预览', exact: true }).click()
 
       const panel = window.locator('#main')
-      await expect(panel.locator('svg').first()).toBeVisible({ timeout: 20_000 })
+      await expect(panel.locator('[data-testid="mermaid-block"] svg[id]').first()).toBeVisible({ timeout: 20_000 })
       await expect(panel.locator('.katex').first()).toBeVisible({ timeout: 10_000 })
       await expect(panel.getByText('const answer').first()).toBeVisible()
     } finally {

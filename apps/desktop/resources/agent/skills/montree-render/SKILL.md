@@ -58,3 +58,17 @@ GFM tables, task lists (read-only), footnotes, KaTeX (`$…$` inline,
 Raw HTML beyond `details`/`summary`/`kbd` is stripped—never emit
 div/span/script/iframe/img tags, and never write React/JSX source in reply
 text (it renders as plain text, not components).
+
+## Positioning a result inside a reply
+
+After a successful montree_present call, you may embed its result between explanatory paragraphs using a standalone fenced block with language montree-present and only the returned result id as its body. Reference each result once, in the same user turn; never invent ids or put HTML/JSX in this block. Unreferenced results remain separate cards. This syntax is chat-only, not the Markdown document format.
+
+Example (replace the id with the tool result id):
+
+Explanation before.
+
+```montree-present
+present-result-id
+```
+
+Explanation after.

@@ -12,6 +12,7 @@ import {
   useAcpUiStore,
 } from '@/stores/acp-ui-store'
 import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
+import { planInlinePresent } from '@/lib/agent/inline-present'
 import { groupChatTimeline } from '@/lib/agent/chat-timeline'
 import { AgentMessageBubble } from '@/components/agent/chat/AgentMessageBubble'
 import { AgentPermissionCard } from '@/components/agent/permission/AgentPermissionCard'
@@ -260,6 +261,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
     viewport.scrollTop = preserved.top + (viewport.scrollHeight - preserved.height)
   }, [windowKey, messagesRef])
 
+  const inlinePresent = useMemo(() => planInlinePresent(messages, new Set(visibleMessages.map(m => m.id))), [messages, visibleMessages])
+
   const timeline = useMemo(() => {
     const visibleIds = new Set(visibleMessages.map((m) => m.id))
     return groupChatTimeline(messages, {
@@ -395,6 +398,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
                   <AgentMessageBubble
                     key={item.key}
                     message={item.message}
+                    inlinePresentSlots={inlinePresent.slotsByMessage.get(item.message.id)}
+                    suppressPresentResult={inlinePresent.claimedToolIds.has(item.message.id)}
                     runStatus={runStatus}
                     onChapterPlanSelect={onChapterPlanSelect}
                     threadId={threadId}

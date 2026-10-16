@@ -90,3 +90,5 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 React artifact 经 `montree_present(kind=react-artifact)` 的真实工具结果独立懒加载：单文件 JSX/TSX 主进程离线编译，复用 HTML artifact 的 allow-scripts/CSP iframe，历史只保存源码。原文正文仍只走单 Streamdown。
 
 R3 文本请求协议见 `packages/contracts/src/agent/react-artifact-actions.ts`：仅文本提议、1536字节上限；业务发送仍需 iframe 外用户确认，沿原 ACP 归属/忙碌/防重复链路。React 内联卡提供继续分析和请求修复，HTML artifact 未开放请求桥。
+
+助手正文支持 `montree-present` 围栏（正文只写成功工具返回的 id）：AgentMessageList 派生当前回合引用归属，AgentMessageBubble 在段落之间复用 ToolBusinessResult；完成后隐藏原工具位置的业务卡，保留过程记录。流式期间保留原卡片并显示插入提示，缺失或重复引用给出说明。普通正文与旧消息布局不变。

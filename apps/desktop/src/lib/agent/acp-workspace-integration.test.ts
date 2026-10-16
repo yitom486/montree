@@ -148,6 +148,7 @@ describe('ACP 工作区绑定会话集成测试', () => {
       cwd: WS_A,
       resumeSessionId: undefined,
       hasLocalHistory: false,
+      recoverToolCallIds: [],
     })
 
     // 在工作区 A 发送消息

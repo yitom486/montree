@@ -114,6 +114,53 @@ function componentUiArgs() {
 }
 
 test.describe('生成式 UI 生产链路 G4', () => {
+  test('正文嵌入：流式保留单卡、完成后段落间交互、重复引用与重载', async ({}, info) => {
+    test.setTimeout(120_000)
+    const directory = await mkdtemp(join(tmpdir(), 'montree-inline-present-'))
+    const gate = join(directory, 'continue')
+    const app = await launchBuiltApp({ ...MOCK_ENV, E2E_DOCUMENT_TOOLS: '1', E2E_ACP_STREAM_GATE: gate })
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      const panel = await openPanel(window)
+      const floating = window.getByTestId('floating-ai-hud')
+      if (await floating.isVisible()) await floating.getByTitle('停靠到侧栏').click()
+      await panel.evaluate(el => { const host = el.closest('[data-panel]') as HTMLElement; host.style.flex = 'none'; host.style.width = '520px' })
+      await connect(window)
+      await panel.getByRole('textbox', { name: '输入消息，Enter 发送，Shift+Enter 换行' }).fill('inline-diagram')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      await expect(panel.getByText('交互组件将在回答完成后嵌入此处').first()).toBeVisible()
+      await expect(panel.getByTestId('html-artifact-card')).toHaveCount(1)
+      await expect(panel.getByTestId('inline-present')).toHaveCount(0)
+      await writeFile(gate, 'continue')
+      const inline = panel.getByTestId('inline-present')
+      await expect(inline).toHaveCount(1)
+      await expect(panel.getByTestId('html-artifact-card')).toHaveCount(1)
+      await expect(panel.getByText('该组件已在上文展示', { exact: true })).toBeVisible()
+      const frame = inline.frameLocator('[data-testid="svg-diagram-frame"]')
+      await expect(frame.getByRole('img', { name: '内置flowchart' })).toBeVisible()
+      await frame.getByRole('button', { name: '内容已准备好？', exact: true }).focus()
+      await window.keyboard.press('Enter')
+      await expect(frame.getByRole('status', { name: '节点详情' })).toContainText('检查文档与工具是否就绪')
+      const paragraphs = await inline.evaluate(el => {
+        const parent = el.parentElement!
+        return { before: parent.textContent!.indexOf('正文前段'), card: parent.textContent!.indexOf('内置flowchart'), after: parent.textContent!.indexOf('正文后段') }
+      })
+      expect(paragraphs.before).toBeLessThan(paragraphs.card)
+      expect(paragraphs.card).toBeLessThan(paragraphs.after)
+      await frame.getByRole('button', { name: '适应宽度', exact: true }).click()
+      await inline.screenshot({ path: info.outputPath('inline-present.png') })
+      await expect.poll(() => window.evaluate(() => (localStorage.getItem('montree-acp-ui') ?? '').includes('montree-present'))).toBe(true)
+      await window.reload()
+      await expect(window.getByTestId('inline-present')).toHaveCount(1)
+      await expect(window.getByTestId('html-artifact-card')).toHaveCount(1)
+      await expect(window.getByTestId('inline-present').frameLocator('[data-testid="svg-diagram-frame"]').getByRole('img', { name: '内置flowchart' })).toBeVisible()
+    } finally {
+      await app.close()
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   test('历史图表恢复：原工具补正文、内联交互、重载保留且不重复', async ({}, info) => {
     test.setTimeout(90_000)
     const directory = await mkdtemp(join(tmpdir(), 'montree-recovery-'))

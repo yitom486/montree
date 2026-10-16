@@ -1,4 +1,6 @@
-import { resolve } from 'node:path'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 
@@ -631,7 +633,11 @@ test.describe('聊天展示层 R2', () => {
     }
   })
 
-  test('流式工作记录：最新工具固定展示，完成收起且可查看历史', async ({}, info) => {    const app = await launchBuiltApp({
+  test('流式工作记录：最新工具固定展示，完成收起且可查看历史', async ({}, info) => {
+    const directory = await mkdtemp(join(tmpdir(), 'montree-worklog-'))
+    const gate = join(directory, 'continue')
+    const app = await launchBuiltApp({
+      E2E_WORKLOG_GATE: gate,
       E2E_ACP_WINDOW_TEST: '1',
       E2E_ACP_COMMAND: process.execPath,
       E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
@@ -647,21 +653,10 @@ test.describe('聊天展示层 R2', () => {
         (window as any).electronAPI.acpConnect({ runtimeId: 'mock-window' }),
       )
       expect(connected.ok, JSON.stringify(connected)).toBe(true)
-      const sessionId = connected.value.sessionId as string
-      const prompt = (text: string) =>
-        window.evaluate(
-          ({ sessionId, text }) => {
-            void (window as any).electronAPI.acpPrompt({
-              sessionId,
-              prompt: [{ type: 'text', text }],
-            })
-          },
-          { sessionId, text },
-        )
-
-      await prompt('worklog')
+      await panel.getByRole('textbox', { name: '输入消息，Enter 发送，Shift+Enter 换行' }).fill('worklog')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
       // 运行中（mock 不主动结束回合，工具保持流式）：一条工作记录，
-      // 默认收起，只见真实当前操作（2 个并行，不伪造串行）
+      // 运行中默认展开，只显示最新工具行（2 个并行，不伪造串行）
       const workLog = panel.getByText(/工作中.*0\/2/).first()
       await expect(workLog).toBeVisible({ timeout: 15_000 })
       await expect(panel.locator('[data-acp-probe="activity"]')).toHaveCount(1)
@@ -684,15 +679,10 @@ test.describe('聊天展示层 R2', () => {
       expect(expanded).toBe('true')
       await expect(panel.locator('[data-slot="agent-activity-row"]')).toHaveCount(1)
 
-      // 手动展开后落定：保持展开，行内工具可见
-      await prompt('worklog-done')
+      // 落定自动收起由 effect 完成；等待真实状态，之后仍可手动查看完整历史。
+      await writeFile(gate, 'continue')
       await expect(panel.getByText(/WORKLOG:.*done/)).toBeVisible({ timeout: 15_000 })
-      expect(
-        await panel
-          .locator('[data-acp-probe="activity"] button[aria-expanded]')
-          .first()
-          .getAttribute('aria-expanded'),
-      ).toBe('false')
+      await expect(panel.locator('[data-acp-probe="activity"] button[aria-expanded]').first()).toHaveAttribute('aria-expanded', 'false')
       await panel.locator('[data-acp-probe="activity"] button[aria-expanded]').first().click()
       await expect(panel.locator('[data-slot="agent-activity-row"]')).toHaveCount(2)
       await expect(panel.getByText(/工作记录 · 工具调用 2/)).toBeVisible()
@@ -701,6 +691,7 @@ test.describe('聊天展示层 R2', () => {
       await info.attach('worklog-stream', { path: info.outputPath('worklog-stream.png'), contentType: 'image/png' })
     } finally {
       await app.close()
+      await rm(directory, { recursive: true, force: true })
     }
   })
   test('社区滚动与历史恢复：离底浮现回到底部，重载后窗口与状态恢复', async ({}, info) => {

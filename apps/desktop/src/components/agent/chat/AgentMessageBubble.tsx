@@ -12,7 +12,8 @@ import { AgentResultEntry } from '@/components/agent/tools/AgentResultEntry'
 import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
 import { toolMessageNeedsApproval } from '@/lib/agent/acp-permission-ui'
 import { useAcpPendingPermission, useAcpUiStore } from '@/stores/acp-ui-store'
-import { hasBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { ToolBusinessResult, hasBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
+import { splitInlinePresent, type InlinePresentSlot } from '@/lib/agent/inline-present'
 import { isRichToolMessage } from '@/lib/agent/chat-timeline'
 import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
 import {
@@ -30,6 +31,8 @@ import '@/styles/markdown-preview.css'
 
 interface AgentMessageBubbleProps {
   message: AcpChatMessage
+  inlinePresentSlots?: Map<number, InlinePresentSlot>
+  suppressPresentResult?: boolean
   runStatus?: ReturnType<typeof currentRunStatus>
   resolveMarkProposal?: ResolveMarkProposal
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
@@ -45,6 +48,8 @@ interface AgentMessageBubbleProps {
 
 export function AgentMessageBubble({
   message,
+  inlinePresentSlots,
+  suppressPresentResult,
   runStatus,
   resolveMarkProposal,
   onChapterPlanSelect,
@@ -104,6 +109,9 @@ export function AgentMessageBubble({
   }
 
   if (message.role === 'tool') {
+    if (suppressPresentResult && !toolMessageNeedsApproval(message, pendingPermission)) {
+      return <AgentToolCallCard message={message} suppressBusinessResult />
+    }
     if (message.markProposal && message.markProposalStatus !== 'dismissed') {
       // 批注提议分支同样外挂审批槽：命中 pending 的工具不能因为不走工具卡就丢审批
       return (
@@ -256,7 +264,19 @@ export function AgentMessageBubble({
               <AgentMarkdownFallback text={renderText} className={markdownClassName} />
             }
           >
-            <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />
+            {inlinePresentSlots?.size ? splitInlinePresent(renderText).map(part => {
+              if (part.kind === 'markdown') return <AgentMarkdownLazy key={part.offset} text={part.text} streaming={showStreaming} className={markdownClassName} />
+              const slot = inlinePresentSlots.get(part.offset)
+              return slot?.state === 'ready' && slot.message ? (
+                <div key={part.offset} data-testid="inline-present" className="my-3 min-w-0 max-w-full">
+                  <ToolBusinessResult message={slot.message} threadId={threadId} prompting={prompting} onGenerativeSubmit={onGenerativeSubmit} />
+                </div>
+              ) : (
+                <p key={part.offset} className="my-2 text-xs text-muted-foreground" role="status">
+                  {slot?.state === 'streaming' ? '交互组件将在回答完成后嵌入此处' : slot?.state === 'duplicate' ? '该组件已在上文展示' : '引用的组件不可用，请查看工具结果或重新生成'}
+                </p>
+              )
+            }) : <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />}
           </Suspense>
         </BeuiStreamingResponse>
         </BuiMessage>

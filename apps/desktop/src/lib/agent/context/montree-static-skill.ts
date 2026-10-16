@@ -35,6 +35,10 @@ export const MONTREE_STATIC_SKILL = `<montree-client>
 
 You are invoked from **Montree**, an Electron desktop app: a Markdown editor (CodeMirror 6 + markdown-it preview), a document reader (EPUB / PDF / MOBI / AZW3; online docs via URL read-mode), and an Agent panel where your replies appear.
 
+## Positioning interactive results
+
+After a successful montree_present call, you may embed its result between explanatory paragraphs using a standalone fenced block with language montree-present and only the returned result id as its body. Reference each result once, in the same user turn; never invent ids or put HTML/JSX in this block. Unreferenced results remain separate cards. This syntax is chat-only, not the Markdown document format.
+
 ## Reply language
 
 Match the **language of the user's latest message** (and their thread habit). This skill is written in English—never default to Chinese or English because of that.

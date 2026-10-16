@@ -78,8 +78,8 @@ async function handle(message) {
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
-    } else if (command.startsWith('diagram:')) {
-      const diagramType = command.slice('diagram:'.length)
+    } else if (command.startsWith('diagram:') || command === 'inline-diagram') {
+      const diagramType = command === 'inline-diagram' ? 'flowchart' : command.slice('diagram:'.length)
       const { mcp } = sessions.get(sessionId)
       const guide = await mcpRequest(mcp, 'tools/call', { name: 'montree_diagram_guide', arguments: { diagramType } })
       if (guide.result?.isError) throw new Error('diagram guide failed')
@@ -119,7 +119,18 @@ async function handle(message) {
       send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title: 'mcp.montree.montree_present', kind: 'execute', status: 'in_progress' } } })
       const rpc = await mcpRequest(mcp, 'tools/call', { name: 'montree_present', arguments: { kind: 'preset', preset: 'diagram', diagramType, title: `内置${diagramType}`, nodes, edges, ...(lanes ? { lanes } : {}) } })
       send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: rpc.result?.isError ? 'failed' : 'completed', rawOutput: { result: rpc.result, error: null } } } })
-      output = `SVG:${sessionId}|${diagramType}`
+      if (command === 'inline-diagram') {
+        const payload = JSON.parse(rpc.result.content[0].text)
+        text(sessionId, ['正文前段：先理解整体流程。', '', '```montree-present', payload.id, '```', '', '正文后段：然后查看节点详情。', '', '```montree-present', payload.id, '```'].join('\n'))
+        if (process.env.E2E_ACP_STREAM_GATE) {
+          const deadline = Date.now() + 30000
+          while (!existsSync(process.env.E2E_ACP_STREAM_GATE)) {
+            if (Date.now() > deadline) throw new Error('inline gate timeout')
+            await new Promise(resolve => setTimeout(resolve, 20))
+          }
+        }
+        output = ''
+      } else output = `SVG:${sessionId}|${diagramType}`
     } else if (command === 'tools') {
       const { mcp } = sessions.get(sessionId)
       const rpc = await mcpRequest(mcp, 'tools/list')
@@ -144,16 +155,16 @@ async function handle(message) {
       send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId: `present-${sessionId}`, title: 'montree_present', kind: 'other', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: JSON.stringify(payload) } }] } } })
       output = `ECHO:${sessionId}|${payload.id}`
     } else if (command === 'worklog') {
-      // U5：两个常驻流式工具调用（不主动完成），覆盖运行中默认收起与手动展开
       for (const [toolCallId, title, kind] of [['worklog-a', 'read_text_file', 'read'], ['worklog-b', 'search', 'search']]) {
         send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title, kind, status: 'in_progress' } } })
       }
-      output = `WORKLOG:${sessionId}|started`
-    } else if (command === 'worklog-done') {
-      // 同一 toolCallId 落定：用户已展开的工作记录不得被收起
-      // （SDK tool_call schema 要求带 title，缺省会被校验丢弃）
-      for (const [toolCallId, title, kind] of [['worklog-a', 'read_text_file', 'read'], ['worklog-b', 'search', 'search']]) {
-        send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title, kind, status: 'completed' } } })
+      const deadline = Date.now() + 30000
+      while (process.env.E2E_WORKLOG_GATE && !existsSync(process.env.E2E_WORKLOG_GATE)) {
+        if (Date.now() > deadline) throw new Error('worklog gate timeout')
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+      for (const toolCallId of ['worklog-a', 'worklog-b']) {
+        send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed' } } })
       }
       output = `WORKLOG:${sessionId}|done`
     } else if (command === 'stream') {      const parts = ['# 流式报告\n\n首段中文正文。\n\n', '表格如下：\n\n| 甲 | 乙 |\n|---|---|\n| 1 | 2 |\n\n', '```ts\nconst answer = 42\n```\n\n', '公式 $2x+1$ 与 [链接](https://example.com/a)。\n\n', '```mermaid\ngraph TD; A-->B\n```\n\n尾段收束。脚注[^1]\n\n[^1]: 脚注证据内容']
