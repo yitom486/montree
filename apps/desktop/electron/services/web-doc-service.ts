@@ -10,6 +10,8 @@ import type {
 } from '@montree/contracts'
 import {
   extractGenericWebDocToc,
+  extractMdBookToc,
+  resolveMdBookTocUrl,
   extractSameOriginDocLinks,
   resolveWebDocTocDiscoveryUrl,
 } from '@montree/web-doc'
@@ -202,6 +204,17 @@ export async function discoverWebDocToc(
   try {
     const pageUrl = new URL(fetchResult.value.url)
     const siteId = resolveWebDocSiteId(pageUrl)
+    const mdbookInline = extractMdBookToc(fetchResult.value.html, fetchResult.value.url)
+    if (mdbookInline.length) return ok({ siteId, entries: mdbookInline })
+    const mdbookTocUrl = resolveMdBookTocUrl(fetchResult.value.html, fetchResult.value.url)
+    if (mdbookTocUrl) {
+      const toc = await fetchWebDocPage({ url: mdbookTocUrl })
+      if (!toc.ok) return toc
+      if (new URL(toc.value.url).origin !== pageUrl.origin) return toFetchError('mdBook 目录跳转到了其他站点')
+      const entries = extractMdBookToc(toc.value.html, toc.value.url)
+      if (!entries.length) return toFetchError('mdBook 目录未包含可读取的章节')
+      return ok({ siteId, entries })
+    }
     let sectionEntries = extractGenericWebDocToc(fetchResult.value.html, fetchResult.value.url)
 
     // 人民日报：通用密集列表若未命中，再回退纸媒版面列表（版面 DOM 特殊）

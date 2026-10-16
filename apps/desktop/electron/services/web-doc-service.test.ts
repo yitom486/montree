@@ -190,3 +190,38 @@ describe('web-doc-service', () => {
     })
   })
 })
+
+
+describe('mdBook static TOC discovery', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const page = '<!-- Book generated using mdBook --><nav id="mdbook-sidebar"><mdbook-sidebar-scrollbox></mdbook-sidebar-scrollbox><noscript><iframe src="../toc.html"></iframe></noscript></nav><main><a href="../mut.html">mut</a></main>'
+  const toc = '<ol class="chapter"><li class="chapter-item"><a href="primitives.html">Primitives</a><ol class="section"><li class="chapter-item"><a href="primitives/literals.html">Literals</a></li></ol></li></ol>'
+  it('fetches toc.html before considering body links, with nested links based on the index directory', async () => {
+    const fetch = vi.fn(async (url: string) => new Response(url.endsWith('toc.html') ? toc : page, { headers: { 'content-type': 'text/html' } }))
+    vi.stubGlobal('fetch', fetch)
+    const result = await discoverWebDocToc({ url: 'https://book.example/rust/primitives/literals.html' })
+    expect(result.ok && result.value.entries).toEqual([
+      { label: 'Primitives', level: 0, href: 'https://book.example/rust/primitives.html' },
+      { label: 'Literals', level: 1, href: 'https://book.example/rust/primitives/literals.html' },
+    ])
+    expect(fetch.mock.calls.map(c => c[0])).toEqual(['https://book.example/rust/primitives/literals.html', 'https://book.example/rust/toc.html'])
+  })
+  it('surfaces failed index loading instead of presenting See also as chapter navigation', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(url.endsWith('toc.html') ? 'not found' : page, { status: url.endsWith('toc.html') ? 404 : 200, headers: { 'content-type': 'text/html' } })))
+    const result = await discoverWebDocToc({ url: 'https://book.example/rust/primitives/literals.html' })
+    expect(result.ok).toBe(false)
+  })
+  it('uses older inline chapter trees without making a second request', async () => {
+    const fetch = vi.fn(async () => new Response(toc, { headers: { 'content-type': 'text/html' } }))
+    vi.stubGlobal('fetch', fetch)
+    const result = await discoverWebDocToc({ url: 'https://book.example/rust/primitives.html' })
+    expect(result.ok && result.value.entries.length).toBe(2)
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+  it('keeps redirect URL protection on index requests', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('toc.html') ? new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/toc.html' } }) : new Response(page, { headers: { 'content-type': 'text/html' } })))
+    const result = await discoverWebDocToc({ url: 'https://book.example/rust/primitives/literals.html' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('内网')
+  })
+})

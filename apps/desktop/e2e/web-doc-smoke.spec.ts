@@ -17,6 +17,36 @@ function mainPanel(window: Awaited<ReturnType<Awaited<ReturnType<typeof launchBu
 }
 
 test.describe('在线文档阅读', () => {
+  test('mdBook：独立toc章节树替代正文参考链接，点击子章与底栏返回保持一致', async ({}, info) => {
+    const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir() })
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await welcomeWebDocUrlField(window).fill('https://e2e.montree.test/book/primitives.html')
+      await welcomeWebDocUrlField(window).press('Enter')
+      const panel = mainPanel(window)
+      await expect(webDocFrame(window).getByRole('heading', { name: 'Primitives', exact: true })).toBeVisible()
+      const toc = panel.getByRole('button', { name: '目录', exact: true })
+      await expect(toc).toBeEnabled()
+      await toc.click()
+      await expect(panel.getByRole('button', { name: 'Introduction', exact: true })).toBeVisible()
+      await expect(panel.getByRole('button', { name: '1. Hello World', exact: true })).toBeVisible()
+      const child = panel.getByRole('button', { name: '2.1. Literals and operators', exact: true })
+      await expect(child).toBeVisible()
+      await expect(panel.getByRole('button', { name: 'mut', exact: true })).toHaveCount(0)
+      await child.click()
+      await expect(webDocFrame(window).getByRole('heading', { name: 'Literals and operators', exact: true })).toBeVisible()
+      await expect(panel.locator('input[placeholder="https://"]')).toHaveValue('https://e2e.montree.test/book/primitives/literals.html')
+      const footer = panel.locator('footer', { hasText: '当前单元' })
+      await footer.getByRole('button', { name: /上一单元/ }).click()
+      await expect(webDocFrame(window).getByRole('heading', { name: 'Primitives', exact: true })).toBeVisible()
+      await expect(panel.locator('input[placeholder="https://"]')).toHaveValue('https://e2e.montree.test/book/primitives.html')
+      // Development Electron may initially treat its main.js argument as an external file.
+      await expect(window.getByText('不支持的文件格式', { exact: true })).toBeHidden()
+      await panel.screenshot({ path: info.outputPath('mdbook-toc.png') })
+    } finally { await app.close() }
+  })
+
   test('论文 SVG 插图可加载，表格保留对齐和合并，宽表只在自身横向滚动', async () => {
     const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir() })
     try {

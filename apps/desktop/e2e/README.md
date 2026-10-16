@@ -38,7 +38,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `reader-pdf-structure.spec.ts` | PDF 结构化 WASM：生产包真加载（非回退）+ Agent 正文走结构化（`E2E_PDF_STRUCTURE` 门控测试钩子） |
 | `reader-pdf-ocr.spec.ts` | 扫描版 PDF 单页 OCR：「更多工具 → 识别本页」落缓存 + 文字层可读（当前页无文字层会自动识别；`apps/desktop/e2e/fixtures/ocr/scanned-hello.pdf`） |
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |
-| `web-doc-smoke.spec.ts` | 在线文档：打开、地址栏换页、目录跳转、论文 SVG 图片与表格对齐/合并/横向滚动 |
+| `web-doc-smoke.spec.ts` | 在线文档：mdBook 独立 toc.html 章节树/子章跳转/底栏返回、打开、地址栏换页、目录跳转、论文 SVG 图片与表格对齐/合并/横向滚动 |
 | `web-doc-xss.spec.ts` | 在线文档 XSS 回归（真浏览器）：恶意载荷不执行、正文完好 |
 | `reader-visual-context.spec.ts` | 网页/Markdown/EPUB/PDF 图片发现、图片地址和图注、主进程阅读区 PNG 截图（`E2E_READER_VISUAL` 门控，不连接 AI） |
 
@@ -52,6 +52,7 @@ apps/desktop/e2e/fixtures/web-doc/
   start.html
   installation.html
   academic.html      # 论文 object SVG 插图、LaTeXML 表格与宽表
+  mdbook-primitives.html / mdbook-literals.html / mdbook-toc.html  # mdBook 独立章节树与深路径导航
   xss.html           # XSS 回归载荷（script / javascript: / 事件处理器）
 ```
 

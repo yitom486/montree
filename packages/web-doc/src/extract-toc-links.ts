@@ -441,10 +441,62 @@ export function extractDenseListToc(html: string, baseUrl: string): WebDocTocEnt
   return entries
 }
 
+/** mdBook keeps its chapter list in static HTML on older builds and toc.html on newer builds. */
+export function extractMdBookToc(html: string, baseUrl: string): WebDocTocEntry[] {
+  const root = extractBalancedElements(stripScriptsAndStyles(html), 'ol').find(block =>
+    /^<ol\b[^>]*\bclass=["'][^"']*\bchapter\b[^"']*["']/i.test(block) && /\bchapter-item\b/i.test(block),
+  )
+  if (!root) return []
+  const entries: WebDocTocEntry[] = []
+  const seen = new Set<string>()
+  const base = new URL(baseUrl)
+  let depth = 0
+  const tokens = root.match(/<ol\b[^>]*>|<\/ol\s*>|<a\b[^>]*>[\s\S]*?<\/a\s*>/gi) ?? []
+  for (const token of tokens) {
+    if (/^<ol\b/i.test(token)) { depth++; continue }
+    if (/^<\/ol/i.test(token)) { depth = Math.max(0, depth - 1); continue }
+    const rawHref = token.match(/\bhref=["']([^"']+)["']/i)?.[1]
+    if (!rawHref) continue // Fold toggles are anchors without href.
+    const decodedHref = decodeHtmlEntities(rawHref)
+    if (!resolveSameOriginHref(decodedHref, base)) continue
+    const href = new URL(decodedHref, base).toString()
+    const label = extractAnchorLabel(token)
+    if (!label || seen.has(href)) continue
+    seen.add(href)
+    entries.push({ href, label: label.slice(0, 120), level: Math.max(0, depth - 1) })
+    if (entries.length >= MAX_TOC_ENTRIES) break
+  }
+  return entries
+}
+
+/** Only follow the mdBook sidebar's declared same-origin static TOC; never execute toc.js. */
+export function resolveMdBookTocUrl(html: string, baseUrl: string): string | null {
+  const clean = stripScriptsAndStyles(html)
+  const sidebar = extractBalancedElements(clean, 'nav').find(block =>
+    /^<nav\b[^>]*\bid=["'](?:mdbook-)?sidebar["']/i.test(block) && /mdbook-sidebar-scrollbox|sidebar-scrollbox|sidebar-iframe-outer/i.test(block),
+  )
+  if (!sidebar) return null
+  for (const frame of sidebar.match(/<iframe\b[^>]*>/gi) ?? []) {
+    const src = frame.match(/\bsrc=["']([^"']+)["']/i)?.[1]
+    if (!src) continue
+    try {
+      const base = new URL(baseUrl)
+      const url = new URL(decodeHtmlEntities(src), base)
+      if (url.origin !== base.origin || !['https:', 'http:'].includes(url.protocol) || url.username || url.password || !/\/toc\.html$/i.test(url.pathname)) continue
+      url.hash = ''
+      return url.href
+    } catch { /* Ignore malformed references and keep the ordinary discovery path. */ }
+  }
+  return null
+}
+
 /**
- * 通用目录：结构化侧栏 → 密集列表 → 整页同站链接。
+ * 通用目录：mdBook 章节树 → 结构化侧栏 → 密集列表 → 整页同站链接。
  */
 export function extractGenericWebDocToc(html: string, baseUrl: string): WebDocTocEntry[] {
+  const mdbook = extractMdBookToc(html, baseUrl)
+  if (mdbook.length) return mdbook
+
   const structured = extractStructuredNavToc(html, baseUrl)
   if (structured.length >= 3) return structured
 

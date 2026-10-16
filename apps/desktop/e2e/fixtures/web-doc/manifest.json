@@ -5,5 +5,8 @@
   "https://e2e.montree.test/docs/card": "installation.html",
   "https://e2e.montree.test/docs/installation": "installation.html",
   "https://e2e.montree.test/docs/xss": "xss.html",
-  "https://e2e.montree.test/docs/agent-chapters": "agent-chapters.html"
+  "https://e2e.montree.test/docs/agent-chapters": "agent-chapters.html",
+  "https://e2e.montree.test/book/primitives.html": "mdbook-primitives.html",
+  "https://e2e.montree.test/book/toc.html": "mdbook-toc.html",
+  "https://e2e.montree.test/book/primitives/literals.html": "mdbook-literals.html"
 }

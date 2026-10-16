@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   decodeHtmlEntities,
+  extractMdBookToc,
+  resolveMdBookTocUrl,
   extractGenericWebDocToc,
   extractSameOriginDocLinks,
   extractStructuredNavToc,
@@ -243,5 +245,32 @@ describe('extractGenericWebDocToc', () => {
       '1:Agents',
       '1:Models',
     ])
+  })
+})
+
+
+describe('mdBook chapter navigation', () => {
+  const tree = `<ol class="chapter"><li class="chapter-item"><a href="index.html">Introduction</a></li>
+    <li class="chapter-item"><a href="primitives.html"><strong>2.</strong> Primitives</a><a class="chapter-fold-toggle">❱</a>
+      <ol class="section"><li class="chapter-item"><a href="primitives/literals.html">2.1. Literals and operators</a>
+        <ol class="section"><li class="chapter-item"><a href="primitives/literals.html#examples">Examples</a></li></ol>
+      </li></ol>
+    </li><li class="chapter-item"><a href="https://other.example/">External</a><a href="javascript:alert(1)">Bad</a></li></ol>`
+  const sidebar = (src: string) => `<nav id="mdbook-sidebar"><mdbook-sidebar-scrollbox></mdbook-sidebar-scrollbox><noscript><iframe src="${src}"></iframe></noscript></nav>`
+  it('extracts nested ordered chapters, preserving anchors and ignoring fold controls and body references', () => {
+    const entries = extractGenericWebDocToc(tree + '<main><a href="mut.html">mut</a></main>', 'https://book.example/rust/toc.html')
+    expect(entries.map(e => [e.label, e.level])).toEqual([['Introduction', 0], ['2. Primitives', 0], ['2.1. Literals and operators', 1], ['Examples', 2]])
+    expect(entries[3]?.href).toBe('https://book.example/rust/primitives/literals.html#examples')
+    expect(extractMdBookToc('<p>not mdbook</p>', 'https://book.example/')).toEqual([])
+  })
+  it('resolves the declared index relative to deep and translated pages', () => {
+    expect(resolveMdBookTocUrl(sidebar('../toc.html'), 'https://book.example/rust/ja/primitives/literals.html')).toBe('https://book.example/rust/ja/toc.html')
+    expect(resolveMdBookTocUrl(sidebar('toc.html?x=1&amp;y=2'), 'https://book.example/rust/primitives.html')).toBe('https://book.example/rust/toc.html?x=1&y=2')
+  })
+  it('ignores arbitrary frames, cross-origin indexes and non-HTTP protocols', () => {
+    expect(resolveMdBookTocUrl('<iframe src="toc.html"></iframe>', 'https://book.example/')).toBeNull()
+    for (const src of ['https://evil.example/toc.html', 'file:///toc.html', 'javascript:alert(1)', 'other.html']) {
+      expect(resolveMdBookTocUrl(sidebar(src), 'https://book.example/rust/page.html')).toBeNull()
+    }
   })
 })
