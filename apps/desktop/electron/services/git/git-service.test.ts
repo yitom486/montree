@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   getGitDiff,
   getGitStatus,
@@ -125,10 +125,12 @@ UU merge-conflict.md
 describe('git-service 临时仓库（无远端 push）', () => {
   const dirs: string[] = []
   const savedEnv: Record<string, string | undefined> = {}
-  for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']) {
-    savedEnv[key] = process.env[key]
-    process.env[key] = key.includes('EMAIL') ? 'montree-test@example.com' : 'montree-test'
-  }
+  beforeEach(() => {
+    for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']) {
+      savedEnv[key] = process.env[key]
+      process.env[key] = key.includes('EMAIL') ? 'montree-test@example.com' : 'montree-test'
+    }
+  })
   afterEach(() => {
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) delete process.env[key]

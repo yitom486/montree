@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -55,7 +55,13 @@ function processHandle(label: string): SpawnedAcpProcess {
 }
 const initialized = { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } }, authMethods: [] }
 let scope: ReturnType<typeof getAcpContext>
+let configHome: string
 beforeEach(() => {
+  // 固定兼容路径，避免开发机现有 Codex 配置与 CI 空 HOME 导致不同温进程标签。
+  configHome = mkdtempSync(join(tmpdir(), 'montree-reconnect-home-'))
+  writeFileSync(join(configHome, 'config.toml'), 'model = "fixture"\n')
+  vi.stubEnv('CODEX_HOME', configHome)
+  vi.stubEnv('CODEX_CONFIG', '{}')
   vi.clearAllMocks()
   mocks.sessionRequest.mockResolvedValue({sessionId:'secondary',configOptions:[]})
   scope = getAcpContext(`reconnect-${Math.random()}`)
@@ -68,6 +74,8 @@ beforeEach(() => {
 afterEach(async () => {
   await runInAcpContext(scope, () => disconnectAcp(undefined, { killProcess: true }))
   forgetAcpContext(scope)
+  vi.unstubAllEnvs()
+  rmSync(configHome, { recursive: true, force: true })
 })
 const payload = { runtimeId: 'codex-acp', resumeSessionId: 'old-session', hasLocalHistory: true }
 
