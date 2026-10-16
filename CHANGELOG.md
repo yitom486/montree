@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **Agent 流式节流修复**：`useRevealText` 的 `lastUpdateTime` / `lastCommitTime` 从 effect 局部变量改为跨 effect 重跑持久的 ref。`source` 每次 delta 都会变化（`chat-slice` 里 `text: last.text + chunk`），effect 随之重跑并把节流时钟重置为 `-Infinity`，导致 `minCommitMs` 形同虚设；修复后相邻提交间隔稳定遵守 32ms，中等粒度流式下提交次数减少约 13%，并补上节流契约回归用例。
+
 ---
 
 ## [0.4.14] - 2026-10-16
