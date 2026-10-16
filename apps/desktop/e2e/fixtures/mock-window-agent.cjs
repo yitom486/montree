@@ -197,6 +197,13 @@ async function handle(message) {
       const body = Array.from({ length: 12 }, (_, i) => `展开后的第${i + 1}段详细内容，文字足够多以产生显著的高度变化。`).join('\n\n')
       text(sessionId, `首段引言。\n\n<details><summary>点击展开查看详细分析过程</summary>\n\n${body}\n\n</details>\n\n尾段收束。`)
       output = `ANCHOR:${sessionId}|done`
+    } else if (command === 'details-expand') {
+      // 展开宽度回归：长历史 + 原生 details 块，展开前后消息列宽不得抖动，且胎内 markdown 已解析。
+      const before = Array.from({ length: 30 }, (_, i) => `第${i + 1}段铺垫正文，用于把视口撑满，确保纵向滚动条本就存在。`).join('\n\n')
+      const body = Array.from({ length: 12 }, (_, i) => `展开后的第${i + 1}段详细内容，包含足够多的文字以产生显著的高度变化。`).join('\n\n')
+      const after = Array.from({ length: 10 }, (_, i) => `尾部第${i + 1}段收束正文。`).join('\n\n')
+      text(sessionId, `${before}\n\n<details><summary>点击展开查看详细分析过程</summary>\n\n${body}\n\n</details>\n\n${after}`)
+      output = `EXPAND:${sessionId}|done`
     }
     text(sessionId, output)
     result(id, { stopReason: 'end_turn' })

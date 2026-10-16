@@ -52,6 +52,8 @@ const mathPlugin = createMathPlugin({ singleDollarTextMath: true })
 const mermaidPlugin = createMermaidPlugin({ config: { securityLevel: 'strict', startOnLoad: false, suppressErrorRendering: true } })
 const AnchorPrefix = createContext('agent')
 const StreamingFlag = createContext(false)
+/** 主题沿组件树下钻：嵌套 ChatMarkdown（details 胎内二次解析）与外层同主题。 */
+const ChatThemeFlag = createContext<ChatMarkdownTheme>('light')
 
 /**
  * 静态 Streamdown 配置全部提升到模块级：引用稳定，
@@ -186,6 +188,20 @@ function AgentDetails({ children, open }: { children?: ReactNode; open?: boolean
   const initialOpen = open !== undefined && open !== false
   const [expanded, setExpanded] = useState(initialOpen)
   const detailsRef = useRef<HTMLDetailsElement>(null)
+  const streaming = useContext(StreamingFlag)
+  const theme = useContext(ChatThemeFlag)
+  // HTML 块内的 markdown 胎文本不会被 remark 二次解析（标准行为）——
+  // 这里拆出 summary 元素，胎内纯文本走嵌套 ChatMarkdown 解析；
+  // 已解析的元素子节点（如空行分隔的段落）原样保留。
+  let summary: ReactNode = null
+  const rest: ReactNode[] = []
+  Children.forEach(children, (child) => {
+    if (summary === null && isValidElement(child) && child.type === AgentSummary) summary = child
+    else rest.push(child)
+  })
+  const bodyText = rest.every((n) => typeof n === 'string' || typeof n === 'number')
+    ? rest.map(String).join('')
+    : null
   // 展开锚定不归这里管：assistant-ui 视口在点击捕获期识别 summary/
   // aria-expanded 并暂停跟底（pauseFollowOnExpand），前提是气泡根带
   // data-message-id（见 AgentChatItem）。这里只跟 expanded 显隐底部收起钮。
@@ -200,7 +216,12 @@ function AgentDetails({ children, open }: { children?: ReactNode; open?: boolean
   }, [])
   return (
     <details ref={detailsRef} open={initialOpen} onToggle={onToggle}>
-      {children}
+      {summary ?? <summary>展开查看详情</summary>}
+      {bodyText !== null
+        ? (bodyText.trim()
+          ? <ChatMarkdown text={bodyText} streaming={streaming} theme={theme} />
+          : null)
+        : rest}
       {expanded ? (
         <button
           type="button"
@@ -214,6 +235,9 @@ function AgentDetails({ children, open }: { children?: ReactNode; open?: boolean
       ) : null}
     </details>
   )
+}
+function AgentSummary({ children }: { children?: ReactNode }) {
+  return <summary>{children}</summary>
 }
 function plain(tag: keyof JSX.IntrinsicElements) {
   const Plain = ({ children, id, className, ...semantic }: SemanticProps) => {
@@ -231,7 +255,7 @@ const agentComponents = {
   blockquote: plain('blockquote'),
   del: plain('del'),
   details: AgentDetails,
-  summary: plain('summary'),
+  summary: AgentSummary,
   kbd: plain('kbd'),
   em: plain('em'),
   h1: plain('h1'),
@@ -329,6 +353,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, classN
   }, [])
   return (
     <div ref={rootRef} data-status={streaming ? 'running' : 'complete'}>
+    <ChatThemeFlag.Provider value={theme}>
     <AnchorPrefix.Provider value={anchorPrefix}>
     <StreamingFlag.Provider value={streaming}>
       <Streamdown
@@ -357,6 +382,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, classN
       </Streamdown>
     </StreamingFlag.Provider>
     </AnchorPrefix.Provider>
+    </ChatThemeFlag.Provider>
     </div>
   )
 })

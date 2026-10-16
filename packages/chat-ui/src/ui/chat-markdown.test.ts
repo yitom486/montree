@@ -435,4 +435,22 @@ describe('ChatMarkdown（Streamdown 接入）', () => {
       expect(container.querySelector('details > button')).toBeNull()
     } finally { act(() => root.unmount()); container.remove() }
   })
+
+  it('details 胎内 markdown 二次解析：加粗/行内代码成元素而非源码', async () => {
+    const el = await render(
+      '<details><summary>点击展开</summary>\n\n文字 **加粗** 和 `code` 结尾\n\n</details>',
+    )
+    const details = el.querySelector('details')!
+    expect(details.querySelector('summary')?.textContent).toContain('点击展开')
+    // 胎内不再是源码裸奔：strong 与行内 code 必须成元素
+    expect(details.querySelector('strong')?.textContent).toBe('加粗')
+    expect(details.textContent).not.toContain('**')
+    expect(el.querySelector('details details')).toBeNull()
+  })
+
+  it('details 无 summary 时给默认标题；空胎不挂空解析器', async () => {
+    const el = await render('<details>\n\n只有正文\n\n</details>')
+    expect(el.querySelector('details > summary')?.textContent).toContain('展开查看详情')
+    expect(el.querySelector('details')?.textContent).toContain('只有正文')
+  })
 })
