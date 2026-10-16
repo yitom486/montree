@@ -122,7 +122,17 @@ export function assertWebDocHostAllowed(hostname: string): void {
 }
 
 /** 仅允许 http(s) 在线文档 URL */
-export function assertWebDocUrlAllowed(raw: string): URL {
+export function getWebDocLoopbackOrigin(raw: string): string | undefined {
+  try {
+    const url = new URL(raw)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return undefined
+    const host = url.hostname.toLowerCase().replace(/\.$/, '')
+    if (host === 'localhost' || host === '[::1]' || host === '127.0.0.1') return url.origin
+  } catch { /* 非 URL 交给正式校验报告 */ }
+  return undefined
+}
+
+export function assertWebDocUrlAllowed(raw: string, localOrigin?: string): URL {
   let parsed: URL
   try {
     parsed = new URL(raw.trim())
@@ -139,13 +149,16 @@ export function assertWebDocUrlAllowed(raw: string): URL {
   if (!parsed.hostname) {
     throw new Error('URL 缺少主机名')
   }
-  assertWebDocHostAllowed(parsed.hostname)
+  if (parsed.username || parsed.password) throw new Error('文档链接不支持内嵌用户名或密码')
+  if (!localOrigin || parsed.origin !== localOrigin || getWebDocLoopbackOrigin(raw) !== localOrigin) {
+    assertWebDocHostAllowed(parsed.hostname)
+  }
 
   return parsed
 }
 
-export function normalizeWebDocUrl(raw: string): string {
-  const url = assertWebDocUrlAllowed(raw)
+export function normalizeWebDocUrl(raw: string, localOrigin?: string): string {
+  const url = assertWebDocUrlAllowed(raw, localOrigin)
   url.hash = ''
   return url.toString()
 }

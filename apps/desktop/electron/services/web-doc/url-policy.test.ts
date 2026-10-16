@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { assertWebDocHostAllowed, assertWebDocUrlAllowed } from './url-policy'
+import { assertWebDocHostAllowed, assertWebDocUrlAllowed, getWebDocLoopbackOrigin } from './url-policy'
 
 describe('url-policy SSRF 防护', () => {
+  it('仅显式同源放行本机文档，不扩大至其他端口、内网或本地域名', () => {
+    for (const raw of ['http://localhost:3000/book', 'http://127.0.0.1:3000/', 'http://[::1]:3000/']) {
+      const origin = getWebDocLoopbackOrigin(raw)
+      expect(origin).toBeDefined()
+      expect(() => assertWebDocUrlAllowed(raw, origin)).not.toThrow()
+      expect(() => assertWebDocUrlAllowed(raw, 'http://localhost:4000')).toThrow()
+    }
+    for (const raw of ['http://printer.local/', 'http://192.168.1.1/', 'file:///book', 'http://u:p@localhost:3000/']) {
+      expect(getWebDocLoopbackOrigin(raw)).toBeUndefined()
+      expect(() => assertWebDocUrlAllowed(raw, new URL(raw).origin)).toThrow()
+    }
+  })
   it('放行正常公网文档站', () => {
     expect(() => assertWebDocUrlAllowed('https://react.dev/learn')).not.toThrow()
     expect(() => assertWebDocUrlAllowed('https://v2.cn.vuejs.org/guide/')).not.toThrow()

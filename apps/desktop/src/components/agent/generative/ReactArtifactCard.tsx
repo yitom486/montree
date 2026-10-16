@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArtifactZoomSurface } from '../tools/ArtifactZoomSurface'
+import { BeuiAgentProgress } from '../chat/BeuiAgentProgress'
 import { Code2, Download, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { fileApi } from '@/api/file-api'
@@ -208,10 +209,14 @@ export function ReactArtifactCard({ result, threadId, prompting, onSubmit, toolS
         </div>
       </div>
 
-      {status === 'building' || status === 'compiling' || status === 'restoring' || status === 'loading' || status === 'ready' ? (
+      {status === 'ready' ? (
         <p role="status" className="min-h-8 px-3 py-2 text-[11px] text-muted-foreground">
-          {status === 'ready' ? '交互界面已就绪' : STATUS_COPY[status]}
+          交互界面已就绪
         </p>
+      ) : status === 'building' || status === 'compiling' || status === 'restoring' || status === 'loading' ? (
+        <div className="px-3 py-1" data-testid="react-artifact-loading">
+          <BeuiAgentProgress label={STATUS_COPY[status]} elapsedSeconds={null} />
+        </div>
       ) : null}
       {status === 'compile-error' ? (
         <div role="alert" className="space-y-1.5 px-3 py-2">

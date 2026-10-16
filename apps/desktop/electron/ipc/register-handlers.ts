@@ -943,13 +943,13 @@ export function registerIpcHandlers(): void {
 
   // --- 在线文档 ---
   ipcMain.handle(IPC.WEB_DOC_FETCH_PAGE, async (_event, payload: WebDocFetchPayload) => {
-    const urlResult = parseWebDocUrlInput(payload?.url)
+    const urlResult = parseWebDocUrlInput(payload?.url, true)
     if (!urlResult.ok) return urlResult
     return fetchWebDocPage({ url: urlResult.value })
   })
 
   ipcMain.handle(IPC.WEB_DOC_DISCOVER_TOC, async (_event, payload: WebDocDiscoverTocPayload) => {
-    const urlResult = parseWebDocUrlInput(payload?.url)
+    const urlResult = parseWebDocUrlInput(payload?.url, true)
     if (!urlResult.ok) return urlResult
     return discoverWebDocToc({ url: urlResult.value })
   })

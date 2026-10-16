@@ -55,7 +55,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | `tools/ArtifactZoomSurface` | 居中放大预览；同一 portal 容器以原子移动保留 iframe/组件状态，关闭返回原位置，Esc 与焦点恢复；不创建第二个 iframe |
 | `tools/ArtifactFrame` / `.test.ts` | 隔离 iframe 共享宿主（内联 React 与 HTML 对话框共用 srcDoc 组装、来源+挂载 ID+2KiB 白名单消息、高度钳制/限频/微差忽略；sandbox 仅 allow-scripts） |
 | `HtmlArtifactCard` / `.test.ts` | HTML Artifact 卡与隔离预览；内置 SVG 图解直接内联、同步主题且不重建帧；普通 HTML 仍以对话框经 `ArtifactFrame` 挂载，行为不变：allow-scripts 沙箱、宿主 CSP/postMessage 校验、查看源码、宿主导出） |
-| `generative/ReactArtifactCard` / `.test.ts` | React 内联卡（同卡构建→编译→加载→就绪/失败真实状态；成功直接挂内联 iframe，ready 仅认 React commit 确认；失败重试/重跑；源码视图为模型源码，导出离线 HTML；支持居中放大，仍为同一 iframe 单实例。详见 `generative/README.md`） |
+| `generative/ReactArtifactCard` / `.test.ts` | React 内联卡（同卡构建→编译→加载→就绪/失败真实状态，加载阶段复用 BeUI 像素动画；成功直接挂内联 iframe，ready 仅认 React commit 确认；失败重试/重跑；源码视图为模型源码，导出离线 HTML；支持居中放大，仍为同一 iframe 单实例。详见 `generative/README.md`） |
 | `DiagramViewerCard` | 交互式图表卡（结果入口默认紧凑：标题+短摘要+至多 3 步+完整入口；展开后为时序步骤流 / 实体概览 / Mermaid 原生出图 / 正文穿透 / 钉入；紧凑态隐藏 Tab，内部展开态随 key 稳定） |
 | `CrossReferenceCard` | 跨章节实体概念流转轨迹卡（章节分布热力权重条 / 证据折叠 / 跨章定位） |
 | `ContentAuditCard` | 深度内容审计探针卡（命中条目来源标识 / 原文取证高亮 / 一键正文穿透定位） |
@@ -91,4 +91,4 @@ React artifact 经 `montree_present(kind=react-artifact)` 的真实工具结果�
 
 R3 文本请求协议见 `packages/contracts/src/agent/react-artifact-actions.ts`：仅文本提议、1536字节上限；业务发送仍需 iframe 外用户确认，沿原 ACP 归属/忙碌/防重复链路。React 内联卡提供继续分析和请求修复，HTML artifact 未开放请求桥。
 
-助手正文支持 `montree-present` 围栏（正文只写成功工具返回的 id）：AgentMessageList 派生当前回合引用归属，AgentMessageBubble 在段落之间复用 ToolBusinessResult；完成后隐藏原工具位置的业务卡，保留过程记录。流式期间保留原卡片并显示插入提示，缺失或重复引用给出说明。普通正文与旧消息布局不变。
+助手正文支持 `montree-present` 围栏（正文只写成功工具返回的 id）：AgentMessageList 派生当前回合引用归属，AgentMessageBubble 在段落之间复用 ToolBusinessResult；完成后隐藏原工具位置的业务卡，保留过程记录。流式期间保留原卡片并显示 BeUI 像素加载占位（复用同一加载组件，无额外计时器），缺失或重复引用给出说明。普通正文与旧消息布局不变。

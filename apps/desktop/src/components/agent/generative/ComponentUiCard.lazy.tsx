@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import type { PresentComponentUi } from '@montree/contracts'
 import type { GenerativeSubmitPayload } from './ComponentUiCard'
+import { BeuiAgentProgress } from '../chat/BeuiAgentProgress'
 
 export type { GenerativeSubmitPayload }
 
@@ -27,7 +28,7 @@ export function ComponentUiCardLazy(props: {
           className="rounded-xl border border-border/60 bg-card px-3 py-2 text-[11px] text-muted-foreground"
           data-testid="component-ui-loading"
         >
-          正在加载交互界面…
+          <BeuiAgentProgress label="正在加载交互界面…" elapsedSeconds={null} />
         </div>
       }
     >

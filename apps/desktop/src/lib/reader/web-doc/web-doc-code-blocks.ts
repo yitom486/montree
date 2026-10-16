@@ -1,3 +1,6 @@
+import githubTheme from 'highlight.js/styles/github.min.css?inline'
+import githubDarkTheme from 'highlight.js/styles/github-dark.min.css?inline'
+import { highlightCode, hljs, normalizeHighlightLanguage } from '@/lib/editor/code-highlight'
 import type { EpubThemeMode } from '@montree/reader-core'
 import { READER_PALETTE } from '@montree/reader-core'
 import { buildCodeBlockToolbarHtml } from '@/lib/preview/code-block-chrome'
@@ -129,6 +132,7 @@ function wrapCodeBlockHost(host: HTMLElement): void {
   if (!pre) return
 
   const lang = detectCodeLanguage(host)
+  pre.setAttribute('data-language', lang)
   const doc = host.ownerDocument
   const wrapper = doc.createElement('div')
   wrapper.className = 'code-block'
@@ -267,35 +271,7 @@ export function activateWebDocCodeTab(tabButton: Element): boolean {
 }
 
 /** 写入阅读文档的可信脚本（非远端 HTML），不依赖宿主 React 事件绑定 */
-export function buildWebDocTabsRuntimeScript(): string {  return `<script>(function(){
-  function activate(tab){
-    var root=tab.closest('.web-doc-tabs');
-    if(!root)return;
-    var index=tab.getAttribute('data-tab-index');
-    if(index==null)return;
-    root.querySelectorAll('.web-doc-tabs-tab').forEach(function(btn){
-      btn.setAttribute('aria-selected', btn.getAttribute('data-tab-index')===index ? 'true' : 'false');
-    });
-    root.querySelectorAll('.web-doc-tabs-panel').forEach(function(panel){
-      if(panel.getAttribute('data-tab-index')===index){
-        panel.removeAttribute('hidden');
-        panel.style.removeProperty('display');
-      }else{
-        panel.setAttribute('hidden','');
-        panel.style.setProperty('display','none','important');
-      }
-    });
-  }
-  document.addEventListener('click',function(event){
-    var t=event.target;
-    if(!t||!t.closest)return;
-    var tab=t.closest('.web-doc-tabs-tab');
-    if(!tab)return;
-    event.preventDefault();
-    activate(tab);
-  },true);
-})();</script>`
-}
+export { buildWebDocTabsRuntimeScript } from './web-doc-runtime-scripts'
 
 /**
  * Tab 运行时内联脚本的 CSP hash（`src/index.html` script-src 放行）。
@@ -350,7 +326,39 @@ export function normalizeWebDocLatexListings(root: ParentNode): void {
   }
 }
 
-/** 为在线文档正文中的 pre/code 注入与 Markdown 预览一致的复制工具栏 */
+/** Reuse preview grammars; replace site-specific token markup without changing the source text. */
+function highlightWebDocCode(pre: Element): void {
+  const language = normalizeHighlightLanguage(detectCodeLanguage(pre))
+  if (language === 'plaintext' || !hljs.getLanguage(language)) return
+  let source = pre.textContent ?? ''
+  const lines = [...pre.querySelectorAll('code > .line, code > .syntax-highlighter-line, :scope > .line')]
+  if (lines.length > 1 && !source.includes('\n') && lines.map(line => line.textContent).join('') === source) {
+    source = lines.map(line => line.textContent).join('\n')
+  }
+  // Bound synchronous work on imported pages; oversized listings remain readable and copyable.
+  if (!source || source.length > 100_000) return
+  const code = pre.ownerDocument.createElement('code')
+  code.className = `hljs language-${language}`
+  code.innerHTML = highlightCode(source, language)
+  pre.replaceChildren(code)
+}
+
+/** Reader typography forces span colors; scoped token rules must override that without altering prose. */
+function scopeHighlightTheme(css: string): string {
+  return (css.replace(/\/\*[\s\S]*?\*\//g, '').match(/[^{}]+\{[^{}]*\}/g) ?? []).map(rule => {
+    const opening = rule.indexOf('{')
+    const selectors = rule.slice(0, opening).split(',').filter(selector => selector.includes('.hljs-'))
+      .map(selector => `body .web-doc-reader-content .code-block pre code.hljs ${selector.trim()}`)
+    if (!selectors.length) return ''
+    const declarations = rule.slice(opening + 1, -1).replace(/([\w-]+)\s*:\s*([^;]+)(;|$)/g,
+      (_, property: string, value: string) => `${property}:${value.trim()} !important;`)
+    return `${selectors.join(',')}{${declarations}}`
+  }).join('\n')
+}
+
+const HIGHLIGHT_THEMES = { light: scopeHighlightTheme(githubTheme), dark: scopeHighlightTheme(githubDarkTheme) }
+
+/** 为在线文档正文中的 pre/code 注入与 Markdown 预览一致的语法高亮与复制工具栏 */
 export function enhanceWebDocCodeBlocks(html: string): string {
   if (
     !html.includes('<pre') &&
@@ -373,6 +381,7 @@ export function enhanceWebDocCodeBlocks(html: string): string {
     wrapCodeBlockHost(host)
   }
 
+  root.querySelectorAll('.code-block pre').forEach(highlightWebDocCode)
   return root.innerHTML
 }
 
@@ -386,6 +395,7 @@ export function buildWebDocCodeBlockCss(mode: EpubThemeMode): string {
   const primary = mode === 'dark' ? '#fafafa' : '#18181b'
 
   return `
+    ${HIGHLIGHT_THEMES[mode === 'dark' ? 'dark' : 'light']}
     .web-doc-tabs {
       margin: 1em 0 !important;
     }

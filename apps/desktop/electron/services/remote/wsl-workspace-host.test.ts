@@ -31,6 +31,12 @@ function guardModule<T extends Record<string, unknown>>(orig: T, keys: string[])
   return patched as T
 }
 
+vi.mock('./remote-service', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./remote-service')>(),
+  listWslDistros: async () => ({ ok: true, value: [{ name: 'Ubuntu' }] }),
+  getWslHome: async () => ({ ok: true, value: '/home/test' }),
+}))
+
 vi.mock('node:fs', async (importOriginal) => {
   const orig = await importOriginal<typeof import('node:fs')>()
   return guardModule(orig as unknown as Record<string, unknown>, [

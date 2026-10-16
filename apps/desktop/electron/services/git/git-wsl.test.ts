@@ -22,7 +22,13 @@ function wslAvailable(): boolean {
     const res = spawnSync('wsl.exe', ['-l', '-v'], { windowsHide: true, timeout: 10000 })
     if (res.error || res.status !== 0 || !res.stdout) return false
     // wsl.exe 常见 UTF-16LE 输出，直接 utf8 判会漏检（见 decodeWslBuffer）
-    return decodeWslBuffer(res.stdout).includes('Ubuntu')
+    if (!decodeWslBuffer(res.stdout).includes('Ubuntu')) return false
+    // 注册发行版不代表当前能启动并执行 Git（例如 WSL 服务不可用）。
+    const probe = spawnSync('wsl.exe', ['-d', 'Ubuntu', '--exec', 'sh', '-c', 'command -v git'], {
+      windowsHide: true,
+      timeout: 10000,
+    })
+    return !probe.error && probe.status === 0
   } catch {
     return false
   }

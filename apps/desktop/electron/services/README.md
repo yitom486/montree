@@ -15,7 +15,7 @@
 | `workspace-bindings.ts` / `.test.ts` | 可信窗口绑定宿主与代际（event.sender 归属；connecting/connected/reconnecting/disconnected/error；销毁自清理） |
 | `remote-workspace-host.ts` / `.test.ts` | B2/B3 远端宿主：实现 WorkspaceHost 接口，读写/CRUD/搜索/Git/图片经 workspace 协议在远端执行；expectedRevision 冲突、断线显式失败（buffer 留渲染端）、代际过期丢弃、跨宿主拒绝、订阅重建与 revision 重核；回环真实服务端验证（T4/T5/T6/T7），真机 WSL 端到端待 Linux Node |
 | `export-save-path.ts` | 导出 HTML/PDF/Markdown 的保存路径 |
-| `web-doc-service.ts` | 在线文档抓取与目录发现入口（mdBook 优先解析章节树或读取声明的同源 toc.html，避免正文参考链接冒充目录；网络边界留守：SSRF 策略与重定向校验见 `web-doc/url-policy.ts`；目录抽取/站点谓词已迁 `@montree/web-doc`，本树 `web-doc/` 仅留 `url-policy`/`site-registry`/`e2e-fixture`） |
+| `web-doc-service.ts` | 在线文档抓取与目录发现入口（mdBook 优先解析章节树或读取声明的同源 toc.html，避免正文参考链接冒充目录；支持显式 localhost / 127.0.0.1 / [::1] 本机文档，同源目录及重定向继承访问，公网转本机/跨端口仍拦截；网络边界留守：SSRF 策略与重定向校验见 `web-doc/url-policy.ts`；目录抽取/站点谓词已迁 `@montree/web-doc`，本树 `web-doc/` 仅留 `url-policy`/`site-registry`/`e2e-fixture`） |
 | `reader-screenshot-service.ts` / `.test.ts` | Agent 按需截图 owner 窗口的阅读区，返回内存 PNG；裁剪与无文档保护 |
 | `binary-document-service.ts` / `.test.ts` | XLSX/PPTX 保存：摘要冲突检测、同目录临时文件替换，避免覆盖外部修改 |
 

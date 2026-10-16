@@ -71,6 +71,34 @@ describe('web-doc-service', () => {
     expect(parseWebDocUrlInput('  ').ok).toBe(false)
   })
 
+  it('文档入口可打开本机，外部链接入口默认保持拦截', async () => {
+    expect(parseWebDocUrlInput('http://localhost:3000/').ok).toBe(false)
+    expect(parseWebDocUrlInput('http://localhost:3000/', true).ok).toBe(true)
+    expect((await fetchWebDocPage({ url: 'http://localhost:3000/' })).ok).toBe(true)
+  })
+
+  it('本机允许同源重定向，禁止换端口和公网重定向到本机', async () => {
+    const fetch = vi.fn(async (url: string) => url.endsWith('/start')
+      ? new Response('', { status: 302, headers: { location: '/chapter' } })
+      : new Response('<article>Local</article>', { headers: { 'content-type': 'text/html' } }))
+    vi.stubGlobal('fetch', fetch)
+    expect((await fetchWebDocPage({ url: 'http://localhost:3000/start' })).ok).toBe(true)
+    expect(fetch).toHaveBeenLastCalledWith('http://localhost:3000/chapter', expect.anything())
+    for (const entry of ['http://localhost:3000/', 'https://public.example/']) {
+      fetch.mockClear()
+      fetch.mockImplementation(async () => new Response('', { status: 302, headers: { location: 'http://localhost:4000/private' } }))
+      expect((await fetchWebDocPage({ url: entry })).ok).toBe(false)
+      expect(fetch).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('公网目录索引不能借 llms.txt 获取本机访问权限', async () => {
+    const fetch = vi.fn(async (_url: string) => new Response('<link rel="alternate" type="text/markdown" href="http://localhost:3000/llms.txt"><article>Docs</article>', { headers: { 'content-type': 'text/html' } }))
+    vi.stubGlobal('fetch', fetch)
+    await discoverWebDocToc({ url: 'https://docs.example/' })
+    expect(fetch.mock.calls.every(([url]) => !String(url).includes('localhost'))).toBe(true)
+  })
+
   it('同时存在局部侧栏与站点 llms.txt 时支持双轨且优先局部侧栏', async () => {
     vi.stubGlobal(
       'fetch',

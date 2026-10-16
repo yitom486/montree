@@ -126,7 +126,7 @@ describe('enhanceWebDocCodeBlocks', () => {
     const enhanced = enhanceWebDocCodeBlocks(html)
     expect(enhanced).not.toContain('syntax-highlighter-line-numbers')
     expect(enhanced).not.toContain('syntax-highlighter-line-number')
-    expect(enhanced).toContain('import { spawn } from "chatgpt-app-server";')
+    expect(new DOMParser().parseFromString(enhanced, 'text/html').querySelector('pre code')?.textContent).toBe('import { spawn } from "chatgpt-app-server";')
     expect(enhanced).not.toMatch(/^\s*1\s*2/m)
 
     document.body.innerHTML = enhanced
@@ -139,7 +139,7 @@ describe('enhanceWebDocCodeBlocks', () => {
     const prismHtml = `<pre class="line-numbers language-js"><code>const x = 42;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>`
     const prismEnhanced = enhanceWebDocCodeBlocks(prismHtml)
     expect(prismEnhanced).not.toContain('line-numbers-rows')
-    expect(prismEnhanced).toContain('const x = 42;')
+    expect(new DOMParser().parseFromString(prismEnhanced, 'text/html').querySelector('pre code')?.textContent).toBe('const x = 42;')
 
     const pygmentsHtml = `<table class="highlighttable"><tbody><tr><td class="linenos"><pre>1\n2</pre></td><td class="code"><div class="highlight"><pre><span></span>print("hello")</pre></div></td></tr></tbody></table>`
     const pygmentsEnhanced = enhanceWebDocCodeBlocks(pygmentsHtml)
@@ -162,7 +162,7 @@ describe('buildWebDocReaderDocument', () => {
 
     expect(doc).toContain('code-block-copy')
     expect(doc).toContain('.code-block-toolbar')
-    expect(doc).toContain('echo hi')
+    expect(new DOMParser().parseFromString(doc, 'text/html').querySelector('pre code')?.textContent).toBe('echo hi')
     expect(doc).toContain('web-doc-tabs-tab')
   })
 
@@ -174,5 +174,36 @@ describe('buildWebDocReaderDocument', () => {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(inner))
     const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)))
     expect(`sha256-${base64}`).toBe(WEB_DOC_TABS_RUNTIME_SCRIPT_SHA256)
+  })
+})
+
+
+describe('web documentation syntax highlighting', () => {
+  it('highlights mdBook Rust keywords, comments and strings while preserving exact copy text', () => {
+    const source = 'fn main() {\n    // comment\n    let n: u32 = 42;\n    println!("hello");\n}\n'
+    const html = enhanceWebDocCodeBlocks(`<pre class="playground"><code class="language-rust editable mdbook-runnable">${source}</code></pre>`)
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('code.hljs.language-rust')?.textContent).toBe(source)
+    expect(doc.querySelector('.hljs-keyword')?.textContent).toBe('fn')
+    expect(doc.querySelector('.hljs-comment')?.textContent).toBe('// comment')
+    expect(doc.querySelector('.hljs-string')?.textContent).toBe('"hello"')
+    expect(getCodeBlockTextFromCopyButton(doc.querySelector('.code-block-copy')!)).toBe(source)
+    expect(enhanceWebDocCodeBlocks(html)).toBe(html)
+  })
+  it('preserves SSR line boundaries, replaces foreign token markup and keeps escaped code inert', () => {
+    const html = enhanceWebDocCodeBlocks('<pre class="language-js"><code><span class="line"><span style="color:red">const x = 1;</span></span><span class="line">console.log("&lt;img src=x onerror=alert(1)&gt;");</span></code></pre>')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('code')?.textContent).toBe('const x = 1;\nconsole.log("<img src=x onerror=alert(1)>");')
+    expect(doc.querySelector('img')).toBeNull()
+    expect(doc.querySelector('code [style]')).toBeNull()
+    expect(doc.querySelector('.hljs-keyword')).not.toBeNull()
+  })
+  it('keeps unsupported languages and oversized listings readable without forcing detection', () => {
+    for (const [lang, source] of [['unknown-example', 'alpha beta gamma'], ['rust', ' '.repeat(100001) + 'fn main() {}']]) {
+      const html = enhanceWebDocCodeBlocks(`<pre><code class="language-${lang}">${source}</code></pre>`)
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      expect(doc.querySelector('code')?.textContent).toBe(source)
+      expect(doc.querySelector('code.hljs')).toBeNull()
+    }
   })
 })

@@ -23,7 +23,7 @@ import {
 import { tryFetchE2eWebDocFixture } from './web-doc/e2e-fixture'
 import { extractPeopleDailyToc } from '@montree/web-doc'
 import { resolveWebDocSiteId } from './web-doc/site-registry'
-import { assertWebDocUrlAllowed, normalizeWebDocUrl } from './web-doc/url-policy'
+import { assertWebDocUrlAllowed, getWebDocLoopbackOrigin, normalizeWebDocUrl } from './web-doc/url-policy'
 
 const WEB_DOC_MAX_BYTES = 5 * 1024 * 1024
 const WEB_DOC_FETCH_TIMEOUT_MS = 30_000
@@ -68,12 +68,12 @@ function toFetchError(message: string): Result<never, AppError> {
 }
 
 /**
- * 带 SSRF 防护的抓取：redirect 手动跟随，每跳 Location 都经 normalizeWebDocUrl
- * 重验协议与主机（初始 URL 由调用方先验）。最终 response.url 同样可信。
+ * 重定向逐跳重验协议与主机；显式本机文档只继承初始同源权限，公网不能转入本机。
  */
 async function fetchWebDocResponse(
   initialUrl: string,
   headers: Record<string, string>,
+  localOrigin?: string,
 ): Promise<Response> {
   let current = initialUrl
   for (let hop = 0; hop <= WEB_DOC_MAX_REDIRECTS; hop++) {
@@ -102,7 +102,11 @@ async function fetchWebDocResponse(
     await response.arrayBuffer().catch(() => undefined)
     if (!location) return response
     // 相对 Location 按当前跳解析；非法/内网目标直接抛给调用方转业务错误
-    current = normalizeWebDocUrl(new URL(location, current).toString())
+    // 本机权限仅跟随原始同源链；跳到公网后不能再返回本机。
+    if (new URL(current).origin !== localOrigin) localOrigin = undefined
+    const next = normalizeWebDocUrl(new URL(location, current).toString(), localOrigin)
+    if (new URL(next).origin !== localOrigin) localOrigin = undefined
+    current = next
   }
   throw new Error('重定向处理异常')
 }
@@ -126,13 +130,14 @@ async function readResponseTextLimited(response: Response): Promise<string> {
 
 export async function fetchWebDocPage(
   payload: WebDocFetchPayload,
+  localOrigin = getWebDocLoopbackOrigin(payload.url),
 ): Promise<Result<WebDocFetchResult, AppError>> {
   try {
     const fixtureResult = await tryFetchE2eWebDocFixture(payload.url)
     if (fixtureResult) return fixtureResult
 
-    const normalized = normalizeWebDocUrl(payload.url)
-    const response = await fetchWebDocResponse(normalized, webDocHtmlHeaders())
+    const normalized = normalizeWebDocUrl(payload.url, localOrigin)
+    const response = await fetchWebDocResponse(normalized, webDocHtmlHeaders(), localOrigin)
 
     if (!response.ok) {
       return toFetchError(httpStatusErrorMessage(response.status))
@@ -166,10 +171,11 @@ export async function fetchWebDocPage(
 /** 抓取站点目录索引（如 Mintlify `/llms.txt`），允许 text/plain */
 async function fetchWebDocPlainText(
   url: string,
+  localOrigin?: string,
 ): Promise<Result<{ url: string; text: string }, AppError>> {
   try {
-    const normalized = normalizeWebDocUrl(url)
-    const response = await fetchWebDocResponse(normalized, webDocPlainTextHeaders())
+    const normalized = normalizeWebDocUrl(url, localOrigin)
+    const response = await fetchWebDocResponse(normalized, webDocPlainTextHeaders(), localOrigin)
 
     if (!response.ok) {
       return toFetchError(httpStatusErrorMessage(response.status))
@@ -200,6 +206,7 @@ export async function discoverWebDocToc(
 ): Promise<Result<WebDocDiscoverTocResult, AppError>> {
   const fetchResult = await fetchWebDocPage({ url: payload.url })
   if (!fetchResult.ok) return fetchResult
+  const localOrigin = getWebDocLoopbackOrigin(fetchResult.value.url)
 
   try {
     const pageUrl = new URL(fetchResult.value.url)
@@ -208,7 +215,7 @@ export async function discoverWebDocToc(
     if (mdbookInline.length) return ok({ siteId, entries: mdbookInline })
     const mdbookTocUrl = resolveMdBookTocUrl(fetchResult.value.html, fetchResult.value.url)
     if (mdbookTocUrl) {
-      const toc = await fetchWebDocPage({ url: mdbookTocUrl })
+      const toc = await fetchWebDocPage({ url: mdbookTocUrl }, localOrigin ?? '')
       if (!toc.ok) return toc
       if (new URL(toc.value.url).origin !== pageUrl.origin) return toFetchError('mdBook 目录跳转到了其他站点')
       const entries = extractMdBookToc(toc.value.html, toc.value.url)
@@ -233,7 +240,7 @@ export async function discoverWebDocToc(
     if (sectionEntries.length === 0 && siteId !== 'people-daily-paper') {
       const fallbackUrl = resolveWebDocTocDiscoveryUrl(fetchResult.value.url, siteId)
       if (fallbackUrl !== fetchResult.value.url) {
-        const rootFetch = await fetchWebDocPage({ url: fallbackUrl })
+        const rootFetch = await fetchWebDocPage({ url: fallbackUrl }, localOrigin ?? '')
         if (rootFetch.ok) {
           const fromRoot = extractGenericWebDocToc(rootFetch.value.html, rootFetch.value.url)
           if (fromRoot.length > 0) {
@@ -244,7 +251,7 @@ export async function discoverWebDocToc(
           if (looksLikeDocsIndexCandidate(rootFetch.value.html)) {
             const llmsUrl = resolveLlmsTxtUrl(rootFetch.value.url, rootFetch.value.html)
             if (llmsUrl) {
-              const llmsResult = await fetchWebDocPlainText(llmsUrl)
+              const llmsResult = await fetchWebDocPlainText(llmsUrl, localOrigin)
               if (llmsResult.ok) {
                 const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
                 if (fromLlms.length >= 3) {
@@ -261,7 +268,7 @@ export async function discoverWebDocToc(
     if (!siteEntries && looksLikeDocsIndexCandidate(fetchResult.value.html)) {
       const llmsUrl = resolveLlmsTxtUrl(fetchResult.value.url, fetchResult.value.html)
       if (llmsUrl) {
-        const llmsResult = await fetchWebDocPlainText(llmsUrl)
+        const llmsResult = await fetchWebDocPlainText(llmsUrl, localOrigin)
         if (llmsResult.ok) {
           const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
           if (fromLlms.length >= 3) {
@@ -300,20 +307,20 @@ export async function discoverWebDocToc(
   }
 }
 
-export function validateWebDocUrl(raw: string): Result<string, AppError> {
+export function validateWebDocUrl(raw: string, allowLocal = true): Result<string, AppError> {
   try {
-    return ok(normalizeWebDocUrl(raw))
+    return ok(normalizeWebDocUrl(raw, allowLocal ? getWebDocLoopbackOrigin(raw) : undefined))
   } catch (cause) {
     return err(toAppError(cause, 'URL 无效'))
   }
 }
 
 /** 供单测与 handler 校验入参 */
-export function parseWebDocUrlInput(raw: unknown): Result<string, AppError> {
+export function parseWebDocUrlInput(raw: unknown, allowLocal = false): Result<string, AppError> {
   if (typeof raw !== 'string' || !raw.trim()) {
     return err({ code: 'FILE_READ_ERROR', message: 'URL 不能为空' })
   }
-  return validateWebDocUrl(raw)
+  return validateWebDocUrl(raw, allowLocal)
 }
 
 export { assertWebDocUrlAllowed }

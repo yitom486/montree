@@ -703,7 +703,7 @@ describe('web-doc-html', () => {
       { title: 'App Server', bodyHtml: result.bodyHtml, baseUrl: 'https://learn.chatgpt.com/docs/app-server' },
       'dark',
     )
-    expect(doc).toContain('import { spawn } from "chatgpt-app-server";')
+    expect(new DOMParser().parseFromString(doc, 'text/html').querySelector('pre code')?.textContent).toBe('import { spawn } from "chatgpt-app-server";')
     expect(doc).not.toMatch(/^\s*1\s*2/m)
   })
 

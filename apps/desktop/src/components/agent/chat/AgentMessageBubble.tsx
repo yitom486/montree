@@ -7,6 +7,7 @@ import { BuiMessage } from '@/components/agent/chat/BuiMessage'
 import { BuiThinking } from '@/components/agent/chat/BuiThinking'
 import { AgentLoadingState, useElapsedSeconds, type currentRunStatus } from '@/components/agent/chat/AgentLoadingState'
 import { BeuiStreamingResponse } from '@/components/agent/chat/BeuiStreamingResponse'
+import { BeuiAgentProgress } from './BeuiAgentProgress'
 import { AgentToolCallCard } from '@/components/agent/tools/AgentToolCallCard'
 import { AgentResultEntry } from '@/components/agent/tools/AgentResultEntry'
 import { ToolApprovalSlot } from '@/components/agent/permission/ToolApprovalSlot'
@@ -271,9 +272,13 @@ export function AgentMessageBubble({
                 <div key={part.offset} data-testid="inline-present" className="my-3 min-w-0 max-w-full">
                   <ToolBusinessResult message={slot.message} threadId={threadId} prompting={prompting} onGenerativeSubmit={onGenerativeSubmit} />
                 </div>
+              ) : slot?.state === 'streaming' ? (
+                <div key={part.offset} data-testid="inline-present-loading" className="my-3 rounded-xl border border-border/60 bg-card px-3 py-2">
+                  <BeuiAgentProgress label="交互组件将在回答完成后嵌入此处" elapsedSeconds={null} />
+                </div>
               ) : (
                 <p key={part.offset} className="my-2 text-xs text-muted-foreground" role="status">
-                  {slot?.state === 'streaming' ? '交互组件将在回答完成后嵌入此处' : slot?.state === 'duplicate' ? '该组件已在上文展示' : '引用的组件不可用，请查看工具结果或重新生成'}
+                  {slot?.state === 'duplicate' ? '该组件已在上文展示' : '引用的组件不可用，请查看工具结果或重新生成'}
                 </p>
               )
             }) : <AgentMarkdownLazy text={renderText} streaming={showStreaming} className={markdownClassName} />}

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+vi.mock('./remote-service', () => ({
+  listWslDistros: async () => ({ ok: true, value: [{ name: 'Ubuntu' }] }),
+  getWslHome: async () => ({ ok: true, value: '/home/tomy' }),
+}))
 import {
   checkProbeNodeUsable,
   installRemoteServerViaPipe,

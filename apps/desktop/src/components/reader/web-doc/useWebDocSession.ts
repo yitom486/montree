@@ -308,8 +308,9 @@ export function useWebDocSession({
       }
 
       const onCodeChromeClick = (event: MouseEvent) => {
-        const target = event.target
-        if (!(target instanceof Element)) return
+        // Events originate in the iframe realm, whose Element constructor differs from the host.
+        const target = event.target as Element | null
+        if (!target || typeof target.closest !== 'function') return
 
         const tab =
           target.closest<HTMLElement>('.web-doc-tabs-tab') ??

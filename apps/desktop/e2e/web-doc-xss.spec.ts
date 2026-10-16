@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
-import { buildWebDocTabsRuntimeScript } from '../src/lib/reader/web-doc/web-doc-code-blocks'
-import { buildWebDocPlaygroundRuntimeScript } from '../src/lib/reader/web-doc/web-doc-html'
+import { buildWebDocTabsRuntimeScript, buildWebDocPlaygroundRuntimeScript } from '../src/lib/reader/web-doc/web-doc-runtime-scripts'
 import {
   E2E_WEB_DOC_XSS_URL,
   webDocFixtureDir,
