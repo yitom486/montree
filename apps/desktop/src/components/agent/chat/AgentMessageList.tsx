@@ -106,7 +106,13 @@ const ThreadMessageList = memo(function ThreadMessageList({
   const theme = useEditorUiStore((s) => s.theme)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const streamingAny = messages.some((m) => m.streaming) || prompting
-  const runStatus = currentRunStatus(messages, pendingPermission != null)
+  const runStatus = currentRunStatus(messages, pendingPermission != null, prompting)
+  // 底部状态行显隐：有可见流式内容（思考/带文本回答）时让位；
+  // 空占位（首包未到的 agent 空壳）只在 thinking 相让位给底部行（气泡自身返回 null），
+  // 工具运行/组织回答等阶段气泡自带状态行，底部行让位，避免双行。
+  const streamingContent = messages.some((m) => m.streaming && (m.role === 'thought' || (m.role === 'agent' && m.text.trim())))
+  const emptyPlaceholder = messages.some((m) => m.streaming && m.role === 'agent' && !m.text.trim())
+  const showRunStatusRow = prompting && !streamingContent && (runStatus.phase === 'thinking' || !emptyPlaceholder)
   const runStartedAt = messages.findLast(message => message.role === 'user')?.createdAt
   const viewportRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
@@ -472,7 +478,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
                 ),
               )}
 
-              {prompting && !messages.some((m) => m.streaming && (m.role === 'agent' || m.role === 'thought')) ? (
+              {showRunStatusRow ? (
                 <AgentLoadingState label={runStatus.label} awaitingApproval={runStatus.phase === 'approval'} seconds={runStartedAt ? Math.max(0, Math.floor((nowMs - runStartedAt) / 1000)) : null} />
               ) : null}
 

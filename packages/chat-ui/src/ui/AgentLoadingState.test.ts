@@ -41,4 +41,19 @@ describe('真实回合状态', () => {
   it('不把上一回合的事件用于当前状态', () => {
     expect(currentRunStatus([message('thought', { streaming: true }), message('user')], false).phase).toBe('waiting')
   })
+  it('回合进行中但无实质事件：说正在思考而非干等', () => {
+    // 首包未到：只有用户提问
+    expect(currentRunStatus([message('user')], false, true)).toEqual({ phase: 'thinking', label: '正在思考' })
+    // 无正文思考被 ingest 丢弃：只剩空占位，仍算进行中
+    expect(
+      currentRunStatus([message('user'), message('agent', { text: '   ', streaming: true })], false, true),
+    ).toEqual({ phase: 'thinking', label: '正在思考' })
+    // 回合已结束才回落干等
+    expect(currentRunStatus([message('user')], false, false).phase).toBe('waiting')
+  })
+  it('回合进行中有进展：仍说正在组织回答而非正在思考', () => {
+    expect(
+      currentRunStatus([message('user'), message('tool', { toolStatus: 'completed', toolTitle: '搜索文档' })], false, true).phase,
+    ).toBe('composing')
+  })
 })

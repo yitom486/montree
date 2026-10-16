@@ -5,7 +5,7 @@ import { BeuiAgentProgress } from './BeuiAgentProgress'
 // `isToolActiveStatus` 同源，合并为单包引用；`./BeuiAgentProgress` 同批随搬，相对路径不变。
 import { isToolActiveStatus, toToolDisplayModel, type ChatMessage as AcpChatMessage } from '@montree/chat-core'
 
-export function currentRunStatus(messages: AcpChatMessage[], awaitingApproval: boolean) {
+export function currentRunStatus(messages: AcpChatMessage[], awaitingApproval: boolean, turnActive = false) {
   const current = messages.slice(messages.findLastIndex(message => message.role === 'user') + 1)
   if (awaitingApproval) return { phase: 'approval', label: '等待批准' }
   const tool = current.findLast(message => message.role === 'tool' && !message.turnEnded &&
@@ -23,6 +23,9 @@ export function currentRunStatus(messages: AcpChatMessage[], awaitingApproval: b
     message.role === 'plan')) {
     return { phase: 'composing', label: '正在组织回答' }
   }
+  // 回合进行中但尚无任何实质事件（首包未到/无正文思考被 ingest 丢弃）：
+  // 明确“正在思考”，不干巴巴地干等。回合已结束才回落到等待响应。
+  if (turnActive) return { phase: 'thinking', label: '正在思考' }
   return { phase: 'waiting', label: '等待响应' }
 }
 
