@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.14] - 2026-10-16
+
 - **本地与在线 mdBook 阅读**：正确识别独立章节目录，支持子章节和前后章导航；允许显式打开 localhost、127.0.0.1、[::1] 文档，保留公网转本机与跨端口拦截。
 - **在线代码高亮**：复用本地语法高亮与亮暗主题，保留代码原文和逐字复制；在线批注保存与重载恢复通过界面回归。
 - **正文交互组件**：流程图与生成式组件可嵌入回答段落之间，加载阶段复用动态占位，完成后自动呈现；保留交互、放大与历史恢复，避免重复卡片。
@@ -522,7 +526,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.12...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.14...HEAD
+[0.4.14]: https://github.com/yitom486/montree/compare/v0.4.12...v0.4.14
 [0.4.12]: https://github.com/yitom486/montree/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/yitom486/montree/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/yitom486/montree/compare/v0.4.9...v0.4.10
