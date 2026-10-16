@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
 import {
   AgentPermissionCard,
+  ChatActivityGroup,
   ChatMessageBubble,
   useChatTimeline,
   type ChatMarkdownTheme,
   type GenerativeSubmitPayload,
   type ResolveMarkProposal,
 } from '@montree/chat-ui'
-import type { ChatMessage } from '@montree/chat-core'
+import { timelineRendersInlineApproval, type ChatMessage } from '@montree/chat-core'
 import type { ChatSessionStore } from '../session/store'
 import { useActiveThread, useChatActions, useChatSessionStore } from '../session/use-chat-session'
 import { ChatComposer } from './ChatComposer'
@@ -21,7 +22,7 @@ export interface ChatPanelProps {
   store: ChatSessionStore
   /** 聊天 Markdown 主题（透传给 `ChatMessageBubble`；缺省 `light`）。 */
   theme?: ChatMarkdownTheme
-  /** 运行时下拉选项；切换经 `selectModel(optionId)` 直写 `modelConfig`。 */
+  /** 运行时下拉选项；切换经 `selectRuntime(optionId)` 直写 `modelConfig`。 */
   runtimes: ChatRuntimeOption[]
   /** 思考档下拉选项；缺省（`undefined`/空数组）时不渲染思考档下拉。 */
   thoughtOptions?: string[]
@@ -83,30 +84,16 @@ const NOOP_RESOLVE: ResolveMarkProposal = () => {}
 
 const EMPTY_MESSAGES: ChatMessage[] = []
 
-function workLogRowLabel(m: ChatMessage): string {
-  if (m.role === 'tool') {
-    return (
-      m.toolTitle?.trim() ||
-      m.toolContentText?.trim().slice(0, 60) ||
-      m.text.trim().slice(0, 60) ||
-      '工具调用'
-    )
-  }
-  if (m.role === 'thought') return m.text.trim().slice(0, 60) || '思考中'
-  return m.text.trim().slice(0, 60) || '计划更新'
-}
-
 /**
  * 可工作的最小聊天面板（S2）：业务代码只调此组件即工作。
  * 壳级布局（侧栏/底栏/滚动容器）由应用自备，包内只给最小可用结构 + className 透传。
  *
  * - 时间线：`useChatTimeline(messages)` 分组；`message` 项用 `ChatMessageBubble`
- *   （回调全接 store/transport，见下）；`work-log` 行用包内最小 `details/summary`
- *   原生渲染——注：宿主 `ActivityGroup` 更完整（进度条/耗时/错误态），应用层如需
- *   完整样式请自备分组渲染替换此处。
+ *   （回调全接 store/transport，见下）；`work-log` 复用 `ChatActivityGroup`，
+ *   与宿主共用进度摘要、最新工具行与回合落定后的历史折叠行为。
  * - 审批：`AgentPermissionCard` 接 `respondPermission`（`transport.respondPermission
  *   + clearPermission`，见 `useChatActions`）。
- * - 顶部最小模型行：runtime `<select>`（`selectModel`）+ thinking `<select>`
+ * - 顶部最小模型行：runtime `<select>`（`selectRuntime`）+ thinking `<select>`
  *   （`setThinking`，无 `thoughtOptions` 则不渲染）。
  * - 底部 `ChatComposer`。
  */
@@ -178,6 +165,7 @@ export function ChatPanel({
             <ChatMessageBubble
               key={item.key}
               message={item.message}
+              threadId={thread?.id}
               theme={theme}
               resolveMarkProposal={resolveMarkProposal}
               pendingPermission={state.pendingPermission}
@@ -193,30 +181,29 @@ export function ChatPanel({
               }
             />
           ) : (
-            <details key={item.key} data-testid="chat-work-log">
-              <summary>
-                {`工作记录 · 工具 ${item.toolCallCount} · 思考 ${item.thoughtCount}`}
-                {item.isActive ? ' · 进行中' : ''}
-              </summary>
-              <ul>
-                {/* work-log 内工具/计划消息同样透传上述槽（与 message 分支一致）：
-                    缺省（两槽皆 undefined）时只渲染标签行，与之前逐字一致。
-                    onGenerativeSubmit 经 renderBusinessResult opts 透传；
-                    onEditMessage 仅作用于 user 气泡（Bubble 内编辑钮），
-                    work-log 按分组仅含 thought/tool/plan（见 groupChatTimeline），故无编辑入口。 */}
-                {item.messages.map((m) => (
-                  <li key={m.id}>
-                    {workLogRowLabel(m)}
-                    {m.role === 'tool' ? renderBusinessResult?.(m, { onGenerativeSubmit }) : null}
-                    {m.role === 'plan' ? renderPlanCard?.(m) : null}
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <div key={item.key} data-testid="chat-work-log">
+              <ChatActivityGroup
+                group={item}
+                theme={theme}
+                threadId={thread?.id}
+                resolveMarkProposal={resolveMarkProposal}
+                pendingPermission={state.pendingPermission}
+                onPermissionRespond={actions.respondPermission}
+                renderBusinessResult={renderBusinessResult}
+                renderPlanCard={renderPlanCard}
+                onGenerativeSubmit={onGenerativeSubmit}
+                onEditMessage={onEditMessage}
+                onChapterPlanSelect={
+                  onLocateChapter
+                    ? (payload) => onLocateChapter(payload.entry.flatIndex)
+                    : undefined
+                }
+              />
+            </div>
           ),
         )}
       </div>
-      {state.pendingPermission ? (
+      {state.pendingPermission && !timelineRendersInlineApproval(timeline, state.pendingPermission.toolCallId) ? (
         <AgentPermissionCard
           pending={state.pendingPermission}
           onRespond={actions.respondPermission}

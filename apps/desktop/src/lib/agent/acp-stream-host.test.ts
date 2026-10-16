@@ -24,6 +24,8 @@ vi.mock('@/api/acp-api', () => ({
 
 import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
+import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import {
   flushAcpStreamBuffer,
   registerStreamAuthReset,
@@ -64,6 +66,52 @@ beforeEach(() => {
 })
 
 describe('acp-stream-host（应用级单例订阅）', () => {
+  it.each(['agent_message_chunk', 'agent_thought_chunk'])('包 store 重建后的首个 %s 不重复追加', async (kind) => {
+    const host = useAcpUiStore.getState()
+    host.createThread()
+    host.setSession('sid-main')
+    host.appendUserMessage('重启后继续')
+    host.beginAgentReply()
+    resetOwnedChatSessionStoreForTests()
+    const stop = startAcpStreamHost()
+    for (const listener of listeners.update) {
+      listener({ sessionId: 'sid-main', update: { sessionUpdate: kind, content: [{ type: 'text', text: '首个增量' }] } })
+    }
+    await settleFlush()
+    const state = getOwnedChatSessionStore().getState()
+    const messages = state.threads.find(t => t.id === state.activeThreadId)!.feed.messages
+    const role = kind === 'agent_thought_chunk' ? 'thought' : 'agent'
+    expect(messages.filter(m => m.role === role).map(m => m.text).join('')).toBe('首个增量')
+    stop()
+  })
+
+  it('恢复定居只冻结一次，不终结包回合，后续合法消息继续流式更新', async () => {
+    const host = useAcpUiStore.getState()
+    host.createThread()
+    host.setSession('sid-main')
+    host.appendUserMessage('历史问题')
+    host.beginAgentReply()
+    const stop = startAcpStreamHost()
+    emitTextChunk('历史回复')
+    await settleFlush()
+    for (const listener of listeners.update) {
+      listener({ sessionId: 'sid-main', update: { sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND } })
+    }
+    const pkg = getOwnedChatSessionStore()
+    const activeFeed = () => {
+      const state = pkg.getState()
+      return state.threads.find(t => t.id === state.activeThreadId)!.feed
+    }
+    expect(useAcpUiStore.getState().turnSettled).toBe(false)
+    expect(activeFeed().turnSettled).toBe(false)
+    expect(activeFeed().messages.every(m => !m.streaming)).toBe(true)
+    emitTextChunk('继续输出')
+    await settleFlush()
+    expect(activeFeed().messages.findLast(m => m.role === 'agent')?.streaming).toBe(true)
+    expect(activeFeed().messages.findLast(m => m.role === 'agent')?.text).toContain('继续输出')
+    stop()
+  })
+
   it('重复 start 只订一份：同一 chunk 只进一次时间线', async () => {
     const stopA = startAcpStreamHost()
     const stopB = startAcpStreamHost()

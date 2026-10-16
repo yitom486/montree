@@ -18,6 +18,12 @@ import { createPermissionSlice } from './permission-slice'
 import { createHudSlice } from './hud-slice'
 import { appApi } from '@/api/app-api'
 import { createWindowChatStorage, windowChatStorageKey } from './window-storage'
+import {
+  getOwnedChatSessionStore,
+  registerOwnedChatHostSnapshotProvider,
+} from '@/lib/agent/chat-session-owner'
+import type { ChatSessionStore } from '@montree/chat-session'
+import { mirrorHostSnapshotToPackageStore } from '@/lib/agent/chat-store-mirror'
 
 export const useAcpUiStore = create<AcpUiStore>()(
   persist(
@@ -100,6 +106,15 @@ export const useAcpUiStore = create<AcpUiStore>()(
     },
   ),
 )
+
+/** 宿主是迁移期历史真相源；仅启动/恢复时迁入，增量仍经镜像，避免重复消息。 */
+function reconcileOwnedChatHost(store: ChatSessionStore): void {
+  mirrorHostSnapshotToPackageStore(store, useAcpUiStore.getState())
+}
+
+registerOwnedChatHostSnapshotProvider(reconcileOwnedChatHost)
+getOwnedChatSessionStore()
+useAcpUiStore.persist?.onFinishHydration(() => reconcileOwnedChatHost(getOwnedChatSessionStore()))
 
 export function useAcpPanelOpen() {
   return useAcpUiStore((s) => s.panelOpen)

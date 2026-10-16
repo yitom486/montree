@@ -30,7 +30,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 |------|------|
 | `AgentMessageList` | 消息列表容器（`@montree/chat-core` 的 `chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新；生成式提交经 `onGenerativeSubmit` 透传面板 `sendPrompt` 链路；P4b 加可选 `messageSource`（`host` 缺省现状，`package-mirror` 时消息数组改读包对账镜像 active feed、streaming 随消息同切，`prompting`/审批/主题/滚动/回调与发送动作仍走宿主）） |
 | `AgentContextMenu` | 聊天/输入框右键：选区快照、复制原文、引用草稿、剪切/粘贴文本/全选与回底；异步编辑校验线程与当前草稿 |
-| `AgentActivityGroup` | 工作记录折叠组（同一用户回合一条；思考在前，运行中只展示最新普通工具的固定行；完成自动收起一次，手动展开保留完整历史；摘要含真实进度与取消/未知/未加载注记，详情按需展开） |
+| `AgentActivityGroup` | 工作记录宿主适配器（读取审批/主题/导航/批注 store，传业务与恢复回调）；折叠、进度摘要、最新工具行和完成历史已迁到 `@montree/chat-ui` 的 `ChatActivityGroup`，与包内 `ChatPanel` 共用实现，DOM/aria/交互保持一致 |
 | `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（最新工具稳定行、完成收起与手动回看、单次渲染、失败摘要、审批外置） |
 | `AgentResultEntry` | 富业务结果独立入口（紧凑过程行 + 独立业务卡，单次调用只渲染一处，`probe="result"`；component-ui 经 `threadId`/`prompting`/`onGenerativeSubmit` 透传选择提交链）（已迁 `@montree/chat-ui`，见包内 `agent-result-entry`；`ToolBusinessResult` 改可选 `businessResultSlot` 回宿主，内卡 store props 透传） |
 | `tools/result-card`（已迁 chat-ui，见包内 `result-card`） | 六张业务卡统一外壳（单层中性描边/浅底头/primary 图标/11px 摘要；去装饰标签与 teal 独走；跨章水墨热力与朱砂印属卡内数据可视化保留；比较卡 `@container` 留各自文件）（已迁 `@montree/chat-ui`，见包内 `result-card`；宿主 present 卡改包内相对引用） |

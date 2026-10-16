@@ -14,6 +14,7 @@
 - `ui/BeuiStreamingResponse`：`BeuiStreamingResponse`（streaming/complete 外壳；零依赖，逐字）。
 - `ui/BeuiCitations`：`BeuiCitations` + `BeuiCitationItem`（折叠结构化来源；`cn` 改包内，余逐字）。
 - `ui/BeuiAgentActivity`：`BeuiAgentActivity` + `BeuiActivityRow` + `BeuiActivityStatus`（过程表面；`cn` 改包内）。
+- `ui/chat-activity-group.tsx` / `.test.ts`：`ChatActivityGroup` + `ChatWorkLogItem` + `ChatActivityGroupProps`（工作记录编排；运行中只显示最新工具、真实进度/耗时摘要、手动折叠跨 chunk 保留、落定收起一次后可展开全历史；工具详情复用包内 `ToolStateIcon`/`AgentToolCallCard`，审批/恢复/批注/主题/导航均经 props，业务与计划经渲染槽；不读宿主 store/API）。
 - `ui/BeuiAgentProgress`：`BeuiAgentProgress` + `BeuiThinkingShimmer`（宿主计时经 props 传入；逐字）。
 - `ui/AgentChatItem`：`AgentChatItem/Body` + 变体/语气类型 + 列宽常量（`Message` 壳与 DEV 布局探针改引包内私有复刻，余逐字）。
 - `ui/AgentLoadingState`：`AgentLoadingState` + `currentRunStatus` + `useElapsedSeconds`（`AcpChatMessage` 即 core 的 `ChatMessage`，合并单包引用）。
@@ -34,10 +35,10 @@
 - `ui/chapter-mark-plan-card`：`ChapterMarkPlanCard` + `ChapterMarkPlanSelectPayload`（自宿主 `propose/ChapterMarkPlanCard` 整搬；`AgentChatItem` 改包内相对，`cn` 改包内，余逐字）。
 - `ui/dialog.tsx`（私有，不进 barrel）：宿主 `components/ui/dialog` 的包内复刻（`cn` 改包内，另改引包内 `./button`；仅供本批 present 卡使用）。
 - `ui/tool-shell.tsx` / `ui/agent-diff-preview.tsx` / `ui/propose-mark-card.tsx` / `ui/business-result-guard.ts`（私有，不进 barrel）：宿主 `ai-elements/tool`、`tools/AgentDiffPreview`、`propose/ProposeMarkCard`（去 store/toast 改回调）、`tools/ToolBusinessResult` 纯守卫（`hasBusinessResult/isUnparsablePresentResult` + 5 解析）的包内复刻（`cn/Button` 改包内，类型改 `chat-core`/`annotations`/`contracts`；仅供本批工具卡/气泡使用）。
-- `ui/message-shell.tsx` / `ui/button.tsx` / `ui/layout-probe.ts` / `ui/dev-log.ts`（私有，不进 barrel）：宿主 `ai-elements/message`、`ui/button`、`lib/agent/acp-layout-probe`、`lib/agent/acp-dev-log` 的包内复刻（`cn` 改包内；`message-shell` 另以 `from` 内联联合替代 `ai` 类型导入）。`AgentActivityGroup` 暂留宿主：其渲染件虽已入包，但组装层直读三 store 并依赖宿主独占 helper，搬入会把 store 带入包内，故留宿主作 adapter。
+- `ui/message-shell.tsx` / `ui/button.tsx` / `ui/layout-probe.ts` / `ui/dev-log.ts`（私有，不进 barrel）：宿主 `ai-elements/message`、`ui/button`、`lib/agent/acp-layout-probe`、`lib/agent/acp-dev-log` 的包内复刻（`cn` 改包内；`message-shell` 另以 `from` 内联联合替代 `ai` 类型导入）。宿主 `AgentActivityGroup` 仅保留 store 读取与业务回调适配，折叠与渲染统一交给包内 `ChatActivityGroup`。
 - `headless/use-reveal-text.ts`：`useRevealText` 流式打字机揭示（自 `apps/desktop/src/hooks/agent/useRevealText` 整搬，行为不变）。
 - `headless/`：`useRevealText`、`useChatTimeline`、`useToolDisplay`（`useInlinePresent` 不存在，内联引用派生用 core 的 `planInlinePresent`/`splitInlinePresent`）——只返回“渲染什么”。
-- `ui/` 默认组件（决定“长什么样”，均经 barrel 导出；替换粒度见“无头/自定义”一节）：`ChatMarkdown`、`ChatMessageBubble`、工具卡（`AgentToolCallCard`/`AgentResultEntry`/`DiagramViewerCard`/比较/审计/推荐卡）、审批（`AgentPermissionCard` + `ToolApprovalSlot`）、present 四件套（`ChapterComparisonCard`/`ComponentUiCard`/`ReactArtifactCard`/`HtmlArtifactCard` + 共享 `ArtifactFrame`）、提议块。`AgentActivityGroup`（work-log 组装）与 `AgentMessageList`（列表容器）留宿主，见“留宿主”一节。
+- `ui/` 默认组件（决定“长什么样”，均经 barrel 导出；替换粒度见“无头/自定义”一节）：`ChatMarkdown`、`ChatMessageBubble`、`ChatActivityGroup`、工具卡（`AgentToolCallCard`/`AgentResultEntry`/`DiagramViewerCard`/比较/审计/推荐卡）、审批（`AgentPermissionCard` + `ToolApprovalSlot`）、present 四件套（`ChapterComparisonCard`/`ComponentUiCard`/`ReactArtifactCard`/`HtmlArtifactCard` + 共享 `ArtifactFrame`）、提议块。`AgentMessageList`（列表容器）与业务适配留宿主。
 - 回调（包内不调 `sendPrompt`，交互经回调回宿主再进 ACP；签名见“回调表”一节）：`resolveMarkProposal`、`pendingPermission`、`onDismissProposedMark`、`onPermissionRespond`、`onRespond`、`onCompile`、`onExport`、`onSubmit`、`onLocate`、`renderMermaid`、`renderBusinessResult`、`renderPlanCard`、`onEditMessage`。`onQuote` 等引用类能力目前仅宿主侧（随 `AgentMessageList` 留宿主）。
 
 ## 私有复刻清单（M4 定案，不删宿主文件）
@@ -49,7 +50,7 @@
 - `ui/layout-probe.ts` ← `lib/agent/acp-layout-probe`：宿主仍被 `AgentMessageList` 调用；包内 `acpDevLog` 改 `./dev-log`，仅供 `AgentChatItem` DEV 探针。
 - `ui/dev-log.ts` ← `lib/agent/acp-dev-log`：宿主仍被 `useAcpSession`/`useMontreeSnapshotHost`/`chat-slice`/`mark-proposal-dev-log` 广泛使用；包内逐字，仅供 `./layout-probe`。
 - `ui/dialog.tsx` ← `components/ui/dialog`：宿主 14 处对话框仍用（AgentAuth/Provider、RemoteConnect、DiagramModal、Quiz、Settings 等，聊天之外广泛使用）；包内 `cn`/`Button` 改包内相对，仅供 `artifact-zoom-surface`/`html-artifact-card`。
-- `ui/tool-shell.tsx` ← `components/ai-elements/tool`：宿主仍被 `AgentActivityGroup`（`ToolStateIcon`）使用；包内 `cn` 改 `./cn`，仅供 `agent-tool-call-card`。
+- `ui/tool-shell.tsx` ← `components/ai-elements/tool`：包内 `cn` 改 `./cn`，供 `agent-tool-call-card` 与 `chat-activity-group` 共用工具状态图标及外壳。
 - `ui/agent-diff-preview.tsx` ← `components/agent/tools/AgentDiffPreview`：宿主现 0 引用（已迁包后孤儿，保留不删）；包内类型改 `chat-core`（`ChatToolDiff`/`buildSimpleDiffLines`），仅供 `agent-tool-call-card`。
 - `ui/propose-mark-card.tsx` ← `components/agent/propose/ProposeMarkCard`：宿主现 0 直接引用但保留 store/toast 版（`adoptProposedMark`/`dismissProposedMark`/`sonner` 包禁入）；包内去 fallback 改 `onAdopt`/`onDismiss`/`onResolved`/`onError`/`onToast` 回调，仅供 `propose-mark-chat-block`。
 - `ui/business-result-guard.ts` ← `components/agent/tools/ToolBusinessResult` 纯守卫：宿主组件仍被 `AgentMessageList`/`AgentActivityGroup` 作 `businessResultSlot` 使用；包内仅复刻纯 `hasBusinessResult`/`isUnparsablePresentResult` + 5 解析（无 store/api/toast），仅供 `agent-message-bubble` 分流。
@@ -109,7 +110,7 @@ Tailwind（M4 教训，必须做）：Tailwind v4 自动扫描只覆盖渲染根
 - `useRevealText(source, streaming, opts?)`：只做文本切片（drainMs 内排空 backlog、自适应步长、`prefers-reduced-motion` 直接落定、改写从空起播），下游保持单个 Streamdown 实例。
 - `useToolDisplay(message, { needsApproval? })`：返回 `ToolDisplayModel`（7 终态 × 11 resultKind，见功能清单），审批优先于一切普通状态。
 
-第三步：按 timeline 渲染（消息级组件）与回调回宿主再进 ACP。渲染对等件：文本/用户/思考走 `ChatMessageBubble`（定义在 `agent-message-bubble.tsx`；`AgentActivityGroup` 未进包，work-log 组装留宿主，见“结构”一节），富业务走 `AgentResultEntry` / 各 present 卡，正文走 `ChatMarkdown`。回调表（概念名 → 实际签名，去向为包模块文件名）：
+第三步：按 timeline 渲染与回调回宿主再进 ACP。文本/用户/思考走 `ChatMessageBubble`，`work-log` 走 `ChatActivityGroup`，富业务走 `AgentResultEntry` / 各 present 卡，正文走 `ChatMarkdown`。回调表（概念名 → 实际签名，去向为包模块文件名）：
 
 | 任务概念名 | 实际 prop 与签名 | 去向文件 |
 |---|---|---|
@@ -129,17 +130,17 @@ Tailwind（M4 教训，必须做）：Tailwind v4 自动扫描只覆盖渲染根
 | onExport（react 卡） | `onExport?(html: string, title: string) => void`（与 html 卡签名不同，注意区分） | `react-artifact-card.tsx` |
 | onDismissProposedMark | `onDismissProposedMark?() => void` | `agent-message-bubble.tsx` |
 | renderMermaid | `renderMermaid?(source: string) => ReactNode`（不复制宿主渲染块；缺省降级源码 `pre`）＋ `mermaidTheme?` 透传（现状为接收但内部未启用，M6 清理） | `diagram-viewer-card.tsx` |
-| renderBusinessResult | `renderBusinessResult?(message, opts: { threadId?, prompting?, onGenerativeSubmit? }) => ReactNode`；工具卡/结果入口侧为已求值节点 `businessResultSlot?: ReactNode` | `agent-message-bubble.tsx`、`agent-tool-call-card.tsx`、`agent-result-entry.tsx` |
-| renderPlanCard | `renderPlanCard?(message) => ReactNode`（`role: 'plan'` 唯一渲染出口；缺省渲染空） | `agent-message-bubble.tsx` |
+| renderBusinessResult | `renderBusinessResult?(message, opts: { threadId?, prompting?, onGenerativeSubmit? }) => ReactNode`；工具卡/结果入口侧为已求值节点 `businessResultSlot?: ReactNode` | `agent-message-bubble.tsx`、`chat-activity-group.tsx`、`agent-tool-call-card.tsx`、`agent-result-entry.tsx` |
+| renderPlanCard | `renderPlanCard?(message) => ReactNode`（`role: 'plan'` 唯一渲染出口；缺省渲染空） | `agent-message-bubble.tsx`、`chat-activity-group.tsx` |
 
 其余透传回调（同槽文件内）：章计划 `onSelectChapter?(payload: ChapterMarkPlanSelectPayload)`（`chapter-mark-plan-card.tsx`，气泡侧透传名为 `onChapterPlanSelect`）；工具失败恢复 `onRecoverChapter?(flatIndex?)` / `onPromptSelectText?()` / `navFlatIndex?`（`agent-tool-call-card.tsx`，气泡透传）；artifact 桥接 `onBridgeMessage?(msg: ArtifactBridgeMessage)`（`artifact-frame.tsx`）；预览对话框 `onOpenChange` / 内层 `onExport`（`html-artifact-card.tsx`）。
 
 ### 3. 最小可跑示例（伪代码，只用 barrel 真实符号）
 
-`AgentMessageList` 未进包：宿主须自备列表容器、视口、滚动跟随与落盘，包只到消息级。`work-log` 项宿主侧组装渲染（包内无 `AgentActivityGroup` 导出）。
+`AgentMessageList` 未进包：宿主须自备列表容器、视口、滚动跟随与落盘；`work-log` 项使用包内 `ChatActivityGroup`，与宿主适配器共享完整工作记录交互。
 
 ```tsx
-import { useChatTimeline, ChatMessageBubble } from '@montree/chat-ui';
+import { useChatTimeline, ChatMessageBubble, ChatActivityGroup } from '@montree/chat-ui';
 import type { ChatMessage, ChatTimelineItem } from '@montree/chat-core';
 import type { ChatMarkdownTheme } from '@montree/chat-ui';
 
@@ -151,7 +152,9 @@ function ChatView({ messages, theme }: { messages: ChatMessage[]; theme: ChatMar
         ? <ChatMessageBubble key={item.key} message={item.message} theme={theme}
             resolveMarkProposal={(id, status) => {/* 回宿主写库 */}}
             pendingPermission={null} onPermissionRespond={(id) => {/* 进 ACP */}} />
-        : <HostWorkLog key={item.key} group={item} /> /* work-log 宿主侧渲染 */)}
+        : <ChatActivityGroup key={item.key} group={item} theme={theme}
+            resolveMarkProposal={(id, status) => {/* 回宿主写库 */}}
+            pendingPermission={null} />)}
     </div>
   );
 }
@@ -178,6 +181,7 @@ function ChatView({ messages, theme }: { messages: ChatMessage[]; theme: ChatMar
 - 加载态（`AgentLoadingState.tsx`）：`AgentLoadingState` 加 `currentRunStatus` 加 `useElapsedSeconds`；关键语义：空流式期占位，避免闪烁切换。
 - 审批（`agent-permission-card.tsx`、`BuiApprovalCard.tsx`、`tool-approval-slot.tsx`）：卡加槽；能力：选项卡渲染、命中当前 pending 的工具才挂载、放折叠容器外；关键语义：同卡防重、跨卡幂等由宿主 `onRespond` 保证、无选项时兜底为允许/拒绝两项（孤儿兜底）。
 - 消息气泡（`agent-message-bubble.tsx`）：`ChatMessageBubble`；能力：按 role 分发全部消息（system/user/thought/tool/agent 正文、提议、章计划、steps、内嵌 present 槽）；关键语义：`resolveMarkProposal` 必填去 fallback、`pendingPermission` 改 prop、富结果经 `renderBusinessResult` 槽、plan 经 `renderPlanCard` 槽。
+- 工作记录（`chat-activity-group.tsx`）：`ChatActivityGroup`；能力：最新工具固定行、完整进度与失败/取消/未知计数、按需工具详情、思考和计划；关键语义：手动选择跨增量保留、落定只收起一次，主题与业务操作经 props，不依赖应用状态。
 - 工具状态机（`agent-tool-call-card.tsx` 加 core 的 `tool-display-model.ts`）：`AgentToolCallCard`；能力：7 终态（`awaiting-approval/pending/in-progress/completed/failed/cancelled/unknown`）× 11 resultKind（diagram/cross-reference/content-audit/chapter-suggestion/chapter-comparison/html-artifact/component-ui/react-artifact/diff/text/none）；关键语义：落定自动收起、审批槽外挂、提议失败分类走 `navFlatIndex` 纯函数。
 - 结果入口（`agent-result-entry.tsx`）：`AgentResultEntry`；能力：富业务紧凑过程行加独立业务卡，单次调用只渲染一处；关键语义：业务卡经 `businessResultSlot` 注入，store 改 props 透传。
 - 结果卡底座（`result-card.ts`）：常量加 `resultCardClassName`；关键语义：四 present 卡统一壳。
@@ -191,4 +195,4 @@ function ChatView({ messages, theme }: { messages: ChatMessage[]; theme: ChatMar
 - present 之交互界面卡（`component-ui-card.tsx`）：`ComponentUiCard`（另有 lazy 件）加 `GenerativeSubmitPayload` 加 `buildGenerativeSubmitTexts`；能力：白名单组件渲染、选择态本地 state、8KiB 提交上限、未知组件跳过、错误边界；关键语义：提交与定位只经回调，不直发模型不执行任意代码。
 - present 之 React 卡（`react-artifact-card.tsx`）：`ReactArtifactCard` 加 `ReactBuildStatus`；能力：构建/编译/恢复/加载/就绪/编译失败/运行失败七态、源码查看、导出、重跑、框内分析请求确认链路；关键语义：编译经 `onCompile`（主进程 Sucrase 留宿主），加载 30s 超时只报失败不声称中止。
 - present 之 HTML 卡（`html-artifact-card.tsx`）：`HtmlArtifactCard` 加 `ArtifactPreviewDialog` 加 `sanitizeArtifactFileName`；能力：内联预览、对话框预览（关闭卸载、重开 nonce 重置）、源码查看、导出；关键语义：主题经 `colorScheme`、导出经 `onExport`，脚本报错不触发保存。
-- 宿主侧（不进包）：`AgentMessageList`（视口引擎、滚动跟随/分页/落盘、assistant-ui Runtime 编排）、`ToolBusinessResult`（文档归属校验、导航、落库、Query 失效编排；纯解析函数已在 core，卡组装留 adapter）、plan 卡（经 `renderPlanCard` 槽由宿主注入）、`AgentActivityGroup`（work-log 组装渲染，barrel 未导出，宿主侧按 `WorkLogItem` 自渲染）。
+- 宿主侧（不进包）：`AgentMessageList`（视口引擎、滚动跟随/分页/落盘、assistant-ui Runtime 编排）、`ToolBusinessResult`（文档归属校验、导航、落库、Query 失效编排；纯解析函数已在 core，卡组装留 adapter）、plan 卡（经 `renderPlanCard` 槽由宿主注入）、`AgentActivityGroup`（读取 store/业务回调后适配 `ChatActivityGroup`，无独立工作记录渲染逻辑）。

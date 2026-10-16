@@ -16,6 +16,7 @@ import {
   mapConnectionStatus,
   mapPermissionRequest,
   mapSessionUpdate,
+  useChatActions,
   type ChatSessionStore,
   type ChatStoragePort,
   type ChatTransportPort,
@@ -63,8 +64,9 @@ function mockStorage(): ChatStoragePort & { saved: unknown[] } {
     saved,
     load: () => data,
     save: (snapshot) => {
-      data = snapshot
-      saved.push(snapshot)
+      // JSON round-trip matches a real persistence boundary (no shared object references).
+      data = JSON.parse(JSON.stringify(snapshot)) as typeof snapshot
+      saved.push(data)
     },
   }
 }
@@ -186,6 +188,240 @@ function componentUiJson(): string {
 }
 
 const agentChunk = (text: string) => ({ sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text }] })
+
+async function sendFromComposer(container: HTMLElement, text: string): Promise<void> {
+  const input = container.querySelector<HTMLTextAreaElement>('[data-testid="chat-composer-input"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-testid="chat-composer-send"]')!.click()
+  })
+  expect(input.value).toBe('')
+}
+
+function mountCancelControl(store: ChatSessionStore): HTMLButtonElement {
+  function ConsumerControl() {
+    const actions = useChatActions(store)
+    return h('button', { onClick: actions.cancel }, '停止')
+  }
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  mounted.push({ container, root })
+  act(() => { root.render(h(ConsumerControl)) })
+  return container.querySelector('button')!
+}
+
+describe('mock ACP transport 与真实会话面板集成', () => {
+  it('从输入框发起两轮请求，异步原始 chunk 逐次出现在 DOM，上一轮答案保持独立', async () => {
+    let store: ChatSessionStore
+    let releaseTail: (() => void) | undefined
+    const transport = mockTransport()
+    transport.sendText.mockImplementation(async (threadId, text) => {
+      await Promise.resolve()
+      ingestUpdate(store, agentChunk(`${text}的回答`), threadId)
+      await new Promise<void>((resolve) => { releaseTail = resolve })
+      ingestUpdate(store, agentChunk('，已完成'), threadId)
+      ingestUpdate(store, { sessionUpdate: 'montree_settle_complete' }, threadId)
+    })
+    store = createChatSessionStore(harness({ transport }))
+    const container = mountPanel({ store, runtimes: RUNTIMES })
+
+    await sendFromComposer(container, '第一问')
+    await vi.waitFor(async () => {
+      await act(async () => {})
+      expect(container.textContent).toContain('第一问的回答')
+    })
+    expect(activeMsgs(store)[1]).toMatchObject({ text: '第一问的回答', streaming: true })
+    expect(container.textContent).not.toContain('，已完成')
+    await act(async () => { releaseTail!() })
+    expect(container.textContent).toContain('第一问的回答，已完成')
+    const firstAnswer = activeMsgs(store).find((m) => m.role === 'agent')!
+    expect(firstAnswer.streaming).toBe(false)
+
+    await sendFromComposer(container, '第二问')
+    expect(activeMsgs(store).at(-1)).toMatchObject({ text: '第二问的回答', streaming: true })
+    await act(async () => { releaseTail!() })
+    expect(container.textContent).toContain('第一问的回答，已完成')
+    expect(container.textContent).toContain('第二问的回答，已完成')
+    expect(activeMsgs(store).map((m) => [m.role, m.text])).toEqual([
+      ['user', '第一问'], ['agent', '第一问的回答，已完成'],
+      ['user', '第二问'], ['agent', '第二问的回答，已完成'],
+    ])
+    expect(activeMsgs(store)[1]!.id).toBe(firstAnswer.id)
+    expect(activeMsgs(store).every((m) => !m.streaming)).toBe(true)
+    expect(transport.sendText.mock.calls.map(([id]) => id)).toEqual(['thread-0', 'thread-0'])
+  })
+
+  it('失败回合只回滚本轮模型正文、保留失败工具记录，并可成功继续下一轮', async () => {
+    let store: ChatSessionStore
+    const transport = mockTransport()
+    transport.sendText.mockImplementation(async (threadId, text) => {
+      const keepIds = threadMsgs(store, threadId).filter((m) => !m.streaming).map((m) => m.id)
+      await Promise.resolve()
+      if (text === '触发失败') {
+        ingestUpdate(store, { sessionUpdate: 'agent_thought_chunk', content: '失败前的内部思考' }, threadId)
+        ingestUpdate(store, agentChunk('失败前的临时正文'), threadId)
+        ingestUpdate(store, { sessionUpdate: 'tool_call', toolCallId: 'failed-read', title: '读取失败', status: 'failed', content: [{ type: 'text', text: '文件不存在' }] }, threadId)
+        // 宿主负责把 transport 失败落成状态；包端处理其回滚/收尾事件。
+        store.rollbackFailedTurn(keepIds, threadId)
+        store.appendSystem('连接中断，请重试', threadId)
+        store.finishTurn(threadId)
+        throw new Error('mock connection closed')
+      }
+      ingestUpdate(store, agentChunk(`${text}完成`), threadId)
+      store.finishTurn(threadId)
+    })
+    store = createChatSessionStore(harness({ transport }))
+    const container = mountPanel({ store, runtimes: RUNTIMES })
+    await sendFromComposer(container, '上一轮')
+    const oldAnswerId = activeMsgs(store).find((m) => m.role === 'agent')!.id
+    await sendFromComposer(container, '触发失败')
+
+    expect(container.textContent).toContain('上一轮完成')
+    expect(container.textContent).toContain('读取失败')
+    expect(container.textContent).toContain('连接中断，请重试')
+    expect(container.textContent).not.toContain('失败前的临时正文')
+    expect(activeMsgs(store).some((m) => m.role === 'thought')).toBe(false)
+    expect(msgByTool(activeMsgs(store), 'failed-read')).toMatchObject({ toolStatus: 'failed', streaming: false })
+    expect(activeMsgs(store).find((m) => m.id === oldAnswerId)?.text).toBe('上一轮完成')
+
+    await sendFromComposer(container, '重试')
+    expect(container.textContent).toContain('重试完成')
+    expect(activeMsgs(store).filter((m) => m.role === 'agent').map((m) => m.text)).toEqual(['上一轮完成', '重试完成'])
+    expect(activeMsgs(store).every((m) => !m.streaming)).toBe(true)
+  })
+
+  it('通过真实 actions 停止进行中的工具，宿主确认收尾后迟到输出不重新激活，再发一轮可恢复', async () => {
+    let store: ChatSessionStore
+    const transport = mockTransport()
+    transport.sendText.mockImplementation(async (threadId, text) => {
+      await Promise.resolve()
+      ingestUpdate(store, agentChunk(text === '慢请求' ? '部分回答' : '恢复回答'), threadId)
+      if (text === '慢请求') {
+        ingestUpdate(store, { sessionUpdate: 'tool_call', toolCallId: 'slow-tool', title: '慢速检索', status: 'in_progress' }, threadId)
+      } else store.finishTurn(threadId)
+    })
+    transport.cancel.mockImplementation(async (threadId) => {
+      await Promise.resolve()
+      store.finishTurn(threadId)
+      ingestUpdate(store, { sessionUpdate: 'tool_call_content_chunk', toolCallId: 'slow-tool', content: { type: 'text', text: '取消后抵达的尾包' } }, threadId)
+    })
+    store = createChatSessionStore(harness({ transport }))
+    const container = mountPanel({ store, runtimes: RUNTIMES })
+    const cancel = mountCancelControl(store)
+    await sendFromComposer(container, '慢请求')
+    expect(msgByTool(activeMsgs(store), 'slow-tool').streaming).toBe(true)
+    await act(async () => { cancel.click() })
+
+    expect(transport.cancel).toHaveBeenCalledWith(store.getState().activeThreadId)
+    expect(msgByTool(activeMsgs(store), 'slow-tool')).toMatchObject({ toolStatus: 'cancelled', streaming: false, toolContentText: '取消后抵达的尾包' })
+    expect(activeMsgs(store).every((m) => !m.streaming)).toBe(true)
+    expect(container.textContent).toContain('部分回答')
+    await sendFromComposer(container, '继续')
+    expect(container.textContent).toContain('恢复回答')
+    expect(msgByTool(activeMsgs(store), 'slow-tool').toolStatus).toBe('cancelled')
+  })
+
+  it('原始审批到达后点击拒绝，异步工具取消和模型回复均落入真实 DOM', async () => {
+    let store: ChatSessionStore
+    const transport = mockTransport()
+    transport.sendText.mockImplementation(async (threadId) => {
+      await Promise.resolve()
+      const { permission } = mapPermissionRequest({
+        requestId: 501,
+        summary: '允许修改文件吗？',
+        toolCall: { toolCallId: 'approve-edit', title: '修改文件', kind: 'edit', status: 'pending' },
+        options: [
+          { optionId: 'allow', name: '允许', kind: 'allow_once' },
+          { optionId: 'reject', name: '拒绝', kind: 'reject_once' },
+        ],
+      })
+      store.requestPermission(permission, threadId)
+    })
+    transport.respondPermission.mockImplementation(async () => {
+      await Promise.resolve()
+      ingestUpdate(store, { sessionUpdate: 'tool_call_update', toolCallId: 'approve-edit', status: 'cancelled' })
+      ingestUpdate(store, agentChunk('已取消修改，文件保持原样'))
+      store.finishTurn()
+    })
+    store = createChatSessionStore(harness({ transport }))
+    const container = mountPanel({ store, runtimes: RUNTIMES })
+    await sendFromComposer(container, '帮我修改文件')
+    expect(container.querySelectorAll('[data-testid="agent-permission-card"]')).toHaveLength(1)
+    const card = container.querySelector('[data-testid="agent-permission-card"]')!
+    expect(card.textContent).toContain('允许修改文件吗？')
+    const reject = Array.from(card.querySelectorAll('button')).find((button) => button.textContent?.includes('拒绝'))!
+    await act(async () => { reject.click() })
+
+    expect(transport.respondPermission).toHaveBeenCalledWith(501, 'reject')
+    expect(store.getState().pendingPermission).toBeNull()
+    expect(container.querySelector('[data-testid="agent-permission-card"]')).toBeNull()
+    expect(container.textContent).toContain('已取消修改，文件保持原样')
+    expect(msgByTool(activeMsgs(store), 'approve-edit')).toMatchObject({ toolStatus: 'cancelled', streaming: false })
+  })
+
+  it('审批没有对应工具消息时保留唯一的兜底卡，点击后仍可响应并撤下', async () => {
+    const transport = mockTransport()
+    const store = createChatSessionStore(harness({ transport }))
+    const { permission } = mapPermissionRequest({
+      requestId: 502,
+      summary: '允许继续处理吗？',
+      options: [{ optionId: 'continue', name: '继续', kind: 'allow_once' }],
+    })
+    store.requestPermission(permission)
+    const container = mountPanel({ store, runtimes: RUNTIMES })
+    const cards = container.querySelectorAll('[data-testid="agent-permission-card"]')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]!.textContent).toContain('允许继续处理吗？')
+    expect(activeMsgs(store).some((message) => message.role === 'tool')).toBe(false)
+    await act(async () => { cards[0]!.querySelector('button')!.click() })
+    expect(transport.respondPermission).toHaveBeenCalledWith(502, 'continue')
+    expect(store.getState().pendingPermission).toBeNull()
+    expect(container.querySelector('[data-testid="agent-permission-card"]')).toBeNull()
+  })
+
+  it('JSON 存储恢复后切换历史线程继续发送，DOM 与持久化均隔离，附件仍可见', async () => {
+    const storage = mockStorage()
+    const first = createChatSessionStore(harness({ storage }))
+    const threadA = first.getState().activeThreadId!
+    first.appendUser('A 历史问题', { attachments: [{ id: 'pdf-a', kind: 'file', name: 'a.pdf', mimeType: 'application/pdf', absolutePath: 'D:/books/a.pdf' }] })
+    ingestUpdate(first, agentChunk('A 历史答案'), threadA)
+    first.finishTurn(threadA)
+    const threadB = first.newThread()
+    first.appendUser('B 历史问题')
+    ingestUpdate(first, agentChunk('B 历史答案'), threadB)
+    first.finishTurn(threadB)
+
+    let resumed: ChatSessionStore
+    const transport = mockTransport()
+    transport.sendText.mockImplementation(async (threadId) => {
+      await Promise.resolve()
+      ingestUpdate(resumed, agentChunk('A 续聊答案'), threadId)
+      resumed.finishTurn(threadId)
+    })
+    let resumedIds = 0
+    resumed = createChatSessionStore({ ...harness({ storage, transport }), createId: (role) => `resumed-${role}-${resumedIds++}` })
+    const container = mountPanel({ store: resumed, runtimes: RUNTIMES })
+    expect(container.textContent).toContain('B 历史问题')
+    await act(async () => { resumed.switchThread(threadA) })
+    expect(container.textContent).toContain('A 历史问题')
+    expect(container.textContent).toContain('a.pdf')
+    expect(container.textContent).not.toContain('B 历史问题')
+    await sendFromComposer(container, 'A 继续提问')
+    expect(container.textContent).toContain('A 续聊答案')
+    expect(transport.sendText).toHaveBeenCalledWith(threadA, 'A 继续提问')
+    expect(resumed.getState().threads).toHaveLength(2)
+    expect(threadMsgs(resumed, threadB).map((m) => m.text)).toEqual(['B 历史问题', 'B 历史答案'])
+
+    const persisted = createChatSessionStore(harness({ storage }))
+    expect(threadMsgs(persisted, threadA).map((m) => m.text)).toEqual(['A 历史问题', 'A 历史答案', 'A 继续提问', 'A 续聊答案'])
+    expect(threadMsgs(persisted, threadA)[0]!.attachments?.[0]?.name).toBe('a.pdf')
+    expect(threadMsgs(persisted, threadB).map((m) => m.text)).toEqual(['B 历史问题', 'B 历史答案'])
+  })
+})
 
 describe('S3-1 完整会话剧本（单线程全链路）', () => {
   it('user→reply→chunks→thought→tool→plan→present→审批通过→finish', () => {

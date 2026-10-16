@@ -1,5 +1,5 @@
 // 宿主 `apps/desktop/src/components/ai-elements/tool.tsx`（社区 AI Elements Tool 折叠组合与状态徽标）
-// 逐字复刻（私有，不进 barrel；仅供包内 `agent-tool-call-card` 使用）。唯一改动：`cn` 改引包内 `./cn`。
+// 逐字复刻（私有，不进 barrel；供包内工具卡与工作记录共用）。唯一改动：`cn` 改引包内 `./cn`。
 // 上游来源与差异说明见宿主原文件头注释（Vercel AI Elements Apache-2.0，Montree 扩展 awaiting-approval/cancelled/unknown 三态）。
 import * as React from 'react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'

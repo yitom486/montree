@@ -59,9 +59,10 @@ export function flushAcpStreamBuffer(): void {
       content: [{ type: 'text', text }],
     }
     const hostThreadId = useAcpUiStore.getState().activeThreadId
+    const pkg = getOwnedChatSessionStore()
     useAcpUiStore.getState().applySessionUpdate(update)
     // P4a 对账：同一合成增量再喂包 store（只加法，不影响主链路）
-    mirrorSessionUpdateToPackageStore(getOwnedChatSessionStore(), update, undefined, hostThreadId)
+    mirrorSessionUpdateToPackageStore(pkg, update, undefined, hostThreadId)
   }
 }
 
@@ -103,10 +104,8 @@ export function startAcpStreamHost(): () => void {
       typeof event.update?.sessionUpdate === 'string' ? event.update.sessionUpdate : ''
     if (updateKind === MONTREE_SETTLE_COMPLETE_KIND) {
       flushAcpStreamBuffer()
-      const hostThreadId = useAcpUiStore.getState().activeThreadId
-      useAcpUiStore.getState().freezeSettledStreaming()
-      // P4a 对账：定居收尾同样进包（包侧映射为 finish-turn；只加法）
-      mirrorSessionUpdateToPackageStore(getOwnedChatSessionStore(), event.update, undefined, hostThreadId)
+      useAcpUiStore.getState().applySessionUpdate(event.update)
+      // 宿主先落定待处理用户回放再同步包；再次映射为 finish-turn 会错误地终结恢复回合。
       return
     }
     const ann = useAnnotationAgentStore.getState()
@@ -142,10 +141,13 @@ export function startAcpStreamHost(): () => void {
       return
     }
     flushAcpStreamBuffer()
+    const pkg = getOwnedChatSessionStore()
     mainStore.applySessionUpdate(event.update)
+    // 用户回放可能被宿主清洗、暂存或去重；仅同步宿主接受后的正文。
+    if (updateKind === 'user_message_chunk') return
     // P4a 对账：同一增量再喂包 store（只加法，不影响主链路）
     mirrorSessionUpdateToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       event.update,
       undefined,
       mainStore.activeThreadId,

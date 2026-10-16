@@ -13,6 +13,8 @@ import {
 } from '@/lib/agent/acp-config-preferences'
 import type { AcpUiStore } from './acp-types'
 import { createEmptyThread, patchActiveThread } from './chat-helpers'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
+import { mirrorHostSnapshotToPackageStore } from '@/lib/agent/chat-store-mirror'
 
 export interface SessionSlice {
   selectedRuntimeId: string
@@ -85,7 +87,9 @@ export const createSessionSlice: StateCreator<
   runtimeSwitchRequestedAt: 0,
   requestedRuntimeId: null,
 
-  setSelectedRuntimeId: (id) =>
+  setSelectedRuntimeId: (id) => {
+    if (get().selectedRuntimeId === id) return
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       if (s.selectedRuntimeId === id) return s
 
@@ -122,7 +126,9 @@ export const createSessionSlice: StateCreator<
         sessionPromptMode: 'compatibility',
         sessionPromptModeReason: undefined,
       }
-    }),
+    })
+    mirrorHostSnapshotToPackageStore(pkg, get())
+  },
 
   setStatus: (status, errorMessage, errorCode) =>
     set({

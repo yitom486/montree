@@ -17,6 +17,8 @@ export type { AcpMessageAttachment, AcpPlanEntry, ChatFeedState, ChatFeedToolCal
  */
 export interface ChatThread {
   id: string
+  /** 宿主线程的稳定身份；随快照保存，重启后无需依赖内存映射。 */
+  hostThreadId?: string
   runtimeId: string
   title: string
   feed: ChatFeedState

@@ -71,6 +71,12 @@ export interface ChatSessionStore {
   /** S1 仅透出注入的 transport（不调用发送）；实际发送由宿主完成 */
   getTransport(): ChatTransportPort | undefined
   newThread(runtimeId?: string): string
+  /** 定向接入宿主线程；迟到消息 provision 不改变当前 active/runtime。 */
+  ensureHostThread(hostThreadId: string, runtimeId?: string, activate?: boolean): string
+  /** 初始化或宿主持久化恢复时迁入权威历史，替换旧版无关联的影子快照。 */
+  reconcileHostThreads(threads: ChatThread[], activeHostThreadId: string): void
+  /** 宿主规范化回放后只替换一个线程，不改变当前选择或其它线程。 */
+  syncHostThread(thread: ChatThread): void
   switchThread(threadId: string): void
   appendUser(text: string, opts?: { attachments?: AcpMessageAttachment[]; threadId?: string }): void
   beginReply(threadId?: string): void
@@ -148,7 +154,7 @@ export interface ChatSessionStore {
   setThinking(level: string): void
   /**
    * 清空 active 线程 messages（P3 新增，对齐宿主 `clearMessages` 的纯 feed 部分）：
-   * 线程本身保留（id/runtimeId/title 不动），feed 置空并收尾 turnSettled=false；
+   * 线程身份保留，标题重置为新对话，feed 置空并收尾 turnSettled=false；
    * 无 active 线程时 no-op；变更后 emit（含 persist）通知订阅者。
    */
   clearActiveThread(): void
@@ -296,13 +302,79 @@ export function createChatSessionStore(opts: CreateChatSessionStoreOptions = {})
       return id
     },
 
+    ensureHostThread(hostThreadId, runtimeId, activate = false): string {
+      const existing = state.threads.find((t) => t.hostThreadId === hostThreadId || t.id === hostThreadId)
+      const id = existing?.id ?? createId('thread')
+      const target: ChatThread = existing
+        ? { ...existing, hostThreadId, runtimeId: runtimeId ?? existing.runtimeId }
+        : { ...createThread(id, runtimeId ?? state.modelConfig.runtimeId), hostThreadId }
+      let threads = existing
+        ? state.threads.map((t) => t.id === id ? target : t)
+        : [target, ...state.threads]
+      if (activate && id !== state.activeThreadId) {
+        threads = threads.map((t) => t.id === state.activeThreadId ? { ...t, feed: freezeFeed(t.feed) } : t)
+      }
+      const active = threads.find((t) => t.id === state.activeThreadId)
+      threads = threads.slice(0, CHAT_SESSION_MAX_THREADS)
+      // 后台线程不能挤掉当前可见线程。
+      if (!activate && active && !threads.some((t) => t.id === active.id)) {
+        threads = [...threads.slice(0, CHAT_SESSION_MAX_THREADS - 1), active]
+      }
+      state = {
+        ...state,
+        threads,
+        ...(activate ? {
+          activeThreadId: id,
+          modelConfig: { ...state.modelConfig, runtimeId: target.runtimeId },
+        } : {}),
+      }
+      emit()
+      return id
+    },
+
+    reconcileHostThreads(threads, activeHostThreadId): void {
+      if (threads.length === 0) return
+      const reconciled = threads.map((thread) => {
+        const hostThreadId = thread.hostThreadId ?? thread.id
+        const existing = state.threads.find((t) => t.hostThreadId === hostThreadId || t.id === hostThreadId)
+        return { ...thread, id: existing?.id ?? thread.id, hostThreadId }
+      })
+      const active = reconciled.find((t) => t.hostThreadId === activeHostThreadId) ?? reconciled[0]!
+      state = {
+        ...state,
+        threads: reconciled,
+        activeThreadId: active.id,
+        modelConfig: { ...state.modelConfig, runtimeId: active.runtimeId },
+        pendingPermission: null,
+      }
+      pendingSnapshotContents = []
+      emit()
+    },
+
+    syncHostThread(thread): void {
+      const hostThreadId = thread.hostThreadId ?? thread.id
+      const existing = state.threads.find((t) => t.hostThreadId === hostThreadId || t.id === hostThreadId)
+      const next = { ...thread, hostThreadId, id: existing?.id ?? thread.id }
+      let threads = existing
+        ? state.threads.map((t) => t.id === existing.id ? next : t)
+        : [next, ...state.threads]
+      const active = threads.find((t) => t.id === state.activeThreadId)
+      threads = threads.slice(0, CHAT_SESSION_MAX_THREADS)
+      if (active && !threads.some((t) => t.id === active.id)) {
+        threads = [...threads.slice(0, CHAT_SESSION_MAX_THREADS - 1), active]
+      }
+      state = { ...state, threads }
+      emit()
+    },
+
     switchThread(threadId: string): void {
       if (threadId === state.activeThreadId) return
       if (!state.threads.some((t) => t.id === threadId)) return
       const threads = state.threads.map((t) =>
         t.id === state.activeThreadId ? { ...t, feed: freezeFeed(t.feed) } : t,
       )
-      state = { ...state, threads, activeThreadId: threadId }
+      const target = threads.find((t) => t.id === threadId)!
+      state = { ...state, threads, activeThreadId: threadId, modelConfig: { ...state.modelConfig, runtimeId: target.runtimeId } }
       emit()
     },
 
@@ -528,11 +600,11 @@ export function createChatSessionStore(opts: CreateChatSessionStoreOptions = {})
       if (state.activeThreadId == null) return
       const target = state.threads.find((t) => t.id === state.activeThreadId)
       if (!target) return
-      if (target.feed.messages.length === 0 && target.feed.turnSettled === false) return
+      if (target.feed.messages.length === 0 && target.feed.turnSettled === false && target.title === CHAT_SESSION_NEW_TITLE) return
       state = {
         ...state,
         threads: state.threads.map((t) =>
-          t.id === target.id ? { ...t, feed: emptyFeed() } : t,
+          t.id === target.id ? { ...t, title: CHAT_SESSION_NEW_TITLE, feed: emptyFeed() } : t,
         ),
       }
       emit()

@@ -36,6 +36,20 @@ function mockTransport(): ChatTransportPort & {
   }
 }
 
+describe('chat-session 宿主线程接入', () => {
+  it('大量后台补建仍保持线程上限，并保留当前可见线程和运行时', () => {
+    const store = createChatSessionStore(harness())
+    const visible = store.ensureHostThread('visible', 'opencode', true)
+    for (let i = 0; i < 45; i++) store.ensureHostThread(`late-${i}`, 'codex-acp')
+    expect(store.getState().threads).toHaveLength(40)
+    expect(store.getState().activeThreadId).toBe(visible)
+    expect(store.getState().threads.some((thread) => thread.id === visible)).toBe(true)
+    expect(store.getState().modelConfig.runtimeId).toBe('opencode')
+    const late = store.getState().threads.find((thread) => thread.hostThreadId === 'late-44')!
+    expect(late.runtimeId).toBe('codex-acp')
+  })
+})
+
 describe('chat-session store 回合流', () => {
   it('append→chunks→tool→finish→冻结断言', () => {
     const store = createChatSessionStore(harness())
@@ -238,6 +252,7 @@ describe('clearActiveThread (P3 追加)', () => {
     expect(s.threads.some((t) => t.id === active)).toBe(true)
     expect(s.threads.find((t) => t.id === active)!.feed.messages).toEqual([])
     expect(s.threads.find((t) => t.id === active)!.feed.turnSettled).toBe(false)
+    expect(s.threads.find((t) => t.id === active)!.title).toBe('新对话')
     expect(listener).toHaveBeenCalledTimes(1)
   })
 

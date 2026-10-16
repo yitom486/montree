@@ -21,7 +21,6 @@ import {
  * - 线程计数（全程避开空白草稿修剪分叉：每次新建前先落字）。
  *
  * 已知不对齐（归一化时排除，P4c/后续对齐点）：
- * - `clear` 后 title：宿主重置为新对话，包侧保留原标题；
  * - `switch` 后 turnSettled：宿主根态清零，包侧各 feed 保留各自收尾态。
  */
 
@@ -166,7 +165,7 @@ describe('chat-store-mirror 线程生命周期双跑', () => {
     expect(packageActiveShapes(pkg)).toEqual(hostActiveShapes())
     expect(hostActiveShapes().map((m) => m.text)).toEqual(['第二问'])
 
-    // 6. 清：两侧 active 置空收尾；title 语义差归一化排除（宿主重置，包侧保留）
+    // 6. 清：两侧 active 置空收尾，标题同样重置
     useAcpUiStore.getState().clearMessages()
     mirrorThreadActionToPackageStore(pkg, { kind: 'clear' })
     expect(packageActiveShapes(pkg)).toEqual(hostActiveShapes())
@@ -174,7 +173,7 @@ describe('chat-store-mirror 线程生命周期双跑', () => {
     expect(useAcpUiStore.getState().turnSettled).toBe(false)
     expect(packageActiveTurnSettled(pkg)).toBe(false)
     expect(hostActiveTitle()).toBe('新对话')
-    expect(packageActiveTitle(pkg)).toBe('第二问')
+    expect(packageActiveTitle(pkg)).toBe('新对话')
   })
 
   it('未知线程切换 no-op：不写不抛', () => {

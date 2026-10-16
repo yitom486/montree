@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createChatSessionStore,
+  type ChatSessionSnapshot,
   type ChatSessionStore,
 } from '@montree/chat-session'
 import {
@@ -48,6 +49,62 @@ beforeEach(() => {
 })
 
 describe('chat-store-mirror hostThreadId 路由', () => {
+  it('快照重建后切回历史线程并续聊，线程身份和原有消息不分裂', () => {
+    let saved: ChatSessionSnapshot | null = null
+    const storage = {
+      load: () => saved,
+      save: (snapshot: ChatSessionSnapshot) => { saved = JSON.parse(JSON.stringify(snapshot)) as ChatSessionSnapshot },
+    }
+    const original = createChatSessionStore({ storage })
+    mirrorThreadActionToPackageStore(original, { kind: 'create', threadId: 'host-a', runtimeId: 'codex-acp' })
+    mirrorThreadActionToPackageStore(original, { kind: 'appendUser', text: '甲旧问' }, 'host-a')
+    mirrorSessionUpdateToPackageStore(original, AGENT_CHUNK('甲旧答'), undefined, 'host-a')
+    mirrorThreadActionToPackageStore(original, { kind: 'finish' }, 'host-a')
+    const aId = original.getState().activeThreadId!
+    mirrorThreadActionToPackageStore(original, { kind: 'create', threadId: 'host-b', runtimeId: 'opencode' })
+    mirrorThreadActionToPackageStore(original, { kind: 'appendUser', text: '乙旧问' }, 'host-b')
+
+    resetThreadMirrorForTests()
+    const restored = createChatSessionStore({ storage })
+    const count = restored.getState().threads.length
+    mirrorThreadActionToPackageStore(restored, { kind: 'switch', threadId: 'host-a' })
+    expect(restored.getState().activeThreadId).toBe(aId)
+    expect(restored.getState().modelConfig.runtimeId).toBe('codex-acp')
+    mirrorThreadActionToPackageStore(restored, { kind: 'appendUser', text: '甲续问' }, 'host-a')
+    expect(restored.getState().threads).toHaveLength(count)
+    expect(threadTexts(restored, aId)).toEqual(['甲旧问', '甲旧答', '甲续问'])
+  })
+
+  it('迁入宿主已有历史可修复旧版随机 ID 快照，保留附件和运行时', () => {
+    const legacy = createChatSessionStore()
+    legacy.appendUser('旧影子副本')
+    const attachments = [{ id: 'file-1', kind: 'file' as const, name: 'notes.md', mimeType: 'text/markdown', absolutePath: 'D:/notes.md' }]
+    const messages = [{ id: 'host-message', role: 'user' as const, text: '宿主历史', attachments, createdAt: 1, updatedAt: 1 }]
+    legacy.reconcileHostThreads([
+      { id: 'host-history', runtimeId: 'opencode', title: '宿主历史', feed: { messages, turnSettled: true } },
+    ], 'host-history')
+    const thread = legacy.getState().threads[0]!
+    expect(legacy.getState().threads).toHaveLength(1)
+    expect(thread.hostThreadId).toBe('host-history')
+    expect(thread.feed.messages[0]?.attachments).toEqual(attachments)
+    expect(legacy.getState().modelConfig.runtimeId).toBe('opencode')
+    mirrorThreadActionToPackageStore(legacy, { kind: 'appendUser', text: '续聊', attachments }, 'host-history')
+    expect(legacy.getState().threads).toHaveLength(1)
+    expect(threadTexts(legacy, thread.id)).toEqual(['宿主历史', '续聊'])
+    expect(legacy.getState().threads[0]!.feed.messages[1]?.attachments).toEqual(attachments)
+  })
+
+  it('后台迟到消息只写对应历史，不切换可见线程或其运行时', () => {
+    mirrorThreadActionToPackageStore(pkg, { kind: 'create', threadId: 'visible', runtimeId: 'opencode' })
+    const active = pkg.getState().activeThreadId
+    mirrorSessionUpdateToPackageStore(pkg, AGENT_CHUNK('后台迟到'), undefined, 'background')
+    const background = pkg.getState().threads.find((t) => t.hostThreadId === 'background')!
+    expect(background.feed.messages[0]?.text).toBe('后台迟到')
+    expect(pkg.getState().activeThreadId).toBe(active)
+    expect(pkg.getState().modelConfig.runtimeId).toBe('opencode')
+    expect(threadTexts(pkg, active!)).toEqual([])
+  })
+
   it('reload：带 hostThreadId 事件自动建线程 + 建映射 + 内容落对应线程，switch 回来路由正确', () => {
     const p0 = pkg.getState().activeThreadId!
     expect(pkg.getState().threads).toHaveLength(1)
@@ -57,16 +114,18 @@ describe('chat-store-mirror hostThreadId 路由', () => {
     // A 线程首个增量：包空 + host 未映射 → 自动建线程并落内容
     mirrorSessionUpdateToPackageStore(pkg, AGENT_CHUNK('甲答'), undefined, hostA)
     expect(pkg.getState().threads).toHaveLength(2)
-    const pA = pkg.getState().activeThreadId!
+    const pA = pkg.getState().threads.find((t) => t.hostThreadId === hostA)!.id
     expect(pA).not.toBe(p0)
+    expect(pkg.getState().activeThreadId).toBe(p0)
     expect(threadTexts(pkg, pA).join('')).toContain('甲答')
     expect(threadTexts(pkg, p0)).toEqual([])
 
     // B 线程用户问：同样自动建线程并记映射
     mirrorThreadActionToPackageStore(pkg, { kind: 'appendUser', text: '乙问' }, hostB)
     expect(pkg.getState().threads).toHaveLength(3)
-    const pB = pkg.getState().activeThreadId!
+    const pB = pkg.getState().threads.find((t) => t.hostThreadId === hostB)!.id
     expect(pB).not.toBe(pA)
+    expect(pkg.getState().activeThreadId).toBe(p0)
     expect(threadTexts(pkg, pB).join('')).toContain('乙问')
 
     // 切回 A：经映射路由到 pA，内容保持

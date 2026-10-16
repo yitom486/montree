@@ -255,11 +255,12 @@ describe('ChatPanel (P2a) slots 补齐', () => {
     const container = mountPanel({
       store,
       runtimes: RUNTIMES,
-      renderBusinessResult: () => h('div', { 'data-testid': 'slot-br' }),
+      renderBusinessResult: (_message, opts) => h('div', { 'data-testid': 'slot-br', 'data-thread': opts.threadId }),
     })
     // 富结果走独立入口壳，宿主槽节点挂在入口内
     expect(container.querySelector('[data-acp-probe="result"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="slot-br"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="slot-br"]')?.getAttribute('data-thread')).toBe(store.getState().activeThreadId)
   })
 
   it('component-ui 工具 + onGenerativeSubmit → 结果入口存在（完整卡提交不断言）', () => {
@@ -354,5 +355,38 @@ describe('ChatPanel (P3 追加) onRuntimeChange', () => {
     expect(store.getState().modelConfig.runtimeId).toBe('r2')
     expect(onRuntimeChange).toHaveBeenCalledTimes(1)
     expect(onRuntimeChange).toHaveBeenCalledWith('r2')
+  })
+})
+
+describe('ChatPanel 共享工作记录接线', () => {
+  it('完成后的工作记录可展开计划和工具详情，生成式提交携带当前线程且槽不重复', () => {
+    const store = createChatSessionStore(harness())
+    const threadId = store.getState().activeThreadId!
+    store.appendUser('检查章节')
+    store.ingestPlan([{ content: '阅读章节', status: 'completed' }], false)
+    store.ingestToolCall({ toolCallId: 'work-tool', title: 'read_text_file', status: 'completed', contentText: '章节正文' })
+    store.finishTurn()
+    const submitted = vi.fn()
+    const payload = { resultId: 'work-result', threadId, title: '章节结果', selections: { mode: 'brief' }, displayText: '继续', promptText: '继续分析章节' }
+    const container = mountPanel({
+      store, runtimes: RUNTIMES, onGenerativeSubmit: submitted,
+      renderPlanCard: (message) => h('div', { 'data-testid': 'shared-plan-slot' }, message.text),
+      renderBusinessResult: (_message, opts) => h('button', {
+        'data-testid': 'shared-business-slot',
+        'data-thread': opts.threadId,
+        onClick: () => opts.onGenerativeSubmit?.(payload),
+      }, '继续分析'),
+    })
+    const group = container.querySelector('[data-testid="chat-work-log"]')!
+    const toggle = group.querySelector<HTMLButtonElement>('[data-slot="agent-activity"] > button')!
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    act(() => toggle.click())
+    expect(container.querySelectorAll('[data-testid="shared-plan-slot"]')).toHaveLength(1)
+    act(() => group.querySelector<HTMLButtonElement>('[data-slot="agent-activity-row"] > button')!.click())
+    const slot = container.querySelector<HTMLButtonElement>('[data-testid="shared-business-slot"]')!
+    expect(container.querySelectorAll('[data-testid="shared-business-slot"]')).toHaveLength(1)
+    expect(slot.dataset.thread).toBe(threadId)
+    act(() => slot.click())
+    expect(submitted).toHaveBeenCalledExactlyOnceWith(payload)
   })
 })

@@ -23,6 +23,13 @@ async function chat(page: Page) {
     return { scope, key, state: JSON.parse(localStorage.getItem(key) ?? '{}').state }
   })
 }
+async function packageChat(page: Page) {
+  return page.evaluate(() => {
+    const scope = (window as any).electronAPI.windowScopeId
+    const key = scope === 'main' ? 'montree-chat-session/v1' : `montree-chat-session/v1:${scope}`
+    return { key, snapshot: JSON.parse(localStorage.getItem(key) ?? '{}').snapshot }
+  })
+}
 async function openDocument(page: Page, name: string) {
   await page.getByRole('button', { name: '更多操作', exact: true }).click()
   await page.getByRole('menuitem', { name: /打开文件夹/ }).click()
@@ -99,6 +106,7 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     await observe(first); await observe(second)
     const firstInitial = await chat(first)
     expect(firstInitial.state.activeThreadId).toBe('old-thread')
+    await expect.poll(async () => JSON.stringify((await packageChat(first)).snapshot)).toContain('OLD_WINDOW_HISTORY')
     const secondScope = (await chat(second)).scope
     expect(secondScope).not.toBe(firstInitial.scope)
     await second.getByRole('button', { name: 'AI 伴读', exact: true }).click()
@@ -108,6 +116,9 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     expect(fresh.state?.activeThreadId).not.toBe('old-thread')
     expect(JSON.stringify(fresh.state ?? {})).not.toContain('old-session')
     expect(JSON.stringify(fresh.state ?? {})).not.toContain('OLD_WINDOW_HISTORY')
+    await expect.poll(async () => (await packageChat(second)).snapshot).toBeDefined()
+    expect((await packageChat(second)).key).not.toBe((await packageChat(first)).key)
+    expect(JSON.stringify((await packageChat(second)).snapshot)).not.toContain('OLD_WINDOW_HISTORY')
 
     await openDocument(first, 'first.md'); await openDocument(second, 'second.md')
     const [a, b] = await Promise.all([connect(first, workspace), connect(second, workspace)])
@@ -200,6 +211,9 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     expect(JSON.stringify(afterA.state.threads)).toContain('OLD_WINDOW_HISTORY')
     expect(JSON.stringify(afterA.state.threads)).not.toContain(sidB)
     expect(JSON.stringify(afterB.state.threads)).not.toContain(sidA)
+    const packageA = await packageChat(first), packageB = await packageChat(second)
+    expect(JSON.stringify(packageA.snapshot)).toContain('OLD_WINDOW_HISTORY')
+    expect(JSON.stringify(packageB.snapshot)).not.toContain('OLD_WINDOW_HISTORY')
     await info.attach('window-isolation-transcript', { body: JSON.stringify({ first: await diagnostics(first), second: await diagnostics(second) }, null, 2), contentType: 'application/json' })
 
     // Destroy the owner; another window's live Agent/MCP must remain usable.
@@ -214,6 +228,8 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
     await observe(second)
     expect((await chat(second)).scope).toBe(secondScope)
     expect(JSON.stringify((await chat(second)).state)).not.toContain('OLD_WINDOW_HISTORY')
+    expect(JSON.stringify((await packageChat(second)).snapshot)).not.toContain('OLD_WINDOW_HISTORY')
+    expect(await second.evaluate(() => localStorage.getItem('montree-chat-session/v1'))).toContain('OLD_WINDOW_HISTORY')
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.destroy())).catch(() => {})
     await app.close()

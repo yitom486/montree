@@ -124,8 +124,8 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `annotation-note-prompts` | 批注 AI 意图/改写 chip 与草稿抽取 |
 | `toc-ai-session` | 目录 AI 整理专用副会话（每次新建防跨书串扰、无头累积、不进时间线） |
 | `acp-stream-host` | ACP 流式推送应用级宿主（单订阅单合并器 + 认证清理回调注册表；`acp-transport` 直连等待） |
-| `chat-store-mirror` / `agent/chat-store-mirror-thread.test.ts` + `agent/chat-store-mirror-p4b.test.ts` + `agent/chat-store-mirror-host-routing.test.ts` | P4a+P4b 宿主→包双写对账镜像（`mirrorSessionUpdate/Permission/ConnectionStatusToPackageStore` + `mirrorThreadActionToPackageStore`（建/切/清/问/开场/收尾，host→包 id 映射（按包隔离） + `hostThreadId` 透传（增量/审批 provision 补齐，其余非 provision 回落） + `resetThreadMirrorForTests`）；只加法，持有口见 `chat-session-owner`） |
-| `chat-session-owner` | P4c 包 store 正式持有单例（`getOwnedChatSessionStore` + localStorage 持久化 `ChatStoragePort`，版本校验 + 缺失回落内存） |
+| `chat-store-mirror` / `agent/chat-store-mirror-thread.test.ts` + `agent/chat-store-mirror-p4b.test.ts` + `agent/chat-store-mirror-host-routing.test.ts` + `agent/chat-store-mirror-host-integration.test.ts` | 宿主→包增量与生命周期镜像；线程 hostThreadId 随快照持久化，启动/恢复历史权威迁入，后台补建不切 active；附件完整透传，用户回放只同步清洗后的单线程 feed；覆盖旧快照迁入、重启续聊、运行时切换、删除后新草稿与撕裂脚手架回归（持有口见 chat-session-owner） |
+| `chat-session-owner` / `.test.ts` | P4c 包 store 按窗口持有单例（`getOwnedChatSessionStore` + `registerOwnedChatHostSnapshotProvider` 恢复宿主关联）；localStorage 持久化 `ChatStoragePort`：main 兼容旧键、副窗口独立分区，版本/快照形状校验 + 按键内存回落；共享底层存储的双实例交错流式写入与重启恢复回归 |
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |

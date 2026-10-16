@@ -5,7 +5,57 @@ import {
   type ChatSessionStore,
 } from '@montree/chat-session'
 import type { MarkProposalStatus } from '@montree/annotations'
+import type { AcpMessageAttachment, ChatMessage } from '@montree/chat-core'
+import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
+
+/** 回放清洗只在宿主发生；将清洗后的单线程 feed 对齐，原始脚手架不进包。 */
+export function mirrorHostThreadToPackageStore(
+  pkg: ChatSessionStore,
+  thread: { id: string; runtimeId?: string; title: string; messages: ChatMessage[] },
+  turnSettled: boolean,
+): void {
+  try {
+    pkg.syncHostThread({
+      id: thread.id,
+      hostThreadId: thread.id,
+      runtimeId: thread.runtimeId || DEFAULT_ACP_RUNTIME_ID,
+      title: thread.title,
+      feed: { messages: thread.messages, turnSettled },
+    })
+  } catch (error) {
+    acpDevLog('chat-store-mirror host thread failed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+/** 宿主历史权威迁入：仅启动/恢复和线程生命周期边界调用，增量仍单次转发。 */
+export function mirrorHostSnapshotToPackageStore(
+  pkg: ChatSessionStore,
+  host: {
+    threads: Array<{ id: string; runtimeId?: string; title: string; messages: ChatMessage[] }>
+    activeThreadId: string
+    turnSettled: boolean
+  },
+): void {
+  try {
+    pkg.reconcileHostThreads(host.threads.map((thread) => ({
+      id: thread.id,
+      hostThreadId: thread.id,
+      runtimeId: thread.runtimeId || DEFAULT_ACP_RUNTIME_ID,
+      title: thread.title,
+      feed: {
+        messages: thread.messages,
+        turnSettled: thread.id === host.activeThreadId ? host.turnSettled : false,
+      },
+    })), host.activeThreadId)
+  } catch (error) {
+    acpDevLog('chat-store-mirror host snapshot failed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
 
 /**
  * P4a 宿主→包双写对账镜像（只加法，不切换任何 UI）。
@@ -74,7 +124,7 @@ export function mirrorSessionUpdateToPackageStore(
           pkg.freezeLight(target)
           break
         case 'user-append':
-          pkg.appendUser(event.text, { threadId: target })
+          pkg.appendUser(event.text, { threadId: target, attachments: event.attachments })
           break
         default:
           break
@@ -129,39 +179,17 @@ export function mirrorConnectionStatusToPackageStore(pkg: ChatSessionStore, stat
 }
 
 /**
- * P4b 线程生命周期镜像动作（包 store 否则是空壳：流式增量有 P4a 喂，
- * 但建/切/清/收尾没人调包 store，包侧 active 永远对不上宿主）。
- *
- * - `create`：调包 `newThread(runtimeId)`；宿主与包两侧 id 生成器各自随机，
- *   id 必然分叉，故本模块记 `hostThreadId -> pkgThreadId` 映射，后续 `switch`
- *   按映射翻译；无映射（P4b 前存量线程）回落原文 id，包侧未知即 no-op。
- * - `switch`：经映射调包 `switchThread`。
- * - `clear`：调包 `clearActiveThread`（线程保留只清 feed，对齐宿主“线程保留”部分；
- *   已知差：宿主另把 title 重置为新对话，包侧 title 不动，归一化比对时忽略 title）。
- * - `appendUser`：调包 `appendUser(text)`（active 线程；附件不进镜像，见下）。
- * - `beginReply`：调包 `beginReply()`（active 线程）。
- * - `finish`：调包 `finishTurn()`（prompt 成功语义，无 fallback；对齐宿主
- *   `finishStreaming` 的冻结部分，`prompting` 置 false 留宿主，P4c 才换动作）。
- *
- * 只做纯转发：不读宿主 store、不调 acpApi、不碰 UI；任一调用抛错内部吞掉并记
- * 一行诊断日志，镜像永不阻断主链路（复用 P4a 同一吞错模式）。
- *
- * P4b 扩展（同上只加法）：
- * - `appendSystem/freezeSettled/cancelTools`：直转包同名方法（active 线程）。
- * - `rollbackFailed`：host keepIds 跨 id 空间不可直转，按 lockstep 前缀长度
- *   翻译为包侧 id 再调包 `rollbackFailedTurn`。
- * - `resolveProposal/selectChapterPlan/attachSnapshot`：直转包同名方法
- *  （提议/章计划 id 与快照内容两侧一致，无需翻译）。
- * - `deleteThread/renameThread`：host id 经映射译包 id（无映射回落原文，
- *   包侧未知即 no-op）；删除后清映射。
- * - `switchWorkspace`：先对旧线程 id 调包 `freezeLight`，再按映射路由
- *   `switch`；目标无映射（宿主新建专属线程）则同建并记映射。
+ * 宿主生命周期与用户输入转发到包 store。hostThreadId 随 ChatThread 快照保存，
+ * 重启后可直接解析；历史的首次迁入与旧快照修复由 acp-store 注册的同步口负责。
+ * 只有显式 create/switch/switchWorkspace 改变 active；定向增量不会抢占可见会话。
+ * 用户附件随 user-append 完整透传；宿主消息 id 的回滚锚点按消息前缀长度翻译。
+ * 所有镜像异常仅记录诊断，不阻断宿主主链路。
  */
 export type ThreadMirrorAction =
   | { kind: 'create'; threadId?: string; runtimeId?: string }
   | { kind: 'switch'; threadId: string }
   | { kind: 'clear' }
-  | { kind: 'appendUser'; text: string }
+  | { kind: 'appendUser'; text: string; attachments?: AcpMessageAttachment[] }
   | { kind: 'beginReply' }
   | { kind: 'finish' }
   | { kind: 'appendSystem'; text: string }
@@ -174,20 +202,6 @@ export type ThreadMirrorAction =
   | { kind: 'deleteThread'; threadId: string }
   | { kind: 'renameThread'; threadId: string; title: string }
   | { kind: 'switchWorkspace'; fromThreadId: string; toThreadId: string; runtimeId?: string }
-
-/** 宿主线程 id → 包镜像线程 id（两侧生成器独立，id 分叉是常态；按包 store 隔离，单例自动镜像与单测自备实例互不污染）。 */
-const hostMapsByPackage = new WeakMap<ChatSessionStore, Map<string, string>>()
-const allHostMaps = new Set<Map<string, string>>()
-
-function hostMapFor(pkg: ChatSessionStore): Map<string, string> {
-  let m = hostMapsByPackage.get(pkg)
-  if (!m) {
-    m = new Map<string, string>()
-    hostMapsByPackage.set(pkg, m)
-    allHostMaps.add(m)
-  }
-  return m
-}
 
 /**
  * 解析包侧目标线程（P4b reload 空洞修复）：
@@ -204,25 +218,16 @@ function resolvePackageThreadId(
 ): string | undefined {
   const state = pkg.getState()
   if (hostThreadId) {
-    const hostMap = hostMapFor(pkg)
-    const mapped = hostMap.get(hostThreadId)
-    if (mapped && state.threads.some((t) => t.id === mapped)) return mapped
-    if (state.threads.some((t) => t.id === hostThreadId)) {
-      hostMap.set(hostThreadId, hostThreadId)
-      return hostThreadId
-    }
+    const existing = state.threads.find((t) => t.hostThreadId === hostThreadId || t.id === hostThreadId)
+    if (existing) return existing.id
     if (!provision) return undefined
-    const created = pkg.newThread(runtimeId)
-    hostMap.set(hostThreadId, created)
-    return created
+    return pkg.ensureHostThread(hostThreadId, runtimeId)
   }
   return state.activeThreadId ?? undefined
 }
 
-/** 仅单测用：清掉线程 id 映射（包 store 本体由调用方自备 fresh 实例）。 */
-export function resetThreadMirrorForTests(): void {
-  for (const m of allHostMaps) m.clear()
-}
+/** 兼容旧测试入口；关联已保存在各线程快照中，无模块内全局状态。 */
+export function resetThreadMirrorForTests(): void {}
 
 export function mirrorThreadActionToPackageStore(
   pkg: ChatSessionStore,
@@ -232,20 +237,13 @@ export function mirrorThreadActionToPackageStore(
   try {
     switch (action.kind) {
       case 'create': {
-        const hostMap = hostMapFor(pkg)
-        const packageThreadId = pkg.newThread(action.runtimeId)
-        if (action.threadId) hostMap.set(action.threadId, packageThreadId)
-        // 宿主修剪空白草稿/40 上限会丢线程，映射同步收敛防无限增长
-        if (hostMap.size > 80) {
-          const alive = new Set(pkg.getState().threads.map((t) => t.id))
-          for (const [hostId, pkgId] of hostMap) {
-            if (!alive.has(pkgId)) hostMap.delete(hostId)
-          }
-        }
+        if (action.threadId) pkg.ensureHostThread(action.threadId, action.runtimeId, true)
+        else pkg.newThread(action.runtimeId)
         break
       }
       case 'switch': {
-        pkg.switchThread(hostMapFor(pkg).get(action.threadId) ?? action.threadId)
+        const target = resolvePackageThreadId(pkg, action.threadId)
+        if (target) pkg.switchThread(target)
         break
       }
       case 'clear': {
@@ -261,7 +259,7 @@ export function mirrorThreadActionToPackageStore(
       case 'appendUser': {
         const target = resolvePackageThreadId(pkg, hostThreadId, undefined, true)
         if (!target) return
-        pkg.appendUser(action.text, { threadId: target })
+        pkg.appendUser(action.text, { threadId: target, attachments: action.attachments })
         break
       }
       case 'beginReply': {
@@ -330,11 +328,6 @@ export function mirrorThreadActionToPackageStore(
         const pkgId = resolvePackageThreadId(pkg, hostId)
         if (!pkgId) return
         pkg.deleteThread(pkgId)
-        const hostMap = hostMapFor(pkg)
-        hostMap.delete(action.threadId)
-        if (hostThreadId && hostThreadId !== action.threadId) {
-          hostMap.delete(hostThreadId)
-        }
         break
       }
       case 'renameThread': {
@@ -347,25 +340,9 @@ export function mirrorThreadActionToPackageStore(
       case 'switchWorkspace': {
         // 宿主切工作区先轻冻旧 active 再路由新 active（见 chat-slice switchWorkspace）；
         // 包侧 switchThread 本就轻冻旧线程，此处显式 freezeLight 只是幂等对齐。
-        const hostMap = hostMapFor(pkg)
-        pkg.freezeLight(hostMap.get(action.fromThreadId) ?? action.fromThreadId)
-        const mapped = hostMap.get(action.toThreadId)
-        const alive = new Set(pkg.getState().threads.map((t) => t.id))
-        if (mapped && alive.has(mapped)) {
-          pkg.switchThread(mapped)
-        } else if (alive.has(action.toThreadId)) {
-          pkg.switchThread(action.toThreadId)
-        } else {
-          // 目标为宿主新建专属线程：包侧同建并记映射（同 create 分支）。
-          const packageThreadId = pkg.newThread(action.runtimeId)
-          hostMap.set(action.toThreadId, packageThreadId)
-          if (hostMap.size > 80) {
-            const alive = new Set(pkg.getState().threads.map((t) => t.id))
-            for (const [hostId, pkgId] of hostMap) {
-              if (!alive.has(pkgId)) hostMap.delete(hostId)
-            }
-          }
-        }
+        const from = resolvePackageThreadId(pkg, action.fromThreadId)
+        if (from) pkg.freezeLight(from)
+        pkg.ensureHostThread(action.toThreadId, action.runtimeId, true)
         break
       }
     }

@@ -23,7 +23,8 @@ import {
 } from '@montree/chat-core'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
-import { mirrorThreadActionToPackageStore } from '@/lib/agent/chat-store-mirror'
+import { mirrorHostSnapshotToPackageStore, mirrorHostThreadToPackageStore, mirrorThreadActionToPackageStore } from '@/lib/agent/chat-store-mirror'
+import type { ChatSessionStore } from '@montree/chat-session'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import {
   hasReplayScaffoldingMarkers,
@@ -85,6 +86,11 @@ function freezeLightMessages(
 ): AcpChatMessage[] {
   return applyChatEvent({ messages, turnSettled }, { type: 'freeze-light' }, { createId: newId })
     .messages
+}
+
+function mirrorCanonicalActiveThread(pkg: ChatSessionStore, host: AcpUiStore): void {
+  const thread = host.threads.find((t) => t.id === host.activeThreadId)
+  if (thread) mirrorHostThreadToPackageStore(pkg, thread, host.turnSettled)
 }
 
 export interface ChatScrollState {
@@ -221,6 +227,7 @@ export const createChatSlice: StateCreator<
   setHistoryOpen: (open) => set({ historyOpen: open }),
 
   appendUserMessage: (text, attachments) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       // 本地新输入 supersede 未落定的回放悬垂（load 半截时用户直接说话）
@@ -242,13 +249,14 @@ export const createChatSlice: StateCreator<
     }))
     // P4b 线程镜像：同一输入再喂包 store（只加法，吞错在 mirror 内）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
-      { kind: 'appendUser', text },
+      pkg,
+      { kind: 'appendUser', text, attachments },
       get().activeThreadId,
     )
   },
 
   appendSystemMessage: (text) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) =>
       patchActiveThread(s, (t) => {
         const feed = applyChatEvent(
@@ -261,13 +269,14 @@ export const createChatSlice: StateCreator<
     )
     // P4b 镜像：同一系统消息再喂包 store（只加法，吞错在 mirror 内）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       { kind: 'appendSystem', text },
       get().activeThreadId,
     )
   },
 
   beginAgentReply: () => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       const patched = patchActiveThread(s, (t) => {
         const feed = applyChatEvent(
@@ -282,10 +291,11 @@ export const createChatSlice: StateCreator<
       return { ...patched, turnSettled: false }
     })
     // P4b 线程镜像：同一开场再喂包 store（只加法，吞错在 mirror 内）
-    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'beginReply' }, get().activeThreadId)
+    mirrorThreadActionToPackageStore(pkg, { kind: 'beginReply' }, get().activeThreadId)
   },
 
   clearMessages: () => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       pendingReplayUserText: null,
@@ -298,10 +308,11 @@ export const createChatSlice: StateCreator<
       })),
     }))
     // P4b 线程镜像：同一清空再喂包 store（只加法，吞错在 mirror 内）
-    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'clear' }, get().activeThreadId)
+    mirrorThreadActionToPackageStore(pkg, { kind: 'clear' }, get().activeThreadId)
   },
 
   finishStreaming: () => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       const proposalFallback = collectStoreFallbackProposal()
       return {
@@ -318,12 +329,13 @@ export const createChatSlice: StateCreator<
       }
     })
     // P4b 线程镜像：同回合收尾再喂包 store（prompt 成功语义即 finishTurn 无 fallback；只加法）
-    mirrorThreadActionToPackageStore(getOwnedChatSessionStore(), { kind: 'finish' }, get().activeThreadId)
+    mirrorThreadActionToPackageStore(pkg, { kind: 'finish' }, get().activeThreadId)
   },
 
   // 定居收尾：复用 finishStreaming 的冻结语义，但不碰 prompting。
   // load 恢复时 prompting 本就 false（断言式保持：prompt 回合的收尾仍走 finishStreaming）。
   freezeSettledStreaming: () => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       const proposalFallback = collectStoreFallbackProposal()
       return {
@@ -339,13 +351,14 @@ export const createChatSlice: StateCreator<
     })
     // P4b 镜像：同一定居冻结再喂包 store（只加法，吞错在 mirror 内）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       { kind: 'freezeSettled' },
       get().activeThreadId,
     )
   },
 
   cancelActiveTools: () => {
+    const pkg = getOwnedChatSessionStore()
     set((s) =>
       patchActiveThread(s, (t) => {
         const feed = applyChatEvent(
@@ -368,13 +381,14 @@ export const createChatSlice: StateCreator<
     )
     // P4b 镜像：同一取消再喂包 store（只加法，吞错在 mirror 内）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       { kind: 'cancelTools' },
       get().activeThreadId,
     )
   },
 
   rollbackFailedTurn: (keepIds) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) =>
       patchActiveThread(s, (t) => {
         const feed = applyChatEvent(
@@ -388,13 +402,14 @@ export const createChatSlice: StateCreator<
     )
     // P4b 镜像：同一回滚再喂包 store（host keepIds 跨 id 空间由 mirror 内翻译；只加法）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       { kind: 'rollbackFailed', keepIds },
       get().activeThreadId,
     )
   },
 
   attachMarkProposalsFromSnapshot: (content) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       let remaining = [...s.pendingMarkProposalSnapshotContents, content]
       let attachedCount = 0
@@ -423,13 +438,14 @@ export const createChatSlice: StateCreator<
     })
     // P4b 镜像：同一快照再喂包 store（包内迷你队列同语义；只加法，吞错在 mirror 内）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       { kind: 'attachSnapshot', content },
       get().activeThreadId,
     )
   },
 
   resolveMarkProposal: (proposalId, status) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) =>
       patchActiveThread(s, (t) => ({
         ...t,
@@ -439,7 +455,7 @@ export const createChatSlice: StateCreator<
     )
     // P4b 镜像：同一决议再喂包 store（提议 id 两侧一致；只加法）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       {
         kind: 'resolveProposal',
         proposalId,
@@ -450,6 +466,7 @@ export const createChatSlice: StateCreator<
   },
 
   selectChapterMarkPlan: (entryId) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) =>
       patchActiveThread(s, (t) => ({
         ...t,
@@ -459,7 +476,7 @@ export const createChatSlice: StateCreator<
     )
     // P4b 镜像：同一选章再喂包 store（条目 id 两侧一致；只加法）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       {
         kind: 'selectChapterPlan',
         entryId,
@@ -469,6 +486,7 @@ export const createChatSlice: StateCreator<
   },
 
   createThread: (workspaceRoot, runtimeId) => {
+    const pkg = getOwnedChatSessionStore()
     const ws =
       workspaceRoot === null
         ? undefined
@@ -504,20 +522,13 @@ export const createChatSlice: StateCreator<
           : {}),
       }
     })
-    // P4b 线程镜像：同一新建再喂包 store（带宿主新线程 id 建映射，包侧 id 分叉由 mirror 内翻译；只加法）
-    mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
-      {
-        kind: 'create',
-        threadId: thread.id,
-        runtimeId: rId,
-      },
-      thread.id,
-    )
+    // 生命周期边界同步完整线程表，包含宿主的空草稿修剪与历史上限。
+    mirrorHostSnapshotToPackageStore(pkg, get())
     return thread.id
   },
 
   switchWorkspace: (workspaceRoot) => {
+    const pkg = getOwnedChatSessionStore()
     const s = get()
     const targetWs = workspaceRoot?.trim() || undefined
     const currentThread = s.threads.find((t) => t.id === s.activeThreadId)
@@ -573,24 +584,14 @@ export const createChatSlice: StateCreator<
       pendingReplayUserText: null,
       pendingPermission: null,
     })
-    // P4b 镜像：同一工作区切换再喂包 store（旧线程 id 取入口快照 s.activeThreadId，
-    // 结果 active 取 targetThreadId；旧线程 freezeLight + 新线程 switch/同建由 mirror 内路由；只加法）
-    mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
-      {
-        kind: 'switchWorkspace',
-        fromThreadId: s.activeThreadId,
-        toThreadId: targetThreadId,
-        runtimeId: currentRuntimeId,
-      },
-      targetThreadId,
-    )
+    mirrorHostSnapshotToPackageStore(pkg, get())
 
     return targetThreadId
   },
 
 
   switchThread: (threadId) => {
+    const pkg = getOwnedChatSessionStore()
     const s = get()
     if (threadId === s.activeThreadId) return
     if (s.prompting) return
@@ -622,15 +623,11 @@ export const createChatSlice: StateCreator<
         ? { configOptions: [], promptCapabilities: {}, pendingPermission: null }
         : {}),
     })
-    // P4b 线程镜像：同一切换再喂包 store（host→包 id 经 mirror 内映射翻译；只加法）
-    mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
-      { kind: 'switch', threadId },
-      threadId,
-    )
+    mirrorHostSnapshotToPackageStore(pkg, get())
   },
 
   deleteThread: (threadId) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => {
       let threads = s.threads.filter((t) => t.id !== threadId)
       const chatScrollByThread = { ...s.chatScrollByThread }
@@ -653,15 +650,12 @@ export const createChatSlice: StateCreator<
         s.activeThreadId === threadId ? runtimeThreads[0]!.id : s.activeThreadId
       return { threads, activeThreadId, prompting: false, chatScrollByThread }
     })
-    // P4b 镜像：同一删除再喂包 store（host→包 id 经 mirror 内映射翻译并清映射；只加法）
-    mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
-      { kind: 'deleteThread', threadId },
-      threadId,
-    )
+    // 宿主可能为当前运行时补建新草稿，按实际结果同步其稳定身份。
+    mirrorHostSnapshotToPackageStore(pkg, get())
   },
 
   renameThread: (threadId, title) => {
+    const pkg = getOwnedChatSessionStore()
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId
@@ -671,7 +665,7 @@ export const createChatSlice: StateCreator<
     }))
     // P4b 镜像：同一重命名再喂包 store（host→包 id 经 mirror 内映射翻译；只加法）
     mirrorThreadActionToPackageStore(
-      getOwnedChatSessionStore(),
+      pkg,
       {
         kind: 'renameThread',
         threadId,
@@ -682,6 +676,7 @@ export const createChatSlice: StateCreator<
   },
 
   applySessionUpdate: (update) => {
+    const pkg = getOwnedChatSessionStore()
     const kind =
       typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
 
@@ -695,6 +690,7 @@ export const createChatSlice: StateCreator<
           pendingReplayUserText: null,
           ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
         }))
+        mirrorCanonicalActiveThread(pkg, get())
       } else if (pending) {
         set({ pendingReplayUserText: null })
       }
@@ -846,6 +842,7 @@ export const createChatSlice: StateCreator<
           pendingReplayUserText: null,
           ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
         }))
+        mirrorCanonicalActiveThread(pkg, get())
       } else if (pending) {
         set({ pendingReplayUserText: null })
       }
@@ -862,5 +859,6 @@ export const createChatSlice: StateCreator<
         return { ...t, messages: feed.messages, updatedAt: Date.now() }
       }),
     }))
+    if (role === 'user') mirrorCanonicalActiveThread(pkg, get())
   },
 })
