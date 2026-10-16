@@ -20,6 +20,7 @@ import {
   parseAcpPlanEntries,
   summarizePlanProgress,
   type ChatFeedToolCall,
+  parseToolCallMetadata,
 } from '@montree/chat-core'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
@@ -69,6 +70,7 @@ function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | 
   const toolCallId = toolCallIdFromUpdate(update)
   if (!toolCallId) return undefined
   const call: ChatFeedToolCall = { toolCallId }
+  Object.assign(call, parseToolCallMetadata(update))
   if (typeof update.title === 'string') call.title = update.title
   if (typeof update.kind === 'string') call.kind = update.kind
   if (typeof update.status === 'string') call.status = update.status

@@ -137,6 +137,7 @@
 - **M0 脚手架**（本分支已做）：两包 `package.json/README/src/index.ts` + `workspaceAlias` + R3 白名单，各门禁绿。
 - **M1 core 搬运**：按 `chat-core/README.md` 表逐文件迁入（含 `.test.ts`），宿主改 import 源；`acp-chat-types.ts` 拆纯部时把 `@montree/annotations` 引用降为 contracts 类型（开放项，见 §4）。
 - **M2 headless** ✅ 已完成并验收（2026-10-16）：`useRevealText` 整搬入 `chat-ui/headless`（hash 一致，唯一调用方 Bubble 换源）；新建 `useChatTimeline` / `useToolDisplay`（core 函数的 useMemo 包裹 + deep-equal 对照测试）；`chat-ui` 加 react peerDeps；补记 M0 遗漏：`tsconfig.web.json` 收录两新包 paths+include（此前未引用到的新文件游离于 typecheck 之外，现补齐后全绿）。验收：chat-ui 3 文件 + Bubble 共 18 用例；lint:deps 0；typecheck 0。未 commit。
+  - 后续更新：聊天文字已统一为 Streamdown 原生动画；M2 当时迁入的旧打字机 Hook、导出与专用测试已删除，上述记录仅描述迁移历史。
 - **M3 ui 搬运**：先 `AgentMarkdown → ChatMarkdown`（主题/URL 策略 props 化），再气泡件（Bui/Beui 系列、`ToolCallCard`、`WorkLog`），最后 present 四件套（`ComponentUiCard`、`ReactArtifactCard`、`ArtifactFrame`，安全语义原样带走，编译器留主进程）。
 - **M4 宿主 adapter**：`acpChatToChatMessage()` + 薄接线层；E2E 留宿主验证行为不变。
 - **M5 门禁**：`typecheck / test / build / test:e2e + lint:docs / lint:deps / check:bundle` 全绿；首屏预算不放宽，UI 入口懒加载。

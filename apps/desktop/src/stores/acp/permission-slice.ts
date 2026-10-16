@@ -48,6 +48,8 @@ export const createPermissionSlice: StateCreator<
     }
     if ('content' in toolCall) update.content = toolCall.content
     if ('locations' in toolCall) update.locations = toolCall.locations
+    if ('name' in toolCall) update.name = toolCall.name
+    if ('rawInput' in toolCall) update.rawInput = toolCall.rawInput
     get().applySessionUpdate(update)
   },
 })

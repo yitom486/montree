@@ -33,6 +33,8 @@ export interface ChatMessage {
   toolKind?: AcpToolCallKind | string
   toolStatus?: AcpToolCallStatus | string
   toolTitle?: string
+  toolName?: string
+  toolInputSummary?: import('./tool-call-metadata').ToolInputSummary
   toolContentText?: string
   toolDiffs?: ChatToolDiff[]
   toolLocations?: Array<{ path: string; line?: number }>

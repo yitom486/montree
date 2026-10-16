@@ -13,6 +13,7 @@
 | `chat-message.ts` | `apps/desktop/src/stores/acp-chat-types.ts` 纯部 | `ChatMessage` 显示模型 + `extract/flatten/parse` 纯函数；store/annotations 引用在迁入时剪掉 |
 | `chat-timeline.ts` | `apps/desktop/src/lib/agent/chat-timeline.ts` | 回合分组、`ChatTimelineItem = message \| work-log`，只读输入 |
 | `tool-display-model.ts` | `apps/desktop/src/lib/agent/tool-display-model.ts` | `ToolDisplayModel`（7 终态 × 11 resultKind），渲染只认它 |
+| `tool-call-metadata.ts` + `.test.ts` | ACP 工具展示适配 | 提取真实工具名与有界参数摘要，兼容 MCP 包装参数；不保存完整输入 |
 | `tool-failure-message.ts` | `apps/desktop/src/lib/agent/tool-failure-message.ts` | 失败摘要纯文案 |
 | `url-policy.ts` | `apps/desktop/src/lib/agent/streamdown-url-policy.ts` | Markdown 链接白名单 |
 | `markdown-plugins.ts` | `apps/desktop/src/components/markdown/agent-markdown-plugins.ts` | remark/rehype 微插件 |
@@ -29,6 +30,8 @@
 | `message-parts.ts` ✅ | E2 新建（无宿主来源，对照 `chat-ui/agent-message-bubble.tsx` 分支条件） | `MessagePart` 9 变体 + `splitMessage()` 零件级拆分；顺序 = 宿主渲染顺序，steps 独立成 part |
 
 呈现契约（四种 `montree_present` kind、白名单校验）不复制，直接依赖 `@montree/contracts`。
+
+工具展示使用真实 `name` 与有界输入摘要（标题、图形类型、路径等）；agy 的通用 MCP 包装先解开再展示，稀疏完成更新保留原摘要。思考正文仅来自实际 thought 事件，进入新工具或正文阶段时结束上一段思考的 streaming；usage 中的思考 token 数不冒充思考正文。
 
 ## 门禁
 

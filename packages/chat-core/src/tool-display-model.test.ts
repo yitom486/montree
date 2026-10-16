@@ -162,6 +162,17 @@ describe('classifyToolResultKind', () => {
 })
 
 describe('toToolDisplayModel', () => {
+  it('通用 MCP 标题使用真实工具名、图形类型与主题，缺失时不猜测', () => {
+    expect(toToolDisplayModel(tool({ toolTitle: 'Call Mcp Tool', toolName: 'montree_present',
+      toolInputSummary: { kind: 'preset', preset: 'diagram', diagramType: 'sequence', title: '登录过程' },
+    }))).toMatchObject({ title: '绘制时序图', targetSummary: '登录过程', activityLabel: '正在绘制时序图：登录过程' })
+    expect(toToolDisplayModel(tool({ toolTitle: 'Call Mcp Tool' }))).toMatchObject({ title: '工具调用', targetSummary: null })
+    expect(toToolDisplayModel(tool({ toolTitle: 'Call Mcp Tool', toolName: 'montree_read' })).title).toBe('读取文档')
+    expect(toToolDisplayModel(tool({ toolTitle: 'Montree Read', toolName: 'montree_read' })).title).toBe('读取文档')
+    expect(toToolDisplayModel(tool({ toolTitle: 'Call Mcp Tool', toolName: 'montree_diagram_guide',
+      toolInputSummary: { diagramType: 'sequence' },
+    })).title).not.toContain('绘制')
+  })
   it('失败携带业务解释，成功不带错误', () => {
     const failed = toToolDisplayModel(
       tool({ toolStatus: 'failed', toolContentText: '未知工具 xxx' }),

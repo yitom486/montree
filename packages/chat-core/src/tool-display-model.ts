@@ -1,6 +1,7 @@
 import type { ChatMessage } from './chat-message'
 import { explainToolFailure } from './tool-failure-message'
 import { isPresentToolTitle } from './parse-present-result'
+import { isGenericToolName } from './tool-call-metadata'
 
 /**
  * 工具调用纯展示模型（R1）。
@@ -35,8 +36,9 @@ export interface ToolDisplayModel {
   toolCallId?: string
   /** 中文能力标题（未知工具保留原名） */
   title: string
+  activityLabel: string
   rawTitle: string
-  /** 仅来自 toolDiffs / toolLocations 的目标摘要；无元数据时为 null，不编造 */
+  /** 来自工具输入或文件位置的目标摘要；无元数据时为 null。 */
   targetSummary: string | null
   state: ToolDisplayState
   stateLabel: string
@@ -57,6 +59,11 @@ const STATE_LABEL: Record<ToolDisplayState, string> = {
   cancelled: '已取消',
   unknown: '状态未知',
 }
+
+const DIAGRAM_NAMES = new Map([
+  ['flowchart', '流程图'], ['sequence', '时序图'], ['architecture', '架构图'], ['mindmap', '思维导图'],
+  ['swimlane', '泳道图'], ['timeline', '时间线'], ['fishbone', '鱼骨图'], ['cycle', '循环图'], ['er', '实体关系图'],
+])
 
 export function toolStateLabel(state: ToolDisplayState): string {
   return STATE_LABEL[state]
@@ -103,6 +110,7 @@ const TITLE_RULES: Array<{ test: RegExp; title: string }> = [
 export function readableToolTitle(rawTitle?: string): string {
   const raw = (rawTitle ?? '').trim()
   if (!raw) return '工具调用'
+  if (isGenericToolName(raw)) return '工具调用'
   for (const rule of TITLE_RULES) {
     if (rule.test.test(raw)) return rule.title
   }
@@ -115,14 +123,18 @@ function basename(path: string): string {
 }
 
 export function summarizeToolTarget(
-  message: Pick<ChatMessage, 'toolDiffs' | 'toolLocations'>,
+  message: Pick<ChatMessage, 'toolDiffs' | 'toolLocations' | 'toolInputSummary'>,
 ): string | null {
+  const input = message.toolInputSummary
+  if (input?.title) return input.title
   const diffs = message.toolDiffs ?? []
   const locations = message.toolLocations ?? []
   if (diffs.length === 1) return basename(diffs[0]!.path)
   if (locations.length === 1) return basename(locations[0]!.path)
   if (diffs.length > 1) return `${diffs.length} 个文件`
   if (locations.length > 1) return `${locations.length} 个文件`
+  if (input?.path) return basename(input.path)
+  if (input?.query) return input.query
   return null
 }
 
@@ -193,6 +205,14 @@ export function toToolDisplayModel(
     : null
   const resultKind = classifyToolResultKind(message)
   const targetSummary = summarizeToolTarget(message)
+  const name = message.toolName || rawTitle
+  const input = message.toolInputSummary
+  const diagram = /(?:^|[.:]|__)montree_generate_diagram$/i.test(name) ||
+    (isPresentToolTitle(name) && input?.kind === 'preset' && input.preset === 'diagram')
+  const namedTitle = readableToolTitle(name)
+  const title = diagram ? `绘制${DIAGRAM_NAMES.get(input?.diagramType ?? '') ?? '图表'}`
+    : namedTitle !== name ? namedTitle : readableToolTitle(rawTitle || name)
+  const action = diagram ? `正在${title}` : `正在调用${title}`
   const hasTextDetail = Boolean(
     detail && detail !== message.toolTitle && (message.toolDiffs ?? []).length === 0,
   )
@@ -205,7 +225,8 @@ export function toToolDisplayModel(
   return {
     messageId: message.id,
     toolCallId: message.toolCallId,
-    title: readableToolTitle(rawTitle),
+    title,
+    activityLabel: `${action}${targetSummary ? `：${targetSummary}` : ''}`,
     rawTitle: rawTitle || '工具调用',
     targetSummary,
     state,

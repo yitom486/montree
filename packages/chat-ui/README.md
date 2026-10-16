@@ -36,8 +36,7 @@
 - `ui/dialog.tsx`（私有，不进 barrel）：宿主 `components/ui/dialog` 的包内复刻（`cn` 改包内，另改引包内 `./button`；仅供本批 present 卡使用）。
 - `ui/tool-shell.tsx` / `ui/agent-diff-preview.tsx` / `ui/propose-mark-card.tsx` / `ui/business-result-guard.ts`（私有，不进 barrel）：宿主 `ai-elements/tool`、`tools/AgentDiffPreview`、`propose/ProposeMarkCard`（去 store/toast 改回调）、`tools/ToolBusinessResult` 纯守卫（`hasBusinessResult/isUnparsablePresentResult` + 5 解析）的包内复刻（`cn/Button` 改包内，类型改 `chat-core`/`annotations`/`contracts`；仅供本批工具卡/气泡使用）。
 - `ui/message-shell.tsx` / `ui/button.tsx` / `ui/layout-probe.ts` / `ui/dev-log.ts`（私有，不进 barrel）：宿主 `ai-elements/message`、`ui/button`、`lib/agent/acp-layout-probe`、`lib/agent/acp-dev-log` 的包内复刻（`cn` 改包内；`message-shell` 另以 `from` 内联联合替代 `ai` 类型导入）。宿主 `AgentActivityGroup` 仅保留 store 读取与业务回调适配，折叠与渲染统一交给包内 `ChatActivityGroup`。
-- `headless/use-reveal-text.ts`：`useRevealText` 流式打字机揭示（自 `apps/desktop/src/hooks/agent/useRevealText` 整搬，行为不变）。
-- `headless/`：`useRevealText`、`useChatTimeline`、`useToolDisplay`（`useInlinePresent` 不存在，内联引用派生用 core 的 `planInlinePresent`/`splitInlinePresent`）——只返回“渲染什么”。
+- `headless/`：`useChatTimeline`、`useToolDisplay`（内联引用派生用 core 的 `planInlinePresent`/`splitInlinePresent`）——只返回“渲染什么”。文字显现统一由 Streamdown 原生动画负责。
 - `ui/` 默认组件（决定“长什么样”，均经 barrel 导出；替换粒度见“无头/自定义”一节）：`ChatMarkdown`、`ChatMessageBubble`、`ChatActivityGroup`、工具卡（`AgentToolCallCard`/`AgentResultEntry`/`DiagramViewerCard`/比较/审计/推荐卡）、审批（`AgentPermissionCard` + `ToolApprovalSlot`）、present 四件套（`ChapterComparisonCard`/`ComponentUiCard`/`ReactArtifactCard`/`HtmlArtifactCard` + 共享 `ArtifactFrame`）、提议块。`AgentMessageList`（列表容器）与业务适配留宿主。
 - 回调（包内不调 `sendPrompt`，交互经回调回宿主再进 ACP；签名见“回调表”一节）：`resolveMarkProposal`、`pendingPermission`、`onDismissProposedMark`、`onPermissionRespond`、`onRespond`、`onCompile`、`onExport`、`onSubmit`、`onLocate`、`renderMermaid`、`renderBusinessResult`、`renderPlanCard`、`onEditMessage`。`onQuote` 等引用类能力目前仅宿主侧（随 `AgentMessageList` 留宿主）。
 
@@ -104,10 +103,9 @@ Tailwind（M4 教训，必须做）：Tailwind v4 自动扫描只覆盖渲染根
 | `presentResult`（contracts 的 `MontreePresentResult`） | `montree_present` 四 kind，由 enrich 挂载，卡片分发只认它 |
 | `steps[]`（`{ num, title, desc, anchorId? }`） | 交互经纬流转分步卡，锚点穿透为包内 DOM 行为，不经回调 |
 
-第二步：`useChatTimeline` 分组 + `useRevealText` 打字机 + `useToolDisplay` 状态（定义分别在 `use-chat-timeline.ts`、`use-reveal-text.ts`、`use-tool-display.ts`，均为 core 纯函数的 `useMemo` 包裹，不读 store）：
+第二步：`useChatTimeline` 分组 + `useToolDisplay` 状态；默认气泡把原文直接交给 Streamdown 的原生动画，不叠加截字队列。headless Hook 均不读 store：
 
 - `useChatTimeline(messages, { pendingToolCallId?, visibleIds?, scopeKey?, nowMs? })`：按真实 user 边界切回合，同一回合普通过程合并为一条 `work-log`（含 `toolCallCount` / `hiddenToolCallCount` / `completedCount` / `lastEvent` / 计数与 `durationLabel`）；待审批、失败、未去重提议、富结果各自提升为单条 `message`；输出 `ChatTimelineItem`（`{ kind: 'message' } | { kind: 'work-log' }`）。
-- `useRevealText(source, streaming, opts?)`：只做文本切片（drainMs 内排空 backlog、自适应步长、`prefers-reduced-motion` 直接落定、改写从空起播），下游保持单个 Streamdown 实例。
 - `useToolDisplay(message, { needsApproval? })`：返回 `ToolDisplayModel`（7 终态 × 11 resultKind，见功能清单），审批优先于一切普通状态。
 
 第三步：按 timeline 渲染与回调回宿主再进 ACP。文本/用户/思考走 `ChatMessageBubble`，`work-log` 走 `ChatActivityGroup`，富业务走 `AgentResultEntry` / 各 present 卡，正文走 `ChatMarkdown`。回调表（概念名 → 实际签名，去向为包模块文件名）：
@@ -170,10 +168,9 @@ function ChatView({ messages, theme }: { messages: ChatMessage[]; theme: ChatMar
 
 凡盘点标 stays 的一律写“宿主侧”，包内不虚构。
 
-- headless（`use-reveal-text.ts`）：流式打字机揭示；能力：按流逝时间匀速切片原文；关键语义：只切片不解析，下游单 Streamdown 实例语义不变，reduced-motion 直接落定。
 - headless（`use-chat-timeline.ts`）：回合分组；能力：user 边界切回合、普通过程并入 `work-log`、审批/失败/富结果提升单条；关键语义：输入只读、key 按作用域加回合稳定、计数含窗口外。
 - headless（`use-tool-display.ts`）：工具展示映射；能力：单条消息映射 `ToolDisplayModel`；关键语义：审批优先，落定残留未知不推断成功。
-- 富文本（`chat-markdown.tsx`）：Streamdown 单实例渲染；能力：code、mermaid、math（KaTeX）、cjk、GFM、breaks、footnote、alert、mark/sub/sup 微插件；关键语义：静态配置模块级提升保块 memo，mermaid 主题随 `theme` 翻转重绘。
+- 富文本（`chat-markdown.tsx`）：Streamdown 单实例渲染；原生字符 `fadeIn`（150ms、字符间隔 8ms、排队上限 320ms），无额外块淡入或截字队列；代码/图表/公式不拆字，完成态无动画包装，减少动态效果沿宿主 CSS 生效。其余 code、mermaid、math、cjk、GFM、脚注与微插件保留；静态配置模块级提升保块 memo，mermaid 主题随 `theme` 翻转重绘。
 - 富文本消毒（`chat-markdown.tsx` 加 core 的 `markdown-plugins.ts`、`url-policy.ts`）：链接白名单加消毒表；能力：`sanitizeAgentUrl` 统一清洗链接与图片源，裸 script/iframe 剥离，details/summary/kbd 放行；关键语义：raw 先转元素再按表剥离，货币美元符号转义先于 LaTeX 规范。
 - 富文本轻入口（`chat-markdown.lazy.tsx`）：`ChatMarkdownLazy` 加 `ChatMarkdownFallback`；关键语义：经子路径静态引用、`React.lazy` 分块，不进首屏。
 - 气泡壳（`BuiMessage.tsx`、`AgentChatItem.tsx`）：用户右气泡、助手轻表面、系统居中三件套；关键语义：纯展示壳，`streaming` 只换外衣不换结构。

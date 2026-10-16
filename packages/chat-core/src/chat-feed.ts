@@ -7,6 +7,7 @@ import { enrichAcpToolMessage } from './enrich-tool-message'
 import { promoteChapterMarkPlansToLastAgent } from './chapter-mark-plans'
 import { promoteMarkProposalsToLastAgent } from './mark-promotion'
 import { pruneIntermediateAgentReplies } from './prune-agent-replies'
+import { isGenericToolName } from './tool-call-metadata'
 
 /**
  * 聊天事件归约器（E1）：ACP 事件流 → ChatMessage 的纯状态机。
@@ -38,6 +39,8 @@ export interface ChatFeedCtx {
 export interface ChatFeedToolCall {
   toolCallId: string
   title?: string
+  name?: string
+  inputSummary?: import('./tool-call-metadata').ToolInputSummary
   kind?: string
   status?: string
   /** 提供即替换（宿主 `toolUpdateContentText` 已算好；缺省沿用旧值） */
@@ -150,7 +153,8 @@ export function applyChatEvent(
     case 'text-chunk': {
       if (!event.text) return state
       const { role } = event
-      const messages = [...state.messages]
+      const messages = state.messages.map(m => role !== 'thought' && m.role === 'thought' && m.streaming
+        ? { ...m, streaming: false, updatedAt: now() } : m)
       const last = messages[messages.length - 1]
       if (last && last.role === role && last.streaming) {
         messages[messages.length - 1] = { ...last, text: last.text + event.text, updatedAt: now() }
@@ -184,7 +188,10 @@ export function applyChatEvent(
     case 'tool-call': {
       const { toolCallId } = event.call
       if (!toolCallId) return state
-      const messages = [...state.messages]
+      const startsTool = !state.messages.some(m => m.role === 'tool' && m.toolCallId === toolCallId)
+        || event.call.status === 'pending' || event.call.status === 'in_progress'
+      const messages = state.messages.map(m => startsTool && m.role === 'thought' && m.streaming
+        ? { ...m, streaming: false, updatedAt: now() } : m)
       const idx = messages.findIndex((m) => m.role === 'tool' && m.toolCallId === toolCallId)
       const prev = idx >= 0 ? messages[idx] : undefined
       const status = event.call.status ?? prev?.toolStatus ?? 'pending'
@@ -198,6 +205,10 @@ export function applyChatEvent(
         toolKind: kind,
         toolStatus: status,
         toolTitle: title,
+        toolName: event.call.name && !(prev?.toolName && isGenericToolName(event.call.name))
+          ? event.call.name : prev?.toolName,
+        toolInputSummary: event.call.inputSummary
+          ? { ...prev?.toolInputSummary, ...event.call.inputSummary } : prev?.toolInputSummary,
         toolContentText: contentText,
         toolDiffs: (event.call.diffs ?? prev?.toolDiffs)?.length
           ? (event.call.diffs ?? prev?.toolDiffs)

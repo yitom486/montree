@@ -38,7 +38,7 @@ import { cn } from './cn'
  * - footnote 经 micromark 官方扩展桥接；alert 经 remark 插件（输出 .markdown-alert，与既有 CSS 同源）；
  * - mark/sub/sup 经自研 rehype 微插件（消毒之后运行，不扩消毒面）；
  * - code / mermaid 用 Streamdown 官方插件，工具栏、复制、下载、全屏交给社区；
- * - 增量揭示由 useRevealText 控制，Streamdown 内置分块复用已完成节点；
+ * - Streamdown 原生字符淡入负责显现，内置分块复用已完成节点；
  * - 不解析任意 raw HTML：裸标签先经 rehype-raw 转元素、再按消毒表剥离——
  *   details/summary/kbd 在表内成元素，其余（script/iframe/事件属性等）
  *   剥离或转义，与聊天消毒语义一致（见单测“裸 script/iframe 不执行”）。
@@ -74,6 +74,7 @@ export function resolveMermaidTheme(appTheme: ChatMarkdownTheme): 'default' | 'n
   return 'default'
 }
 const STREAMDOWN_PLUGINS = { math: mathPlugin, cjk, code, mermaid: mermaidPlugin }
+const STREAMDOWN_ANIMATION = { animation: 'fadeIn', sep: 'char', duration: 150, stagger: 8, maxBacklogMs: 320 } as const
 const STREAMDOWN_REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkAgentAlert]
 // 允许透传的原生标签：自研 alert 之外，只放行 inert 展示标签——
 // details/summary（原生折叠，无 JS 参与；open 为惰性布尔属性）、kbd（按键帽）。
@@ -94,16 +95,13 @@ function StreamingCode(props: React.ComponentProps<NonNullable<typeof defaultCom
 
 const AgentBlock = memo(function AgentBlock(props: BlockProps) {
   const prefix = useContext(AnchorPrefix)
-  const streaming = useContext(StreamingFlag)
   const plugins = useMemo(() => props.rehypePlugins?.map((plugin) =>
     Array.isArray(plugin) && plugin[0] === rehypeAgentAnchors
       ? [rehypeAgentAnchors, { prefix, blockIndex: props.index }] : plugin,
   ) as BlockProps['rehypePlugins'], [props.rehypePlugins, props.index, prefix])
-  // 流式中新块挂载仅淡入（CSS animation 只在挂载跑一次；
-  // 块内逐字更新走同元素复用，不重播、不闪烁）。落定/历史态不挂类，
-  // 由外层消息级 fade-slide-in 负责入场，避免 double。
+  // 只保留稳定块壳；文字显现交给 Block 的原生 animatePlugin，不叠加整块淡入。
   return (
-    <div className={streaming ? 'agent-block-in' : undefined}>
+    <div>
       <Block {...props} rehypePlugins={plugins} />
     </div>
   )
@@ -360,11 +358,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, classN
         key={theme}
         mode="streaming"
         isAnimating={streaming}
-        // 块淡入关闭：字符流由 useRevealText 匀速揭示；Streamdown 的 animated
-        // 是另一套词级 cascade 调度（见 AnimateOptions：sep/stagger/maxBacklogMs），
-        // 与外部切片同活，双开即双层调度叠加闪烁。块级淡入改由 AgentBlock
-        // 挂载动画实现（只播一次，旧块不重播），见下方。
-        animated={false}
+        animated={STREAMDOWN_ANIMATION}
         lineNumbers
         translations={STREAMDOWN_TRANSLATIONS}
         codeBlockMaxHeight={360}

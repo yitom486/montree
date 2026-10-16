@@ -454,7 +454,7 @@ interface ChapterComparisonCardProps { // 未导出
 - `props-ify`（9，先剪后搬）：`markdown/AgentMarkdown.tsx`（theme）、`chat/AgentMessageBubble.tsx`（resolve+pending）、`tools/AgentToolCallCard.tsx`（pending+恢复操作）、`tools/HtmlArtifactCard.tsx`（theme+export）、`generative/ReactArtifactCard.tsx`（compile+export）、`propose/ProposeMarkChatBlock.tsx`（去 adopt fallback）、`permission/AgentPermissionCard.tsx`（onRespond）、`permission/ToolApprovalSlot.tsx`（pending）、`tools/DiagramViewerCard.tsx`（Mermaid 主题间接依赖）。
 - `stays`（2，留宿主 adapter，不进包）：`chat/AgentMessageList.tsx`（视口/滚动/落盘/Runtime 编排）、`tools/ToolBusinessResult.tsx`（多 store + `readingMarksApi` + 导航落库编排；纯解析函数可先行进 core）。
 
-补充：30 文件均无 `window.electronAPI` / `node:` 直接引用；`@/hooks/*` 直接引用 0 处（`useRevealText` 已是 `@montree/chat-ui` 头件、`useElapsedSeconds` 是同目录纯 timer）；`navigator.clipboard`（Bubble/Diagram 复制）与 `document/CSS/DOM` 定位属于 Web API，随包走。
+补充：30 文件均无 `window.electronAPI` / `node:` 直接引用；`@/hooks/*` 直接引用 0 处（文字显现现由 Streamdown 原生动画负责，`useElapsedSeconds` 是同目录纯 timer）；`navigator.clipboard`（Bubble/Diagram 复制）与 `document/CSS/DOM` 定位属于 Web API，随包走。
 
 ## M3b / M3c / M3d 切分建议（互不重叠；stays 两件不进批）
 

@@ -10,7 +10,7 @@ export function currentRunStatus(messages: AcpChatMessage[], awaitingApproval: b
   if (awaitingApproval) return { phase: 'approval', label: '等待批准' }
   const tool = current.findLast(message => message.role === 'tool' && !message.turnEnded &&
     (message.streaming || isToolActiveStatus(message.toolStatus)))
-  if (tool) return { phase: 'tool', label: `正在调用${toToolDisplayModel(tool).title}` }
+  if (tool) return { phase: 'tool', label: toToolDisplayModel(tool).activityLabel }
   if (current.some(message => message.role === 'thought' && message.streaming)) {
     return { phase: 'thinking', label: '思考中' }
   }

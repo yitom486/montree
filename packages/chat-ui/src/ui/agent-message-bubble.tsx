@@ -6,7 +6,7 @@
  * M4 主题 prop 化：`theme?: ChatMarkdownTheme`（缺省 `light`），不再读宿主 store。
  */
 import { ArrowRight, Check, Copy, Layers, Pencil } from 'lucide-react'
-import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AgentChatItem } from './AgentChatItem'
 import { BuiMessage } from './BuiMessage'
 import { BuiThinking } from './BuiThinking'
@@ -26,7 +26,6 @@ import {
   type ChapterMarkPlanSelectPayload,
 } from './chapter-mark-plan-card'
 import { ProposeMarkBlockList, ProposeMarkChatBlock, type ResolveMarkProposal } from './propose-mark-chat-block'
-import { useRevealText } from '../headless/use-reveal-text'
 import { ChatMarkdownFallback, ChatMarkdownLazy } from './chat-markdown.lazy'
 import type { ChatMarkdownTheme } from './chat-markdown'
 import { cn } from './cn'
@@ -124,9 +123,8 @@ export function ChatMessageBubble({
     if (status === 'adopted' || status === 'dismissed') onDismissProposedMark?.()
   }
   const active = Boolean(message.streaming)
-  // 流式平滑：chunk 进缓冲，rAF 匀速揭示；重解析再 defer 让路滚动/输入。
-  // 只切片原文，下游单 Streamdown 实例与安全语义不变。
-  const renderText = useDeferredValue(useRevealText(message.text, Boolean(message.streaming)))
+  // 原文直接交给 Streamdown：分块与字符显现使用同一套原生调度。
+  const renderText = message.text
   const markdownClassName = useMemo(
     () =>
       cn(

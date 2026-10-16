@@ -1,6 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
 import { mapConnectionStatus, mapPermissionRequest, mapSessionUpdate } from './acp-events'
+import { applyChatEvent, toToolDisplayModel, type ChatFeedState } from '@montree/chat-core'
+
+describe('agy 思考与工具协议集成', () => {
+  it('思考→绘图→完成稀疏更新→再次思考→正文，保留摘要并收起上一阶段', () => {
+    let feed: ChatFeedState = { messages: [], turnSettled: false }
+    const ingest = (update: unknown) => {
+      for (const event of mapSessionUpdate(update)) feed = applyChatEvent(feed, event)
+    }
+    ingest({ sessionUpdate: 'agent_thought_chunk', messageId: 'msg_thought_agy_1', content: { type: 'text', text: '先梳理登录过程。' } })
+    expect(feed.messages[0]).toMatchObject({ role: 'thought', streaming: true, text: '先梳理登录过程。' })
+    ingest({ sessionUpdate: 'tool_call', toolCallId: 'agy-t1-s2', title: 'Call Mcp Tool', name: 'call_mcp_tool', status: 'in_progress',
+      rawInput: { tool_name: 'montree_present', arguments: { kind: 'preset', preset: 'diagram', diagramType: 'sequence', title: '登录过程', source: 'do not store' } },
+    })
+    expect(feed.messages[0]?.streaming).toBe(false)
+    expect(toToolDisplayModel(feed.messages[1]!)).toMatchObject({ title: '绘制时序图', activityLabel: '正在绘制时序图：登录过程', state: 'in-progress' })
+    ingest({ sessionUpdate: 'tool_call_update', toolCallId: 'agy-t1-s2', name: 'call_mcp_tool', title: 'Call Mcp Tool', status: 'completed' })
+    expect(toToolDisplayModel(feed.messages[1]!)).toMatchObject({ title: '绘制时序图', targetSummary: '登录过程', state: 'completed' })
+    expect(JSON.stringify(feed)).not.toContain('do not store')
+    ingest({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '核对图形结果。' } })
+    expect(feed.messages.at(-1)).toMatchObject({ role: 'thought', streaming: true })
+    ingest({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '图已绘制。' } })
+    expect(feed.messages.filter(m => m.role === 'thought').every(m => !m.streaming)).toBe(true)
+    expect(feed.messages.at(-1)).toMatchObject({ role: 'agent', text: '图已绘制。' })
+  })
+
+  it('只有 thinkingTokens 的 usage_update 不伪造思考正文', () => {
+    expect(mapSessionUpdate({ sessionUpdate: 'usage_update', used: 100, size: 1000, _meta: { thinkingTokens: 20 } })).toEqual([])
+  })
+
+  it('迟到的工具完成事件不会结束下一阶段新到的思考', () => {
+    let feed: ChatFeedState = { messages: [], turnSettled: false }
+    for (const update of [
+      { sessionUpdate: 'tool_call', toolCallId: 't1', status: 'in_progress' },
+      { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '下一步分析。' } },
+      { sessionUpdate: 'tool_call_update', toolCallId: 't1', status: 'completed' },
+    ]) {
+      for (const event of mapSessionUpdate(update)) feed = applyChatEvent(feed, event)
+    }
+    expect(feed.messages.at(-1)).toMatchObject({ role: 'thought', streaming: true })
+  })
+})
 
 describe('mapSessionUpdate 文本三 chunk', () => {
   it('agent_message_chunk → agent text-chunk', () => {

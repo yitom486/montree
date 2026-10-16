@@ -85,7 +85,6 @@
 | `useDocumentReader` | 新格式统一正文/单元读取、搜索、图片与 DOM 选区；表格/PPT 使用结构化选区 |
 | `useAcpStreamHost` | App 根 ACP 流式推送宿主（生命周期跟应用走，不跟面板挂载走；双面板曾致复读） |
 | `useAnnotationAgentAssist` | 批注对话框：独立 ACP session；意图/写成批注 → 不进右侧时间线 |
-| `useRevealText` / `.test.ts`（已迁 @montree/chat-ui，见包内 headless/use-reveal-text） | 流式打字机揭示：chunk 进缓冲、rAF 匀速吐字（动态封顶小步高频 + 32ms 提交）、backlog 加速、封顶帧丢结余防 burst、追上停调度；只切片原文，下游单 Streamdown 实例与安全语义不变；reduced-motion 直出 |
 
 ---
 

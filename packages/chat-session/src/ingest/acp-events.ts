@@ -4,6 +4,7 @@ import {
   parseToolDiffs,
   parseToolLocations,
   toolUpdateContentText,
+  parseToolCallMetadata,
   parseAcpPlanEntries,
   summarizePlanProgress,
   type ChatFeedEvent,
@@ -51,6 +52,7 @@ function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | 
   const toolCallId = toolCallIdFromUpdate(update)
   if (!toolCallId) return undefined
   const call: ChatFeedToolCall = { toolCallId }
+  Object.assign(call, parseToolCallMetadata(update))
   const title = asString(update.title)
   if (title !== undefined) call.title = title
   const kind = asString(update.kind)
@@ -191,6 +193,7 @@ export function mapPermissionRequest(req: unknown): {
   }
   const toolCall: ChatFeedToolCall = {
     toolCallId: toolCallId ?? '',
+    ...parseToolCallMetadata(toolCallRaw ?? {}),
     title: toolCallRaw != null && typeof toolCallRaw.title === 'string' ? toolCallRaw.title : summary,
     kind: toolCallRaw != null && typeof toolCallRaw.kind === 'string' ? toolCallRaw.kind : 'other',
     status:

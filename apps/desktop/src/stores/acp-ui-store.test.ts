@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
+import { toToolDisplayModel } from '@montree/chat-core'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import { formatTurnContextBlock } from '@/lib/agent/context/turn-context'
 import {
@@ -9,6 +10,31 @@ import {
 } from '@/stores/acp-ui-store'
 
 describe('acp-ui-store history + plan', () => {
+  it('agy 实际消息形状保留思考、解开 MCP 工具参数且稀疏完成不丢主题', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('画登录时序图')
+    store.beginAgentReply()
+    store.applySessionUpdate({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '分析登录步骤。' } })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'agy-diagram', name: 'call_mcp_tool', title: 'Call Mcp Tool', status: 'in_progress',
+      rawInput: { tool_name: 'montree_present', arguments: { kind: 'preset', preset: 'diagram', diagramType: 'sequence', title: '登录过程' } },
+    })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call_update', toolCallId: 'agy-diagram', status: 'completed' })
+    const active = useAcpUiStore.getState()
+    const messages = active.threads.find(t => t.id === active.activeThreadId)!.messages
+    expect(messages.find(m => m.role === 'thought')).toMatchObject({ text: '分析登录步骤。', streaming: false })
+    expect(toToolDisplayModel(messages.find(m => m.toolCallId === 'agy-diagram')!))
+      .toMatchObject({ title: '绘制时序图', targetSummary: '登录过程', state: 'completed' })
+  })
+
+  it('审批入口也保留工具名与参数摘要', () => {
+    const store = useAcpUiStore.getState()
+    store.ingestPermissionRequest({ requestId: 56, summary: '允许绘图', options: [], toolCallId: 'agy-permission',
+      toolCall: { name: 'montree_generate_diagram', rawInput: { diagramType: 'flowchart', title: '审批流程' } },
+    })
+    const active = useAcpUiStore.getState()
+    const message = active.threads.find(t => t.id === active.activeThreadId)!.messages.find(m => m.toolCallId === 'agy-permission')!
+    expect(toToolDisplayModel(message)).toMatchObject({ title: '绘制流程图', targetSummary: '审批流程' })
+  })
   it.each(['content', 'structuredContent'])('接收 codex-acp rawOutput.result.%s 并生成交互卡数据', (field) => {
     const store = useAcpUiStore.getState()
     const payload = { schemaVersion: 1, kind: 'react-artifact', id: 'raw-result', title: '交互组件', source: 'export default ()=> <button>点击</button>' }

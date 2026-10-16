@@ -1,5 +1,4 @@
 export const CHAT_UI_SCAFFOLD = 'chat-ui' as const
-export * from './headless/use-reveal-text'
 export * from './headless/use-chat-timeline'
 export * from './headless/use-tool-display'
 export * from './ui/chat-markdown'

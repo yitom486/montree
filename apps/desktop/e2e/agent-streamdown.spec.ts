@@ -18,6 +18,49 @@ async function openPanel(page: Page) {
 }
 
 test.describe('Streamdown 正文 S1', () => {
+  test('agy 思考→具体绘图状态→组织回答→结束，真实 IPC 保留工具参数摘要', async ({}, info) => {
+    const gate = info.outputPath('agy-status')
+    const app = await launchBuiltApp({ E2E_ACP_WINDOW_TEST: '1', E2E_ACP_COMMAND: process.execPath,
+      E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'), E2E_ACP_STREAM_GATE: gate })
+    try {
+      const window = await app.firstWindow()
+      await window.setViewportSize({ width: 1600, height: 900 })
+      await window.waitForLoadState('domcontentloaded')
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
+      await window.evaluate(() => {
+        const now = Date.now()
+        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
+          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'agy-status',
+          threads: [{ id: 'agy-status', runtimeId: 'mock-window', title: 'agy 状态回归', createdAt: now, updatedAt: now, messages: [] }],
+        } }))
+      })
+      await window.reload()
+      const panel = await openPanel(window)
+      await panel.locator('textarea').fill('agy-status-flow')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      const thought = panel.locator('[data-part-key^="thought-"]').first()
+      await expect(thought).toContainText('先梳理登录步骤。')
+      await expect(thought).toContainText('思考中')
+      await expect(panel.getByTestId('agent-loading-state')).toHaveCount(0)
+      writeFileSync(gate + '-thought', 'continue')
+      const progress = panel.getByTestId('agent-loading-state')
+      await expect(progress).toContainText('正在绘制时序图：登录过程')
+      await expect(thought).toContainText('已思考')
+      const activity = panel.locator('[data-slot="agent-activity"]')
+      await expect(activity).toContainText('绘制时序图')
+      await expect(activity).toContainText('登录过程')
+      await expect(activity).not.toContainText('Call Mcp Tool')
+      await panel.screenshot({ path: info.outputPath('agy-tool-running.png') })
+      writeFileSync(gate + '-tool', 'continue')
+      await expect(progress).toContainText('正在组织回答')
+      await expect(activity).toContainText('已完成')
+      await expect(activity).toContainText('登录过程')
+      writeFileSync(gate + '-complete', 'continue')
+      await expect(panel.locator('[data-slot="streaming-response"]').last()).toContainText('AGY_STATUS_DONE')
+      await expect(progress).toHaveCount(0)
+    } finally { await app.close() }
+  })
+
   test('等待计时与动效、真实思考展开、BeUI 输出完成动作', async ({}, info) => {
     const app = await launchBuiltApp({ E2E_ACP_WINDOW_TEST: '1', E2E_ACP_COMMAND: process.execPath, E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs') })
     try {
@@ -38,7 +81,7 @@ test.describe('Streamdown 正文 S1', () => {
       await panel.locator('textarea').fill('status-flow')
       await panel.getByRole('button', { name: '发送', exact: true }).click()
       const waiting = panel.getByTestId('agent-loading-state').first()
-      await expect(waiting).toContainText('等待响应')
+      await expect(waiting).toContainText('正在思考')
       await expect(waiting.locator('.agent-pixel-loader > span')).toHaveCount(9)
       await window.emulateMedia({ reducedMotion: 'reduce' })
       expect(await waiting.locator('.agent-pixel-loader > span').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none')
@@ -89,6 +132,19 @@ test.describe('Streamdown 正文 S1', () => {
       })
       await window.reload()
       const panel = await openPanel(window)
+      await window.evaluate(() => {
+        const probe = { samples: [] as number[], names: [] as string[] }
+        ;(window as unknown as { nativeStreamProbe: typeof probe }).nativeStreamProbe = probe
+        document.addEventListener('animationstart', event => {
+          const target = event.target
+          if (!(target instanceof HTMLElement) || !target.matches('.agent-md [data-sd-animate]') || probe.samples.length >= 64) return
+          probe.names.push(event.animationName)
+          probe.samples.push(Number(getComputedStyle(target).opacity))
+          requestAnimationFrame(() => {
+            if (target.isConnected) probe.samples.push(Number(getComputedStyle(target).opacity))
+          })
+        })
+      })
       await panel.locator('textarea').fill('stream')
       await panel.getByRole('button', { name: '发送', exact: true }).click()
 
@@ -97,6 +153,19 @@ test.describe('Streamdown 正文 S1', () => {
       await expect(panel.getByText('尾段收束')).toHaveCount(0)
       // 空行/新块到达不应把已显示正文从尾渲染器搬到头渲染器。
       const firstParagraph = await panel.locator('.agent-md p').filter({ hasText: '首段中文正文' }).elementHandle()
+      await expect(panel.locator('.agent-md [data-sd-animate]').first()).toBeAttached()
+      const nativeAnimation = await window.evaluate(() => (window as unknown as {
+        nativeStreamProbe: { samples: number[]; names: string[] }
+      }).nativeStreamProbe)
+      expect(nativeAnimation.names).toContain('sd-fadeIn')
+      expect(nativeAnimation.samples.some(opacity => opacity > 0 && opacity < 1)).toBe(true)
+      await expect(panel.locator('.agent-block-in')).toHaveCount(0)
+      await window.emulateMedia({ reducedMotion: 'reduce' })
+      const reduced = await panel.locator('.agent-md [data-sd-animate]').first().evaluate(el => ({
+        duration: getComputedStyle(el).animationDuration, delay: getComputedStyle(el).animationDelay,
+      }))
+      expect(reduced).toEqual({ duration: '0s', delay: '0s' })
+      await window.emulateMedia({ reducedMotion: 'no-preference' })
       // 流式气泡挂翡翠光环（落定即卸）；旧顶栏扫光条已删除
       await expect(panel.locator('.agent-beam-ring-emerald').first()).toBeVisible()
       await expect(panel.locator('.agent-stream-sweep')).toHaveCount(0)
@@ -126,6 +195,7 @@ test.describe('Streamdown 正文 S1', () => {
       expect(await firstParagraph!.evaluate(el => el.isConnected)).toBe(true)
       await expect(panel.locator('.agent-md p').filter({ hasText: '首段中文正文' })).toHaveCount(1)
       await expect(panel.getByText('正在生成')).toHaveCount(0)
+      await expect(panel.locator('.agent-md [data-sd-animate]')).toHaveCount(0)
       await expect(panel.locator('.agent-beam-ring-emerald')).toHaveCount(0)
       // BUI：用户分支走 BuiMessage，用户动作（复制正文/编辑后继续）保留
       await expect(panel.locator('[data-bui-message="user"]').first()).toBeVisible()

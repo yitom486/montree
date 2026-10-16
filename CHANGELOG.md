@@ -6,7 +6,8 @@
 
 ## [未发布]
 
-- **Agent 流式节流修复**：`useRevealText` 的 `lastUpdateTime` / `lastCommitTime` 从 effect 局部变量改为跨 effect 重跑持久的 ref。`source` 每次 delta 都会变化（`chat-slice` 里 `text: last.text + chunk`），effect 随之重跑并把节流时钟重置为 `-Infinity`，导致 `minCommitMs` 形同虚设；修复后相邻提交间隔稳定遵守 32ms，中等粒度流式下提交次数减少约 13%，并补上节流契约回归用例。
+- **Agent 原生流式动画**：正文和思考内容改用 Streamdown 原生逐字淡入，移除旧打字机队列、重复块动画与配套冗余代码；保留代码、表格、公式、图表及滚动交互，完成后移除字符动画包装。
+- **工具执行反馈**：保留真实工具名和有界参数摘要，绘图时显示图形类型与主题，工具完成后保留任务信息；进入工具或正文阶段时结束上一段思考状态。
 
 ---
 

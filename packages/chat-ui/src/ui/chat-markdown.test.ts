@@ -39,6 +39,30 @@ async function render(text: string, streaming = false): Promise<HTMLElement> {
 }
 
 describe('ChatMarkdown（Streamdown 接入）', () => {
+  it('同段追加只动画新字，旧字与段落节点保持稳定，结束后不丢正文', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const draw = async (text: string, streaming = true) => {
+      await act(async () => root.render(createElement(ChatMarkdown, { text, streaming })))
+    }
+    try {
+      await draw('原生中文')
+      const paragraph = container.querySelector('p')!
+      const firstChar = paragraph.querySelector<HTMLElement>('[data-sd-animate]')!
+      expect(firstChar.style.getPropertyValue('--sd-duration')).toBe('150ms')
+      await draw('原生中文继续输出')
+      expect(container.querySelector('p')).toBe(paragraph)
+      expect(paragraph.querySelector('[data-sd-animate]')).toBe(firstChar)
+      expect(firstChar.style.getPropertyValue('--sd-duration')).toBe('0ms')
+      expect(paragraph.querySelectorAll('[data-sd-animate]')).toHaveLength(8)
+      expect(paragraph.querySelectorAll<HTMLElement>('[data-sd-animate]')[4]?.style.getPropertyValue('--sd-duration')).toBe('150ms')
+      await draw('原生中文继续输出', false)
+      expect(container.querySelector('p')).toBe(paragraph)
+      expect(container.querySelector('[data-sd-animate]')).toBeNull()
+      expect(container.textContent).toBe('原生中文继续输出')
+    } finally { act(() => root.unmount()); container.remove() }
+  })
   it('空行与后续段落到达时保留已有正文节点和原生折叠状态', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -137,11 +161,17 @@ describe('ChatMarkdown（Streamdown 接入）', () => {
     expect(resolveMermaidTheme('sepia')).toBe('neutral')
   })
 
-  it('流式中新块挂载带淡入类，落定态不带', async () => {
+  it('流式中文使用原生逐字淡入，代码不拆字；落定移除动画包装', async () => {
     const running = await render('首段。\n\n次段。', true)
-    expect(running.querySelector('.agent-block-in')).not.toBeNull()
+    const chars = [...running.querySelectorAll('[data-sd-animate]')]
+    expect(chars.map(el => el.textContent)).toEqual(['首', '段', '。', '次', '段', '。'])
+    expect(chars[0]?.getAttribute('style')).toContain('--sd-duration')
+    expect(running.querySelector('.agent-block-in')).toBeNull()
+    const code = await render('```ts\nconst value = 42\n```', true)
+    expect(code.querySelector('pre [data-sd-animate]')).toBeNull()
+    expect(code.querySelector('code')?.textContent).toContain('const value = 42')
     const done = await render('首段。\n\n次段。', false)
-    expect(done.querySelector('.agent-block-in')).toBeNull()
+    expect(done.querySelector('[data-sd-animate]')).toBeNull()
     // 内容本身不受包装影响
     expect(done.textContent).toContain('首段。')
     expect(done.textContent).toContain('次段。')

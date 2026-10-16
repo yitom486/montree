@@ -181,6 +181,25 @@ async function handle(message) {
         }
       }
       output = `STREAM:${sessionId}|done`
+    } else if (command === 'agy-status-flow') {
+      const update = value => send({ method: 'session/update', params: { sessionId, update: value } })
+      const gate = async suffix => {
+        const path = process.env.E2E_ACP_STREAM_GATE
+        const deadline = Date.now() + 30000
+        while (path && !existsSync(path + suffix)) {
+          if (Date.now() > deadline) throw new Error('agy status gate timeout: ' + suffix)
+          await new Promise(resolve => setTimeout(resolve, 20))
+        }
+      }
+      // Same ACP payload fields as agy-acp-map: thought chunks and call_mcp_tool rawInput.
+      update({ sessionUpdate: 'agent_thought_chunk', messageId: 'msg_thought_agy_1', content: { type: 'text', text: '先梳理登录步骤。' } })
+      await gate('-thought')
+      update({ sessionUpdate: 'tool_call', toolCallId: 'agy-t1-s2', title: 'Call Mcp Tool', name: 'call_mcp_tool', kind: 'other', status: 'in_progress',
+        rawInput: { tool_name: 'montree_present', arguments: JSON.stringify({ kind: 'preset', preset: 'diagram', diagramType: 'sequence', title: '登录过程' }) } })
+      await gate('-tool')
+      update({ sessionUpdate: 'tool_call_update', toolCallId: 'agy-t1-s2', title: 'Call Mcp Tool', name: 'call_mcp_tool', status: 'completed' })
+      await gate('-complete')
+      output = 'AGY_STATUS_DONE'
     } else if (command === 'status-flow') {
       // 给状态 UI 一个可观察的等待窗口；思考只来自此真实协议事件。
       await new Promise((resolve) => setTimeout(resolve, 2000))

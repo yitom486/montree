@@ -7,6 +7,13 @@ function message(role: AcpChatMessage['role'], extra: Partial<AcpChatMessage> = 
 }
 
 describe('真实回合状态', () => {
+  it('工具状态包含真实任务摘要，即使有上一阶段残留的思考消息', () => {
+    const messages = [message('user'), message('thought', { text: '考虑中', streaming: true }), message('tool', {
+      streaming: true, toolStatus: 'in_progress', toolTitle: 'Call Mcp Tool', toolName: 'montree_present',
+      toolInputSummary: { kind: 'preset', preset: 'diagram', diagramType: 'sequence', title: '登录过程' },
+    })]
+    expect(currentRunStatus(messages, false)).toEqual({ phase: 'tool', label: '正在绘制时序图：登录过程' })
+  })
   it('没有 reasoning 事件时只说等待响应', () => {
     expect(currentRunStatus([message('user'), message('agent', { streaming: true })], false).phase).toBe('waiting')
   })

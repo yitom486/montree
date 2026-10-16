@@ -137,24 +137,6 @@
   text-shadow: 0 0 6px var(--primary);
 }
 
-/*
- * 流式新块挂载动画（只播一次）：新段落/代码块/表格“滑入”（淡入 + 上滑
- * 仅淡入，避免新块上滑/模糊与视口跟滚叠加形成抖动。由 AgentBlock 在
- * streaming 时才挂 `agent-block-in` 类——历史恢复/落定态走外层消息级
- * fade-slide-in，不 double。reduce-motion 由文件头统一关停。
- */
-@keyframes agent-block-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.agent-md .agent-block-in {
-  animation: agent-block-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 .markdown-preview h1,
 .markdown-preview h2,
 .markdown-preview h3,
