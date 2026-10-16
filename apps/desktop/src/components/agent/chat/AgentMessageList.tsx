@@ -54,6 +54,11 @@ export type AgentMessageSource = 'host' | 'package-mirror'
 /** 包镜像 active 为空时的稳定空数组（避免每渲染新建数组抖动 memo）。 */
 const EMPTY_PACKAGE_MIRROR_MESSAGES: AcpChatMessage[] = []
 
+/** 线程用量数字格式化（包内无现成工具，就地 `k` 缩写）：8281 → `8.3k` */
+function formatUsageTokens(used: number): string {
+  return used >= 1000 ? `${(used / 1000).toFixed(1)}k` : `${used}`
+}
+
 interface AgentMessageListProps {
   bottomRef: RefObject<HTMLDivElement | null>
   messagesRef: RefObject<HTMLDivElement | null>
@@ -102,6 +107,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
   const resolveMarkProposal = useAcpUiStore((s) => s.resolveMarkProposal)
   const prompting = useAcpUiStore((s) => s.prompting)
   const threadId = useAcpUiStore((s) => s.activeThreadId)
+  // 线程级用量（usage_update 落库）：存量引用，替换时才变，不抖动订阅
+  const threadUsage = useAcpUiStore((s) => s.threads.find((t) => t.id === s.activeThreadId)?.usage)
   const navFlatIndex = useReaderNavigationStore((s) => s.nav.flatIndex)
   const theme = useEditorUiStore((s) => s.theme)
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -113,6 +120,11 @@ const ThreadMessageList = memo(function ThreadMessageList({
   const streamingContent = messages.some((m) => m.streaming && (m.role === 'thought' || (m.role === 'agent' && m.text.trim())))
   const emptyPlaceholder = messages.some((m) => m.streaming && m.role === 'agent' && !m.text.trim())
   const showRunStatusRow = prompting && !streamingContent && (runStatus.phase === 'thinking' || !emptyPlaceholder)
+  // 线程用量后缀：只有 thinking/composing 相且 usage 存在时才传，其他相不传（零视觉变化）
+  const usageText =
+    threadUsage != null && (runStatus.phase === 'thinking' || runStatus.phase === 'composing')
+      ? `已用 ${formatUsageTokens(threadUsage.used)} tokens`
+      : undefined
   const runStartedAt = messages.findLast(message => message.role === 'user')?.createdAt
   const viewportRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
@@ -479,7 +491,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
               )}
 
               {showRunStatusRow ? (
-                <AgentLoadingState label={runStatus.label} awaitingApproval={runStatus.phase === 'approval'} seconds={runStartedAt ? Math.max(0, Math.floor((nowMs - runStartedAt) / 1000)) : null} />
+                <AgentLoadingState label={runStatus.label} awaitingApproval={runStatus.phase === 'approval'} seconds={runStartedAt ? Math.max(0, Math.floor((nowMs - runStartedAt) / 1000)) : null} usageText={usageText} />
               ) : null}
 
               {pendingOrphan && pendingPermission ? (

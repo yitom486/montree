@@ -7,10 +7,12 @@ export function BeuiThinkingShimmer({ children }: { children: ReactNode }) {
 }
 
 /** 使用宿主真实计时，不启动上游独立计时器或轮播虚构活动。 */
-export function BeuiAgentProgress({ label, elapsedSeconds, running = true }: {
+export function BeuiAgentProgress({ label, elapsedSeconds, running = true, usageText }: {
   label: string
   elapsedSeconds: number | null
   running?: boolean
+  /** 线程用量后缀（如“已用 8.3k tokens”），缺省不渲染 */
+  usageText?: string
 }) {
   const seconds = elapsedSeconds != null && Number.isFinite(elapsedSeconds) ? Math.max(0, Math.floor(elapsedSeconds)) : null
   const elapsed = seconds == null ? null : seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
@@ -22,6 +24,7 @@ export function BeuiAgentProgress({ label, elapsedSeconds, running = true }: {
         </span>
       ) : <ShieldAlert aria-hidden className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />}
       <span role="status" className="min-w-0 break-words">{running ? <BeuiThinkingShimmer>{label}</BeuiThinkingShimmer> : label}</span>
+      {usageText ? <span className="shrink-0 text-[11px] opacity-60">{usageText}</span> : null}
       {elapsed != null ? <span aria-label={`已等待 ${seconds} 秒`} className="shrink-0 font-mono text-[11px] tabular-nums opacity-70">{elapsed}</span> : null}
     </div>
   )

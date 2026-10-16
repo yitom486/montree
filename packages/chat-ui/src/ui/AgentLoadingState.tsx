@@ -42,10 +42,12 @@ export function useElapsedSeconds(startedAt: number | undefined, active: boolean
 }
 
 /** 状态由真实 ACP 事件派生，视觉由 BeUI 受控 AgentProgress 接管。 */
-export function AgentLoadingState({ label, seconds, awaitingApproval = false }: {
+export function AgentLoadingState({ label, seconds, awaitingApproval = false, usageText }: {
   label: string
   seconds: number | null
   awaitingApproval?: boolean
+  /** 线程用量后缀（如“已用 8.3k tokens”）：有值时在 label 后以次级样式渲染，缺省无后缀 */
+  usageText?: string
 }) {
-  return <BeuiAgentProgress label={label} elapsedSeconds={seconds} running={!awaitingApproval} />
+  return <BeuiAgentProgress label={label} elapsedSeconds={seconds} running={!awaitingApproval} usageText={usageText} />
 }

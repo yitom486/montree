@@ -767,6 +767,62 @@ describe('cursor load 回放清洗（user-chunk 第二道网）', () => {
   })
 })
 
+describe('usage_update 落库（线程级纯记录）', () => {
+  beforeEach(() => {
+    const fresh = useAcpUiStore.getState().createThread()
+    useAcpUiStore.setState({
+      prompting: false,
+      sessionId: null,
+      status: 'disconnected',
+      pendingMarkProposalSnapshotContents: [],
+    })
+    const thread = useAcpUiStore.getState().threads.find((t) => t.id === fresh)
+    useAcpUiStore.setState({
+      threads: thread ? [thread] : useAcpUiStore.getState().threads.slice(0, 1),
+      activeThreadId: fresh,
+    })
+  })
+
+  function activeThread() {
+    const s = useAcpUiStore.getState()
+    return s.threads.find((t) => t.id === s.activeThreadId)!
+  }
+
+  it('usage_update 写入 used/size/cost 与 _meta.thinkingTokens，不新建消息', () => {
+    useAcpUiStore.getState().appendUserMessage('hi')
+    const before = activeThread().messages.length
+    useAcpUiStore.getState().applySessionUpdate({
+      sessionUpdate: 'usage_update',
+      used: 8281,
+      size: 262144,
+      cost: { amount: 0, currency: 'USD' },
+      _meta: { thinkingTokens: 20 },
+    })
+    const thread = activeThread()
+    expect(thread.messages).toHaveLength(before)
+    expect(thread.usage).toEqual({
+      used: 8281,
+      size: 262144,
+      cost: { amount: 0, currency: 'USD' },
+      thinkingTokens: 20,
+    })
+  })
+
+  it('无 _meta 时不写 thinkingTokens，不新建消息', () => {
+    useAcpUiStore.getState().appendUserMessage('hi')
+    const before = activeThread().messages.length
+    useAcpUiStore.getState().applySessionUpdate({
+      sessionUpdate: 'usage_update',
+      used: 100,
+      size: 1000,
+    })
+    const thread = activeThread()
+    expect(thread.messages).toHaveLength(before)
+    expect(thread.usage).toEqual({ used: 100, size: 1000 })
+    expect(thread.usage?.thinkingTokens).toBeUndefined()
+  })
+})
+
 describe('会话 prompt 模式（native/compatibility）', () => {
   it('缺省兼容：写入 native 后断开回落', () => {
     expect(useAcpUiStore.getState().sessionPromptMode).toBe('compatibility')

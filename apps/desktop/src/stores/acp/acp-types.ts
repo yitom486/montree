@@ -41,6 +41,17 @@ export interface AcpChatThread {
    */
   agentSessionIds?: Record<string, string | null>
   messages: AcpChatMessage[]
+  /**
+   * ACP `usage_update` 落库（线程级纯记录，不新建消息）：
+   * used=已用 tokens，size=上下文窗口大小，cost=费用（可空），
+   * thinkingTokens=思考 tokens（取自 `update._meta.thinkingTokens`，缺省不写）。
+   */
+  usage?: {
+    used: number
+    size: number
+    cost?: { amount: number; currency: string } | null
+    thinkingTokens?: number | null
+  }
 }
 
 export interface AcpUiStore {

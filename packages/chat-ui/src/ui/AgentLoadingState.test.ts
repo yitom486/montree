@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { currentRunStatus } from './AgentLoadingState'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { AgentLoadingState, currentRunStatus } from './AgentLoadingState'
 import type { ChatMessage as AcpChatMessage } from '@montree/chat-core'
+
+;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 function message(role: AcpChatMessage['role'], extra: Partial<AcpChatMessage> = {}): AcpChatMessage {
   return { id: role, role, text: '', createdAt: 1000, ...extra }
@@ -55,5 +60,43 @@ describe('真实回合状态', () => {
     expect(
       currentRunStatus([message('user'), message('tool', { toolStatus: 'completed', toolTitle: '搜索文档' })], false, true).phase,
     ).toBe('composing')
+  })
+})
+
+/** 用量后缀：可选 prop，缺省无后缀（零视觉变化），有值时在 label 后渲染。 */
+describe('AgentLoadingState 用量后缀', () => {
+  let container: HTMLDivElement
+  let root: Root
+
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    container.remove()
+  })
+
+  it('缺省不渲染后缀', () => {
+    act(() => {
+      root.render(createElement(AgentLoadingState, { label: '思考中', seconds: null }))
+    })
+    const row = container.querySelector('[data-testid="agent-loading-state"]')
+    expect(row).not.toBeNull()
+    expect(row!.textContent).not.toContain('已用')
+  })
+
+  it('有值时在 label 后以次级样式渲染', () => {
+    act(() => {
+      root.render(
+        createElement(AgentLoadingState, { label: '思考中', seconds: null, usageText: '已用 8.3k tokens' }),
+      )
+    })
+    expect(container.textContent).toContain('思考中')
+    expect(container.textContent).toContain('已用 8.3k tokens')
   })
 })

@@ -688,6 +688,7 @@ export const createChatSlice: StateCreator<
     if (
       kind !== MONTREE_SETTLE_COMPLETE_KIND &&
       kind !== 'config_option_update' && kind !== 'config_options_update' &&
+      kind !== 'usage_update' &&
       kind !== 'plan' && kind !== 'plan_update' &&
       kind !== 'tool_call' && kind !== 'tool_call_update' &&
       kind !== 'tool_call_content_chunk' &&
@@ -715,6 +716,47 @@ export const createChatSlice: StateCreator<
     }
 
     if (kind === 'config_option_update' || kind === 'config_options_update') {
+      return
+    }
+
+    // ACP usage_update：线程级纯记录（used/size/cost + `_meta.thinkingTokens`，
+    // 缺省不写该键），只写当前线程的 `usage`，不新建消息，不碰其他分支。
+    // 包镜像不管：包 `mapSessionUpdate` 对 usage_update 本就返回 []（无 feed 事件），
+    // 包 `ChatThread` 也是刻意最小提炼（非 feed 宿主态不进包），显示直读宿主线程。
+    if (kind === 'usage_update') {
+      const used = typeof update.used === 'number' && Number.isFinite(update.used)
+        ? update.used
+        : undefined
+      const size = typeof update.size === 'number' && Number.isFinite(update.size)
+        ? update.size
+        : undefined
+      if (used === undefined || size === undefined) return
+      let cost: { amount: number; currency: string } | undefined
+      const rawCost: unknown = update.cost
+      if (typeof rawCost === 'object' && rawCost !== null && !Array.isArray(rawCost)) {
+        const row = rawCost as Record<string, unknown>
+        if (
+          typeof row.amount === 'number' && Number.isFinite(row.amount) &&
+          typeof row.currency === 'string'
+        ) {
+          cost = { amount: row.amount, currency: row.currency }
+        }
+      }
+      let thinkingTokens: number | undefined
+      const rawMeta: unknown = update._meta
+      if (typeof rawMeta === 'object' && rawMeta !== null && !Array.isArray(rawMeta)) {
+        const tt = (rawMeta as Record<string, unknown>).thinkingTokens
+        if (typeof tt === 'number' && Number.isFinite(tt)) thinkingTokens = tt
+      }
+      const usage: AcpChatThread['usage'] = {
+        used,
+        size,
+        ...(cost !== undefined ? { cost } : {}),
+        ...(thinkingTokens !== undefined ? { thinkingTokens } : {}),
+      }
+      set((s) =>
+        patchActiveThread(s, (t) => ({ ...t, usage, updatedAt: Date.now() })),
+      )
       return
     }
 
