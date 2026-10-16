@@ -6,8 +6,17 @@ import { useRevealText } from './use-reveal-text'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
+// 记录每次「揭示值真正变化」的时刻，供节流契约用例校验 minCommitMs 是否被遵守。
+// complete 标记本帧揭示已追平 source（isComplete 短路提交，不受节流约束）。
+const revealLog: Array<{ t: number; complete: boolean }> = []
+let prevRevealed = ''
+
 function Harness({ text, streaming }: { text: string; streaming: boolean }) {
   const revealed = useRevealText(text, streaming)
+  if (revealed !== prevRevealed) {
+    revealLog.push({ t: performance.now(), complete: revealed === text })
+    prevRevealed = revealed
+  }
   return createElement('div', { 'data-revealed': revealed }, revealed)
 }
 
@@ -22,6 +31,8 @@ describe('useRevealText 打字机揭示', () => {
     // 时间算法依赖 performance.now：测试里手动推进，与 rAF 步调一致
     now = 1000
     nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    revealLog.length = 0
+    prevRevealed = ''
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -111,5 +122,44 @@ describe('useRevealText 打字机揭示', () => {
     expect(cancel.mock.calls.length).toBeLessThanOrEqual(calls + 1)
     expect(container.textContent).toBe('稳态文本')
     cancel.mockRestore()
+  })
+
+  it('节流契约：source 高频增量下，连续提交间隔不小于 minCommitMs', () => {
+    // 真实流式形态：source 每 60ms 增长 12 字，rAF 每 17ms 一帧。
+    // 若计时状态随 effect 重跑被重置，每次 delta 到达后的首帧都会破例立即提交
+    // （32ms 节流退化成「每个 delta 提交一次」）。
+    const total = 2400
+    const charsPerDelta = 12
+    const deltaEveryMs = 60
+    const frameMs = 17
+    const minCommitMs = 32
+
+    render('', true)
+    revealLog.length = 0
+
+    let emitted = 0
+    let nextDeltaAt = 0
+    let ms = 0
+    while (ms < 60_000) {
+      const boundary = ms + frameMs
+      while (nextDeltaAt < boundary && emitted < total) {
+        emitted = Math.min(total, emitted + charsPerDelta)
+        render('文'.repeat(emitted), true)
+        nextDeltaAt += deltaEveryMs
+      }
+      frames(1)
+      ms = boundary
+      if (emitted >= total && (container.textContent ?? '').length >= total) break
+    }
+    expect(container.textContent).toBe('文'.repeat(total))
+
+    // 首帧（lastCommitTime 初值 -Infinity）允许立即提交，排除在外；
+    // 追平帧（isComplete 短路）本身不受节流约束，但仍会刷新 lastCommitTime，
+    // 因此保留在时间轴里参与间隔计算，只豁免它自身的间隔检查。
+    const log = revealLog.slice(1)
+    const violations = log.filter(
+      (entry, i) => i > 0 && !entry.complete && entry.t - log[i - 1].t < minCommitMs,
+    )
+    expect(violations).toHaveLength(0)
   })
 })
