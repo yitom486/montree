@@ -67,16 +67,26 @@ export function useRevealText(source: string, streaming: boolean, opts?: RevealO
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
+  // 计时状态跨 effect 重跑持久：source 每次 delta 都变（chat-slice 里 `text: last.text + chunk`），
+  // 若把它放在 effect 局部变量里，节流时钟会被反复重置为 -Infinity，minCommitMs 形同虚设。
+  // 对齐上游 @assistant-ui/react 的 useSmooth：把 lastUpdateTime / lastCommitTime
+  // 放在动画器实例字段上，而不是每次 effect 重跑都新建一份。
+  // null 表示「本轮流式尚未取基准」。
+  const lastUpdateTimeRef = useRef<number | null>(null)
+  const lastCommitTimeRef = useRef(-Infinity)
 
   useEffect(() => {
     if (!streaming || reduceMotionRef.current) {
       revealedRef.current = sourceRef.current
       setRevealed(sourceRef.current)
+      // 落定即清空计时基准，下一轮流式从头起算
+      lastUpdateTimeRef.current = null
+      lastCommitTimeRef.current = -Infinity
       return
     }
+    // 仅本轮首个 effect 取基准；此后因 source 变化重跑时保持连续
+    if (lastUpdateTimeRef.current === null) lastUpdateTimeRef.current = performance.now()
     let raf = 0
-    let lastUpdateTime = performance.now()
-    let lastCommitTime = -Infinity
     const schedule = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(tick)
@@ -89,14 +99,13 @@ export function useRevealText(source: string, streaming: boolean, opts?: RevealO
       if (!target.startsWith(shown)) {
         revealedRef.current = ''
         setRevealed('')
-        lastCommitTime = -Infinity
-        lastUpdateTime = performance.now()
+        lastCommitTimeRef.current = -Infinity
+        lastUpdateTimeRef.current = performance.now()
         schedule()
         return
       }
       const now = performance.now()
-      const deltaTime = now - lastUpdateTime
-      let timeToConsume = deltaTime
+      let timeToConsume = now - (lastUpdateTimeRef.current ?? now)
       const remaining = target.length - shown.length
       const baseTimePerChar = Math.min(maxCharIntervalMs, drainMs / Math.max(1, remaining))
       // 动态封顶：剩余量越大步子越大，收尾越小步（打字感来自小步高频）
@@ -121,9 +130,9 @@ export function useRevealText(source: string, streaming: boolean, opts?: RevealO
       }
       const next = target.slice(0, shown.length + charsToAdd)
       revealedRef.current = next
-      lastUpdateTime = now - timeToConsume
-      if (isComplete || now - lastCommitTime >= minCommitMs) {
-        lastCommitTime = now
+      lastUpdateTimeRef.current = now - timeToConsume
+      if (isComplete || now - lastCommitTimeRef.current >= minCommitMs) {
+        lastCommitTimeRef.current = now
         setRevealed(next)
       }
       if (!isComplete) schedule()
