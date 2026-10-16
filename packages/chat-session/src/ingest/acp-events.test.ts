@@ -30,6 +30,17 @@ describe('agy 思考与工具协议集成', () => {
     expect(mapSessionUpdate({ sessionUpdate: 'usage_update', used: 100, size: 1000, _meta: { thinkingTokens: 20 } })).toEqual([])
   })
 
+  it('未知 kind 经 onUnknownKind 上报但行为不变', () => {
+    const seen: string[] = []
+    expect(mapSessionUpdate({ sessionUpdate: 'usage_update', used: 1 }, (k) => { seen.push(k) })).toEqual([])
+    expect(seen).toEqual(['usage_update'])
+    // 已知 kind 不上报
+    mapSessionUpdate({ sessionUpdate: 'agent_message_chunk', content: 'hi' }, (k) => { seen.push(k) })
+    expect(seen).toEqual(['usage_update'])
+    // 缺省回调时静默（旧行为）
+    expect(mapSessionUpdate({ sessionUpdate: 'usage_update', used: 1 })).toEqual([])
+  })
+
   it('迟到的工具完成事件不会结束下一阶段新到的思考', () => {
     let feed: ChatFeedState = { messages: [], turnSettled: false }
     for (const update of [

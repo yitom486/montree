@@ -682,6 +682,20 @@ export const createChatSlice: StateCreator<
     const kind =
       typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
 
+    // 未知 kind 留痕：曾因静默丢弃导致新能力（如 usage_update/available_commands_update）
+    // 无从查起。有文本的未知 kind 仍按旧语义走 agent 文本，不改行为；
+    // acpDevLog 仅开发环境输出，生产构建为 no-op。
+    if (
+      kind !== MONTREE_SETTLE_COMPLETE_KIND &&
+      kind !== 'config_option_update' && kind !== 'config_options_update' &&
+      kind !== 'plan' && kind !== 'plan_update' &&
+      kind !== 'tool_call' && kind !== 'tool_call_update' &&
+      kind !== 'tool_call_content_chunk' &&
+      kind !== 'agent_message_chunk' && kind !== 'agent_thought_chunk' && kind !== 'user_message_chunk'
+    ) {
+      acpDevLog('unknown session update kind', { kind })
+    }
+
     if (kind === MONTREE_SETTLE_COMPLETE_KIND) {
       // 主进程定居收尾：先把回放清洗悬垂落定（有则成泡、无则丢），再冻结残留，
       // 不新增空泡，不碰 prompting

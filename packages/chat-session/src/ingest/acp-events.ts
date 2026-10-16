@@ -74,12 +74,23 @@ function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | 
  * - `config_option_update` → `[]`（模型配置走专有事件/端口，不进 feed）；
  * - `montree_settle_complete` → `[{type:'finish-turn'}]`
  *   （字面量来源 `packages/contracts/src/types/acp.ts` 的 `MONTREE_SETTLE_COMPLETE_KIND`）；
- * - 未知种类：有文本按宿主默认走 agent chunk，无文本 → `[]`。
+ * - 未知种类：有文本按宿主默认走 agent chunk，无文本 → `[]`；
+ *   两种都经 `onUnknownKind` 上报（缺省静默），便于新协议能力留痕，纯函数本身不记日志。
  */
-export function mapSessionUpdate(update: unknown): ChatFeedEvent[] {
+export function mapSessionUpdate(update: unknown, onUnknownKind?: (kind: string) => void): ChatFeedEvent[] {
   const row = asRecord(update)
   if (!row) return []
   const kind = asString(row.sessionUpdate) ?? ''
+  if (
+    kind !== MONTREE_SETTLE_COMPLETE_KIND &&
+    kind !== 'config_option_update' && kind !== 'config_options_update' &&
+    kind !== 'plan' && kind !== 'plan_update' &&
+    kind !== 'tool_call' && kind !== 'tool_call_update' &&
+    kind !== 'tool_call_content_chunk' &&
+    kind !== 'agent_message_chunk' && kind !== 'agent_thought_chunk' && kind !== 'user_message_chunk'
+  ) {
+    onUnknownKind?.(kind)
+  }
 
   // 主进程定居收尾标记（宿主 `chat-slice.ts:549-564` 先落悬垂再 `freezeSettledStreaming`；
   // 悬垂落定留宿主，本映射只产出收尾事件）。

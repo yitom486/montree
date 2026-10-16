@@ -55,6 +55,19 @@ describe('acp-ui-store history + plan', () => {
     expect(tool.toolContentText).toContain('schemaVersion')
   })
 
+  it('未知 kind 不进消息（留痕由 acpDevLog 负责，不抛错）', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    const threadId = useAcpUiStore.getState().activeThreadId
+    const count = () => useAcpUiStore.getState().threads.find((t) => t.id === threadId)!.messages.length
+    const before = count()
+    store.applySessionUpdate({ sessionUpdate: 'usage_update', used: 1, size: 100 })
+    store.applySessionUpdate({ sessionUpdate: 'available_commands_update', availableCommands: [] })
+    store.applySessionUpdate({ sessionUpdate: 'future_kind', content: { type: 'text', text: 'x' } })
+    // 有文本的未知 kind 按旧语义走 agent 文本（非静默），其余不新增消息
+    expect(count()).toBe(before + 1)
+  })
+
   beforeEach(() => {
     const fresh = useAcpUiStore.getState().createThread()
     useAcpUiStore.setState({
