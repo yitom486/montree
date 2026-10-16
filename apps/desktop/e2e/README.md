@@ -19,6 +19,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-window-isolation.spec.ts` / `fixtures/mock-window-agent.cjs` | 模拟 ACP Agent 经真实子进程/SDK/IPC/stdio MCP 验证多窗口聊天、制卡指针、权限、取消、恢复、关闭和 iframe 原生快捷键隔离；同时验证独立聊天包的窗口存储分区、主窗口旧历史迁入及副窗口重载不继承主历史；不调用真实模型；HTTP 仅保留专用测试钩子兼容 |
 | `agent-tool-timeline.spec.ts` | 聊天展示层定向回归：种子时间线（单回合一条工作记录/失败摘要/图表独立入口紧凑态/长内容，浅色+深色截图与默认态高度测量）、10 调用收敛基线（一条记录+2 结果入口）、流式工作记录（运行收起·展开后落定保持，需 mock `worklog`/`worklog-done` 台本）、真实 mock 审批 Allow/Reject 全链路（唯一可见·幂等消失）、分隔线三档宽度（约 320/390/480）与 JSON 内部滚动；不调用真实模型 |
 | `agent-streamdown.spec.ts` | Streamdown 正文链路：真实 mock 流式中间态占位与完成态（表格/代码/数字公式/Mermaid/链接）、脚注引用和返回实际点击、社区代码复制、代码头标签与动作浮层无重叠、Shiki token 高亮生效、无面板溢出截图；不调用真实模型 |
+| `agent-bubble-scrollbar.spec.ts` | 流式正文与工作记录的真实界面回归：浅/深色、320/480/800px 及小数宽度下无多余内部纵向滚动条，光环启停不挤压正文，列表正常滚动；不调用真实模型 |
 | `agent-rich-check.spec.ts` | 富文本核验单：mock `rich-check` 台本一次回放 mark/上标/脚注成对/行内公式/原生 details 点开展示/只读任务列表/kbd 键帽；附截图；不调用真实模型 |
 | `agent-mermaid.spec.ts` | Mermaid 双修：深色主题节点深底（相对亮度断言）+ 深→亮切换旧图重绘（themeKey remount）+ 普通滚轮不劫持列表滚动（合成滚轮缩放纹丝不动、且不被 preventDefault）+ ±按钮缩放可用；附深/浅截图；不调用真实模型 |
 | `agent-rich-result.spec.ts` | 富结果生产链路：真实 MCP `montree_present` 调用→回放→章节比较卡筛选/证据（Markdown 编辑/预览实际章节滚动与原文选区、跨文档禁止）；EPUB 目录就绪、真实跨章节滚动及选区可见；HTML 预览交互/隔离探针（前置脚本禁网、脚本与链接/改名自导航阻止）、静默取消及真实点击导出逐字回读、深色壳截图和主题变化保持 iframe；发现/复放/拒绝回归；不调用真实模型 |

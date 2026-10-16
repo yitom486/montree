@@ -495,7 +495,7 @@
 /*
  * 进行中光环（替代与卡片脱节的扫光条）：沿卡片描边行走的光束。
  * conic 角度经 @property 注册后可插值旋转；遮罩把填充压成 1.5px 边框带。
- * 落定即卸类，光环消失；::after 绝对定位，无布局占位。
+ * 落定即卸类，光环消失；::after 绝对定位且内绘，避免溢出触发消息壳的纵向滚动条。
  * 两色：emerald 给助手正文流式，amber 给工作记录运行中。
  */
 @property --agent-beam-angle {
@@ -517,7 +517,7 @@
 .agent-beam-ring::after {
   content: "";
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: inherit;
   padding: 1.5px;
   background: conic-gradient(
