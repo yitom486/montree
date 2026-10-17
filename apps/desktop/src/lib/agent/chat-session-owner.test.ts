@@ -40,6 +40,71 @@ afterEach(() => {
 })
 
 describe('chat-session-owner 持有单例', () => {
+  it('首次迁移以旧宿主真实历史替换影子快照，后续只恢复包权威且不修改旧键', () => {
+    const legacy = JSON.stringify({ state: {
+      activeThreadId: 'legacy-thread', selectedRuntimeId: 'codex-acp',
+      threads: [{ id: 'legacy-thread', title: '真实历史', runtimeId: 'codex-acp',
+        messages: [{ id: 'stable-message', role: 'user', text: '完整正文', createdAt: 1,
+          attachments: [{ id: 'image', kind: 'image', previewUrl: 'data:image/png;base64,test' }] }],
+      }],
+    }, version: 0 })
+    const mocked = memoryLocalStorage({ 'montree-acp-ui': legacy })
+    vi.stubGlobal('localStorage', mocked)
+    // Simulates the previously persisted mirror, whose ids/content are not authoritative.
+    mocked.setItem(OWNED_CHAT_SESSION_STORAGE_KEY, JSON.stringify({ version: 1, snapshot: {
+      activeThreadId: 'shadow', modelConfig: { runtimeId: 'codex-acp' }, threads: [{
+        id: 'shadow', hostThreadId: 'legacy-thread', runtimeId: 'codex-acp', title: '影子',
+        feed: { turnSettled: false, messages: [] },
+      }],
+    } }))
+    const first = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    expect(first.getState().threads[0]!.id).toBe('legacy-thread')
+    expect(first.getState().threads[0]!.feed.messages[0]).toMatchObject({ id: 'stable-message', text: '完整正文', attachments: [{ id: 'image' }] })
+    first.appendUser('迁移后新增')
+    const restarted = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    expect(restarted.getState().threads[0]!.feed.messages.map(m => m.text)).toEqual(['完整正文', '迁移后新增'])
+    expect(mocked.getItem('montree-acp-ui')).toBe(legacy)
+  })
+
+  it('包主快照损坏时优先使用最近成功副本，保留损坏原文，绝不倒退旧宿主历史', () => {
+    const mocked = memoryLocalStorage()
+    vi.stubGlobal('localStorage', mocked)
+    const first = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    first.appendUser('最新历史')
+    const id = first.getState().threads[0]!.feed.messages[0]!.id
+    mocked.setItem(OWNED_CHAT_SESSION_STORAGE_KEY, '{broken-primary')
+    const restored = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    expect(restored.getState().threads[0]!.feed.messages[0]).toMatchObject({ id, text: '最新历史' })
+    restored.appendSystem('恢复成功')
+    expect(mocked.getItem(`${OWNED_CHAT_SESSION_STORAGE_KEY}:corrupt-backup`)).toBe('{broken-primary')
+  })
+
+  it('首次迁移按窗口选旧键，副窗口绝不迁入主窗历史', () => {
+    const mocked = memoryLocalStorage({ 'montree-acp-ui': JSON.stringify({ state: {
+      activeThreadId: 'main-thread', selectedRuntimeId: 'codex-acp', threads: [{
+        id: 'main-thread', title: '主窗', runtimeId: 'codex-acp', messages: [{ id: 'm', role: 'user', text: '主窗私有历史', createdAt: 1 }],
+      }],
+    } }) })
+    vi.stubGlobal('localStorage', mocked)
+    const second = createChatSessionStore({ storage: createOwnedChatSessionStorage('second') })
+    expect(second.getState().threads[0]!.feed.messages).toEqual([])
+    expect(mocked.getItem(`${OWNED_CHAT_SESSION_STORAGE_KEY}:second`)).toBeNull()
+  })
+
+  it('旧宿主显式空历史不会复活旧双写影子的消息', () => {
+    const mocked = memoryLocalStorage()
+    vi.stubGlobal('localStorage', mocked)
+    const shadow = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    shadow.appendUser('已被用户删除的影子内容')
+    const envelope = JSON.parse(mocked.getItem(OWNED_CHAT_SESSION_STORAGE_KEY)!)
+    delete envelope.authorityVersion
+    mocked.setItem(OWNED_CHAT_SESSION_STORAGE_KEY, JSON.stringify(envelope))
+    mocked.removeItem(`${OWNED_CHAT_SESSION_STORAGE_KEY}:last-good`)
+    mocked.setItem('montree-acp-ui', JSON.stringify({ state: { threads: [] } }))
+    const migrated = createChatSessionStore({ storage: createOwnedChatSessionStorage('main') })
+    expect(migrated.getState().threads[0]!.feed.messages).toEqual([])
+  })
+
   it('单例同一性：同进程同实例', () => {
     expect(getOwnedChatSessionStore()).toBe(getOwnedChatSessionStore())
   })
@@ -106,7 +171,9 @@ describe('chat-session-owner 持有单例', () => {
       .toEqual(['副窗口历史', '副窗口回复'])
     expect([...mocked._map.keys()].sort()).toEqual([
       OWNED_CHAT_SESSION_STORAGE_KEY,
+      `${OWNED_CHAT_SESSION_STORAGE_KEY}:last-good`,
       `${OWNED_CHAT_SESSION_STORAGE_KEY}:second`,
+      `${OWNED_CHAT_SESSION_STORAGE_KEY}:second:last-good`,
     ])
   })
 

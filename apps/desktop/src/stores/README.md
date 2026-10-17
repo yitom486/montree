@@ -17,7 +17,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `reading-progress-store.ts` | 阅读进度百分比等（含在线文档滚动比例） |
 | `web-doc-store.ts` | 当前在线文档 URL、最近打开的文档站 |
 | `reading-mark-panel-store.ts` | 标记侧栏筛选（重点/批注/书签，persist） |
-| `acp-ui-store.ts` | Agent 线程、消息、连接状态、权限与配置偏好；线程会话 id 按运行时分桶（`agentSessionIds`） |
+| `acp-ui-store.ts` | Agent 连接、权限、业务线程元数据与包消息只读投影；消息 feed/回合由 `@yitom/chat-session` 唯一归约和持久化；元数据同步落盘，线程会话 id 按运行时分桶（`agentSessionIds`） |
 | `annotation-agent-store.ts` | 批注 AI 助手：按书线程、独立 agentSessionIds（按运行时分桶）、pendingDraft |
 | `tts-store.ts` | 语音朗读听书：Google Gemini / Azure Speech / Local OpenAI / 系统语音；接收段号、排队、缓冲等待与播放完成分别维护，云端确认结束且播放队列耗尽才完成。主备容灾由主进程处理；接收中断后缓冲音频继续播放，耗尽后保留位置并暂停，按服务端额度恢复时间保护重试。未接收完的进度条显示已验证、可播放音频进度。按正文与语音配置指纹持久保存最近 100 章的实际播放秒数（每 2 秒、暂停/关闭/退出时保存），恢复时跳过已经听过的缓存 PCM，完整播放后清除位置。悬浮播放器、章节进度记忆。回归测试见 `tts-store-stream.test.ts`。 |
 | `subsession-progress-store.ts` | 独立副会话（目录 AI 整理等）流式进度与实时看板状态（步骤计数、当前工具、思考摘要） |

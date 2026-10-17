@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AgentMessageList, formatUsageText } from './AgentMessageList'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
+import { updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
+import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from '@/lib/agent/chat-session-owner'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -32,9 +34,13 @@ describe('AgentMessageList 历史分页', () => {
       threads: [{ id: threadId, title: 't', createdAt: 1, updatedAt: 1, messages }],
       activeThreadId: threadId,
     } as never)
+    updateOwnedChatThreadMessages({ id: threadId, title: 't' }, messages, false)
+    getOwnedChatSessionStore().switchThread(threadId)
   }
 
   beforeEach(() => {
+    localStorage.clear()
+    resetOwnedChatSessionStoreForTests()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -168,21 +174,12 @@ describe('AgentMessageList 历史分页', () => {
 
     // 追加 m13 与 m14
     await act(async () => {
-      useAcpUiStore.setState((s) => ({
-        ...s,
-        threads: s.threads.map((t) =>
-          t.id === 't1'
-            ? {
-                ...t,
-                messages: [
-                  ...t.messages,
-                  { id: 'm13', role: 'user', text: '新问题m13', createdAt: 2000 } as AcpChatMessage,
-                  { id: 'm14', role: 'agent', text: '回答正文m14', createdAt: 2001 } as AcpChatMessage,
-                ],
-              }
-            : t,
-        ),
-      }))
+      const thread = useAcpUiStore.getState().threads.find(t => t.id === 't1')!
+      updateOwnedChatThreadMessages(thread, [
+        ...thread.messages,
+        { id: 'm13', role: 'user', text: '新问题m13', createdAt: 2000 },
+        { id: 'm14', role: 'agent', text: '回答正文m14', createdAt: 2001 },
+      ])
     })
 
     const text = container.textContent ?? ''
@@ -202,20 +199,11 @@ describe('AgentMessageList 历史分页', () => {
 
     // 用户发出新提问
     await act(async () => {
-      useAcpUiStore.setState((s) => ({
-        ...s,
-        threads: s.threads.map((t) =>
-          t.id === 't1'
-            ? {
-                ...t,
-                messages: [
-                  ...t.messages,
-                  { id: 'm13', role: 'user', text: '新用户问题m13', createdAt: 2000 } as AcpChatMessage,
-                ],
-              }
-            : t,
-        ),
-      }))
+      const thread = useAcpUiStore.getState().threads.find(t => t.id === 't1')!
+      updateOwnedChatThreadMessages(thread, [
+        ...thread.messages,
+        { id: 'm13', role: 'user', text: '新用户问题m13', createdAt: 2000 },
+      ])
     })
 
     // 点击回到底部

@@ -11,10 +11,9 @@ import {
   useAcpPendingPermission,
   useAcpUiStore,
 } from '@/stores/acp-ui-store'
-import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
 import { planInlinePresent } from '@yitom/chat-core'
-import { groupChatTimeline } from '@yitom/chat-core'
+import { useChatTimeline } from '@yitom/chat-ui'
 import { ChatMessageBubble } from '@yitom/chat-ui'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
 import { AgentPermissionCard } from '@yitom/chat-ui'
@@ -36,23 +35,8 @@ import {
 import { AGENT_CHAT_COL_CLASS } from '@yitom/chat-ui'
 import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
-import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
-import { useChatSessionStore } from '@yitom/chat-session'
 import type { ChapterMarkPlanSelectPayload } from '@yitom/chat-ui'
 import type { GenerativeSubmitPayload } from '@yitom/chat-ui'
-
-/**
- * 消息读取源（P4b 壳收敛第一步，只切 docked 面）：
- * - `host`（缺省）：沿用宿主 `useAcpActiveMessages`，行为与现状逐字一致；
- * - `package-mirror`：消息数组改读包对账镜像 `getOwnedChatSessionStore()` 的 active
- *   线程 feed（经 `useChatSessionStore` 订阅），streaming 标记随消息同切；
- *   其余一律走宿主现有：`prompting`（动作驱动，P4c 才换）、`pendingPermission`、
- *   主题、滚动快照、全部回调与发送/审批/配置动作。
- */
-export type AgentMessageSource = 'host' | 'package-mirror'
-
-/** 包镜像 active 为空时的稳定空数组（避免每渲染新建数组抖动 memo）。 */
-const EMPTY_PACKAGE_MIRROR_MESSAGES: AcpChatMessage[] = []
 
 /** 线程用量数字格式化（包内无现成工具，就地 `k` 缩写）：8281 → `8.3k` */
 function formatUsageTokens(used: number): string {
@@ -70,7 +54,6 @@ interface AgentMessageListProps {
   messagesRef: RefObject<HTMLDivElement | null>
   authHint: string | null
   runtimeName?: string
-  messageSource?: AgentMessageSource
   onChapterPlanSelect?: (payload: ChapterMarkPlanSelectPayload) => void
   onGenerativeSubmit?: (payload: GenerativeSubmitPayload) => void
   onEditMessage?: (text: string) => void
@@ -91,24 +74,12 @@ const ThreadMessageList = memo(function ThreadMessageList({
   messagesRef,
   authHint,
   runtimeName,
-  messageSource = 'host',
   onChapterPlanSelect,
   onGenerativeSubmit,
   onEditMessage,
   onQuote,
 }: AgentMessageListProps) {
-  const hostMessages = useAcpActiveMessages()
-  // P4b 包镜像订阅：host 模式下同样订阅（hooks 禁条件调用），但渲染不用其消息；
-  // 输出与现状一致，仅多一次无害订阅（输出仍由 hostMessages 决定）。
-  const packageMirrorState = useChatSessionStore(getOwnedChatSessionStore())
-  const packageMirrorThread =
-    packageMirrorState.activeThreadId != null
-      ? packageMirrorState.threads.find((t) => t.id === packageMirrorState.activeThreadId)
-      : undefined
-  const messages =
-    messageSource === 'package-mirror'
-      ? (packageMirrorThread?.feed.messages ?? EMPTY_PACKAGE_MIRROR_MESSAGES)
-      : hostMessages
+  const messages = useAcpActiveMessages()
   const pendingPermission = useAcpPendingPermission()
   const resolveMarkProposal = useAcpUiStore((s) => s.resolveMarkProposal)
   const prompting = useAcpUiStore((s) => s.prompting)
@@ -326,15 +297,13 @@ const ThreadMessageList = memo(function ThreadMessageList({
 
   const inlinePresent = useMemo(() => planInlinePresent(messages, new Set(visibleMessages.map(m => m.id))), [messages, visibleMessages])
 
-  const timeline = useMemo(() => {
-    const visibleIds = new Set(visibleMessages.map((m) => m.id))
-    return groupChatTimeline(messages, {
-      pendingToolCallId: pendingPermission?.toolCallId,
-      nowMs,
-      visibleIds,
-      scopeKey: threadId ?? 'default',
-    })
-  }, [messages, visibleMessages, pendingPermission?.toolCallId, nowMs, threadId])
+  const visibleIds = useMemo(() => new Set(visibleMessages.map((m) => m.id)), [visibleMessages])
+  const timeline = useChatTimeline(messages, {
+    pendingToolCallId: pendingPermission?.toolCallId,
+    nowMs,
+    visibleIds,
+    scopeKey: threadId ?? 'default',
+  })
 
   // 滑到顶部自动向前补（懒加载）
   useEffect(() => {

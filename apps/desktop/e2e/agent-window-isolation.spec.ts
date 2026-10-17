@@ -19,8 +19,13 @@ async function observe(page: Page) {
 async function chat(page: Page) {
   return page.evaluate(() => {
     const scope = (window as any).electronAPI.windowScopeId
-    const key = scope === 'main' ? 'montree-acp-ui' : `montree-acp-ui:${scope}`
-    return { scope, key, state: JSON.parse(localStorage.getItem(key) ?? '{}').state }
+    const suffix = scope === 'main' ? '' : ':' + scope
+    const key = 'montree-acp-metadata/v2' + suffix
+    const state = JSON.parse(localStorage.getItem(key) ?? '{}').state
+    const owner = JSON.parse(localStorage.getItem('montree-chat-session/v1' + suffix) ?? '{}').snapshot
+    return { scope, key, state: state && { ...state, threads: state.threads?.map((thread: any) => ({ ...thread,
+      messages: owner?.threads?.find((owned: any) => (owned.hostThreadId ?? owned.id) === thread.id)?.feed.messages ?? [],
+    })) } }
   })
 }
 async function packageChat(page: Page) {
@@ -97,13 +102,21 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
   try {
     const first = await app.firstWindow()
     await first.waitForFunction(() => Boolean((window as any).electronAPI))
-    await first.evaluate(() => localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: { selectedRuntimeId: 'opencode', activeThreadId: 'old-thread', threads: [{ id: 'old-thread', title: 'Old window', runtimeId: 'opencode', createdAt: 1, updatedAt: 1, agentSessionIds: { opencode: 'old-session' }, messages: [{ id: 'old-message', role: 'user', text: 'OLD_WINDOW_HISTORY', createdAt: 1 }] }] } })))
-    await first.reload()
+    // 静置：等启动期 persist 节流排空，否则播种会被应用落盘覆盖
+    await first.waitForTimeout(3000)
+    await first.evaluate(async () => {
+      const workspaceRoot = (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel
+      // Exercise the upgrade path with only the legacy host history present.
+      for (const key of ['montree-acp-metadata/v2', 'montree-chat-session/v1', 'montree-chat-session/v1:last-good']) localStorage.removeItem(key)
+      localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: { selectedRuntimeId: 'opencode', activeThreadId: 'old-thread', threads: [{ id: 'old-thread', title: 'Old window', runtimeId: 'opencode', workspaceRoot, createdAt: 1, updatedAt: 1, agentSessionIds: { opencode: 'old-session' }, messages: [{ id: 'old-message', role: 'user', text: 'OLD_WINDOW_HISTORY', createdAt: 1 }] }] } }))
+      location.reload()
+    })
     await expect(first.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
     await first.keyboard.press('Control+Shift+N')
     await expect.poll(() => app.windows().length).toBe(2)
     const second = app.windows()[1]!
     await observe(first); await observe(second)
+    await expect.poll(async () => (await chat(first)).state?.activeThreadId).toBe('old-thread')
     const firstInitial = await chat(first)
     expect(firstInitial.state.activeThreadId).toBe('old-thread')
     await expect.poll(async () => JSON.stringify((await packageChat(first)).snapshot)).toContain('OLD_WINDOW_HISTORY')

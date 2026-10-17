@@ -41,6 +41,7 @@ export interface AcpChatThread {
    * 按运行时分桶：切换 Agent 不覆盖其他 Agent 的会话 id。
    */
   agentSessionIds?: Record<string, string | null>
+  /** Read-only compatibility projection of the owned chat-session feed. Write through actions. */
   messages: AcpChatMessage[]
   /**
    * ACP `usage_update` 落库（线程级纯记录，不新建消息）：
@@ -99,8 +100,8 @@ export interface AcpUiStore {
    */
   pendingReplayUserText: { threadId: string; raw: string } | null
   /**
-   * 本轮内容是否已被收尾冻结（不持久化）：
-   * finishStreaming 置 true；beginAgentReply/新建/切换/清空线程置 false。
+   * 活动线程包 feed 的 turnSettled 兼容投影：
+   * finishStreaming 置 true；beginAgentReply/新建/清空线程置 false，切换恢复目标线程值。
    * 冻结后到达的 agent 文本 chunk（prompt 结果先于文本通知的竞态）照常合入
    * 正文，但不再点亮 streaming——否则另起一条永不落定的流式气泡。
    * 定居回放（freezeSettledStreaming）故意不碰：回放本就分批到达，

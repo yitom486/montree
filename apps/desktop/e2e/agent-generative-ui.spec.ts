@@ -152,7 +152,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
       expect(paragraphs.card).toBeLessThan(paragraphs.after)
       await frame.getByRole('button', { name: '适应宽度', exact: true }).click()
       await inline.screenshot({ path: info.outputPath('inline-present.png') })
-      await expect.poll(() => window.evaluate(() => (localStorage.getItem('montree-acp-ui') ?? '').includes('montree-present'))).toBe(true)
+      await expect.poll(() => window.evaluate(() => (localStorage.getItem('montree-chat-session/v1') ?? '').includes('montree-present'))).toBe(true)
       await window.reload()
       await expect(window.getByTestId('inline-present')).toHaveCount(1)
       await expect(window.getByTestId('html-artifact-card')).toHaveCount(1)
@@ -171,8 +171,20 @@ test.describe('生成式 UI 生产链路 G4', () => {
     try {
       const window = await app.firstWindow()
       await window.waitForLoadState('domcontentloaded')
-      await window.evaluate(()=>localStorage.setItem('montree-acp-ui',JSON.stringify({version:0,state:{panelOpen:true,hudDisplayMode:'docked',selectedRuntimeId:'mock-window'}})))
-      await window.reload()
+      // 静置：等启动期 persist 节流排空，否则播种会被应用落盘覆盖
+      await window.waitForTimeout(3000)
+      const historyReloaded = window.waitForEvent('domcontentloaded')
+      await window.evaluate(async () => {
+        const workspaceRoot = (await window.electronAPI.getWorkspaceStatus()).value?.rootLabel
+        const thread = { id: 'recovery-test', runtimeId: 'mock-window', title: '历史恢复', createdAt: 1, updatedAt: 1, workspaceRoot }
+        localStorage.setItem('montree-acp-metadata/v2', JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: thread.id, threads: [thread] } }))
+        localStorage.setItem('montree-chat-session/v1', JSON.stringify({ version: 1, authorityVersion: 1, snapshot: {
+          threads: [{ id: thread.id, hostThreadId: thread.id, runtimeId: thread.runtimeId, title: thread.title, feed: { messages: [], turnSettled: false } }],
+          activeThreadId: thread.id, modelConfig: { runtimeId: thread.runtimeId },
+        } }))
+        location.reload()
+      })
+      await historyReloaded
       const panel = await openPanel(window)
       const floating = window.getByTestId('floating-ai-hud')
       if (await floating.isVisible()) await floating.getByTitle('停靠到侧栏').click()
@@ -199,7 +211,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
       await frame.getByRole('button',{name:'开始',exact:true}).focus()
       await window.keyboard.press('Enter')
       await expect(frame.getByRole('status',{name:'节点详情'})).toContainText('恢复后仍可交互')
-      await expect.poll(()=>window.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('montree-acp-ui')).some(k=>JSON.parse(localStorage.getItem(k)!).state?.threads?.some((t:any)=>t.messages.some((m:any)=>m.toolCallId==='agy-t1-s17' && m.presentResult))))).toBe(true)
+      await expect.poll(()=>window.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('montree-chat-session')).some(k=>{try{const s=JSON.parse(localStorage.getItem(k)!).snapshot;return (s?.threads ?? []).some((t:any)=>(t.feed?.messages ?? []).some((m:any)=>m.toolCallId==='agy-t1-s17' && m.presentResult))}catch{return false}}))).toBe(true)
       await card.screenshot({path:info.outputPath('recovered-chart.png')})
       await window.reload()
       await expect(window.getByTestId('html-artifact-card')).toHaveCount(1)
@@ -213,11 +225,17 @@ test.describe('生成式 UI 生产链路 G4', () => {
     try {
       const window = await app.firstWindow()
       await window.waitForLoadState('domcontentloaded')
+      // 静置：等启动期 persist 节流排空，否则播种会被应用落盘覆盖
+      await window.waitForTimeout(3000)
       await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'diagram-test', threads: [{ id: 'diagram-test', runtimeId: 'mock-window', title: '图解回归', createdAt: now, updatedAt: now, messages: [] }] } }))
+        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'diagram-test' } }))
+        localStorage.setItem('montree-chat-session/v1', JSON.stringify({ version: 1, authorityVersion: 1, snapshot: {
+          threads: [{ id: 'diagram-test', hostThreadId: 'diagram-test', runtimeId: 'mock-window', title: '图解回归', feed: { messages: [], turnSettled: false } }],
+          activeThreadId: 'diagram-test',
+          modelConfig: { runtimeId: 'mock-window' },
+        } }))
+        location.reload()
       })
-      await window.reload()
       const panel = await openPanel(window)
       const initialFloating = window.getByTestId('floating-ai-hud')
       if (await initialFloating.isVisible()) await initialFloating.getByTitle('停靠到侧栏').click()
@@ -741,7 +759,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
           () =>
             window.evaluate(() => {
               try {
-                const raw = localStorage.getItem('montree-acp-ui') ?? ''
+                const raw = localStorage.getItem('montree-acp-metadata/v2') ?? ''
                 return (JSON.parse(raw).state?.activeThreadId ?? '') as string
               } catch {
                 return ''
@@ -752,7 +770,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
         .not.toBe('')
       oldThreadId = await window.evaluate(() => {
         try {
-          const raw = localStorage.getItem('montree-acp-ui') ?? ''
+          const raw = localStorage.getItem('montree-acp-metadata/v2') ?? ''
           return (JSON.parse(raw).state?.activeThreadId ?? '') as string
         } catch {
           return ''
@@ -771,7 +789,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
           () =>
             window.evaluate(() => {
               try {
-                const raw = localStorage.getItem('montree-acp-ui') ?? ''
+                const raw = localStorage.getItem('montree-acp-metadata/v2') ?? ''
                 return (JSON.parse(raw).state?.activeThreadId ?? '') as string
               } catch {
                 return ''
@@ -794,7 +812,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
         .poll(
           () =>
             window.evaluate(() => {
-              const raw = localStorage.getItem('montree-acp-ui') ?? ''
+              const raw = localStorage.getItem('montree-acp-metadata/v2') ?? ''
               return (JSON.parse(raw).state?.activeThreadId ?? '') as string
             }),
           { timeout: 10_000 },

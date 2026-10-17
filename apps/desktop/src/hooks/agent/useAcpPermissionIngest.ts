@@ -5,8 +5,6 @@ import {
   permissionSummaryFromToolCall,
   toolCallIdFromPermission,
 } from '@/lib/agent/acp-permission'
-import { mirrorPermissionRequestToPackageStore } from '@/lib/agent/chat-store-mirror'
-import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
 /**
@@ -15,11 +13,12 @@ import { useAcpUiStore } from '@/stores/acp-ui-store'
  *  Agent 断开/出错时清掉未决请求。）
  */
 export function useAcpPermissionIngest(): void {
-  const ingestPermissionRequest = useAcpUiStore((s) => s.ingestPermissionRequest)
-  const clearPendingPermission = useAcpUiStore((s) => s.clearPendingPermission)
+  useEffect(startAcpPermissionIngest, [])
+}
 
-  useEffect(() => {
-    return acpApi.onPermissionRequest((event) => {
+/** 应用级订阅入口；权限工具只经宿主适配一次写入权威 feed。 */
+export function startAcpPermissionIngest(): () => void {
+  const offPermission = acpApi.onPermissionRequest((event) => {
       const toolCall =
         event.toolCall && typeof event.toolCall === 'object'
           ? event.toolCall
@@ -31,7 +30,7 @@ export function useAcpPermissionIngest(): void {
         toolCallId: toolCallIdFromPermission(toolCall),
         optionCount: options.length,
       })
-      ingestPermissionRequest({
+      useAcpUiStore.getState().ingestPermissionRequest({
         requestId: event.requestId,
         sessionId: event.sessionId,
         toolCallId: toolCallIdFromPermission(toolCall),
@@ -41,20 +40,15 @@ export function useAcpPermissionIngest(): void {
         options,
         toolCall,
       })
-      // P4a 对账：同一原始请求再喂包 store（只加法，不影响主链路）
-      mirrorPermissionRequestToPackageStore(
-        getOwnedChatSessionStore(),
-        event,
-        useAcpUiStore.getState().activeThreadId,
-      )
-    })
-  }, [ingestPermissionRequest])
-
-  useEffect(() => {
-    return acpApi.onStatusChanged((event) => {
+      // ingestPermissionRequest 已将工具事件写入唯一 feed；审批槽与校验由宿主持有。
+  })
+  const offStatus = acpApi.onStatusChanged((event) => {
       if (event.status === 'disconnected' || event.status === 'error') {
-        clearPendingPermission()
+        useAcpUiStore.getState().clearPendingPermission()
       }
-    })
-  }, [clearPendingPermission])
+  })
+  return () => {
+    offPermission()
+    offStatus()
+  }
 }

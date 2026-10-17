@@ -1,6 +1,7 @@
 // Layout reference: beui.dev/components/agents/prompt-input (MIT © 2026 Saurabh Chauhan), see LICENSE.beui.
 import { PromptInput, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputAttachmentBridge, PromptInputAttachments, PromptInputAttachment } from '@/components/ai-elements/prompt-input'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useChatComposerController } from '@yitom/chat-ui'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { fileApi } from '@/api/file-api'
 import { extractClipboardImage } from '@/lib/editor/codemirror-paste-image'
@@ -10,7 +11,6 @@ import {
   attachmentToMessageMeta,
   blobToBase64,
   buildAcpPromptBlocks,
-  canSendComposer,
   dataTransferHasWorkspacePaths,
   fileNameFromPath,
   isImageMimeType,
@@ -66,29 +66,49 @@ export function AgentComposer({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const attachmentsRef = useRef(attachments)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   attachmentsRef.current = attachments
   const composerFocusNonce = useAcpUiStore((state) => state.composerFocusNonce)
 
-  /** 拖入/粘贴附件后聚焦输入末尾，便于立刻打字；不影响继续拖贴 */
-  const focusComposerEnd = useCallback(() => {
-    const el = textareaRef.current
-    if (!el || el.disabled) return
-    requestAnimationFrame(() => {
-      el.focus({ preventScroll: true })
-      const len = el.value.length
-      try {
-        el.setSelectionRange(len, len)
-      } catch {
-        /* 部分环境下 disabled 切换瞬间可能抛错，忽略即可 */
-      }
+  const submitPayload = useCallback(() => {
+    const prompt = buildAcpPromptBlocks({
+      text: draft,
+      attachments,
+      promptCapabilities,
     })
-  }, [])
+    if (prompt.length === 0) {
+      toast.error('没有可发送的内容')
+      return false
+    }
+
+    onSubmit({
+      text: draft.trim(),
+      prompt,
+      messageAttachments: attachments.map(attachmentToMessageMeta),
+    })
+    // previewUrl 交给气泡展示，此处不 revoke
+    setAttachments([])
+  }, [
+    attachments,
+    draft,
+    onSubmit,
+    promptCapabilities,
+  ])
+
+  const { canSend, submit, stop, textareaRef, focusEnd: focusComposerEnd } = useChatComposerController({
+    value: draft,
+    onValueChange: onDraftChange,
+    disabled,
+    running: prompting,
+    hasAttachments: attachments.length > 0,
+    onSubmit: submitPayload,
+    onStop: onCancel,
+  })
 
   useEffect(() => {
     if (composerFocusNonce === 0) return
     focusComposerEnd()
   }, [composerFocusNonce, focusComposerEnd])
+
 
   useEffect(() => {
     return () => {
@@ -278,43 +298,10 @@ export function AgentComposer({
     [addAttachments, ingestImageBlob, promptCapabilities.image, workspaceRoot],
   )
 
-  const submit = useCallback(() => {
-    if (disabled || prompting) return
-    if (!canSendComposer(draft, attachments)) return
-
-    const prompt = buildAcpPromptBlocks({
-      text: draft,
-      attachments,
-      promptCapabilities,
-    })
-    if (prompt.length === 0) {
-      toast.error('没有可发送的内容')
-      return
-    }
-
-    onSubmit({
-      text: draft.trim(),
-      prompt,
-      messageAttachments: attachments.map(attachmentToMessageMeta),
-    })
-    // previewUrl 交给气泡展示，此处不 revoke
-    setAttachments([])
-    onDraftChange('')
-  }, [
-    attachments,
-    disabled,
-    draft,
-    onDraftChange,
-    onSubmit,
-    prompting,
-    promptCapabilities,
-  ])
-
-  const canSend = !disabled && !prompting && canSendComposer(draft, attachments)
 
   return (
     <AgentContextMenu textareaRef={textareaRef} onDraftChange={onDraftChange}>
-    <PromptInput onSubmit={() => submit()}
+    <PromptInput onSubmit={() => { submit() }}
       data-slot="agent-composer"
       className={cn(
         'relative min-w-0 [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-background [&_[data-slot=input-group]]:shadow-sm',
@@ -403,7 +390,7 @@ export function AgentComposer({
           title={prompting ? '停止' : '发送'}
           className="size-8 shrink-0 self-end rounded-lg bg-foreground text-background transition-colors hover:bg-foreground/85 disabled:opacity-30 motion-reduce:transition-none"
           disabled={!prompting && !canSend}
-          onClick={prompting ? onCancel : undefined}
+          onClick={prompting ? stop : undefined}
         >{prompting ? <Square className="size-3.5" /> : <ArrowUp className="size-4" />}</PromptInputSubmit>
       </PromptInputFooter>
       </PromptInputAttachmentBridge>

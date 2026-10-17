@@ -80,8 +80,8 @@
 
 | 文件 | 功能 |
 |------|------|
-| `useAcpSession` | 连接 ACP、发 prompt、流式消息、权限与配置；Agent 面板主状态机 |
-| `useAcpPermissionIngest` | App 根订阅权限请求 → store（聊天内联审批卡数据源）；断开/出错清未决 |
+| `useAcpSession` / `.test.ts` | ACP 连接/认证/产品提示与配置；发送/取消通过包 `createChatTurnController` 编排，窗口内实例共享单 flight，并按线程/运行时/会话代际丢弃迟到结果；含并发、失败重试与切换竞态回归 |
+| `useAcpPermissionIngest` / `.test.ts` | App 根订阅权限请求 → 宿主审批槽与包权威 feed，工具仅写一次；断开/出错清未决；覆盖订阅清理与单次归约 |
 | `useMontreeSnapshotHost` | App 根应答主进程快照请求（MCP 工具 / `fs/read .montree/agent/*`） |
 | `useDocumentReader` | 新格式统一正文/单元读取、搜索、图片与 DOM 选区；表格/PPT 使用结构化选区 |
 | `useAcpStreamHost` | App 根 ACP 流式推送宿主（生命周期跟应用走，不跟面板挂载走；双面板曾致复读） |

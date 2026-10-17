@@ -2,6 +2,8 @@ import type { StateCreator } from 'zustand'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import type { AcpHudDisplayMode, AcpUiStore } from './acp-types'
 import { ensureThreadList, openPanelPreservingThread } from './chat-helpers'
+import { reconcileOwnedChatThreadMetadata } from '@/lib/agent/chat-session-authority'
+import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 
 export interface HudSlice {
   panelOpen: boolean
@@ -30,7 +32,7 @@ export const createHudSlice: StateCreator<
 
   setHudDisplayMode: (mode) => set({ hudDisplayMode: mode }),
 
-  setPanelOpen: (open) =>
+  setPanelOpen: (open) => {
     set((s) => {
       if (!open) {
         const workspaceRoot = s.threads.find(
@@ -51,7 +53,9 @@ export const createHudSlice: StateCreator<
         panelOpen: true,
         ...openPanelPreservingThread(s),
       }
-    }),
+    })
+    reconcileOwnedChatThreadMetadata(getOwnedChatSessionStore(), get())
+  },
 
   togglePanel: () => {
     const open = !get().panelOpen
@@ -64,16 +68,18 @@ export const createHudSlice: StateCreator<
     set({ composerFocusNonce: composerFocusNonce + 1 })
   },
 
-  openPanelAndFocusComposer: () =>
+  openPanelAndFocusComposer: () => {
     set((s) => ({
       ...(s.panelOpen
         ? { panelOpen: true }
         : { panelOpen: true, ...openPanelPreservingThread(s) }),
       hudDisplayMode: s.hudDisplayMode === 'capsule' ? 'floating' : s.hudDisplayMode,
       composerFocusNonce: s.composerFocusNonce + 1,
-    })),
+    }))
+    reconcileOwnedChatThreadMetadata(getOwnedChatSessionStore(), get())
+  },
 
-  insertComposerSelectionMarker: () =>
+  insertComposerSelectionMarker: () => {
     set((s) => ({
       ...(s.panelOpen
         ? { panelOpen: true }
@@ -81,5 +87,7 @@ export const createHudSlice: StateCreator<
       hudDisplayMode: s.hudDisplayMode === 'capsule' ? 'floating' : s.hudDisplayMode,
       composerFocusNonce: s.composerFocusNonce + 1,
       composerInsertNonce: s.composerInsertNonce + 1,
-    })),
+    }))
+    reconcileOwnedChatThreadMetadata(getOwnedChatSessionStore(), get())
+  },
 })

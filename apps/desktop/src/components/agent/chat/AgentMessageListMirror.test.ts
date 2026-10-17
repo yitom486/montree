@@ -9,7 +9,6 @@ import {
   getOwnedChatSessionStore,
   resetOwnedChatSessionStoreForTests,
 } from '@/lib/agent/chat-session-owner'
-import { resetThreadMirrorForTests } from '@/lib/agent/chat-store-mirror'
 import {
   flushAcpStreamBuffer,
   resetAcpStreamHostForTests,
@@ -31,12 +30,8 @@ vi.mock('@/api/acp-api', () => ({ acpApi: {
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
-/**
- * P4b 切换面渲染：`messageSource="package-mirror"` 时列表改读包对账镜像。
- * 包镜像注入消息 → 该面正常渲染；宿主独有消息 → 该面不渲染（读源已切）。
- * 既有 `AgentMessageList.test.ts` 一行不动（默认 host 路径零改动）。
- */
-describe('AgentMessageList 包镜像读源', () => {
+// 包事件更新驱动全部面板，宿主不再选择独立消息数组。
+describe('AgentMessageList 包权威读源', () => {
   let container: HTMLDivElement
   let root: Root
 
@@ -58,18 +53,18 @@ describe('AgentMessageList 包镜像读源', () => {
   }
 
   function seedPackageMirror() {
-    resetThreadMirrorForTests()
     const pkg = getOwnedChatSessionStore()
+    const thread = pkg.getState().threads.find(t => t.hostThreadId === 'host-only')!
+    pkg.switchThread(thread.id)
     pkg.clearActiveThread()
-    pkg.appendUser('包镜像问题')
+    pkg.appendUser('包权威问题')
     pkg.beginReply()
-    pkg.ingestTextChunk('包镜像回答')
+    pkg.ingestTextChunk('包权威回答')
   }
 
   beforeEach(() => {
     resetAcpStreamHostForTests()
     resetOwnedChatSessionStoreForTests()
-    resetThreadMirrorForTests()
     localStorage.clear()
     useAcpUiStore.setState({ prompting: false, pendingPermission: null, turnSettled: false, sessionId: null, selectedRuntimeId: 'codex-acp', chatScrollByThread: {} })
     container = document.createElement('div')
@@ -104,7 +99,6 @@ describe('AgentMessageList 包镜像读源', () => {
             messagesRef: hostRef,
             bottomRef: createRef<HTMLDivElement>(),
             authHint: null,
-            messageSource: 'package-mirror',
           }),
         ),
       )
@@ -114,8 +108,8 @@ describe('AgentMessageList 包镜像读源', () => {
   it('包镜像消息正常渲染，宿主消息不渲染', async () => {
     await renderList()
     const text = container.textContent ?? ''
-    expect(text).toContain('包镜像问题')
-    expect(text).toContain('包镜像回答')
+    expect(text).toContain('包权威问题')
+    expect(text).toContain('包权威回答')
     expect(text).not.toContain('宿主独有问题')
   })
 
@@ -166,7 +160,6 @@ describe('AgentMessageList 包镜像读源', () => {
     useAcpUiStore.getState().appendUserMessage('B 历史问题')
     const storedCount = getOwnedChatSessionStore().getState().threads.length
     resetOwnedChatSessionStoreForTests()
-    resetThreadMirrorForTests()
     await renderList()
     expect(container.textContent).toContain('B 历史问题')
 

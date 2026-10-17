@@ -19,7 +19,9 @@ import {
   selectActiveThreadAgentSessionId,
   selectThreadsForRuntime,
   useAcpUiStore,
+  ACP_METADATA_STORAGE_KEY,
 } from '@/stores/acp-ui-store'
+import { OWNED_CHAT_SESSION_STORAGE_KEY, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import {
   annotationFileKey,
   annotationOwnsSessionId,
@@ -173,6 +175,12 @@ describe('ACP 运行时切换：状态联动语义', () => {
   })
 
   it('旧版持久化自动迁移：单值 agentSessionId 归入 codex 桶', async () => {
+    // Simulate a pre-migration installation, not a later legacy-key edit after
+    // the owned feed has already become authoritative.
+    localStorage.removeItem(ACP_METADATA_STORAGE_KEY)
+    localStorage.removeItem(OWNED_CHAT_SESSION_STORAGE_KEY)
+    localStorage.removeItem(`${OWNED_CHAT_SESSION_STORAGE_KEY}:last-good`)
+    resetOwnedChatSessionStoreForTests()
     const threadId = 'thread_legacy'
     localStorage.setItem(
       'montree-acp-ui',

@@ -15,7 +15,7 @@ vi.mock('@/components/agent/AgentPanel', () => ({
   AgentPanel: (props: { messageSource?: string }) =>
     createElement('div', {
       'data-testid': 'mock-agent-panel',
-      'data-message-source': props.messageSource ?? 'host-default',
+      'data-message-source': props.messageSource ?? 'unified',
     }),
   useIsDockedAgentVisible: () => false,
 }))
@@ -29,11 +29,7 @@ vi.mock('@/api/reading-marks-api', () => ({
   },
 }))
 
-/**
- * P4b 挂载面接线：停靠面 opt-in 包镜像读源，悬浮面保持宿主默认。
- * 既有用例（`DockedAgentPane.test.ts` / `FloatingAIHud.test.ts`）一行不动。
- */
-describe('P4b 挂载面读源接线', () => {
+describe('挂载面统一读源接线', () => {
   let container: HTMLDivElement
   let root: Root
   let queryClient: QueryClient
@@ -64,16 +60,16 @@ describe('P4b 挂载面读源接线', () => {
     queryClient.clear()
   })
 
-  it('停靠面传 package-mirror 读源', async () => {
+  it('停靠面不再覆盖统一读源', async () => {
     await act(async () => {
       root.render(createElement(DockedAgentPane, { workspaceRoot: '/workspace' }))
     })
     const panel = container.querySelector('[data-testid="mock-agent-panel"]')
     expect(panel).not.toBeNull()
-    expect(panel?.getAttribute('data-message-source')).toBe('package-mirror')
+    expect(panel?.getAttribute('data-message-source')).toBe('unified')
   })
 
-  it('悬浮面不传读源（宿主默认，一行不动）', async () => {
+  it('悬浮面不再覆盖统一读源', async () => {
     await act(async () => {
       root.render(
         createElement(
@@ -85,6 +81,6 @@ describe('P4b 挂载面读源接线', () => {
     })
     const panel = container.querySelector('[data-testid="mock-agent-panel"]')
     expect(panel).not.toBeNull()
-    expect(panel?.getAttribute('data-message-source')).toBe('host-default')
+    expect(panel?.getAttribute('data-message-source')).toBe('unified')
   })
 })

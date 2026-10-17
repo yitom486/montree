@@ -10,12 +10,12 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 
 | 文件 | 功能 |
 |------|------|
-| `AgentPanel` | 右侧 Agent 主面板（壳 + 接线；配置项分类纯逻辑已出库 `lib/agent/acp-config-menu`，模型尾缀思考档只读徽标见 `lib/agent/acp-model-thinking`，fast 类 boolean 在输入栏给可见开关（`findFastToggle` 单列，不进 secondary），其余 boolean 仍在 secondary；运行时切换器全量读 `BUILTIN_ACP_RUNTIMES`，下游 8 项落地后零改动展示，非 codex 走中性认证提示；生成式 UI 提交经 `handleGenerativeSubmit` 做线程归属校验后沿 `sendPrompt` 回到同一会话；P4b 加可选 `messageSource` 透传 `AgentMessageList`（缺省宿主现状）） |
-| `DockedAgentPane` | 阅读器内停靠态面板壳（左侧拉伸分隔线，宽持久化，三端 viewer 共用；P4b 壳收敛第一步：传 `messageSource="package-mirror"` opt-in 包镜像读源，悬浮窗与 WorkspaceShell 不动） |
+| `AgentPanel` | 右侧 Agent 主面板（壳 + 接线；配置项分类纯逻辑已出库 `lib/agent/acp-config-menu`，模型尾缀思考档只读徽标见 `lib/agent/acp-model-thinking`，fast 类 boolean 在输入栏给可见开关（`findFastToggle` 单列，不进 secondary），其余 boolean 仍在 secondary；运行时切换器全量读 `BUILTIN_ACP_RUNTIMES`，下游 8 项落地后零改动展示，非 codex 走中性认证提示；生成式 UI 提交经 `handleGenerativeSubmit` 做线程归属校验后沿 `sendPrompt` 回到同一会话；消息列表统一通过 `useAcpActiveMessages` 读取包权威 feed） |
+| `DockedAgentPane` | 阅读器内停靠态面板壳（左侧拉伸分隔线，宽持久化，三端 viewer 共用；与悬浮窗、WorkspaceShell 共用单一包权威消息读源） |
 | `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换） |
 | `FloatingAIHud` | 悬浮 AI 伴读浮窗与微型药丸胶囊（支持 docked / floating / capsule 三态切换、四大 Tab 与自由拖拽） |
 | `CompactConfigMenu` | 输入栏旁的紧凑配置下拉（primary 配置项） |
-| `AgentComposer` | BeUI Prompt Input 布局适配：可换行参数与独立 32px 发送/停止；附件、ACP payload、IME/键盘沿用社区内核；输入框右键编辑 |
+| `AgentComposer` | BeUI Prompt Input 布局适配：可换行参数与独立 32px 发送/停止；受控发送/停止、草稿清空、附件可发送判定与焦点由包 `useChatComposerController` 共用；附件获取、ACP payload、右键编辑留宿主；社区 PromptInput 保持唯一 IME/Enter 入口 |
 | `AgentMark` | Agent 徽标（布局/TitleBar 共用） |
 | `AgentAuthDialog` | 认证方式选择（复用本机 Codex / Google 登录，对齐 VS Code / Zed） |
 | `AgentProviderDialog` | 自定义模型供应商配置（base URL + API Key + 模型，Key 只存主进程） |
@@ -28,7 +28,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 
 | 文件 | 功能 |
 |------|------|
-| `AgentMessageList` | 消息列表容器（`@montree/chat-core` 的 `chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新；生成式提交经 `onGenerativeSubmit` 透传面板 `sendPrompt` 链路；P4b 加可选 `messageSource`（`host` 缺省现状，`package-mirror` 时消息数组改读包对账镜像 active feed、streaming 随消息同切，`prompting`/审批/主题/滚动/回调与发送动作仍走宿主）） |
+| `AgentMessageList` | 消息列表容器（`@yitom/chat-core` 的 `chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新；生成式提交经 `onGenerativeSubmit` 透传面板 `sendPrompt` 链路；统一 `useAcpActiveMessages` 包权威 feed，删除 host/package 开关与双订阅；回合分组复用包 `useChatTimeline`） |
 | `AgentContextMenu` | 聊天/输入框右键：选区快照、复制原文、引用草稿、剪切/粘贴文本/全选与回底；异步编辑校验线程与当前草稿 |
 | `AgentActivityGroup` | 工作记录宿主适配器（读取审批/主题/导航/批注 store，传业务与恢复回调）；折叠、进度摘要、最新工具行和完成历史已迁到 `@montree/chat-ui` 的 `ChatActivityGroup`，与包内 `ChatPanel` 共用实现，DOM/aria/交互保持一致 |
 | `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（最新工具稳定行、完成收起与手动回看、单次渲染、失败摘要、审批外置） |

@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { toToolDisplayModel } from '@yitom/chat-core'
+import { updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import { formatTurnContextBlock } from '@/lib/agent/context/turn-context'
 import {
@@ -217,6 +218,9 @@ describe('acp-ui-store history + plan', () => {
       }
     })
 
+    // Seed historical feed through its authoritative owner, not the read-only projection.
+    const seeded = useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)!
+    updateOwnedChatThreadMessages(seeded, seeded.messages)
     useAcpUiStore.getState().finishStreaming()
     const messages =
       useAcpUiStore.getState().threads.find(

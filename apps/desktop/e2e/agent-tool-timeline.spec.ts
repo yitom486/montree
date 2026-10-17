@@ -126,8 +126,12 @@ async function seedTimelineScript() {
       },
     ],
   }
+  // 新存储契约（迁移后）：消息正文只进包快照，宿主键只留元数据；
+  // 旧键带消息的种子会被合并丢弃（包权威）。reload 与种子同任务提交：
+  // 启动期 persist 节流落盘会覆盖跨任务播种。
+  const scopeSuffix = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
   localStorage.setItem(
-    (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
+    'montree-acp-ui' + scopeSuffix,
     JSON.stringify({
       version: 0,
       state: {
@@ -135,10 +139,34 @@ async function seedTimelineScript() {
         hudDisplayMode: 'docked',
         selectedRuntimeId: 'codex-acp',
         activeThreadId: thread.id,
-        threads: [thread],
       },
     }),
   )
+  localStorage.setItem(
+    'montree-acp-metadata/v2' + scopeSuffix,
+    JSON.stringify({
+      state: {
+        panelOpen: true,
+        hudDisplayMode: 'docked',
+        selectedRuntimeId: 'codex-acp',
+        activeThreadId: thread.id,
+        threads: [{ id: thread.id, runtimeId: thread.runtimeId, title: thread.title, createdAt: thread.createdAt, updatedAt: thread.updatedAt, workspaceRoot: thread.workspaceRoot, agentSessionIds: thread.agentSessionIds }],
+      },
+    }),
+  )
+  localStorage.setItem(
+    'montree-chat-session/v1' + scopeSuffix,
+    JSON.stringify({
+      version: 1,
+      authorityVersion: 1,
+      snapshot: {
+        threads: [{ id: thread.id, hostThreadId: thread.id, runtimeId: thread.runtimeId, title: thread.title, feed: { messages: thread.messages, turnSettled: true } }],
+        activeThreadId: thread.id,
+        modelConfig: { runtimeId: 'codex-acp' },
+      },
+    }),
+  )
+  location.reload()
 }
 
 async function openPanel(page: Page) {
@@ -261,17 +289,32 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 1600, height: 900 })
-      await window.evaluate(`(${seedTimelineScript.toString()})()`)
+      // 静置：等启动期 persist 节流排空，否则播种会被覆盖（见本文件种子函数注释）
+      await window.waitForTimeout(3000)
       await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
         )
       })
-      await window.reload()
+      await window.evaluate(`(${seedTimelineScript.toString()})()`)
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
+      // 种子存活校验：包快照 activeThreadId 即种子线程（仅线程存在不够，
+      // 未读入的种子字节也会命中；失败即播种竞态，需先查 harness 再归因产品）
+      await expect
+        .poll(
+          () =>
+            window.evaluate(() => {
+              try {
+                return JSON.parse(localStorage.getItem('montree-chat-session/v1') ?? '{}').snapshot?.activeThreadId ?? ''
+              } catch {
+                return ''
+              }
+            }),
+          { timeout: 10_000 },
+        ).toBe('thread-r2-seed')
 
       const panel = await openPanel(window)
       const panelWidth = await panel.evaluate((el) => el.getBoundingClientRect().width)
@@ -436,11 +479,26 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 2000, height: 900 })
+      // 静置：等启动期 persist 节流排空，否则播种会被覆盖（见种子函数注释）
+      await window.waitForTimeout(3000)
       await window.evaluate(`(${seedTimelineScript.toString()})()`)
-      await window.reload()
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
+      // 种子存活校验：包快照 activeThreadId 即种子线程
+      await expect
+        .poll(
+          () =>
+            window.evaluate(() => {
+              try {
+                return JSON.parse(localStorage.getItem('montree-chat-session/v1') ?? '{}').snapshot?.activeThreadId ?? ''
+              } catch {
+                return ''
+              }
+            }),
+          { timeout: 10_000 },
+        )
+        .toBe('thread-r2-seed')
       const panel = await openPanel(window)
       const loadMore = panel.getByTestId('chat-load-more')
       if ((await loadMore.count()) > 0) {
@@ -527,6 +585,8 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 1600, height: 900 })
+      // 静置：等启动期 persist 节流排空，否则播种会被覆盖
+      await window.waitForTimeout(3000)
       await window.evaluate(async () => {
         const base = Date.now()
         const messages: Array<Record<string, unknown>> = [
@@ -581,8 +641,13 @@ test.describe('聊天展示层 R2', () => {
           toolContentText: JSON.stringify({ schemaVersion: 1, kind: 'html-artifact', id: 'present-html-artifact-10', title: '小结页', html: '<p>十节小结</p>' }),
         })
         messages.push({ id: 'a-10', role: 'agent', text: '十节已梳理完毕。', createdAt: base + 70, updatedAt: base + 170, streaming: false })
+        const convergeScope = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
+        // 工作区亲和性：种子线程必须带应用真实 workspaceRoot，否则启动 effect
+        // switchWorkspace 匹配不到而另建空白线程（旧种子即因此丢失，见交付记录）
+        const convergeWs = (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel
+        const convergeThread = { id: 'thread-converge', title: '收敛基线', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: convergeWs, agentSessionIds: {} }
         localStorage.setItem(
-          (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
+          'montree-acp-metadata/v2' + convergeScope,
           JSON.stringify({
             version: 0,
             state: {
@@ -590,18 +655,47 @@ test.describe('聊天展示层 R2', () => {
               hudDisplayMode: 'docked',
               selectedRuntimeId: 'codex-acp',
               activeThreadId: 'thread-converge',
-              threads: [{ id: 'thread-converge', title: '收敛基线', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel, agentSessionIds: {}, messages }],
+              threads: [convergeThread],
             },
           }),
         )
+        localStorage.setItem(
+          'montree-chat-session/v1' + convergeScope,
+          JSON.stringify({
+            version: 1,
+            authorityVersion: 1,
+            snapshot: {
+              threads: [{ id: 'thread-converge', hostThreadId: 'thread-converge', runtimeId: 'codex-acp', title: '收敛基线', feed: { messages, turnSettled: true } }],
+              activeThreadId: 'thread-converge',
+              modelConfig: { runtimeId: 'codex-acp' },
+            },
+          }),
+        )
+        location.reload()
       })
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      // 种子存活校验：包快照 activeThreadId 即种子线程
+      await expect
+        .poll(
+          () =>
+            window.evaluate(() => {
+              try {
+                return JSON.parse(localStorage.getItem('montree-chat-session/v1') ?? '{}').snapshot?.activeThreadId ?? ''
+              } catch {
+                return ''
+              }
+            }),
+          { timeout: 10_000 },
+        )
+        .toBe('thread-converge')
       await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
         )
       })
-      await window.reload()
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
@@ -703,6 +797,8 @@ test.describe('聊天展示层 R2', () => {
         timeout: 15_000,
       })
       await window.setViewportSize({ width: 1600, height: 900 })
+      // 静置：等启动期 persist 节流排空，否则播种会被覆盖
+      await window.waitForTimeout(3000)
       await window.evaluate(async () => {
         const base = Date.now()
         const messages: Array<Record<string, unknown>> = []
@@ -723,8 +819,10 @@ test.describe('聊天展示层 R2', () => {
           })
           messages.push({ id: 'a-scroll-' + turn, role: 'agent', text: '第' + (turn + 1) + '答：已梳理。', createdAt: base + turn * 10 + 3, updatedAt: base + turn * 10 + 4, streaming: false })
         }
+        const scrollScope = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
+        const scrollThread = { id: 'thread-scroll', title: '滚动恢复', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel, agentSessionIds: {} }
         localStorage.setItem(
-          (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui'),
+          'montree-acp-metadata/v2' + scrollScope,
           JSON.stringify({
             version: 0,
             state: {
@@ -732,20 +830,46 @@ test.describe('聊天展示层 R2', () => {
               hudDisplayMode: 'docked',
               selectedRuntimeId: 'codex-acp',
               activeThreadId: 'thread-scroll',
-              threads: [{ id: 'thread-scroll', title: '滚动恢复', createdAt: base, updatedAt: base, runtimeId: 'codex-acp', workspaceRoot: (await (window as any).electronAPI.getWorkspaceStatus()).value?.rootLabel, agentSessionIds: {}, messages }],
+              threads: [scrollThread],
             },
           }),
         )
+        localStorage.setItem(
+          'montree-chat-session/v1' + scrollScope,
+          JSON.stringify({
+            version: 1,
+            authorityVersion: 1,
+            snapshot: {
+              threads: [{ id: 'thread-scroll', hostThreadId: 'thread-scroll', runtimeId: 'codex-acp', title: '滚动恢复', feed: { messages, turnSettled: true } }],
+              activeThreadId: 'thread-scroll',
+              modelConfig: { runtimeId: 'codex-acp' },
+            },
+          }),
+        )
+        location.reload()
       })
+      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
+        timeout: 15_000,
+      })
+      // 种子存活校验（必须在导航完成后，否则执行上下文已销毁）：包快照 activeThreadId 即种子线程
+      await expect
+        .poll(
+          () =>
+            window.evaluate(() => {
+              try {
+                return JSON.parse(localStorage.getItem('montree-chat-session/v1') ?? '{}').snapshot?.activeThreadId ?? ''
+              } catch {
+                return ''
+              }
+            }),
+          { timeout: 10_000 },
+        )
+        .toBe('thread-scroll')
       await window.evaluate(async () => {
         localStorage.setItem(
           'montree-reader-hud-ui',
           JSON.stringify({ version: 0, state: { dockedAgentWidth: 390 } }),
         )
-      })
-      await window.reload()
-      await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
-        timeout: 15_000,
       })
       const panel = await openPanel(window)
       const loadMore = panel.getByTestId('chat-load-more')
@@ -776,7 +900,8 @@ test.describe('聊天展示层 R2', () => {
         .poll(
           async () =>
             window.evaluate(() => {
-              const raw = JSON.parse(localStorage.getItem((window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? 'montree-acp-ui:' + window.electronAPI.windowScopeId : 'montree-acp-ui')) ?? '{}')
+              const scope = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
+              const raw = JSON.parse(localStorage.getItem('montree-acp-metadata/v2' + scope) ?? '{}')
               return raw?.state?.chatScrollByThread?.['thread-scroll'] ?? null
             }),
           { timeout: 15_000 },

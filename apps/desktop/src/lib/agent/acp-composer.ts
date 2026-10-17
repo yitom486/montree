@@ -181,10 +181,6 @@ export function buildAcpPromptBlocks(options: {
   return blocks
 }
 
-export function canSendComposer(text: string, attachments: ComposerAttachment[]): boolean {
-  return text.trim().length > 0 || attachments.length > 0
-}
-
 export async function blobToBase64(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer()
   const bytes = new Uint8Array(buffer)

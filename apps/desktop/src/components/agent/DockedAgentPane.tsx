@@ -114,7 +114,7 @@ export const DockedAgentPane = memo(function DockedAgentPane({
       <div className="h-full min-h-0 min-w-0 flex-1">
         {/* P4b 壳收敛第一步：仅停靠面改读包对账镜像（消息 + streaming），
             主题/回调/发送/审批/配置仍走宿主原链路；悬浮窗与 WorkspaceShell 不动 */}
-        <AgentPanel workspaceRoot={workspaceRoot} className="w-full" messageSource="package-mirror" />
+        <AgentPanel workspaceRoot={workspaceRoot} className="w-full" />
       </div>
     </div>
   )

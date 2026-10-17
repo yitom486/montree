@@ -14,7 +14,7 @@ import {
 import type { AcpUiStore } from './acp-types'
 import { createEmptyThread, patchActiveThread } from './chat-helpers'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
-import { mirrorHostSnapshotToPackageStore } from '@/lib/agent/chat-store-mirror'
+import { reconcileOwnedChatThreadMetadata } from '@/lib/agent/chat-session-authority'
 
 export interface SessionSlice {
   selectedRuntimeId: string
@@ -127,7 +127,7 @@ export const createSessionSlice: StateCreator<
         sessionPromptModeReason: undefined,
       }
     })
-    mirrorHostSnapshotToPackageStore(pkg, get())
+    reconcileOwnedChatThreadMetadata(pkg, get())
   },
 
   setStatus: (status, errorMessage, errorCode) =>

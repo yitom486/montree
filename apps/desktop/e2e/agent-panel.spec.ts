@@ -12,12 +12,21 @@ test.describe('Agent 面板壳', () => {
     try {
       const window = await app.firstWindow()
       await window.waitForLoadState('domcontentloaded')
+      // 静置：等启动期 persist 节流排空，否则播种会被应用落盘覆盖
+      await window.waitForTimeout(3000)
       await window.evaluate(() => {
-        const now = Date.now()
+        const scopeSuffix = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
         localStorage.setItem('markdown-editor-ui', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'composer-test', threads: [{ id: 'composer-test', runtimeId: 'mock-window', title: '输入框回归', createdAt: now, updatedAt: now, messages: [] }] } }))
+        localStorage.setItem('montree-acp-ui' + scopeSuffix, JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'composer-test' } }))
+        localStorage.setItem('montree-acp-metadata/v2' + scopeSuffix, JSON.stringify({ state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'composer-test' } }))
+        localStorage.setItem('montree-chat-session/v1' + scopeSuffix, JSON.stringify({ version: 1, authorityVersion: 1, snapshot: {
+          threads: [{ id: 'composer-test', hostThreadId: 'composer-test', runtimeId: 'mock-window', title: '输入框回归', feed: { messages: [], turnSettled: false } }],
+          activeThreadId: 'composer-test',
+          modelConfig: { runtimeId: 'mock-window' },
+        } }))
+        // 与 reload 同任务提交： persist 节流落盘与 reload 读取之间不留跨任务窗口。
+        location.reload()
       })
-      await window.reload()
       const panel = window.locator('aside[aria-label="Agent 聊天"]:visible').first()
       const input = panel.locator('textarea')
       await input.fill('identity')

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAcpPromptBlocks,
-  canSendComposer,
   fileNameFromPath,
   MONTREE_WORKSPACE_PATHS_MIME,
   isPathInsideWorkspace,
@@ -43,12 +42,6 @@ describe('acp-composer', () => {
   it('maps common mime types', () => {
     expect(mimeFromFileName('x.png')).toBe('image/png')
     expect(mimeFromFileName('note.md')).toBe('text/markdown')
-  })
-
-  it('requires text or attachments to send', () => {
-    expect(canSendComposer('', [])).toBe(false)
-    expect(canSendComposer(' hi ', [])).toBe(true)
-    expect(canSendComposer('', [fileAtt({ id: '1', name: 'a.md' })])).toBe(true)
   })
 
   it('sends resource_link for files', () => {

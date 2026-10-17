@@ -5,19 +5,19 @@ import {
   type ChatStoragePort,
 } from '@yitom/chat-session'
 import { appApi } from '@/api/app-api'
-import { windowStorageKey } from '@/stores/acp/window-storage'
+import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
+import { windowChatStorageKey, windowStorageKey } from '@/stores/acp/window-storage'
 
 /**
- * P4c 正式持有单例：包会话 store 的 Electron 应用侧持有者。
- *
- * 宿主 store = 应用脑（认证/滚动/批注/prompting）；包 store = 可移植会话态；
- * 本模块以 localStorage 持久化持有包 store，mirror 只保对齐（parity 测试锁死）。
+ * Package owns feed history. The host persists only product metadata in a separate key.
+ * authorityVersion marks the one-time transition from legacy dual-write snapshots.
  */
 export const OWNED_CHAT_SESSION_STORAGE_KEY = 'montree-chat-session/v1'
 export const OWNED_CHAT_SESSION_STORAGE_VERSION = 1
 
 interface OwnedStorageEnvelope {
   version: number
+  authorityVersion?: number
   snapshot: ChatSessionSnapshot
 }
 
@@ -75,26 +75,82 @@ function isSnapshot(value: unknown): value is ChatSessionSnapshot {
 /** main 保留旧键兼容历史；其它窗口只读写自己的分区，绝不回退主窗口历史。 */
 export function createOwnedChatSessionStorage(scopeId = appApi.getWindowScopeId()): ChatStoragePort {
   const key = windowStorageKey(OWNED_CHAT_SESSION_STORAGE_KEY, scopeId)
+  const parse = (raw: string | null): OwnedStorageEnvelope | null => {
+    try {
+      const value: unknown = raw ? JSON.parse(raw) : null
+      return isRecord(value) && value.version === OWNED_CHAT_SESSION_STORAGE_VERSION && isSnapshot(value.snapshot)
+        ? value as unknown as OwnedStorageEnvelope : null
+    } catch { return null }
+  }
   return {
     load(): ChatSessionSnapshot | null {
       try {
         const raw = readRaw(key)
-        if (!raw) return null
-        const parsed: unknown = JSON.parse(raw)
-        if (!isRecord(parsed)) return null
-        if (parsed.version !== OWNED_CHAT_SESSION_STORAGE_VERSION) return null
-        return isSnapshot(parsed.snapshot) ? parsed.snapshot : null
+        const parsed = parse(raw)
+        if (parsed?.authorityVersion === 1) return parsed.snapshot
+        const lastGood = parse(readRaw(`${key}:last-good`))
+        if (!parsed && lastGood) return lastGood.snapshot
+        // Old host key is an immutable migration backup: metadata now uses a new key.
+        // Only this window's legacy key is consulted, never the main-window fallback.
+        const legacyRaw = readRaw(windowChatStorageKey(scopeId))
+        const legacy: unknown = legacyRaw ? JSON.parse(legacyRaw) : null
+        if (isRecord(legacy) && isRecord(legacy.state) && Array.isArray(legacy.state.threads)) {
+          const legacyState = legacy.state
+          const legacyThreads = legacy.state.threads
+          // An explicitly empty legacy history is authoritative too; never resurrect
+          // an old nonempty mirror after the user cleared the host's thread list.
+          if (legacyThreads.length === 0) return null
+          const threads = legacyThreads.filter(isRecord).map(thread => ({
+            id: thread.id, hostThreadId: thread.id,
+            runtimeId: thread.runtimeId || DEFAULT_ACP_RUNTIME_ID, title: thread.title,
+            feed: { messages: Array.isArray(thread.messages) ? thread.messages.map(message =>
+              isRecord(message) ? { ...message, streaming: false } : message,
+            ) : thread.messages, turnSettled: false },
+          }))
+          const snapshot = {
+            threads,
+            activeThreadId: threads.some(thread => thread.id === legacyState.activeThreadId)
+              ? legacyState.activeThreadId : threads[0]?.id,
+            modelConfig: { runtimeId: legacyState.selectedRuntimeId || DEFAULT_ACP_RUNTIME_ID },
+          }
+          if (isSnapshot(snapshot)) {
+            const migrated = { version: OWNED_CHAT_SESSION_STORAGE_VERSION, authorityVersion: 1, snapshot }
+            const encoded = JSON.stringify(migrated)
+            if (raw && !parsed && !readRaw(`${key}:corrupt-backup`)) writeRaw(`${key}:corrupt-backup`, raw)
+            writeRaw(key, encoded)
+            writeRaw(`${key}:last-good`, encoded)
+            return snapshot
+          }
+        }
+        return parsed?.snapshot ?? null
       } catch {
-        return null
+        return parse(readRaw(key))?.snapshot ?? parse(readRaw(`${key}:last-good`))?.snapshot ?? null
       }
     },
     save(snapshot: ChatSessionSnapshot): void {
       try {
         const envelope: OwnedStorageEnvelope = {
           version: OWNED_CHAT_SESSION_STORAGE_VERSION,
-          snapshot,
+          authorityVersion: 1,
+          snapshot: {
+            ...snapshot,
+            threads: snapshot.threads.map(thread => ({ ...thread, feed: {
+              ...thread.feed,
+              messages: thread.feed.messages.slice(-300).map(message => ({ ...message,
+                streaming: false,
+                ...(message.attachments ? { attachments: message.attachments.map(attachment =>
+                  attachment.previewUrl?.startsWith('blob:') ? { ...attachment, previewUrl: undefined } : attachment,
+                ) } : {}),
+              })),
+            } })),
+          },
         }
-        writeRaw(key, JSON.stringify(envelope))
+        const previous = readRaw(key)
+        if (previous && !parse(previous) && !readRaw(`${key}:corrupt-backup`)) writeRaw(`${key}:corrupt-backup`, previous)
+        const next = JSON.stringify(envelope)
+        writeRaw(key, next)
+        // Redundant last-good snapshot protects history from a corrupt primary envelope.
+        writeRaw(`${key}:last-good`, next)
       } catch {
         // 落盘失败不影响内存态
       }
@@ -105,7 +161,7 @@ export function createOwnedChatSessionStorage(scopeId = appApi.getWindowScopeId(
 const ownedStores = new Map<string, ChatSessionStore>()
 const hostSnapshotProviders = new Map<string, (store: ChatSessionStore) => void>()
 
-/** 宿主在其 store 初始化后注册，重建包单例时以同窗口宿主历史补齐持久关联。 */
+/** Host registers its read-only projection after initialization, for the current window only. */
 export function registerOwnedChatHostSnapshotProvider(provider: (store: ChatSessionStore) => void): () => void {
   const scopeId = appApi.getWindowScopeId()
   hostSnapshotProviders.set(scopeId, provider)

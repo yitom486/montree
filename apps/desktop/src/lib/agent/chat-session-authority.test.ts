@@ -3,17 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_ACP_RUNTIME_ID, MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
-import { createChatSessionStore } from '@yitom/chat-session'
-import { mirrorSessionUpdateToPackageStore } from './chat-store-mirror'
 import { MONTREE_TURN_CONTEXT_OPEN_TAG, MONTREE_TURN_CONTEXT_CLOSE_TAG } from './context/turn-context'
-
-// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
-// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
-// 正式升级六包后此守卫恒真，可整体移除。
-const HAS_DISPATCH_FEED_EVENT =
-  typeof (
-    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
-  ).dispatchFeedEvent === 'function'
 
 // 窗口身份和 localStorage 均为测试环境内存实现，不访问桌面用户数据。
 vi.mock('@/api/app-api', () => ({ appApi: { getWindowScopeId: () => 'mirror-host-tests' } }))
@@ -40,7 +30,89 @@ beforeEach(() => {
   resetOwnedChatSessionStoreForTests()
 })
 
-describe('宿主与独立聊天包集成', () => {
+describe('聊天包单权威与宿主业务投影', () => {
+  it('消息写入时线程元数据已落盘，立即重载不丢工作区或恢复会话绑定', () => {
+    const host = useAcpUiStore.getState()
+    host.createThread('D:/durable-workspace', DEFAULT_ACP_RUNTIME_ID)
+    useAcpUiStore.getState().setSession('durable-session')
+    useAcpUiStore.getState().appendUserMessage('立即重载的历史')
+    const key = 'montree-acp-metadata/v2:mirror-host-tests'
+    const saved = JSON.parse(localStorage.getItem(key) ?? '{}').state
+    expect(saved?.activeThreadId).toBe(hostActive().id)
+    expect(saved?.threads.find((t: { id: string }) => t.id === hostActive().id)).toMatchObject({
+      workspaceRoot: 'D:/durable-workspace',
+      agentSessionIds: { [DEFAULT_ACP_RUNTIME_ID]: 'durable-session' },
+    })
+  })
+
+  it('副窗口首次重载优先自己的旧历史元数据，保留工作区/会话/usage/滚动且不读主窗历史', async () => {
+    localStorage.clear()
+    localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
+      panelOpen: true, selectedRuntimeId: DEFAULT_ACP_RUNTIME_ID,
+      activeThreadId: 'private-main', threads: [{ id: 'private-main', title: '主窗', runtimeId: DEFAULT_ACP_RUNTIME_ID,
+        messages: [{ id: 'main-only', role: 'user', text: '主窗私有', createdAt: 1 }],
+      }],
+    } }))
+    const legacy = JSON.stringify({ version: 0, state: {
+      selectedRuntimeId: DEFAULT_ACP_RUNTIME_ID, activeThreadId: 'own-legacy', panelOpen: false,
+      chatScrollByThread: { 'own-legacy': { scrollTop: 123, pinned: false } },
+      threads: [{ id: 'own-legacy', title: '副窗旧历史', runtimeId: DEFAULT_ACP_RUNTIME_ID,
+        workspaceRoot: 'D:/own-workspace', agentSessionIds: { [DEFAULT_ACP_RUNTIME_ID]: 'own-session' },
+        createdAt: 10, updatedAt: 20, usage: { used: 12, size: 100 },
+        messages: [{ id: 'own-message', role: 'user', text: '副窗历史', createdAt: 11 }],
+      }],
+    } })
+    localStorage.setItem('montree-acp-ui:mirror-host-tests', legacy)
+    resetOwnedChatSessionStoreForTests()
+    await useAcpUiStore.persist.rehydrate()
+    expect(hostActive()).toMatchObject({ id: 'own-legacy', workspaceRoot: 'D:/own-workspace',
+      agentSessionIds: { [DEFAULT_ACP_RUNTIME_ID]: 'own-session' }, usage: { used: 12, size: 100 },
+      messages: [{ id: 'own-message', text: '副窗历史' }],
+    })
+    expect(useAcpUiStore.getState().chatScrollByThread['own-legacy']).toEqual({ scrollTop: 123, pinned: false })
+    expect(packageActive().feed.messages).toBe(hostActive().messages)
+    expect(localStorage.getItem('montree-acp-ui:mirror-host-tests')).toBe(legacy)
+  })
+
+  it('生产文本入口仅归约一次，不反灌宿主快照，兼容投影引用就是包feed', () => {
+    const pkg = getOwnedChatSessionStore()
+    const dispatch = vi.spyOn(pkg, 'dispatchFeedEvent')
+    const sync = vi.spyOn(pkg, 'syncHostThread')
+    try {
+      useAcpUiStore.getState().applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '只归约一次' } })
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(sync).not.toHaveBeenCalled()
+      expect(hostActive().messages).toBe(packageActive().feed.messages)
+      expect(hostActive().messages.map(m => m.text)).toEqual(['只归约一次'])
+    } finally { dispatch.mockRestore(); sync.mockRestore() }
+  })
+
+  it('清空仅写一次业务feed，且投影引用与回合状态和包保持一致', () => {
+    useAcpUiStore.getState().appendUserMessage('清空之前')
+    useAcpUiStore.getState().finishStreaming()
+    const pkg = getOwnedChatSessionStore()
+    const sync = vi.spyOn(pkg, 'syncHostThread')
+    try {
+      useAcpUiStore.getState().clearMessages()
+      expect(sync).toHaveBeenCalledTimes(1)
+      expect(hostActive().messages).toBe(packageActive().feed.messages)
+      expect(hostActive().messages).toEqual([])
+      expect(useAcpUiStore.getState().turnSettled).toBe(packageActive().feed.turnSettled)
+      expect(packageActive().feed.turnSettled).toBe(false)
+    } finally { sync.mockRestore() }
+  })
+
+  it('修改宿主投影不会成为第二写入源，下一真实事件继续消费包历史', () => {
+    useAcpUiStore.getState().appendUserMessage('包权威历史')
+    const real = packageActive().feed.messages
+    useAcpUiStore.setState(s => ({ threads: s.threads.map(t => t.id === s.activeThreadId
+      ? { ...t, messages: [{ id: 'projection-only', role: 'user', text: '不应反灌', createdAt: 1 }] } : t) }))
+    useAcpUiStore.getState().applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '新回复' } })
+    expect(hostActive().messages[0]).toBe(real[0])
+    expect(hostActive().messages.map(m => m.text)).toEqual(['包权威历史', '新回复'])
+    expect(hostActive().messages).toBe(packageActive().feed.messages)
+  })
+
   it('新建和工作区切换会同步裁剪空白草稿，切回历史保持身份且不重复消息', () => {
     useAcpUiStore.getState().appendUserMessage('保留的历史')
     const historyId = hostActive().id
@@ -122,12 +194,11 @@ describe('宿主与独立聊天包集成', () => {
     expect(packageActive().feed.messages).toEqual(hostActive().messages)
   })
 
-  it.runIf(HAS_DISPATCH_FEED_EVENT)('回复到达或定居收尾会落定悬垂用户前文，包侧保持顺序且不泄漏标记', () => {
+  it('回复到达或定居收尾会落定悬垂用户前文，包侧保持顺序且不泄漏标记', () => {
     replay(`用户前文\n${MONTREE_TURN_CONTEXT_OPEN_TAG}\n未完的脚手架`)
     const pkg = getOwnedChatSessionStore()
     const update = { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '模型回复' }] }
     useAcpUiStore.getState().applySessionUpdate(update)
-    mirrorSessionUpdateToPackageStore(pkg, update, undefined, hostActive().id)
     expect(packageActive().feed.messages.map((m) => m.text)).toEqual(['用户前文', '模型回复'])
     useAcpUiStore.getState().clearMessages()
     replay(`定居前文\n${MONTREE_TURN_CONTEXT_OPEN_TAG}\n未完的脚手架`)

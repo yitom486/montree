@@ -5,6 +5,10 @@
 
 组件胶水在 `src/hooks/`，IPC 在 `src/api/`，UI 状态在 `src/stores/`。
 
+聊天消息经 `chat-session-authority` 交由包 `dispatchFeedEvent` 单次归约；消息列表只订阅包 feed，宿主只留业务元数据与兼容投影，退役的双写镜像已移除。
+
+`agent/acp-turn-controller.ts` 按窗口持有包 `createChatTurnController`，以宿主线程/运行时/会话代际守卫发送和取消的异步结果；连接、认证、产品提示与错误展示仍由 `useAcpSession` 负责。
+
 | 目录 | 管什么 |
 |------|--------|
 | `editor/` | Markdown 解析/编辑/导出、CodeMirror、草稿、换行规范化 |
@@ -107,7 +111,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 
 | 文件 | 功能 |
 |------|------|
-| `acp-composer` | 输入框附件、工作区路径拖入 |
+| `acp-composer` | 输入框附件、工作区路径拖入与 ACP payload；通用发送判定已由包 `useChatComposerController` 持有 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
 | `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
 | `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @montree/chat-core，见包内 `permission-ui`） |
@@ -127,8 +131,8 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `toc-ai-session` | 目录 AI 整理专用副会话（每次新建防跨书串扰、无头累积、不进时间线） |
 | `acp-stream-host` | ACP 流式推送应用级宿主（单订阅单合并器 + 认证清理回调注册表；`acp-transport` 直连等待） |
 | `acp-update-adapter` / `.test.ts` | ACP `session/update` → 宿主分发意图的**纯适配**（C1）：标准成员经 `@yitom/chat-session` `mapSessionUpdate` 复用单表与 SDK 联合穷尽校验，宿主只保留 `montree_settle_complete`、`usage_update`（线程字段）、`tool_call_content_chunk`（camelCase-only）与无 id 工具调用（快照旁路）等独有语义；不读 store、不做回放清洗，线程归属/清洗时序仍在 `apps/desktop/src/stores/acp/chat-slice.ts` |
-| `chat-store-mirror` / `agent/chat-store-mirror-thread.test.ts` + `agent/chat-store-mirror-p4b.test.ts` + `agent/chat-store-mirror-host-routing.test.ts` + `agent/chat-store-mirror-host-integration.test.ts` + `agent/chat-store-mirror-dispatch.test.ts` | 宿主→包增量与生命周期镜像；线程 hostThreadId 随快照持久化，启动/恢复历史权威迁入，后台补建不切 active；附件完整透传，用户回放只同步清洗后的单线程 feed；session/update 桥（C2b1）复用 `acp-update-adapter` 意图统一调包 `dispatchFeedEvent`（plan-remove 补齐、settle 只冻、fallback 显式注入、空映射不建线程），未知 kind 留痕仍归宿主；覆盖旧快照迁入、重启续聊、运行时切换、删除后新草稿与撕裂脚手架回归（持有口见 chat-session-owner） |
-| `chat-session-owner` / `.test.ts` | P4c 包 store 按窗口持有单例（`getOwnedChatSessionStore` + `registerOwnedChatHostSnapshotProvider` 恢复宿主关联）；localStorage 持久化 `ChatStoragePort`：main 兼容旧键、副窗口独立分区，版本/快照形状校验 + 按键内存回落；共享底层存储的双实例交错流式写入与重启恢复回归 |
+| `chat-session-owner` / `.test.ts` | 包会话单例与唯一消息历史持久化：按窗口分区，`authorityVersion` 标记旧宿主历史的一次性迁入；保留旧键，包历史后续优先，最近成功副本与坏数据备份支持恢复 |
+| `chat-session-authority` / `.test.ts` | 宿主通用 feed 事件定向交给包单次归约；业务清洗/提议通过显式受控更新入口；线程元数据路由始终保留包 feed，宿主只读兼容投影不再反灌快照 |
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |

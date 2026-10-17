@@ -1,6 +1,7 @@
 import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { type AcpChatMessage } from '@/stores/acp-chat-types'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
+import { ensureOwnedChatThread, updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
 import {
   attachMarkProposalsToCurrentTurn as attachMarkProposalsToCurrentTurnCore,
   attachPendingMarkProposals as attachPendingMarkProposalsCore,
@@ -129,9 +130,16 @@ export function patchActiveThread(
   // 异 runtime 消息写入当前 thread，而是先纠偏到对的线程（同 runtime 最新；
   // 无则建专属空线程），再 patch。调用方 spread 返回值即可自动切 active。
   const ensured = ensureActiveThreadForRuntime(state)
-  const threads = ensured.threads.map((t) =>
-    t.id === ensured.activeThreadId ? patch(t) : t,
-  )
+  const threads = ensured.threads.map((t) => {
+    if (t.id !== ensured.activeThreadId) return t
+    const owned = ensureOwnedChatThread(t)
+    const projected = owned.feed.messages === t.messages ? t : { ...t, messages: owned.feed.messages }
+    const next = patch(projected)
+    // Generic events already changed the owner. Only explicit product transformations
+    // (cleaned replay / annotation enrichment / clearing) arrive here with a new array.
+    updateOwnedChatThreadMessages(next, next.messages)
+    return next
+  })
   if (ensured.activeThreadId !== state.activeThreadId) {
     return { threads, activeThreadId: ensured.activeThreadId }
   }

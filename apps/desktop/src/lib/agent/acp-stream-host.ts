@@ -1,12 +1,6 @@
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { acpApi } from '@/api/acp-api'
 import { STREAM_FLUSH_MS, StreamCoalescer, isCoalescableAgentChunk } from '@/lib/agent/stream-coalescer'
-import {
-  mirrorConnectionStatusToPackageStore,
-  mirrorSessionUpdateToPackageStore,
-} from '@/lib/agent/chat-store-mirror'
-import { collectStoreFallbackProposal } from '@/lib/agent/promote-mark-proposals'
-import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import { useAcpUiStore, selectActiveThreadAgentSessionId } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore, annotationOwnsSessionId } from '@/stores/annotation-agent-store'
 import { subsessionOwnsSessionId, accumulateSubsessionUpdate, isSubsessionPrompting } from '@/lib/agent/acp-subsession'
@@ -41,6 +35,7 @@ export function registerStreamAuthReset(resetter: StreamAuthResetter): () => voi
 let streamBuffer: {
   coalescer: StreamCoalescer
   timer: ReturnType<typeof setTimeout> | null
+  owner: { threadId: string; sessionId: string | null; runtimeId: string } | null
 } | null = null
 
 let stopStreamHost: (() => void) | null = null
@@ -53,20 +48,17 @@ export function flushAcpStreamBuffer(): void {
     clearTimeout(buf.timer)
     buf.timer = null
   }
+  const owner = buf.owner
+  buf.owner = null
   const text = buf.coalescer.flush()
-  if (text) {
-    const update = {
-      sessionUpdate: 'agent_message_chunk',
-      content: [{ type: 'text', text }],
-    }
-    const hostThreadId = useAcpUiStore.getState().activeThreadId
-    const pkg = getOwnedChatSessionStore()
-    useAcpUiStore.getState().applySessionUpdate(update)
-    // P4a 对账：同一合成增量再喂包 store（只加法，不影响主链路）
-    mirrorSessionUpdateToPackageStore(pkg, update, undefined, hostThreadId, {
-      proposalFallback: collectStoreFallbackProposal(),
-    })
-  }
+  if (!text || !owner) return
+  const host = useAcpUiStore.getState()
+  const activeSid = selectActiveThreadAgentSessionId(host) ?? host.sessionId
+  // A timer belongs to its original thread/session/runtime. Switching drops an orphan;
+  // it must never turn buffered old text into a chunk for the newly active conversation.
+  if (host.activeThreadId !== owner.threadId || host.selectedRuntimeId !== owner.runtimeId || activeSid !== owner.sessionId) return
+  host.applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text }] })
+
 }
 
 function scheduleStreamFlush(): void {
@@ -82,12 +74,10 @@ function scheduleStreamFlush(): void {
 export function startAcpStreamHost(): () => void {
   if (stopStreamHost) return stopStreamHost
 
-  streamBuffer = { coalescer: new StreamCoalescer(), timer: null }
+  streamBuffer = { coalescer: new StreamCoalescer(), timer: null, owner: null }
 
   const offStatus = acpApi.onStatusChanged((event) => {
     const store = useAcpUiStore.getState()
-    // P4a 对账：同一状态事件再喂包 store（只加法，不影响主链路）
-    mirrorConnectionStatusToPackageStore(getOwnedChatSessionStore(), event.status)
     store.setStatus(event.status, event.errorMessage)
     if (event.sessionId) store.setSession(event.sessionId)
     if (event.status === 'disconnected') {
@@ -111,7 +101,9 @@ export function startAcpStreamHost(): () => void {
       // 与下方常规路径同一判定（两者都无 sessionId 时不拦截）。
       const mainStore = useAcpUiStore.getState()
       const activeMainSid = selectActiveThreadAgentSessionId(mainStore) ?? mainStore.sessionId
-      if (event.sessionId && activeMainSid && event.sessionId !== activeMainSid) {
+      if (event.sessionId && (activeMainSid ? event.sessionId !== activeMainSid :
+        mainStore.threads.some(thread => thread.id !== mainStore.activeThreadId &&
+          Object.values(thread.agentSessionIds ?? {}).includes(event.sessionId)))) {
         return
       }
       flushAcpStreamBuffer()
@@ -141,31 +133,27 @@ export function startAcpStreamHost(): () => void {
     const activeMainSid = selectActiveThreadAgentSessionId(mainStore) ?? mainStore.sessionId
     // 严格会话隔离：若事件带有具体 sessionId，且既不是当前主会话、也不是全局广播，
     // 则属于已退役副会话或已切走的过时会话，坚决丢弃，绝不污染主会话
-    if (event.sessionId && activeMainSid && event.sessionId !== activeMainSid) {
+    if (event.sessionId && (activeMainSid ? event.sessionId !== activeMainSid :
+        mainStore.threads.some(thread => thread.id !== mainStore.activeThreadId &&
+          Object.values(thread.agentSessionIds ?? {}).includes(event.sessionId)))) {
       return
     }
 
     const chunkText = isCoalescableAgentChunk(event.update)
     if (chunkText) {
-      streamBuffer?.coalescer.push(chunkText)
+      const owner = { threadId: mainStore.activeThreadId, sessionId: activeMainSid, runtimeId: mainStore.selectedRuntimeId }
+      const previous = streamBuffer?.owner
+      if (previous && (previous.threadId !== owner.threadId || previous.sessionId !== owner.sessionId || previous.runtimeId !== owner.runtimeId)) flushAcpStreamBuffer()
+      if (streamBuffer) {
+        streamBuffer.owner = owner
+        streamBuffer.coalescer.push(chunkText)
+      }
       scheduleStreamFlush()
       return
     }
     flushAcpStreamBuffer()
-    const pkg = getOwnedChatSessionStore()
     mainStore.applySessionUpdate(event.update)
-    // 用户回放可能被宿主清洗、暂存或去重；仅同步宿主接受后的正文。
-    if (updateKind === 'user_message_chunk') return
-    // P4a 对账：同一增量再喂包 store（只加法，不影响主链路）
-    mirrorSessionUpdateToPackageStore(
-      pkg,
-      event.update,
-      undefined,
-      mainStore.activeThreadId,
-      // 与宿主同一 tick 内读取同一批注 store，值与宿主分支内采集的一致；
-      // 纯桥自身不读应用 store，只收显式参数。
-      { proposalFallback: collectStoreFallbackProposal() },
-    )
+
   })
 
   const stop = () => {

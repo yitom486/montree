@@ -30,7 +30,9 @@ import {
   selectActiveThreadAgentSessionId,
   selectActiveThreadHasSubstantiveMessages,
 } from '@/stores/acp-ui-store'
-import { reportAppError } from '@/lib/workspace/report-error'
+import { reportAppError, reportUnknownError } from '@/lib/workspace/report-error'
+import { updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
+import { captureAcpTurnIdentity, getAcpTurnController, isAcpTurnIdentityCurrent, isAcpTurnRouteCurrent } from '@/lib/agent/acp-turn-controller'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
 function activeThreadAgentSessionId(): string | undefined {
@@ -148,7 +150,9 @@ export function useAcpSession(workspaceRoot?: string) {
       setSession(result.sessionId, options)
       if (result.sessionRestored && result.requestedSessionId === result.sessionId && result.recoveredToolOutputs?.length) {
         const outputs = result.recoveredToolOutputs
-        useAcpUiStore.setState(s => ({threads: s.threads.map(t => t.id === s.activeThreadId ? {...t, messages: recoverPresentToolMessages(t.messages, outputs)} : t)}))
+        const state = useAcpUiStore.getState()
+        const thread = state.threads.find(t => t.id === state.activeThreadId)
+        if (thread) updateOwnedChatThreadMessages(thread, recoverPresentToolMessages(thread.messages, outputs))
       }
       setPromptCapabilities(result.promptCapabilities ?? {})
       // 原生绑定模式随连接确认写入（缺席=兼容）；断开/切换由 slice 清零
@@ -470,6 +474,7 @@ export function useAcpSession(workspaceRoot?: string) {
   const syncAgentSessionToActiveThread = useCallback(async (
     forceReconnect = false,
   ): Promise<boolean> => {
+    const route = captureAcpTurnIdentity()
     const cwd = workspaceRoot?.trim() || undefined
     const statusNow = useAcpUiStore.getState().status
     if (statusNow === 'connecting' || statusNow === 'awaiting_auth') {
@@ -522,6 +527,7 @@ export function useAcpSession(workspaceRoot?: string) {
 
     if (wasOnline) {
       const disconnected = await acpApi.disconnect()
+      if (!isAcpTurnRouteCurrent(route) || epoch !== connectionEpochRef.current) return false
       if (!isOk(disconnected)) {
         acpDevWarn('sync disconnect failed', disconnected.error)
         setStatus('error', disconnected.error.message, disconnected.error.code)
@@ -542,7 +548,7 @@ export function useAcpSession(workspaceRoot?: string) {
       hasLocalHistory: activeThreadHasLocalHistory(),
         recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
     })
-    if (epoch !== connectionEpochRef.current) return false
+    if (epoch !== connectionEpochRef.current || !isAcpTurnRouteCurrent(route)) return false
     if (!isOk(result)) {
       acpDevWarn('sync connect failed', result.error)
       setStatus('error', result.error.message, result.error.code)
@@ -637,72 +643,72 @@ export function useAcpSession(workspaceRoot?: string) {
       prompt: AcpContentBlock[]
       messageAttachments?: AcpMessageAttachment[]
     }) => {
-      // 忙时丢弃曾是静默的：卡住的回合会让后续发送人间蒸发（用户视角“被吞”）。
-      // 仍不排队（保单轮语义），但必须告知，否则与丢消息无异。
+      if (!payload.prompt.length) return
       if (useAcpUiStore.getState().prompting) {
         toast.info('上一轮还没结束，请稍候或取消后再发送')
         return
       }
-      if (!payload.prompt.length) return
-
-      let sid = useAcpUiStore.getState().sessionId
-      if (!sid) {
-        acpDevLog('sendPrompt: offline, auto-connect before send')
-        const ok = await syncAgentSessionToActiveThread()
-        sid = useAcpUiStore.getState().sessionId
-        if (!ok || !sid) {
-          appendSystemMessage('自动连接未完成，请完成认证后再发送。')
-          return
-        }
-      }
-
-      appendUserMessage(payload.text, payload.messageAttachments)
-      setPrompting(true)
-      beginAgentReply()
-      // 回合开始时的已有消息 id 快照：失败回滚只删本回合新增 agent/thought（id 锚定，不用墙钟）
-      const keepIds = useAcpUiStore
-        .getState()
-        .threads.find((t) => t.id === useAcpUiStore.getState().activeThreadId)!
-        .messages.map((m) => m.id)
-      const includeBootstrap = shouldSendSessionBootstrap(sid)
-      const prefix = buildMontreePromptPrefix(useAcpUiStore.getState().activeThreadId, {
-        includeBootstrap,
-        mode: useAcpUiStore.getState().sessionPromptMode,
+      const initial = captureAcpTurnIdentity()
+      const controller = getAcpTurnController()
+      await controller.send({
+        onBusy: () => toast.info('上一轮还没结束，请稍候或取消后再发送'),
+        prepare: async () => {
+          if (!useAcpUiStore.getState().sessionId) {
+            acpDevLog('sendPrompt: offline, auto-connect before send')
+            const ok = await syncAgentSessionToActiveThread()
+            if (!isAcpTurnRouteCurrent(initial)) return null
+            if (!ok || !useAcpUiStore.getState().sessionId) {
+              appendSystemMessage('自动连接未完成，请完成认证后再发送。')
+              return null
+            }
+          }
+          if (!isAcpTurnRouteCurrent(initial)) return null
+          const identity = captureAcpTurnIdentity()
+          if (!identity.sessionId) return null
+          const keepIds = useAcpUiStore.getState().threads.find(t => t.id === identity.threadId)?.messages.map(m => m.id) ?? []
+          return { identity, sessionId: identity.sessionId, keepIds, includeBootstrap: false }
+        },
+        isCurrent: target => isAcpTurnIdentityCurrent(target.identity),
+        execute: async target => {
+          appendUserMessage(payload.text, payload.messageAttachments)
+          setPrompting(true)
+          beginAgentReply()
+          target.keepIds = useAcpUiStore.getState().threads.find(t => t.id === target.identity.threadId)!.messages.map(m => m.id)
+          target.includeBootstrap = shouldSendSessionBootstrap(target.sessionId)
+          const prefix = buildMontreePromptPrefix(target.identity.threadId, {
+            includeBootstrap: target.includeBootstrap,
+            mode: useAcpUiStore.getState().sessionPromptMode,
+          })
+          return acpApi.prompt({ sessionId: target.sessionId, prompt: [...prefix, ...payload.prompt] })
+        },
+        onResult: (target, result) => {
+          if (isOk(result) && target.includeBootstrap) markSessionBootstrapSent(target.sessionId)
+          flushBufferedChunks()
+          if (isOk(result) && result.value.stopReason === 'cancelled') useAcpUiStore.getState().cancelActiveTools()
+          finishStreaming()
+          if (!isOk(result)) {
+            reportAppError(result.error)
+            useAcpUiStore.getState().rollbackFailedTurn(target.keepIds)
+            appendSystemMessage('发送失败：' + result.error.message)
+          } else if (result.value.stopReason && result.value.stopReason !== 'end_turn') {
+            appendSystemMessage('回合结束：' + result.value.stopReason)
+          }
+        },
+        onError: (target, error) => {
+          if (target ? !isAcpTurnIdentityCurrent(target.identity) : !isAcpTurnRouteCurrent(initial)) return
+          if (target) {
+            flushBufferedChunks()
+            finishStreaming()
+            useAcpUiStore.getState().rollbackFailedTurn(target.keepIds)
+          } else {
+            setStatus('error', error instanceof Error ? error.message : String(error), 'UNKNOWN')
+          }
+          reportUnknownError(error)
+          appendSystemMessage('发送失败：' + (error instanceof Error ? error.message : String(error)))
+        },
       })
-      const result = await acpApi.prompt({
-        sessionId: sid,
-        prompt: [...prefix, ...payload.prompt],
-      })
-      if (isOk(result) && includeBootstrap) {
-        markSessionBootstrapSent(sid)
-      }
-      flushBufferedChunks()
-      // 服务端 stopReason=cancelled 视为确认取消：先标残留工具再收尾
-      if (isOk(result) && result.value.stopReason === 'cancelled') {
-        useAcpUiStore.getState().cancelActiveTools()
-      }
-      finishStreaming()
-      if (!isOk(result)) {
-        reportAppError(result.error)
-        // 失败回合回滚：prompt 失败前流进来的错误正文（如额度报错）不再以
-        // 正常 agent 气泡残留并污染后续回合；工具执行记录保留；再补系统通知。
-        useAcpUiStore.getState().rollbackFailedTurn(keepIds)
-        appendSystemMessage(`发送失败：${result.error.message}`)
-        return
-      }
-      if (result.value.stopReason && result.value.stopReason !== 'end_turn') {
-        appendSystemMessage(`回合结束：${result.value.stopReason}`)
-      }
     },
-    [
-      appendSystemMessage,
-      appendUserMessage,
-      beginAgentReply,
-      finishStreaming,
-      setPrompting,
-      syncAgentSessionToActiveThread,
-      flushBufferedChunks,
-    ],
+    [appendSystemMessage, appendUserMessage, beginAgentReply, finishStreaming, setPrompting, setStatus, syncAgentSessionToActiveThread, flushBufferedChunks],
   )
 
   /** 清空时间线等于重新开场：turn-context 与渲染速览计数一并归零 */
@@ -713,18 +719,26 @@ export function useAcpSession(workspaceRoot?: string) {
   }, [clearMessagesInStore])
 
   const cancel = useCallback(async () => {
-    const sid = useAcpUiStore.getState().sessionId
-    if (!sid) return
-    const result = await acpApi.cancel({ sessionId: sid })
-    if (!isOk(result)) {
-      reportAppError(result.error)
-      return
-    }
-    useAcpUiStore.getState().clearPendingPermission()
-    // 服务端已确认取消：残留工具标 cancelled，再收尾（结果未知的残留走“状态未知”）
-    useAcpUiStore.getState().cancelActiveTools()
-    flushBufferedChunks()
-    finishStreaming()
+    const identity = captureAcpTurnIdentity()
+    if (!identity.sessionId) return
+    const controller = getAcpTurnController()
+    await controller.cancel({
+      prepare: () => identity,
+      isCurrent: isAcpTurnIdentityCurrent,
+      execute: target => acpApi.cancel({ sessionId: target.sessionId! }),
+      onResult: (_target, result) => {
+        if (!isOk(result)) {
+          reportAppError(result.error)
+          return
+        }
+        controller.invalidateSend()
+        useAcpUiStore.getState().clearPendingPermission()
+        useAcpUiStore.getState().cancelActiveTools()
+        flushBufferedChunks()
+        finishStreaming()
+      },
+      onError: (_target, error) => reportUnknownError(error),
+    })
   }, [finishStreaming, flushBufferedChunks])
 
   const setModel = useCallback(

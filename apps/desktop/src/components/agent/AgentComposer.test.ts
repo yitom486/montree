@@ -10,18 +10,19 @@ describe('community composer keyboard', () => {
   beforeEach(() => { host = document.createElement('div'); document.body.append(host); root = createRoot(host) })
   afterEach(() => { act(() => root.unmount()); host.remove() })
   const mount = async (prompting = false) => {
-    const send = vi.fn(), cancel = vi.fn()
-    await act(async () => root.render(createElement(AgentComposer, { draft: '中文内容', onDraftChange: vi.fn(), disabled: false, prompting, promptCapabilities: { image: false, audio: false, embeddedContext: false }, toolbarStart: null, onSubmit: send, onCancel: cancel })))
-    return { send, cancel, textarea: host.querySelector('textarea')! }
+    const send = vi.fn(), cancel = vi.fn(), change = vi.fn()
+    await act(async () => root.render(createElement(AgentComposer, { draft: '中文内容', onDraftChange: change, disabled: false, prompting, promptCapabilities: { image: false, audio: false, embeddedContext: false }, toolbarStart: null, onSubmit: send, onCancel: cancel })))
+    return { send, cancel, change, textarea: host.querySelector('textarea')! }
   }
   it('Enter submits; Shift+Enter and native IME confirmation do not', async () => {
-    const { send, textarea } = await mount()
+    const { send, change, textarea } = await mount()
     await act(async () => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })))
     await act(async () => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true })))
     expect(send).not.toHaveBeenCalled()
     await act(async () => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
     expect(send).toHaveBeenCalledTimes(1)
     expect(send.mock.calls[0][0].text).toBe('中文内容')
+    expect(change).toHaveBeenCalledExactlyOnceWith('')
   })
   it('composition lifecycle protects Enter even when a platform omits isComposing', async () => {
     const { send, textarea } = await mount()
