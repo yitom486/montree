@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import {
   resolveEpubChapter,
   resolveMobiChapter,
@@ -9,7 +9,7 @@ import {
   tocFromPdfUnits,
   toCanonicalChapter,
   type ReadingNotesChapterRef,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { sortMarksByDocumentPosition } from './mark-document-order'
 
 /**

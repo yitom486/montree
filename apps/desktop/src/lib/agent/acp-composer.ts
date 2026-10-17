@@ -1,9 +1,9 @@
 import {
   IMAGE_EXTENSION_BY_MIME,
   IMAGE_MIME_BY_EXTENSION,
-} from '@montree/contracts'
-import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
-import type { ComposerAttachmentKind } from '@montree/chat-core'
+} from '@yitom/contracts'
+import type { AcpContentBlock, AcpPromptCapabilities } from '@yitom/contracts'
+import type { ComposerAttachmentKind } from '@yitom/chat-core'
 
 /** 侧栏 → Agent 输入区拖拽的自定义 MIME（JSON 绝对路径数组） */
 export const MONTREE_WORKSPACE_PATHS_MIME = 'application/x-montree-workspace-paths'

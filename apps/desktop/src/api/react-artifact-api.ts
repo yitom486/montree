@@ -1,4 +1,4 @@
-import { err, type AppError, type Result } from '@montree/contracts'
+import { err, type AppError, type Result } from '@yitom/contracts'
 
 export function compileReactArtifact(source: string, css?: string): Promise<Result<string, AppError>> {
   const api = window.electronAPI

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
-import { computeTocSignature } from '@montree/reader-core'
+import { computeTocSignature } from '@yitom/reader-core'
 import { migrateBookDb } from './schema'
 import {
   getTocEntry,

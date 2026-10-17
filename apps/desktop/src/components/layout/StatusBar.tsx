@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { GitBranch, Loader2, RefreshCw, Terminal, UploadCloud } from 'lucide-react'
-import { isWslPath, parseWslPath, getDocumentKind } from '@montree/contracts'
+import { isWslPath, parseWslPath, getDocumentKind } from '@yitom/contracts'
 import { useGitStatus } from '@/hooks/workspace/useGitStatus'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

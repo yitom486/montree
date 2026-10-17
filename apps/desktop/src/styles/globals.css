@@ -11,12 +11,12 @@
 @source "../../../../node_modules/@streamdown/*/dist/**/*.js";
 
 /*
- * M4 构建回归修复：聊天 UI 已迁 `packages/chat-ui`（M1–M3），Tailwind v4
- * 自动扫描只覆盖渲染根目录，包内独用的工具类（如比较卡的
- * `@min-[480px]:columns-2`）会被 tree-shake 掉 → 容器查询列数断言失败。
- * 路径相对于本文件；`chat-core` 无 UI 类故不收录。
+ * M4 构建回归修复（后迁 npm @yitom/chat-ui）：聊天 UI 包内独用的工具类
+ * （如比较卡的 `@min-[480px]:columns-2`）会被 tree-shake 掉 → 容器查询列数断言失败。
+ * 扫描已发版的 dist JS（类名字符串原样保留）；路径相对于本文件；
+ * `chat-core` 无 UI 类故不收录。
  */
-@source "../../../../packages/chat-ui/src";
+@source "../../../../node_modules/@yitom/chat-ui/dist";
 
 @custom-variant dark (&:is(.dark *));
 @custom-variant sepia (&:is(.sepia *));

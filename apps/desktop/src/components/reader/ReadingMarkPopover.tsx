@@ -4,9 +4,9 @@ import {
   HIGHLIGHT_COLORS,
   type HighlightColorId,
   normalizeHighlightColor,
-} from '@montree/reader-core'
-import { getReadingMarkStatusLabel } from '@montree/reader-core'
-import type { ReadingMark } from '@montree/contracts'
+} from '@yitom/reader-core'
+import { getReadingMarkStatusLabel } from '@yitom/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
 import { cn } from '@/lib/utils'
 import { AnchoredSurface } from '@/components/shared/AnchoredSurface'
 

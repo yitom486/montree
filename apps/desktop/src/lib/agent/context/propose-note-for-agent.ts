@@ -6,7 +6,7 @@ export {
 } from '@/lib/agent/context/propose-mark'
 
 import { proposeMarksUnifiedForAgent } from '@/lib/agent/context/propose-mark'
-import type { MarkProposalPayload } from '@montree/annotations'
+import type { MarkProposalPayload } from '@yitom/annotations'
 
 function normalizePayload(payload: MarkProposalPayload): MarkProposalPayload {
   return payload

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { buildBookIndex, findChapterForPage, modulePageRange } from '@montree/reader-core'
-import { computeTocSignature, normalizeTocTitle } from '@montree/reader-core'
+import { buildBookIndex, findChapterForPage, modulePageRange } from '@yitom/reader-core'
+import { computeTocSignature, normalizeTocTitle } from '@yitom/reader-core'
 import { migrateBookDb } from './schema'
 
 /**

@@ -8,12 +8,12 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { Flashcard } from '@montree/annotations'
+import type { Flashcard } from '@yitom/annotations'
 import {
   calculateReviewStats,
   parseClozeContent,
   type FlashcardReviewRating,
-} from '@montree/annotations'
+} from '@yitom/annotations'
 import {
   BookOpen,
   RotateCcw,

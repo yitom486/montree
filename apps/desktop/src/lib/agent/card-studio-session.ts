@@ -1,5 +1,5 @@
 import { aiSessionApi } from '@/api/ai-session-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import {
   accumulateSubsessionUpdateFor,
   clearSubsessionSessions,

@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process'
-import { isWslPath, parseWslPath, type AcpRuntimeInfo } from '@montree/contracts'
+import { isWslPath, parseWslPath, type AcpRuntimeInfo } from '@yitom/contracts'
 import { bindAcpContext, currentAcpContext } from './acp-context'
 import { logAcpDiagnostic } from './mcp/diagnostics'
 

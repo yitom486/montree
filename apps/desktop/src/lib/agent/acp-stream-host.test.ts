@@ -24,7 +24,7 @@ vi.mock('@/api/acp-api', () => ({
 
 import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import {
   flushAcpStreamBuffer,

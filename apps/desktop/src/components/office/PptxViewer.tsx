@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { PresentationDocument } from '@/lib/data/presentation-document'
 import { notifyDocumentTools, registerDocumentTools } from '@/lib/agent/context/document-tool-registry'

@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { BunRuntimeStatus } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { BunRuntimeStatus } from '@yitom/contracts'
 
 /** Agent 通过 bunx 启动时，是否像「未安装 Bun」导致的错误 */
 export function isLikelyBunMissingMessage(message: string): boolean {

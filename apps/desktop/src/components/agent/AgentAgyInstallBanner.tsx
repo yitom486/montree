@@ -3,7 +3,7 @@ import { Check, Copy, Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { acpApi } from '@/api/acp-api'
 import { appApi } from '@/api/app-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 interface AgentAgyInstallBannerProps {

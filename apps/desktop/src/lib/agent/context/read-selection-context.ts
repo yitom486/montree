@@ -1,7 +1,7 @@
 import { buildSelectionContext, type SelectionContextResult } from './expand-selection-context'
 import { readCurrentDocumentText } from './reader-content-registry'
 import { readSelectionText, getStickyReaderSelection, getSelectionProvider } from './reader-selection-registry'
-import type { DocumentSelection } from '@montree/contracts'
+import type { DocumentSelection } from '@yitom/contracts'
 
 /**
  * 读取用户选区。

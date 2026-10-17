@@ -1,5 +1,5 @@
-import type { ReadingMarkCategory } from '@montree/contracts'
-import type { HighlightColorId } from '@montree/reader-core'
+import type { ReadingMarkCategory } from '@yitom/contracts'
+import type { HighlightColorId } from '@yitom/reader-core'
 
 export interface HeuristicCardResult {
   category: ReadingMarkCategory

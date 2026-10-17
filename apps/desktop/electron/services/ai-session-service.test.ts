@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
 import { MONTREE_DB_SCHEMA_VERSION, getMontreeDbVersion, migrateMontreeDb } from './app-db/schema'
 import { closeAllMontreeDbs, openMontreeDb } from './app-db/open-app-db'
 import { getAiSession, putAiSession, touchAiSession } from './ai-session-service'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 describe('ai-session-service（一书一会话指针）', () => {
   beforeEach(async () => {

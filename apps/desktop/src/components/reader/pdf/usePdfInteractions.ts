@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import type { ReadingMark } from '@montree/contracts'
-import { isOk } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
+import { isOk } from '@yitom/contracts'
 import {
   clearWindowSelection,
   DEFAULT_HIGHLIGHT_COLOR,
@@ -11,7 +11,7 @@ import {
   toCanonicalChapter,
   type PdfSelectionSnapshot,
   type ReaderUnit,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { findPdfMarksAtPoint } from '@/lib/reader/marks/pdf-reading-marks'
 import { parseNoteToCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { useReaderSelectionActions } from '@/hooks/reader/useReaderSelectionActions'
@@ -35,7 +35,7 @@ import { focusAgentComposerOnReaderSelection } from '@/lib/agent/context/focus-a
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useTtsStore } from '@/stores/tts-store'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
-import { buildPdfSnapshotFromRange } from '@montree/reader-core'
+import { buildPdfSnapshotFromRange } from '@yitom/reader-core'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 import { toast } from 'sonner'
@@ -50,7 +50,7 @@ export interface UsePdfInteractionsOptions {
   pdfDocRef: React.RefObject<PDFDocumentProxy | null>
   pageAnchorRefs: React.RefObject<Map<number, HTMLDivElement>>
   marks: ReadingMark[]
-  marksToc: ReturnType<typeof import('@montree/reader-core').tocFromPdfUnits>
+  marksToc: ReturnType<typeof import('@yitom/reader-core').tocFromPdfUnits>
   outlineUnits: ReaderUnit[]
   inspector: ReturnType<typeof useReadingMarkInspector>
   createMark: (payload: any) => Promise<any>
@@ -174,7 +174,7 @@ export function usePdfInteractions({
     async (
       note: string,
       color = DEFAULT_HIGHLIGHT_COLOR,
-      overrideCategory?: import('@montree/contracts').ReadingMarkCategory,
+      overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
     ) => {
       const snapshot = selectionTransactionRef.current

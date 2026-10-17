@@ -1,9 +1,9 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { err, ok, type Result } from '@montree/contracts'
-import { toAppError, type AppError } from '@montree/contracts'
-import type { SyncConfig } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
+import type { SyncConfig } from '@yitom/contracts'
 
 export const DEFAULT_SYNC_CONFIG: SyncConfig = {
   enabled: false,

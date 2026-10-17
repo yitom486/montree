@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { TypstService } from './typst-service'
-import type { TypstEvent } from '@montree/contracts'
+import type { TypstEvent } from '@yitom/contracts'
 
 const executable = process.env.MONTREE_TINYMIST_PATH || path.resolve('apps/desktop/resources/typst', process.platform === 'win32' ? 'tinymist.exe' : 'tinymist')
 async function pdfText(bytes: Buffer): Promise<string> {

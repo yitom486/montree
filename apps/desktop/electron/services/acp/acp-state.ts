@@ -11,7 +11,7 @@ import {
   type AcpStatusChangedEvent,
   type MontreeSnapshotArgs,
   type MontreeSnapshotResource,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { SdkStreamHandle } from './sdk-client'
 import type { SpawnedAcpProcess } from './process-manager'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'

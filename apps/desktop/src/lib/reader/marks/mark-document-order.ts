@@ -1,5 +1,5 @@
-import type { ReadingMark } from '@montree/contracts'
-import { highlightSortKey } from '@montree/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
+import { highlightSortKey } from '@yitom/reader-core'
 
 /**
  * 卡片按文档位置排序：先按目录键序（章），同章内按锚点位置键排序，

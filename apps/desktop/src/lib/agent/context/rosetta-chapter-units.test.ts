@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { err, ok } from '@montree/contracts'
+import { err, ok } from '@yitom/contracts'
 import {
   iterateRosettaChapterUnits,
   ROSETTA_UNITS_UNAVAILABLE,

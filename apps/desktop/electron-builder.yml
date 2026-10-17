@@ -39,6 +39,9 @@ files:
   - node_modules/@yitom/acp-client/**/*
   - node_modules/@agentclientprotocol/sdk/**/*
   - node_modules/zod/**/*
+  # 聊天/阅读器 npm 包中主进程实际 import 的运行时依赖（renderer 侧由 vite 打进包，无需收录）
+  - node_modules/@yitom/annotations/**/*
+  - node_modules/@yitom/reader-core/**/*
   - node_modules/@google/genai/**/*
   - node_modules/gemini-tts-studio/**/*
   - node_modules/microsoft-cognitiveservices-speech-sdk/**/*

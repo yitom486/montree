@@ -1,4 +1,4 @@
-import type { FileTreeNode } from '@montree/contracts'
+import type { FileTreeNode } from '@yitom/contracts'
 import { flattenFileTree } from './quick-open'
 
 export interface WikilinkResolvedTarget {

@@ -1,5 +1,5 @@
-import type { AcpAuthMethod, CodexAuthPreflight } from '@montree/contracts'
-import { DEEPSEEK_DSH_NPM_PACKAGE } from '@montree/contracts'
+import type { AcpAuthMethod, CodexAuthPreflight } from '@yitom/contracts'
+import { DEEPSEEK_DSH_NPM_PACKAGE } from '@yitom/contracts'
 import type { GenericRuntimeAdapter } from '../index'
 
 /**

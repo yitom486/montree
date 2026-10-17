@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import { collectHighlightPassages, isHighlightPassage } from './read-marks-for-agent'
 
 function mark(overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' | 'anchor'>): ReadingMark {

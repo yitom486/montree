@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { findBuiltinAcpRuntime } from '@montree/contracts'
+import { findBuiltinAcpRuntime } from '@yitom/contracts'
 import {
   useAcpUiStore,
   selectThreadsForWorkspaceAndRuntime,

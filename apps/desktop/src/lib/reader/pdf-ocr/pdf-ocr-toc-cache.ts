@@ -1,5 +1,5 @@
 import { ocrTocToReaderUnits } from '@montree/ocr-core'
-import type { OcrTocEntry, PdfOcrTocCache, ReaderTocUnit } from '@montree/contracts'
+import type { OcrTocEntry, PdfOcrTocCache, ReaderTocUnit } from '@yitom/contracts'
 
 export function buildPdfOcrTocCache(params: {
   fileFingerprint: string

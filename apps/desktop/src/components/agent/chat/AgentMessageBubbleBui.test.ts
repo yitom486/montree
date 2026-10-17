@@ -3,7 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ChatMessageBubble } from '@montree/chat-ui'
+import { ChatMessageBubble } from '@yitom/chat-ui'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true

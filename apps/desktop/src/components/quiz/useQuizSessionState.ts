@@ -7,7 +7,7 @@ import type {
   QuizQuestion,
   QuizQuestionType,
   QuizSessionRecord,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   evaluateAnswersWithAi,
   generateQuestionsWithAi,

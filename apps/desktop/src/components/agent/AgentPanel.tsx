@@ -18,9 +18,9 @@ import { AgentHeaderOverflowMenu } from '@/components/agent/AgentHeaderOverflowM
 import { CompactConfigMenu } from '@/components/agent/CompactConfigMenu'
 import { AgentMessageList } from '@/components/agent/chat/AgentMessageList'
 import type { AgentMessageSource } from '@/components/agent/chat/AgentMessageList'
-import type { ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
-import type { GenerativeSubmitPayload } from '@montree/chat-ui'
-import { isStaleGenerativeSubmit } from '@montree/chat-core'
+import type { ChapterMarkPlanSelectPayload } from '@yitom/chat-ui'
+import type { GenerativeSubmitPayload } from '@yitom/chat-ui'
+import { isStaleGenerativeSubmit } from '@yitom/chat-core'
 import { Button } from '@/components/ui/button'
 import { appendSelectionChatMarker } from '@/lib/agent/context/selection-chat-marker'
 import { splitConfigOptions, rankPrimary } from '@/lib/agent/acp-config-menu'
@@ -50,13 +50,13 @@ import { useAcpChatShell, useAcpUiStore } from '@/stores/acp-ui-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { acpApi } from '@/api/acp-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import {
   BUILTIN_ACP_RUNTIMES,
   DEFAULT_ACP_RUNTIME_ID,
   findBuiltinAcpRuntime,
-} from '@montree/contracts'
-import type { AcpConfigOption, AcpProviderStatus, AcpProxySettings } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { AcpConfigOption, AcpProviderStatus, AcpProxySettings } from '@yitom/contracts'
 
 interface AgentPanelProps {
   workspaceRoot?: string

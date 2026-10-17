@@ -1,4 +1,4 @@
-import type { SlideChart } from '@montree/contracts'
+import type { SlideChart } from '@yitom/contracts'
 
 const palette = ['#2563eb', '#ea580c', '#16a34a', '#9333ea', '#dc2626', '#0891b2']
 export function PresentationChart({ chart }: { chart: SlideChart }) {

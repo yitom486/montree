@@ -1,12 +1,12 @@
 import { app } from 'electron'
-import { toAppError, type AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 import type {
   AiSessionGetPayload,
   AiSessionPutPayload,
   AiSessionRecord,
   AiSessionTouchPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { openMontreeDb } from './app-db/open-app-db'
 
 /**

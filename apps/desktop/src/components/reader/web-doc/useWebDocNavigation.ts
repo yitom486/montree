@@ -22,7 +22,7 @@ import {
   findWebDocFlatIndex,
   normalizeWebDocNavUrl,
   webDocTocEntriesToReaderUnits,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { extractWebDocHeadings } from '@/lib/reader/web-doc/web-doc-outline'
 import {
   collectPreviewHeadingPositions,

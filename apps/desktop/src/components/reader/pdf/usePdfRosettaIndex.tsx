@@ -11,8 +11,8 @@ import {
   type PdfToolbarMenuItem,
 } from '@/components/reader/PdfToolbarMoreMenu'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
-import type { OcrTocEntry } from '@montree/contracts'
-import type { ReaderUnit } from '@montree/reader-core'
+import type { OcrTocEntry } from '@yitom/contracts'
+import type { ReaderUnit } from '@yitom/reader-core'
 import { toast } from 'sonner'
 
 export interface UsePdfRosettaIndexOptions {

@@ -12,10 +12,10 @@ import {
   getDocumentKind,
   isTextDocumentKind,
   isOfficeDocumentKind,
-} from '@montree/contracts'
-import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@montree/contracts'
-import { toAppError, type AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+} from '@yitom/contracts'
+import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@yitom/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 import type {
   ExportDocumentPayload,
   ExportDocumentResult,
@@ -30,7 +30,7 @@ import type {
   SaveFileResult,
   SavePastedImagePayload,
   SavePastedImageResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { scanWorkspace } from './workspace'
 import { resolveExportSavePath } from './export-save-path'
 import { documentHash } from './binary-document-service'

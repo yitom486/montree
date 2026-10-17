@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
+import { parseQuizJsonl, serializeQuizSession } from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 
 describe('quiz-service JSONL serialization', () => {
   const sampleRecord: QuizSessionRecord = {

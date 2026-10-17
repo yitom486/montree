@@ -1,6 +1,6 @@
 import type { SentenceItem } from './text-sanitizer'
 import { base64ToBytes } from './pcm-player'
-import type { TtsSpeechBoundary } from '@montree/contracts'
+import type { TtsSpeechBoundary } from '@yitom/contracts'
 
 /**
  * 音频-文本静态时间标记（AudioTextCueMarker）

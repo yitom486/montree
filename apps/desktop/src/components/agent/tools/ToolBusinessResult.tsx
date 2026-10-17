@@ -11,7 +11,7 @@ import { emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import {
   DiagramViewerCard,
   type DiagramPayload,
-} from '@montree/chat-ui'
+} from '@yitom/chat-ui'
 import {
   CrossReferenceCard,
   type CrossReferencePayload,
@@ -30,20 +30,20 @@ import {
   ComponentUiCardLazy,
   sanitizeArtifactFileName,
   type GenerativeSubmitPayload,
-} from '@montree/chat-ui'
+} from '@yitom/chat-ui'
 import { openChapterForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { checkPresentDocument } from '@/lib/agent/present-locate'
-import { isPresentToolTitle } from '@montree/chat-core'
+import { isPresentToolTitle } from '@yitom/chat-core'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
-import { isOk, parsePresentResult, type MontreePresentResult } from '@montree/contracts'
-import { toChapterKey, type ReadingAnchor } from '@montree/contracts'
-import { normalizeLoadKey } from '@montree/reader-core'
+import { isOk, parsePresentResult, type MontreePresentResult } from '@yitom/contracts'
+import { toChapterKey, type ReadingAnchor } from '@yitom/contracts'
+import { normalizeLoadKey } from '@yitom/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { fileApi } from '@/api/file-api'
 import { compileReactArtifact } from '@/api/react-artifact-api'
 
-const ReactArtifactCardLazy = lazy(() => import('@montree/chat-ui').then(module => ({ default: module.ReactArtifactCard })))
+const ReactArtifactCardLazy = lazy(() => import('@yitom/chat-ui').then(module => ({ default: module.ReactArtifactCard })))
 
 export function buildNoteFromDiagram(payload: DiagramPayload): string {
   const lines: string[] = []

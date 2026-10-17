@@ -3,7 +3,7 @@ import {
   createChatSessionStore,
   type ChatSessionSnapshot,
   type ChatSessionStore,
-} from '@montree/chat-session'
+} from '@yitom/chat-session'
 import {
   mirrorPermissionRequestToPackageStore,
   mirrorSessionUpdateToPackageStore,

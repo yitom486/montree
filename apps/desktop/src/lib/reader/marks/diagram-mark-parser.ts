@@ -1,5 +1,5 @@
-import type { ReadingMark } from '@montree/contracts'
-import type { DiagramPayload, DiagramVisualStep } from '@montree/chat-ui'
+import type { ReadingMark } from '@yitom/contracts'
+import type { DiagramPayload, DiagramVisualStep } from '@yitom/chat-ui'
 
 /**
  * 从 ReadingMark 的 note 或属性中深度解析 DiagramPayload。

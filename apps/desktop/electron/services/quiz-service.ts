@@ -2,9 +2,9 @@ import { appendFile, mkdir, readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
-import { toAppError, type AppError } from '@montree/contracts'
-import { err, ok, parseQuizJsonl, serializeQuizSession, type Result } from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
+import { err, ok, parseQuizJsonl, serializeQuizSession, type Result } from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 import {
   exportQuizJsonl,
   importQuizJsonl,
@@ -14,7 +14,7 @@ import {
 } from './quiz-db'
 
 // 兼容再导出：纯函数已下沉 contracts，旧测试仍从本模块引入，保持可用
-export { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
+export { parseQuizJsonl, serializeQuizSession } from '@yitom/contracts'
 
 export function getQuizFilePath(): string {
   return join(app.getPath('userData'), 'quiz-records.jsonl')

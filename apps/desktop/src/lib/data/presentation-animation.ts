@@ -1,4 +1,4 @@
-import type { SlideAnimation, SlideAnimationEffect, SlideTransition } from '@montree/contracts'
+import type { SlideAnimation, SlideAnimationEffect, SlideTransition } from '@yitom/contracts'
 import { P, P14, child, children, descendants, object, number, shapeTree, shapeId, insertOrdered } from './presentation-xml'
 
 const MC = 'http://schemas.openxmlformats.org/markup-compatibility/2006'

@@ -1,7 +1,7 @@
 import { buildWebDocPlaygroundRuntimeScript } from './web-doc-runtime-scripts'
 import DOMPurify from 'dompurify'
 import { Readability } from '@mozilla/readability'
-import type { WebDocPageContent, WebDocSiteId } from '@montree/contracts'
+import type { WebDocPageContent, WebDocSiteId } from '@yitom/contracts'
 import {
   normalizeWebDocCallouts,
   normalizeWebDocCardGrids,
@@ -13,8 +13,8 @@ import {
   extractNextFlightCardHrefs,
   stripWebDocChrome,
 } from '@/lib/reader/web-doc/web-doc-chrome'
-import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@montree/reader-core'
-import { DEFAULT_READER_TYPOGRAPHY, type ReaderTypography } from '@montree/reader-core'
+import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@yitom/reader-core'
+import { DEFAULT_READER_TYPOGRAPHY, type ReaderTypography } from '@yitom/reader-core'
 import { buildWebDocCodeBlockCss, buildWebDocTabsRuntimeScript, enhanceWebDocCodeBlocks } from '@/lib/reader/web-doc/web-doc-code-blocks'
 import {
   buildWebDocEmbedCss,

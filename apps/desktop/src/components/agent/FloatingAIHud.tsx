@@ -32,8 +32,8 @@ import { getReaderContentProvider } from '@/lib/agent/context/reader-content-reg
 import { sortCardsByDocumentPosition } from '@/lib/reader/marks/card-order-from-units'
 import { emitRevealMark, emitAnchorHighlight } from '@/lib/reader/marks/mark-linkage'
 import { toast } from 'sonner'
-import { BUILTIN_ACP_RUNTIMES, type ReadingMarkCategory } from '@montree/contracts'
-import { isOk } from '@montree/contracts'
+import { BUILTIN_ACP_RUNTIMES, type ReadingMarkCategory } from '@yitom/contracts'
+import { isOk } from '@yitom/contracts'
 import { queryKeys } from '@/api/query-keys'
 import { readingMarksApi } from '@/api/reading-marks-api'
 

@@ -1,4 +1,4 @@
-import type { MontreePresentResult } from '@montree/contracts'
+import type { MontreePresentResult } from '@yitom/contracts'
 
 export type PresentLocateVerdict = { ok: true } | { ok: false; message: string }
 

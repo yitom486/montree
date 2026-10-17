@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { appApi } from '@/api/app-api'
 import { windowStorageKey } from './acp/window-storage'
 import { persist } from 'zustand/middleware'
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import {
   extractTextFromContent,
@@ -10,11 +10,11 @@ import {
   toolUpdateContentText,
   isToolActiveStatus,
 } from '@/stores/acp-chat-types'
-import { parseAcpPlanEntries, summarizePlanProgress } from '@montree/chat-core'
-import { enrichAcpToolMessage } from '@montree/chat-core'
+import { parseAcpPlanEntries, summarizePlanProgress } from '@yitom/chat-core'
+import { enrichAcpToolMessage } from '@yitom/chat-core'
 import { promoteMarkProposalsToLastAgent, resolveMarkProposalOnMessages } from '@/lib/agent/promote-mark-proposals'
 import { extractAnnotationDraft } from '@/lib/agent/annotation-note-prompts'
-import type { MarkProposalStatus } from '@montree/annotations'
+import type { MarkProposalStatus } from '@yitom/annotations'
 
 function messageId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`

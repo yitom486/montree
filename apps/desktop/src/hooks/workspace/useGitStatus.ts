@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { gitApi } from '@/api/git-api'
 import { queryKeys } from '@/api/query-keys'
 import { useWorkspaceIdentity } from '@/stores/workspace-store'
-import type { GitCommitOptions, GitPushOptions } from '@montree/contracts'
+import type { GitCommitOptions, GitPushOptions } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 export function useGitStatus(workspaceRoot?: string) {

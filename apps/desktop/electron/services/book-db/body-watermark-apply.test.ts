@@ -20,7 +20,7 @@ import {
   sha256HexAscii,
   type BodyWatermarkPatch,
 } from '@montree/ocr-core'
-import type { BookBlockType } from '@montree/contracts'
+import type { BookBlockType } from '@yitom/contracts'
 import { getBookDbPath } from './open-book-db'
 import { migrateBookDb } from './schema'
 import { getBookRecord, searchBookBlocks } from './queries'

@@ -5,9 +5,9 @@ import {
   ListTodo,
   Loader2,
 } from 'lucide-react'
-import { AgentChatItem, AgentChatItemBody } from '@montree/chat-ui'
+import { AgentChatItem, AgentChatItemBody } from '@yitom/chat-ui'
 import { cn } from '@/lib/utils'
-import { summarizePlanProgress } from '@montree/chat-core'
+import { summarizePlanProgress } from '@yitom/chat-core'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
 interface AgentPlanCardProps {

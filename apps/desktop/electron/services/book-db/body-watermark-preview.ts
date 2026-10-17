@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { BookBlockType } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { BookBlockType } from '@yitom/contracts'
 import type {
   RosettaBodyWatermarkPreviewResult,
   RosettaBodyWatermarkPreviewSample,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   computeBodyWatermarkPlanSignature,
   planBodyWatermarkPatches,

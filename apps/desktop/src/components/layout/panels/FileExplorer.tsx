@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { getDocumentKind, SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
+import { getDocumentKind, SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@yitom/contracts'
 import {
   BookMarked,
   BookOpen,
@@ -18,8 +18,8 @@ import {
   Table2,
   Terminal,
 } from 'lucide-react'
-import type { FileTreeNode } from '@montree/contracts'
-import { isWslPath } from '@montree/contracts'
+import type { FileTreeNode } from '@yitom/contracts'
+import { isWslPath } from '@yitom/contracts'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { writeWorkspacePathsToDataTransfer } from '@/lib/agent/acp-composer'

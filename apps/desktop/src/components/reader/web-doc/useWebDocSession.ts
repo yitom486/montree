@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import {
   bindDocumentSelectionCollapse,
   bindOutsideReaderPointerDismiss,
@@ -10,7 +10,7 @@ import {
   isClickNotDrag,
   readMobiSelection,
   type ReaderUnit,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import {
   findMobiMarksAtPoint,
   findMobiNoteMarkAtPoint,
@@ -60,7 +60,7 @@ import {
 import { logWebDoc } from '@/lib/reader/web-doc/web-doc-debug'
 import type { WebDocPageData } from '@/hooks/reader/useWebDocPage'
 import type { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
-import type { PdfSelectionSnapshot } from '@montree/reader-core'
+import type { PdfSelectionSnapshot } from '@yitom/reader-core'
 
 type UseReadingMarkInspectorReturn = ReturnType<typeof useReadingMarkInspector>
 

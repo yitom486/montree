@@ -1,4 +1,4 @@
-import type { AcpContentBlock, AcpPromptMode } from '@montree/contracts'
+import type { AcpContentBlock, AcpPromptMode } from '@yitom/contracts'
 import { collectActiveDocument, collectReaderLocationKey, collectReadingState, collectTocTopLevelForDocument } from './collect-turn-context'
 import {
   MONTREE_BOOTSTRAP_CLOSE_TAG,

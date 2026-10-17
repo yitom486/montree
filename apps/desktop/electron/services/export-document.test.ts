@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 const { showOpenDialog, showSaveDialog, printToPDF, loadURL, destroy, executeJavaScript } = vi.hoisted(() => ({
   showOpenDialog: vi.fn(),

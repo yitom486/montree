@@ -1,4 +1,4 @@
-import type { ReaderImageReference, ReaderVisualContext, ReaderViewportRect } from '@montree/contracts'
+import type { ReaderImageReference, ReaderVisualContext, ReaderViewportRect } from '@yitom/contracts'
 import { markdownParser } from '@/lib/editor/markdown'
 import { getReaderContentProvider } from './reader-content-registry'
 

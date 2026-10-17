@@ -11,7 +11,7 @@ import {
   Server,
   Terminal,
 } from 'lucide-react'
-import { isWslPath, type RemoteDirectoryEntry, type RemoteServerConnectionInfo, type SshConfigHost, type WslDistroInfo } from '@montree/contracts'
+import { isWslPath, type RemoteDirectoryEntry, type RemoteServerConnectionInfo, type SshConfigHost, type WslDistroInfo } from '@yitom/contracts'
 import { remoteApi } from '@/api/remote-api'
 import { queryKeys } from '@/api/query-keys'
 import { useWorkspaceStore } from '@/stores/workspace-store'

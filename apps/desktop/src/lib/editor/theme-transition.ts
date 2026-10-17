@@ -9,7 +9,7 @@ export function registerThemeParticipant(apply: (theme: ThemeTransitionTarget) =
   return () => { themeParticipants.delete(apply) }
 }
 
-import { notifyArtifactThemeParticipants } from '@montree/chat-ui'
+import { notifyArtifactThemeParticipants } from '@yitom/chat-ui'
 
 async function syncThemeParticipants(theme: ThemeTransitionTarget): Promise<void> {
   // 包内隔离帧集合（M4 主题回执修复）：与宿主集合同一次过渡、同 160ms 上限；

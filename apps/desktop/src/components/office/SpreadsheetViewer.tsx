@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, Suspense, lazy } from 'react'
 import * as XLSX from 'xlsx'
-import { isOk, type CellInput } from '@montree/contracts'
+import { isOk, type CellInput } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { SpreadsheetDocument, tableRange } from '@/lib/data/spreadsheet-document'
 import { commitDocumentSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'

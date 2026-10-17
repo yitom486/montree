@@ -1,17 +1,17 @@
 import { readFile, rm } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import { buildBookIndex } from '@montree/reader-core'
-import { DEFAULT_PDF_OCR_SCALE } from '@montree/contracts'
-import type { PdfOcrPageCache } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import { buildBookIndex } from '@yitom/reader-core'
+import { DEFAULT_PDF_OCR_SCALE } from '@yitom/contracts'
+import type { PdfOcrPageCache } from '@yitom/contracts'
 import type {
   RosettaActiveImport,
   RosettaImportPayload,
   RosettaImportPhase,
   RosettaImportStats,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { InspectorSpanLike } from '@montree/ocr-core'
 import { filterOcrHitLayerWords, normalizeInspectorSpans } from '@montree/ocr-core'
 import { discoverWatermarksByPosition, isDiagonalStampSpan } from '@montree/ocr-core'

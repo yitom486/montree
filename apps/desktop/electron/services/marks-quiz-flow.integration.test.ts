@@ -44,8 +44,8 @@ import {
   readQuizSessionsByFile,
 } from './quiz-service'
 import { clearQuizFingerprintCache, exportQuizJsonl, importQuizJsonl } from './quiz-db'
-import { isOk, toChapterKey } from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
+import { isOk, toChapterKey } from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 
 afterEach(() => {
   // 兜底：helper 已做清理；此处只防用例中途抛错漏关句柄（不删目录，由 helper 断言负责）

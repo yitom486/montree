@@ -1,5 +1,5 @@
-import { LOCAL_WORKSPACE_ID, documentRefKey } from '@montree/contracts'
-import type { DocumentRef } from '@montree/contracts'
+import { LOCAL_WORKSPACE_ID, documentRefKey } from '@yitom/contracts'
+import type { DocumentRef } from '@yitom/contracts'
 
 /**
  * TanStack Query key 工厂（A1）：工作区身份进入 key，防跨工作区缓存串用（T7）。

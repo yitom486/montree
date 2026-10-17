@@ -5,12 +5,12 @@ import {
   modulePageRange,
   type BookIndex,
   type PrintedTocEntry,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import type { InspectorSpanLike } from '@montree/ocr-core'
 // 复用同一套归一化做 span 对齐（空格/标点/全角折叠），保证入库匹配与清洗一致
 import { normalizeWatermarkText } from '@montree/ocr-core'
-import type { BookBlockType, PdfPointBBox } from '@montree/contracts'
-import { computeTocSignature } from '@montree/reader-core'
+import type { BookBlockType, PdfPointBBox } from '@yitom/contracts'
+import { computeTocSignature } from '@yitom/reader-core'
 import { migrateBookDb } from './schema'
 
 export interface ImportBookPageInput {

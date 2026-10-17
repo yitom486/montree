@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { RosettaBookInfo, RosettaImportState } from '@montree/contracts'
-import type { ReaderUnit } from '@montree/reader-core'
+import type { RosettaBookInfo, RosettaImportState } from '@yitom/contracts'
+import type { ReaderUnit } from '@yitom/reader-core'
 
 declare global {
   interface Window {
@@ -26,7 +26,7 @@ import { iterateRosettaChapterUnits } from '@/lib/agent/context/rosetta-chapter-
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { appApi } from '@/api/app-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 export interface UsePdfAgentRegistryOptions {
   filePath: string

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createChatSessionStore } from '@montree/chat-session'
+import { createChatSessionStore } from '@yitom/chat-session'
 import { appApi } from '@/api/app-api'
 import {
   createOwnedChatSessionStorage,

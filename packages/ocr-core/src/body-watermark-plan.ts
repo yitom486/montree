@@ -1,4 +1,4 @@
-import type { BookBlockType } from '@montree/contracts'
+import type { BookBlockType } from '@yitom/contracts'
 import { normalizeWatermarkText } from './ocr-watermark'
 
 /**

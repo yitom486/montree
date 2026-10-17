@@ -5,13 +5,13 @@
  * 天然兼容 UTF-8 多字节；stdin/stdout 只走协议帧，日志走 stderr。
  * 请求 id 统一 `ws-<n>` 命名空间，不复用 ACP 消息 ID。
  */
-import type { AppError } from "@montree/contracts/core/errors";
+import type { AppError } from "@yitom/contracts/core/errors";
 import {
   WORKSPACE_PROTOCOL_MAJOR,
   WORKSPACE_PROTOCOL_MINOR,
   type WorkspaceMethod,
   type WorkspaceServerHandshake,
-} from "@montree/contracts/types/workspace";
+} from "@yitom/contracts/types/workspace";
 
 export const WORKSPACE_FRAME_HEADER_BYTES = 4;
 

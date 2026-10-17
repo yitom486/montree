@@ -1,6 +1,6 @@
-import type { QuizSessionRecord } from '@montree/contracts'
-import type { Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
+import type { Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 
 export interface IQuizRepository {
   appendSession(session: QuizSessionRecord): Promise<Result<void, AppError>>

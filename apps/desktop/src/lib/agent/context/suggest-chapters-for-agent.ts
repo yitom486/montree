@@ -2,7 +2,7 @@ import {
   CHAPTER_MARK_PLAN_MAX,
   type ChapterMarkPlanInput,
   type ChapterMarkPlanToolResult,
-} from '@montree/annotations'
+} from '@yitom/annotations'
 import { collectActiveDocument } from '@/lib/agent/context/collect-turn-context'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 

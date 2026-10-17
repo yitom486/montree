@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { IPC } from '@montree/contracts'
+import { IPC } from '@yitom/contracts'
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<unknown>>(),

@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { PDF_OCR_TOC_CACHE_VERSION } from '@montree/contracts'
-import type { PdfOcrTocCache } from '@montree/contracts'
+import { PDF_OCR_TOC_CACHE_VERSION } from '@yitom/contracts'
+import type { PdfOcrTocCache } from '@yitom/contracts'
 
 export { PDF_OCR_TOC_CACHE_VERSION }
 

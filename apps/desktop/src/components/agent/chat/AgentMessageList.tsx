@@ -13,19 +13,19 @@ import {
 } from '@/stores/acp-ui-store'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { AgentActivityGroup } from '@/components/agent/chat/AgentActivityGroup'
-import { planInlinePresent } from '@montree/chat-core'
-import { groupChatTimeline } from '@montree/chat-core'
-import { ChatMessageBubble } from '@montree/chat-ui'
+import { planInlinePresent } from '@yitom/chat-core'
+import { groupChatTimeline } from '@yitom/chat-core'
+import { ChatMessageBubble } from '@yitom/chat-ui'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
-import { AgentPermissionCard } from '@montree/chat-ui'
+import { AgentPermissionCard } from '@yitom/chat-ui'
 import { respondPermissionRequest } from '@/lib/agent/permission-respond'
 import { openChapterForMarkRecovery, promptSelectTextForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
 import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
-import { AgentLoadingState, currentRunStatus } from '@montree/chat-ui'
-import { timelineRendersInlineApproval } from '@montree/chat-core'
+import { AgentLoadingState, currentRunStatus } from '@yitom/chat-ui'
+import { timelineRendersInlineApproval } from '@yitom/chat-core'
 import { logAcpLayoutProbe } from '@/lib/agent/acp-layout-probe'
 import {
   CHAT_HISTORY_INITIAL_COUNT,
@@ -33,13 +33,13 @@ import {
   resolveScrollViewport,
   sliceChatWindow,
 } from '@/lib/agent/stick-to-bottom'
-import { AGENT_CHAT_COL_CLASS } from '@montree/chat-ui'
+import { AGENT_CHAT_COL_CLASS } from '@yitom/chat-ui'
 import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
-import { useChatSessionStore } from '@montree/chat-session'
-import type { ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
-import type { GenerativeSubmitPayload } from '@montree/chat-ui'
+import { useChatSessionStore } from '@yitom/chat-session'
+import type { ChapterMarkPlanSelectPayload } from '@yitom/chat-ui'
+import type { GenerativeSubmitPayload } from '@yitom/chat-ui'
 
 /**
  * 消息读取源（P4b 壳收敛第一步，只切 docked 面）：

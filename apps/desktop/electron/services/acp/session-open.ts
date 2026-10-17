@@ -1,5 +1,5 @@
 import { RequestError } from '@agentclientprotocol/sdk'
-import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@montree/contracts'
+import type { AcpSessionRestoreAttempt, AcpSessionRestoreMethod } from '@yitom/contracts'
 import { mergeTopLevelModelsIntoConfigOptions } from "@yitom/acp-client"
 import { logAcpDiagnostic } from './mcp/diagnostics'
 

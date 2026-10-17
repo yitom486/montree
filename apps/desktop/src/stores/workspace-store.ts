@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
-import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
+import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
 import type {
   WorkspaceConnectionState,
   WorkspaceConnectResult,
   WorkspaceDescriptor,
   WindowWorkspaceStatus,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 interface WorkspaceStoreState {
   /** 当前窗口绑定的工作区描述符（未绑定为 null，身份回落 local）。 */

@@ -1,4 +1,4 @@
-import type { OcrTocEntry, OcrTocEntrySource } from '@montree/contracts'
+import type { OcrTocEntry, OcrTocEntrySource } from '@yitom/contracts'
 import {
   cleanupOcrTocTitle,
   computeTocPageRanges,

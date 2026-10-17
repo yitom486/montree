@@ -12,8 +12,8 @@ import {
 } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 import {
   INSPECTOR_MODELS,
   INSPECTOR_OCR_REVISION,

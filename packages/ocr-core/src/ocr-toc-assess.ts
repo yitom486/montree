@@ -1,4 +1,4 @@
-import { PDF_OCR_TOC_CACHE_VERSION, type ReaderTocUnit } from '@montree/contracts'
+import { PDF_OCR_TOC_CACHE_VERSION, type ReaderTocUnit } from '@yitom/contracts'
 import { ocrTocToReaderUnits } from './ocr-toc-extractor'
 
 /**

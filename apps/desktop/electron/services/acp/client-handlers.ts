@@ -4,7 +4,7 @@ import {
   parseMontreeVirtualPath,
   type AcpPermissionOutcome,
   type MontreeVirtualResource,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { methods, RequestError, type ClientApp } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from './acp-terminal'

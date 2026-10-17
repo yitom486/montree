@@ -9,7 +9,7 @@ import {
   normalizeLoadKey,
   scrollToViewportEntry,
   type ViewportNavEntry,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 
 import { mockScrollDocument } from '@/lib/reader/reader-viewport-test-helpers'
 describe('isHeadingLabelMatch', () => {

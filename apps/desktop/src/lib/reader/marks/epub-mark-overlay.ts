@@ -1,5 +1,5 @@
 import { emitRailFocus } from '../rail-follow'
-import { normalizeLoadKey } from '@montree/reader-core'
+import { normalizeLoadKey } from '@yitom/reader-core'
 import { findTextRangeInRoot } from './excerpt-text-match'
 
 /**

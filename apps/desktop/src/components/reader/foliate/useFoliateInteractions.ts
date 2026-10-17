@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FoliateViewElement } from '@foliate/view.js'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import type { FoliateBookAdapter } from '@/lib/reader/adapter/foliate-book-adapter'
-import type { EpubChapter } from '@montree/reader-core'
+import type { EpubChapter } from '@yitom/reader-core'
 import {
   clearReaderSelection,
   commitReaderSelection,
@@ -17,7 +17,7 @@ import {
   readEpubSelection,
   toCanonicalChapter,
   tocFromEpubUnits,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import {
   findMarkByOverlayerKey,
   overlayerKeyForMark,
@@ -30,7 +30,7 @@ import { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
 import { useReaderSelectionActions } from '@/hooks/reader/useReaderSelectionActions'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 const DEFAULT_HIGHLIGHT_COLOR = 'rgba(234, 179, 8, 0.45)'
@@ -169,7 +169,7 @@ export function useFoliateInteractions({
     async (
       note: string,
       color = DEFAULT_HIGHLIGHT_COLOR,
-      overrideCategory?: import('@montree/contracts').ReadingMarkCategory,
+      overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
     ): Promise<ReadingMark> => {
       const snapshot = selectionSnapshotRef.current

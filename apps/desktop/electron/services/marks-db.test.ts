@@ -31,8 +31,8 @@ import {
   rowToReadingMark,
   searchMarks,
 } from './marks-db'
-import { isOk } from '@montree/contracts'
-import { toChapterKey } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import { toChapterKey } from '@yitom/contracts'
 
 describe('marks-db（[2]-01 卡片 SQL 后端）', () => {
   beforeEach(async () => {

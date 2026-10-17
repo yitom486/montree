@@ -136,7 +136,7 @@ function toPackageName(specifier: string): string | null {
   // 路径别名（electron.vite.config.ts / vitest.config.ts）与 Electron 运行时内置模块
   // Monorepo workspace 包经 electron.vite.config.ts workspaceAlias 直接打进 bundle，
   // 主进程产物无运行时 require（已验 out/main 无 @montree 引用），不进 files 白名单
-  if (specifier === '@montree/contracts' || specifier.startsWith('@montree/')) return null
+  if (specifier === '@yitom/contracts' || specifier.startsWith('@montree/')) return null
   if (specifier === 'electron') return null
   if (specifier.startsWith('node:') || BUILTINS.has(specifier)) return null
   if (specifier.includes('://') || specifier.startsWith('/') || specifier.endsWith('.css')) return null

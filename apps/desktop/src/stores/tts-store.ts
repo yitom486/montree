@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { toast } from 'sonner'
 import { ttsApi } from '@/api/tts-api'
 import { getReaderContentProvider } from '@/lib/agent/context/reader-content-registry'
-import type { TtsConfig, TtsProviderType, TtsStreamProgressPayload } from '@montree/contracts'
+import type { TtsConfig, TtsProviderType, TtsStreamProgressPayload } from '@yitom/contracts'
 import {
   allocateSentenceTimeline,
   findCurrentSentenceIndex,

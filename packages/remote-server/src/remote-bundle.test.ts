@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decodeWorkspaceFrames, encodeWorkspaceFrame } from "@montree/workspace-core";
-import { DEFAULT_WORKSPACE_LIMITS } from "@montree/contracts/types/workspace";
+import { DEFAULT_WORKSPACE_LIMITS } from "@yitom/contracts/types/workspace";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
 const BUILD_SCRIPT = join(REPO_ROOT, "packages", "remote-server", "scripts", "build.ts");

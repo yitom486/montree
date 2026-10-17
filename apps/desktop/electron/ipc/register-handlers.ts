@@ -2,7 +2,7 @@ import { registerTypstHandlers } from './typst-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { IPC, ok, err } from '@montree/contracts'
+import { IPC, ok, err } from '@yitom/contracts'
 import type {
   ExportDocumentPayload,
   ExportMarkdownPayload,
@@ -16,18 +16,18 @@ import type {
   WorkspaceFsMovePayload,
   WorkspaceFsRenamePayload,
   WorkspaceSearchMarkdownPayload,
-} from '@montree/contracts'
-import type { RendererErrorPayload } from '@montree/contracts'
-import type { AppError, Result } from '@montree/contracts'
-import type { WorkspaceWatchEvent } from '@montree/contracts'
-import type { WindowWorkspaceStatus, WorkspaceConnectPayload } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { RendererErrorPayload } from '@yitom/contracts'
+import type { AppError, Result } from '@yitom/contracts'
+import type { WorkspaceWatchEvent } from '@yitom/contracts'
+import type { WindowWorkspaceStatus, WorkspaceConnectPayload } from '@yitom/contracts'
 import type {
   WorkspaceHostReadRequest,
   WorkspaceHostSaveAsRequest,
   WorkspaceHostTextRef,
   WorkspaceHostWriteRequest,
-} from '@montree/contracts'
-import { makeLocalWorkspaceDescriptor, makeWslWorkspaceDescriptor } from '@montree/contracts'
+} from '@yitom/contracts'
+import { makeLocalWorkspaceDescriptor, makeWslWorkspaceDescriptor } from '@yitom/contracts'
 import type {
   AppendFlashcardReviewPayload,
   CreateReadingMarkPayload,
@@ -35,15 +35,15 @@ import type {
   MarksListByChapterPayload,
   MarksSearchPayload,
   UpdateReadingMarkPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   AcpAuthPreflightPayload,
   AcpProviderSavePayload,
   AcpProxySettings,
-} from '@montree/contracts'
-import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@yitom/contracts'
 import { saveBinaryDocument } from '../services/binary-document-service'
-import type { SaveBinaryDocumentPayload } from '@montree/contracts'
+import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
 import { callReaderVisualTool } from '../services/acp/mcp/reader-visual-tools'
 import { callDocumentTool } from '../services/acp/mcp/document-tools'
@@ -56,29 +56,29 @@ import type {
   RecognizePdfPagePayload,
   RecognizePdfTocPayload,
   SavePdfOcrTocPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   ClassifyPdfDocumentPayload,
   ExtractPdfBookMarkdownPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   classifyPdfDocument,
   extractPdfBookMarkdown,
 } from '../services/pdf-inspector-service'
-import type { SyncConfig } from '@montree/contracts'
+import type { SyncConfig } from '@yitom/contracts'
 import type {
   RemoteWslConnectPayload,
   RemoteWslStatPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   RemoteOpenWslWorkspacePayload,
   RemoteOpenWslWorkspaceResult,
-} from '@montree/contracts'
-import type { GitCommitOptions, GitPushOptions } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { GitCommitOptions, GitPushOptions } from '@yitom/contracts'
 import type {
   RemoteServerConnectPayload,
   RemoteServerInvokePayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   listWslDistros,
   getWslHome,
@@ -108,7 +108,7 @@ import type {
   TtsSynthesizePayload,
   TtsTestKeyPayload,
   TtsBatchCreatePayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   readTtsConfig,
   writeTtsConfig,
@@ -156,7 +156,7 @@ import type {
   RosettaInspectContentPayload,
   RosettaQuery,
   RosettaTocRebuildPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { applyWindowTitle } from '../window/window-title'
 import { setVerboseRendererLogs } from '../services/runtime-state'
 import {
@@ -183,8 +183,8 @@ import type {
   AiSessionGetPayload,
   AiSessionPutPayload,
   AiSessionTouchPayload,
-} from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,

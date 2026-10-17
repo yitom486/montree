@@ -1,4 +1,4 @@
-import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@yitom/contracts'
 
 export interface ResolvedCardMeta {
   category: ReadingMarkCategory

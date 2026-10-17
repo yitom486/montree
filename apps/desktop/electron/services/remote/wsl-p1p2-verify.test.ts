@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest'
 import { WslWorkspaceHost } from './wsl-workspace-host'
 import { RemoteWorkspaceHost } from '../remote-workspace-host'
 import { realWslRunner, type WslRunner } from './wsl-bootstrap'
-import type { WorkspaceDescriptor, WorkspaceWatchEvent } from '@montree/contracts'
+import type { WorkspaceDescriptor, WorkspaceWatchEvent } from '@yitom/contracts'
 
 const DISTRO = 'Ubuntu'
 const LOG = join(process.cwd(), '.plan', 'p1p2-wsl-verify.log')

@@ -18,7 +18,7 @@ import {
   readPdfOcrTocCache,
   writePdfOcrTocCache,
 } from './ocr-toc-cache'
-import type { PdfOcrTocCache } from '@montree/contracts'
+import type { PdfOcrTocCache } from '@yitom/contracts'
 
 function makeCache(): PdfOcrTocCache {
   return {

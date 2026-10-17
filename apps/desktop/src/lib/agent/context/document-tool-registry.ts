@@ -1,5 +1,5 @@
-import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
-import type { DocumentSelection, SlideViewContext } from '@montree/contracts'
+import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
+import type { DocumentSelection, SlideViewContext } from '@yitom/contracts'
 
 export interface DocumentToolProvider {
   filePath: string

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeDocumentRef } from '@montree/contracts'
+import { makeDocumentRef } from '@yitom/contracts'
 import { queryKeys } from './query-keys'
 
 describe('query-keys（工作区身份隔离）', () => {

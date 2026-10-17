@@ -7,11 +7,11 @@ import type {
   MarkProposalToolResult,
   ProposedMark,
   ProposedMarkSource,
-} from '@montree/annotations'
+} from '@yitom/annotations'
 import {
   MARK_PROPOSAL_BATCH_MAX,
   toProposedMark,
-} from '@montree/annotations'
+} from '@yitom/annotations'
 import { getReaderMarksProvider } from '@/lib/agent/context/reader-marks-registry'
 import { resolveMarkTarget } from '@/lib/agent/context/resolve-mark-target'
 import {
@@ -29,7 +29,7 @@ export interface ProposeMarkOptions {
   excerpt?: string
   flatIndex?: number
   kind?: MarkProposalKind
-  category?: import('@montree/contracts').ReadingMarkCategory
+  category?: import('@yitom/contracts').ReadingMarkCategory
   title?: string
   filePath?: string
   fileFingerprint?: string
@@ -54,7 +54,7 @@ export interface AdoptProposedMarkInput {
   excerpt?: string
   flatIndex?: number
   kind?: MarkProposalKind
-  category?: import('@montree/contracts').ReadingMarkCategory
+  category?: import('@yitom/contracts').ReadingMarkCategory
   title?: string
 }
 

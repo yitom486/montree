@@ -38,7 +38,7 @@ import { clearAllPdfOcrCache } from '@/api/ocr-api'
 import { useOcrComponent } from '@/hooks/reader/useOcrComponent'
 import { SyncSettingsSection } from './SyncSettingsSection'
 import { TtsSettingsSection } from './TtsSettingsSection'
-import { isWslPath } from '@montree/contracts'
+import { isWslPath } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 interface SettingsDialogProps {

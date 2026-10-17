@@ -1,4 +1,4 @@
-import type { SlideChart } from '@montree/contracts'
+import type { SlideChart } from '@yitom/contracts'
 import * as XLSX from 'xlsx'
 import { SpreadsheetDocument } from './spreadsheet-document'
 import { A, C, R, child, children, descendants, parsePart, relation, encodeXml, object, color, string, number, insertOrdered, type PresentationFiles } from './presentation-xml'

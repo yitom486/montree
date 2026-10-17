@@ -1,4 +1,4 @@
-import { applyEpubReadingLayout, getEpubThemeRules, type ReaderTypography } from '@montree/reader-core'
+import { applyEpubReadingLayout, getEpubThemeRules, type ReaderTypography } from '@yitom/reader-core'
 import type { AppTheme } from '@/stores/editor-ui-store'
 
 export const READING_PROGRESS_SAVE_MS = 400

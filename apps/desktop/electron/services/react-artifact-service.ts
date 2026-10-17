@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { REACT_ARTIFACT_MOUNT_TOKEN } from '@montree/contracts'
+import { REACT_ARTIFACT_MOUNT_TOKEN } from '@yitom/contracts'
 
 const SOURCE_LIMIT = 96 * 1024
 let runtimePromise: Promise<string> | undefined

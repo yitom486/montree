@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
-import type { AcpPromptMode } from '@montree/contracts'
+import type { AcpPromptMode } from '@yitom/contracts'
 
 /**
  * Host resource location, process reuse and delivery decisions.

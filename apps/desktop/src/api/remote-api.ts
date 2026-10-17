@@ -14,8 +14,8 @@ import type {
   WorkspaceMethod,
   WorkspaceStatResult,
   WslDistroInfo,
-} from '@montree/contracts'
-import { err, ok } from '@montree/contracts'
+} from '@yitom/contracts'
+import { err, ok } from '@yitom/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   if (!window.electronAPI) {

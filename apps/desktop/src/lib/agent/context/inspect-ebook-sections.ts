@@ -5,7 +5,7 @@ import {
   windowContentAuditText,
   type ContentAuditHit,
   type ContentAuditResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { ReaderUnitText } from './reader-content-registry'
 
 /**

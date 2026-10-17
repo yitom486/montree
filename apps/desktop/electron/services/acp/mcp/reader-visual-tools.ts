@@ -1,5 +1,5 @@
 import type { InkdownMcpToolDefinition } from '@yitom/acp-client'
-import type { MontreeSnapshotArgs, MontreeSnapshotResource, ReaderViewportImage } from '@montree/contracts'
+import type { MontreeSnapshotArgs, MontreeSnapshotResource, ReaderViewportImage } from '@yitom/contracts'
 
 export interface ReaderVisualToolContext {
   readSnapshot: (resource: MontreeSnapshotResource, args?: MontreeSnapshotArgs) => Promise<string>

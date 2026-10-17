@@ -1,10 +1,10 @@
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { type AcpChatMessage } from '@/stores/acp-chat-types'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import {
   attachMarkProposalsToCurrentTurn as attachMarkProposalsToCurrentTurnCore,
   attachPendingMarkProposals as attachPendingMarkProposalsCore,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'
 import {
   MAX_MESSAGES_PER_THREAD,
   type AcpChatThread,
@@ -12,7 +12,7 @@ import {
 } from './acp-types'
 
 // 快照旁路已整搬至 core（E1b）：宿主保留薄转发，防外部调用方 churn。
-export type { MarkProposalAttachResult } from '@montree/chat-core'
+export type { MarkProposalAttachResult } from '@yitom/chat-core'
 export const attachMarkProposalsToCurrentTurn = attachMarkProposalsToCurrentTurnCore
 export const attachPendingMarkProposals = attachPendingMarkProposalsCore
 

@@ -6,7 +6,7 @@ import { azureProvider, geminiProvider, localProvider, prettyApiError } from 'ge
 import { synthesizeGeminiStream, validateGeminiWav } from './gemini-stream'
 import { splitGeminiText, type GeminiRequestPriority } from './gemini-queue'
 import { geminiQuota, GeminiQuotaError } from './gemini-quota'
-import { IPC, err, ok, toAppError, type AppError, type Result } from '@montree/contracts'
+import { IPC, err, ok, toAppError, type AppError, type Result } from '@yitom/contracts'
 import type {
   TtsBatchCreatePayload,
   TtsBatchJobStatus,
@@ -20,7 +20,7 @@ import type {
   TtsTestKeyResult,
   TtsVoiceInfo,
   TtsStreamProgressPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 export const DEFAULT_TTS_CONFIG: TtsConfig = {
   enabled: true,

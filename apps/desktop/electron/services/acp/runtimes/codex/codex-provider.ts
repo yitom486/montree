@@ -7,8 +7,8 @@ import type {
   AcpProviderSavePayload,
   AcpProviderStatus,
   AppError,
-} from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+} from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 
 export interface StoredAcpProvider extends AcpProviderConfig {
   apiKey: string

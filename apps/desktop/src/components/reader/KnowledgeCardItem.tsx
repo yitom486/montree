@@ -15,7 +15,7 @@ import {
   GitCommit,
   Brain,
 } from 'lucide-react'
-import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@yitom/contracts'
 import { filterRedundantKeyPoints, resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 import { renderAgentMarkdown } from '@/lib/agent/agent-markdown'

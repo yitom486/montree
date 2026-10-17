@@ -10,7 +10,7 @@ import {
   unbindWindowWorkspace,
   type BindableSender,
 } from './workspace-bindings'
-import { makeLocalWorkspaceDescriptor } from '@montree/contracts'
+import { makeLocalWorkspaceDescriptor } from '@yitom/contracts'
 
 function fakeSender(id: number): BindableSender {
   return { id, once: vi.fn() }

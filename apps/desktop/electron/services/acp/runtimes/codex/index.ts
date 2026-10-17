@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { CodexAuthPreflight } from '@montree/contracts'
+import type { CodexAuthPreflight } from '@yitom/contracts'
 import {
   buildCustomProviderConfigToml,
   buildCustomProviderSpawnEnv,

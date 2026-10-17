@@ -20,9 +20,9 @@ import {
   selectAnnotationActiveMessages,
   useAnnotationAgentStore,
 } from '@/stores/annotation-agent-store'
-import { ProposeMarkChatBlock } from '@montree/chat-ui'
-import { groupChatTimeline } from '@montree/chat-core'
-import { ChatMessageBubble } from '@montree/chat-ui'
+import { ProposeMarkChatBlock } from '@yitom/chat-ui'
+import { groupChatTimeline } from '@yitom/chat-core'
+import { ChatMessageBubble } from '@yitom/chat-ui'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
 import { respondPermissionRequest } from '@/lib/agent/permission-respond'
 import { useAcpPendingPermission } from '@/stores/acp-ui-store'
@@ -32,7 +32,7 @@ import {
   ThreadPrimitive,
   useExternalStoreRuntime,
 } from '@assistant-ui/react'
-import { toProposedMark } from '@montree/annotations'
+import { toProposedMark } from '@yitom/annotations'
 import { toast } from 'sonner'
 
 interface AnnotationNoteDialogProps {

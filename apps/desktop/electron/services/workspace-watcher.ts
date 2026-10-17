@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'fs'
 import { BrowserWindow, type WebContents } from 'electron'
-import { IPC } from '@montree/contracts'
-import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
+import { IPC } from '@yitom/contracts'
+import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
 
 /** 与 VS Code 类似：合并短时间内的多次 fs 事件后再通知渲染进程重扫 */
 export const WORKSPACE_WATCH_DEBOUNCE_MS = 400

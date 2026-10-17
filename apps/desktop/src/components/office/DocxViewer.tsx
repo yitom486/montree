@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
 import { fileApi } from '@/api/file-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { appApi } from '@/api/app-api'
 import { Button } from '@/components/ui/button'

@@ -10,7 +10,7 @@ import {
   type Result,
   type SshConfigHost,
   type WslDistroInfo,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { wslWorkspaceHost } from './wsl-workspace-host'
 
 /**
@@ -122,7 +122,7 @@ export function getLinuxParentPath(linuxPath: string): string | null {
  * 本机 readdir；调用前须先经 `remote:wsl-connect` 建连（见
  * `wsl-workspace-host.ts`）。未连接/发行版不一致时返回明确的
  * REMOTE_NOT_CONNECTED，禁止静默回落 UNC、伪装空树。
- * UNC 语法仅保留于路径识别与日志诊断（`@montree/contracts` 的
+ * UNC 语法仅保留于路径识别与日志诊断（`@yitom/contracts` 的
  * `isWslPath`/`parseWslPath`），不生成 UNC 路径交给本机 fs。
  */
 export async function browseWslDirectory(

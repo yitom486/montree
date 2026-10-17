@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { findBuiltinAcpRuntime, isOk, isSameWorkspace } from '@montree/contracts'
+import { findBuiltinAcpRuntime, isOk, isSameWorkspace } from '@yitom/contracts'
 import type {
   AcpAuthMethod,
   AcpConfigOption,
   AcpConnectReadyResult,
   AcpContentBlock,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import { acpApi } from '@/api/acp-api'
-import { presentRecoveryToolCallIds, recoverPresentToolMessages } from '@montree/chat-core'
+import { presentRecoveryToolCallIds, recoverPresentToolMessages } from '@yitom/chat-core'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {
   markSessionBootstrapSent,

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { WORKSPACE_MIN_NODE_MAJOR } from '@montree/contracts'
+import { WORKSPACE_MIN_NODE_MAJOR } from '@yitom/contracts'
 import { checkNodeVersionCompatible } from '@montree/workspace-core'
 import { getWslHome, listWslDistros } from './remote-service'
 

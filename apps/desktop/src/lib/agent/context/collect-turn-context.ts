@@ -1,6 +1,6 @@
-import { getDocumentKind } from '@montree/contracts'
+import { getDocumentKind } from '@yitom/contracts'
 import { resolveWebDocDocumentId, resolveWebDocSiteId } from '@montree/web-doc'
-import type { ReaderFormat } from '@montree/reader-core'
+import type { ReaderFormat } from '@yitom/reader-core'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { useWebDocStore } from '@/stores/web-doc-store'

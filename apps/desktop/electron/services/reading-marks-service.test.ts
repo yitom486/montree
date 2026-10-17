@@ -18,7 +18,7 @@ import {
   listReadingMarks,
   updateReadingMark,
 } from './reading-marks-service'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 describe('reading-marks-service', () => {
   beforeEach(async () => {
@@ -134,7 +134,7 @@ describe('reading-marks-service', () => {
     const { searchReadingMarks, listReadingMarksByChapter } = await import(
       './reading-marks-service'
     )
-    const { toChapterKey } = await import('@montree/contracts')
+    const { toChapterKey } = await import('@yitom/contracts')
     const created = await createReadingMark({
       filePath: 'D:\\books\\file-svc.epub',
       fileFingerprint: 'fp-file-svc',

@@ -1,19 +1,19 @@
 import { mkdir } from 'node:fs/promises'
 import { BrowserWindow, app } from 'electron'
-import { IPC } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
-import { toAppError, type AppError } from '@montree/contracts'
+import { IPC } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
 import type {
   SyncConfig,
   SyncStatus,
   SyncExecuteResult,
   TestConnectionResult,
   SyncStats,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { WebDavStorageAdapter } from './webdav-adapter'
 import { readSyncConfig } from './sync-config-service'
 import { readMarksStore, writeMarksStore } from '../reading-marks-service'
-import { mergeReadingMarks, type SyncMarksPayload } from '@montree/annotations'
+import { mergeReadingMarks, type SyncMarksPayload } from '@yitom/annotations'
 import { readLocalProgress, writeLocalProgress } from './reading-progress-sync'
 import { mergeReadingProgress, type ReadingProgressSnapshot } from './mergers/progress-merger'
 import { readQuizJsonlForSync, writeQuizJsonlForSync } from '../quiz-service'

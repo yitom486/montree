@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 import {
   defaultPdfPageOffset,
   extractOcrTocFromText,
@@ -8,8 +8,8 @@ import {
 } from '@montree/ocr-core'
 import { cleanOcrWatermarks } from '@montree/ocr-core'
 import { buildSectionPageMap } from '@montree/ocr-core'
-import type { PdfOcrTocCache, RecognizePdfTocPayload } from '@montree/contracts'
-import { DEFAULT_PDF_TOC_SCALE } from '@montree/contracts'
+import type { PdfOcrTocCache, RecognizePdfTocPayload } from '@yitom/contracts'
+import { DEFAULT_PDF_TOC_SCALE } from '@yitom/contracts'
 import { writePdfOcrTocCache } from './ocr-toc-cache'
 import { ensureInspectorOcrRuntime } from './inspector-ocr-runtime'
 

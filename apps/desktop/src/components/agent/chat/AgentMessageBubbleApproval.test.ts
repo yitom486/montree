@@ -2,15 +2,13 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChatMessageBubble } from '@montree/chat-ui'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ChatMessageBubble } from '@yitom/chat-ui'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 
-vi.mock('../../../../../../packages/chat-ui/src/ui/propose-mark-chat-block', () => ({
-  ProposeMarkChatBlock: () => createElement('div', null, 'proposal-result'),
-  ProposeMarkBlockList: () => null,
-}))
+// 说明：曾用 vi.mock 直连包内 `propose-mark-chat-block` 源码桩；包迁 npm 后
+// 深路径 mock 不再可靠，改断言真实块渲染（excerpt 可见 + 审批卡唯一），覆盖更强。
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -65,7 +63,7 @@ describe('AgentMessageBubble 提议分支审批外挂', () => {
         ),
       )
     })
-    expect(container.textContent).toContain('proposal-result')
+    expect(container.textContent).toContain('x')
     expect(container.querySelectorAll('[data-testid="agent-permission-card"]')).toHaveLength(1)
   })
 })

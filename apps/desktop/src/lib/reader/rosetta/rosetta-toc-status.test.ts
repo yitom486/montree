@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeTocSignature } from '@montree/reader-core'
+import { computeTocSignature } from '@yitom/reader-core'
 import {
   getCurrentRosettaTocSignature,
   resolveRosettaIndexStatus,

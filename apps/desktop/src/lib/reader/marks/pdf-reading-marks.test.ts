@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { findPdfMarksAtPoint, flagSpotForQuads, renderPdfMarkOverlays } from './pdf-reading-marks'
-import type { PdfSelectionSnapshot } from '@montree/reader-core'
-import type { ReadingMark } from '@montree/contracts'
+import type { PdfSelectionSnapshot } from '@yitom/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
 import type { PageViewport } from 'pdfjs-dist'
 
 const viewport = {

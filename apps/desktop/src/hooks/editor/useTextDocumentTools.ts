@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { getDocumentKind, isOk } from '@montree/contracts'
+import { getDocumentKind, isOk } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { TextDocument } from '@/lib/editor/text-document'
 import { notifyDocumentTools, registerDocumentTools } from '@/lib/agent/context/document-tool-registry'

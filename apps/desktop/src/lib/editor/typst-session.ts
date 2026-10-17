@@ -1,4 +1,4 @@
-import type { Result, AppError, TypstEvent, TypstOpenPayload, TypstSession, TypstSyncPayload, TypstRequestPayload, TypstExportPayload, TypstExportResult } from '@montree/contracts'
+import type { Result, AppError, TypstEvent, TypstOpenPayload, TypstSession, TypstSyncPayload, TypstRequestPayload, TypstExportPayload, TypstExportResult } from '@yitom/contracts'
 import type { TypstDiagnostic } from './typst-lsp'
 
 export interface TypstSessionPort {

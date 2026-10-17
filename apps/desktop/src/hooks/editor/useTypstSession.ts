@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { typstApi } from '@/api/typst-api'
 import { TypstSessionController, type TypstSessionState } from '@/lib/editor/typst-session'
 import { typstProjectRoot } from '@/lib/editor/typst-lsp'
-import type { TypstRequestMethod } from '@montree/contracts'
+import type { TypstRequestMethod } from '@yitom/contracts'
 
 const initialState: TypstSessionState = { phase: 'starting', session: null, message: null, diagnostics: [], version: 1, compileStatus: null, diagnosticsUnversioned: false, recoverableExit: false }
 const fileLifetimes = new Map<string, Promise<void>>()

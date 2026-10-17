@@ -1,4 +1,4 @@
-import type { DocumentKind } from '@montree/contracts'
+import type { DocumentKind } from '@yitom/contracts'
 
 /** 附加到用户消息前的 turn-context 体积上限（字符数） */
 export const TURN_CONTEXT_MAX_CHARS = 1200

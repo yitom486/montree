@@ -1,5 +1,5 @@
-import type { ReadingMark } from '@montree/contracts'
-import { toChapterKey } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
+import { toChapterKey } from '@yitom/contracts'
 import {
   normalizeLoadKey,
   resolveEpubChapter,
@@ -8,7 +8,7 @@ import {
   tocFromEpubUnits,
   tocFromPdfUnits,
   type ReadingNotesChapterRef,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { sortMarksByDocumentPosition } from './mark-document-order'
 
 /**

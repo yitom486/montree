@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { APP_GITHUB_REPO, APP_TAGLINE, APP_TITLE } from '@montree/contracts'
+import { APP_GITHUB_REPO, APP_TAGLINE, APP_TITLE } from '@yitom/contracts'
 import { useAppUpdate } from '@/hooks/workspace/useAppUpdate'
 import { appApi } from '@/api/app-api'
 import { cn, formatBytes } from '@/lib/utils'

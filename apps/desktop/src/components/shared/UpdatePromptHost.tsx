@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { appApi } from '@/api/app-api'
-import { APP_TITLE } from '@montree/contracts'
-import type { AppUpdateStatus } from '@montree/contracts'
+import { APP_TITLE } from '@yitom/contracts'
+import type { AppUpdateStatus } from '@yitom/contracts'
 
 /** 启动后监听主进程更新事件，用 toast 提示并可一键下载 / 重启安装 */
 export function UpdatePromptHost() {

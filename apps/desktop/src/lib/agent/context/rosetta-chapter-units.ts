@@ -1,5 +1,5 @@
-import { isOk } from '@montree/contracts'
-import type { BookDbBlockHit } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import type { BookDbBlockHit } from '@yitom/contracts'
 import { rosettaApi } from '@/api/rosetta-api'
 import { formatRosettaBlocksForAgent } from '@/lib/reader/rosetta/rosetta-agent-text'
 import type { ReaderUnitText } from './reader-content-registry'

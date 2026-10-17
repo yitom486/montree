@@ -5,7 +5,7 @@ import {
   windowContentAuditText,
   type ContentAuditHit,
   type ContentAuditResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 /**
  * 编辑器内存字面检索（P2.1，纯函数）。输入为已校验的 query（≥3 字）与

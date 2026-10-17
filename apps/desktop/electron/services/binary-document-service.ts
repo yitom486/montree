@@ -2,7 +2,7 @@ import { readFile, writeFile, rename, unlink } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { err, ok, toAppError, type AppError, type Result, type SaveBinaryDocumentPayload, type SaveBinaryDocumentResult } from '@montree/contracts'
+import { err, ok, toAppError, type AppError, type Result, type SaveBinaryDocumentPayload, type SaveBinaryDocumentResult } from '@yitom/contracts'
 
 export function documentHash(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex')

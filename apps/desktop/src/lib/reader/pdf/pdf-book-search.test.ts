@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 import {
   BOOK_SEARCH_LIMIT,
   BookSearchSession,

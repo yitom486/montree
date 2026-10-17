@@ -2,8 +2,8 @@ import type {
   MontreeSnapshotArgs,
   MontreeSnapshotResource,
   ReadingMarkCategory,
-} from '@montree/contracts'
-import type { MarkProposalItem, MarkProposalKind, MarkProposalPayload } from '@montree/annotations'
+} from '@yitom/contracts'
+import type { MarkProposalItem, MarkProposalKind, MarkProposalPayload } from '@yitom/annotations'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { collectActiveDocument, collectReadingState } from './collect-turn-context'
 import {

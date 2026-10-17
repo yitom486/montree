@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import { parseDiagramFromMark } from './diagram-mark-parser'
 
 describe('parseDiagramFromMark', () => {

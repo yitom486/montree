@@ -3,10 +3,10 @@ import {
   mapPermissionRequest,
   mapSessionUpdate,
   type ChatSessionStore,
-} from '@montree/chat-session'
-import type { MarkProposalStatus } from '@montree/annotations'
-import type { AcpMessageAttachment, ChatMessage } from '@montree/chat-core'
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+} from '@yitom/chat-session'
+import type { MarkProposalStatus } from '@yitom/annotations'
+import type { AcpMessageAttachment, ChatMessage } from '@yitom/chat-core'
+import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
 
 /** 回放清洗只在宿主发生；将清洗后的单线程 feed 对齐，原始脚手架不进包。 */

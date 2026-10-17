@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { IPC } from '@montree/contracts'
+import { IPC } from '@yitom/contracts'
 import {
   DEFAULT_TTS_CONFIG,
   formatFriendlyErrorMessage,

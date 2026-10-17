@@ -1,10 +1,10 @@
 import { useCallback } from 'react'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import {
   type ReadingNotesChapterRef,
   type ReadingNotesContentKind,
   type ReadingNotesScope,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { saveAnkiCardsExport } from '@/lib/reader/marks/export-anki-cards'
 import { saveReadingNotesExport } from '@/lib/reader/marks/save-reading-notes-export'
 

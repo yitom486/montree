@@ -9,7 +9,7 @@ import {
   textFromOcrPageCache,
 } from '@/lib/reader/pdf/pdf-page-text'
 import { assertPageOcrAllowed, mergeOcrPageCaches } from '@/lib/reader/pdf-ocr/pdf-page-auto-ocr'
-import type { PdfOcrPageCache } from '@montree/contracts'
+import type { PdfOcrPageCache } from '@yitom/contracts'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 
 /**

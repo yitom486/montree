@@ -48,7 +48,7 @@ import type {
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
   WorkspaceWatchEvent,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   CROSS_WORKSPACE_MOVE_MESSAGE,
   DEFAULT_WORKSPACE_LIMITS,
@@ -57,7 +57,7 @@ import {
   err,
   getDocumentKind,
   ok,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   HostTextRead,
   HostWriteTextInput,

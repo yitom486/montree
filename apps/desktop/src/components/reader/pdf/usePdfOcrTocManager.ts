@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { OcrTocEntry } from '@montree/contracts'
-import type { ReaderUnit } from '@montree/reader-core'
+import type { OcrTocEntry } from '@yitom/contracts'
+import type { ReaderUnit } from '@yitom/reader-core'
 import {
   canUseOcrToc,
 } from '@/lib/reader/pdf-ocr/pdf-ocr-toc-gate'
@@ -33,8 +33,8 @@ import {
   savePdfOcrToc,
 } from '@/api/ocr-api'
 import { buildPdfOcrTocCache, resolveOcrTocEditorEntries } from '@/lib/reader/pdf-ocr/pdf-ocr-toc-cache'
-import { suggestTocPageOffset, type PdfOutlineSource, formatPdfOutlineNotice } from '@montree/reader-core'
-import { loadPdfOutlineInfo } from '@montree/reader-core'
+import { suggestTocPageOffset, type PdfOutlineSource, formatPdfOutlineNotice } from '@yitom/reader-core'
+import { loadPdfOutlineInfo } from '@yitom/reader-core'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { toast } from 'sonner'
 

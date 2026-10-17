@@ -12,7 +12,7 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { QuizConfig, QuizQuestionType } from '@montree/contracts'
+import type { QuizConfig, QuizQuestionType } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 export interface QuizConfigPanelProps {

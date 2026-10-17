@@ -1,4 +1,4 @@
-import type { TypstConfig, TypstEvent, TypstExportPayload, TypstOpenPayload, TypstRequestPayload, TypstSyncPayload } from '@montree/contracts'
+import type { TypstConfig, TypstEvent, TypstExportPayload, TypstOpenPayload, TypstRequestPayload, TypstSyncPayload } from '@yitom/contracts'
 
 function api() {
   if (!window.electronAPI) throw new Error('electronAPI 不可用')

@@ -2,7 +2,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AppError } from "@montree/contracts/core/errors";
+import type { AppError } from "@yitom/contracts/core/errors";
 import { createWorkspaceServer, type WorkspaceServer } from "./server";
 import type { WorkspaceRequest } from "@montree/workspace-core";
 

@@ -5,7 +5,7 @@ import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { TINYMIST_VERSION, type TypstConfig, type TypstEvent, type TypstOpenPayload, type TypstRequestPayload, type TypstRuntimeStatus, type TypstSession, type TypstSyncPayload } from '@montree/contracts'
+import { TINYMIST_VERSION, type TypstConfig, type TypstEvent, type TypstOpenPayload, type TypstRequestPayload, type TypstRuntimeStatus, type TypstSession, type TypstSyncPayload } from '@yitom/contracts'
 import { LspProcess } from './lsp-process'
 
 const execFileAsync = promisify(execFile)

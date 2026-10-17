@@ -1,6 +1,6 @@
-import type { AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
-import type { ElectronAPI } from '@montree/contracts'
+import type { AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { ElectronAPI } from '@yitom/contracts'
 import type {
   AcpAuthPreflightPayload,
   AcpAuthPreflightResult,
@@ -26,7 +26,7 @@ import type {
   AcpProxySettings,
   AcpStatusChangedEvent,
   AgyCliStatus,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   if (!window.electronAPI) {

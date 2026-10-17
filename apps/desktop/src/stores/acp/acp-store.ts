@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { createThrottledStorage } from '@/lib/agent/throttled-storage'
-import { DEFAULT_ACP_RUNTIME_ID } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import {
   MAX_THREADS,
   type AcpChatMessage,
@@ -22,7 +22,7 @@ import {
   getOwnedChatSessionStore,
   registerOwnedChatHostSnapshotProvider,
 } from '@/lib/agent/chat-session-owner'
-import type { ChatSessionStore } from '@montree/chat-session'
+import type { ChatSessionStore } from '@yitom/chat-session'
 import { mirrorHostSnapshotToPackageStore } from '@/lib/agent/chat-store-mirror'
 
 export const useAcpUiStore = create<AcpUiStore>()(

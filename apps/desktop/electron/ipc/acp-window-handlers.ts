@@ -1,6 +1,6 @@
 import { ipcMain, type WebContents } from 'electron'
-import { IPC, err, resolveSnapshotTimeoutMs, type AcpPermissionResponsePayload, type AcpSnapshotResponsePayload } from '@montree/contracts'
-import type { AcpConnectPayload, AcpAuthenticatePayload, AcpLoadSessionPayload, AcpSessionNewPayload, AcpPromptPayload, AcpCancelPayload, AcpSetConfigOptionPayload, Result, AppError } from '@montree/contracts'
+import { IPC, err, resolveSnapshotTimeoutMs, type AcpPermissionResponsePayload, type AcpSnapshotResponsePayload } from '@yitom/contracts'
+import type { AcpConnectPayload, AcpAuthenticatePayload, AcpLoadSessionPayload, AcpSessionNewPayload, AcpPromptPayload, AcpCancelPayload, AcpSetConfigOptionPayload, Result, AppError } from '@yitom/contracts'
 import {
   acpState, ownsAcpSession, claimAcpSession, releaseAcpSession, onAcpSessionUpdate, onAcpStatusChanged,
   setAcpPermissionBridge, setAcpSnapshotBridge,

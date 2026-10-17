@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { FileTreeNode } from '@montree/contracts'
+import type { FileTreeNode } from '@yitom/contracts'
 import {
   flattenFileTree,
   scoreFuzzyMatch,

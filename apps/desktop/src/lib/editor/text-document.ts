@@ -2,7 +2,7 @@ import { EditorState, Transaction, type EditorStateConfig, type TransactionSpec 
 import { history, historyField, isolateHistory, undo } from '@codemirror/commands'
 import type { EditorView } from '@codemirror/view'
 import MarkdownIt from 'markdown-it'
-import type { TextSelection } from '@montree/contracts'
+import type { TextSelection } from '@yitom/contracts'
 
 const parser = new MarkdownIt()
 let nextRevision = 0

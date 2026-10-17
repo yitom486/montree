@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 import { normalizeInspectorSpans } from '@montree/ocr-core'
-import type { PdfOcrPageCache, PdfOcrScale, RecognizePdfPagePayload } from '@montree/contracts'
-import { DEFAULT_PDF_OCR_SCALE } from '@montree/contracts'
+import type { PdfOcrPageCache, PdfOcrScale, RecognizePdfPagePayload } from '@yitom/contracts'
+import { DEFAULT_PDF_OCR_SCALE } from '@yitom/contracts'
 import { writePdfOcrPageCache } from './ocr-page-cache'
 import { ensureInspectorOcrRuntime } from './inspector-ocr-runtime'
 

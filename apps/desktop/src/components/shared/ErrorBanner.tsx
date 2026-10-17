@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import type { AppError } from '@montree/contracts'
+import type { AppError } from '@yitom/contracts'
 import { Button } from '@/components/ui/button'
 
 interface ErrorBannerProps {

@@ -1,8 +1,8 @@
 import { BrowserWindow } from 'electron'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import { IPC } from '@montree/contracts'
-import type { OcrComponentStatus } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import { IPC } from '@yitom/contracts'
+import type { OcrComponentStatus } from '@yitom/contracts'
 import {
   ensureInspectorOcrRuntime,
   isInspectorOcrRuntimeInstalled,

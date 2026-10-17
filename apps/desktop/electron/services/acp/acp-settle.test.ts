@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent, client, methods } from '@agentclientprotocol/sdk'
-import { MONTREE_SETTLE_COMPLETE_KIND, type AcpSessionUpdateEvent } from '@montree/contracts'
+import { MONTREE_SETTLE_COMPLETE_KIND, type AcpSessionUpdateEvent } from '@yitom/contracts'
 import {
   acpState,
   armSuppressSettle,

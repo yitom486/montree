@@ -9,7 +9,7 @@ import {
   isOk,
   type AcpConfigOption,
   type OcrTocEntry,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { rankPrimary, splitConfigOptions } from '@/lib/agent/acp-config-menu'
 import {

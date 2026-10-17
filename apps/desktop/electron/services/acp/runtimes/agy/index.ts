@@ -12,7 +12,7 @@ import {
   type AppError,
   type CodexAuthPreflight,
   type Result,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { GenericRuntimeAdapter } from '../index'
 
 const execFileAsync = promisify(execFile)

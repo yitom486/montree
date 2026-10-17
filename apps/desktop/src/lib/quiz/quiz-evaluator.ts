@@ -4,8 +4,8 @@ import type {
   QuizAnswerSubmission,
   QuizConfig,
   QuizQuestionType,
-} from '@montree/contracts'
-import { calculateQuizGrade } from '@montree/contracts'
+} from '@yitom/contracts'
+import { calculateQuizGrade } from '@yitom/contracts'
 import { sendQuizPrompt } from './quiz-acp-session'
 
 /**

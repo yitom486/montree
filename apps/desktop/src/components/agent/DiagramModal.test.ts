@@ -3,10 +3,10 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DiagramModal } from './DiagramModal'
-import type { DiagramPayload } from '@montree/chat-ui'
+import type { DiagramPayload } from '@yitom/chat-ui'
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
-vi.mock('@montree/chat-ui', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@montree/chat-ui')>()
+vi.mock('@yitom/chat-ui', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@yitom/chat-ui')>()
   return { ...mod, DiagramViewerCard: ({ payload }: { payload: DiagramPayload }) => createElement('div', { 'data-testid': 'mock-diagram-viewer' }, payload.title) }
 })
 describe('Radix DiagramModal', () => {

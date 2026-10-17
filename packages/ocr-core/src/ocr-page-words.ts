@@ -1,5 +1,5 @@
 import type { TextContent, TextItem } from 'pdfjs-dist/types/src/display/api'
-import type { OcrPageWord, PdfOcrPageCache } from '@montree/contracts'
+import type { OcrPageWord, PdfOcrPageCache } from '@yitom/contracts'
 
 /** inspector 行框置信度门限（0–1；与 napi minimum_confidence 对齐） */
 const INSPECTOR_MIN_CONFIDENCE = 0.3

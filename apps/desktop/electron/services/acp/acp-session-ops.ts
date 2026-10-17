@@ -1,12 +1,12 @@
 import { requestSessionWithResources } from './session-open'
 import { resolvePromptMode } from './native-binding'
-import type { AppError } from '@montree/contracts'
-import { err, ok, type Result, isWslPath, windowsToLinuxPath } from '@montree/contracts'
+import type { AppError } from '@yitom/contracts'
+import { err, ok, type Result, isWslPath, windowsToLinuxPath } from '@yitom/contracts'
 import type {
   AcpContentBlock,
   AcpPromptResult,
   AcpSetConfigOptionResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { methods } from '@agentclientprotocol/sdk'
 import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
@@ -50,7 +50,7 @@ export async function loadAcpSession(payload: {
   cwd?: string
   secondary?: boolean
 }): Promise<
-  Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@montree/contracts').AcpPromptMode }, AppError>
+  Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@yitom/contracts').AcpPromptMode }, AppError>
 > {
   const a = requireAgent()
   if (!a.ok) return err(a.error)
@@ -110,7 +110,7 @@ export async function loadAcpSession(payload: {
 export async function createAcpSession(
   cwd?: string,
   toolScope: 'full' | 'toc' = 'full',
-): Promise<Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@montree/contracts').AcpPromptMode }, AppError>> {
+): Promise<Result<{ sessionId: string; configOptions: ReturnType<typeof parseAcpConfigOptions>; promptMode?: import('@yitom/contracts').AcpPromptMode }, AppError>> {
   const a = requireAgent()
   if (!a.ok) return err(a.error)
 

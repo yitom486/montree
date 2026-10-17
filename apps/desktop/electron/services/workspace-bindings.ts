@@ -14,8 +14,8 @@ import type {
   WindowWorkspaceStatus,
   WorkspaceConnectionState,
   WorkspaceDescriptor,
-} from '@montree/contracts'
-import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
+} from '@yitom/contracts'
+import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
 
 /** 绑定所需的最小 WebContents 形状（测试可伪造，不依赖 electron 运行时）。 */
 export interface BindableSender {

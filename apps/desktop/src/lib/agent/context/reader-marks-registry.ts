@@ -2,21 +2,21 @@ export interface CreateMarkAtParams {
   excerpt: string
   note: string
   flatIndex?: number
-  category?: import('@montree/contracts').ReadingMarkCategory
+  category?: import('@yitom/contracts').ReadingMarkCategory
   title?: string
 }
 
 export interface ReaderMarksProvider {
   filePath: string
   /** 在当前阅读位置创建书签（不跳转） */
-  createBookmark: () => Promise<import('@montree/contracts').ReadingMark>
+  createBookmark: () => Promise<import('@yitom/contracts').ReadingMark>
   /**
    * 基于当前选区（或 sticky 选区快照）创建批注/高亮。
    * note 为空时创建 highlight。
    */
-  createNoteFromSelection: (note: string) => Promise<import('@montree/contracts').ReadingMark>
+  createNoteFromSelection: (note: string) => Promise<import('@yitom/contracts').ReadingMark>
   /** 按摘录在章/视口 DOM 内定位并创建标记（无 fresh 选区） */
-  createMarkAt: (params: CreateMarkAtParams) => Promise<import('@montree/contracts').ReadingMark>
+  createMarkAt: (params: CreateMarkAtParams) => Promise<import('@yitom/contracts').ReadingMark>
   /** 跳到目录 flatIndex（失败引导「打开该章」） */
   navigateToFlatIndex?: (flatIndex: number) => Promise<boolean>
 }

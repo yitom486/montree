@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { narrowChapterScopeMarks } from './chapter-scope'
-import { toChapterKey } from '@montree/contracts'
-import type { ReadingMark } from '@montree/contracts'
-import type { ReadingNotesChapterRef } from '@montree/reader-core'
+import { toChapterKey } from '@yitom/contracts'
+import type { ReadingMark } from '@yitom/contracts'
+import type { ReadingNotesChapterRef } from '@yitom/reader-core'
 
 const toc: ReadingNotesChapterRef[] = [
   { key: '0:text/a', matchKey: 'text/a', label: '甲章', level: 0 },

@@ -6,7 +6,7 @@ import {
   readPdfPageNativeText,
 } from './pdf-page-text'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { PdfOcrPageCache } from '@montree/contracts'
+import type { PdfOcrPageCache } from '@yitom/contracts'
 
 describe('pdf-page-text', () => {
   it('pdfPageNeedsOcr 无嵌入文字时为 true', () => {

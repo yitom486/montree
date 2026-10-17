@@ -1,15 +1,15 @@
-import type { AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+import type { AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 import type {
   AcpAuthMethod,
   AcpAuthPreflightResult,
   AcpPermissionOutcome,
   AcpSessionUpdateEvent,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   MontreeSnapshotArgs,
   MontreeSnapshotResource,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { ClientContext } from '@agentclientprotocol/sdk'
 import { getAcpRuntimeAdapter } from './runtimes'
 import { currentAcpContext } from './acp-context'

@@ -1,7 +1,7 @@
-import type { RendererErrorPayload } from '@montree/contracts'
-import type { AppUpdateStatus, WorkspaceChangedEvent } from '@montree/contracts'
-import { ok, err, isOk, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import type { RendererErrorPayload } from '@yitom/contracts'
+import type { AppUpdateStatus, WorkspaceChangedEvent } from '@yitom/contracts'
+import { ok, err, isOk, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 
 function getElectronAPI() {
   return typeof window !== 'undefined' ? window.electronAPI : undefined

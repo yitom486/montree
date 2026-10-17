@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { acpApi } from '@/api/acp-api'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import {

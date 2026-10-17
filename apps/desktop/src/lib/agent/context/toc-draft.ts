@@ -4,7 +4,7 @@ import {
   isBareChapterTitle,
   isWatermarkTocEntry,
 } from '@montree/ocr-core'
-import type { OcrTocEntrySource } from '@montree/contracts'
+import type { OcrTocEntrySource } from '@yitom/contracts'
 
 /**
  * 目录 Agent 草稿本（渲染进程内存单例）。

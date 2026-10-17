@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@montree/contracts'
-import { toAppError, type AppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
 import type {
   InspectorBookMarkdown,
   InspectorPdfClassification,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type {
   InspectorPagesMarkdown,
 } from '@montree/pdf'

@@ -9,7 +9,7 @@ import {
   validateWorkspaceRequest,
   type WorkspaceResponse,
 } from "./protocol";
-import { DEFAULT_WORKSPACE_LIMITS } from "@montree/contracts/types/workspace";
+import { DEFAULT_WORKSPACE_LIMITS } from "@yitom/contracts/types/workspace";
 
 function baseRequest(overrides: Record<string, unknown> = {}) {
   return {

@@ -114,7 +114,7 @@ vi.mock('@/api/app-api', () => ({
 import { useFileOperations } from './useFileOperations'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { notifyDocumentTools, registerDocumentTools } from '@/lib/agent/context/document-tool-registry'
 

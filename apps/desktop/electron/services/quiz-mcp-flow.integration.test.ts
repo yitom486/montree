@@ -17,7 +17,7 @@ import { closeAllMontreeDbs } from './app-db/open-app-db'
 import { callAdaptedMontreeTool } from './acp/mcp/montree-mcp-server'
 import { appendQuizSession, readAllQuizSessions, readQuizSessionsByFile } from './quiz-service'
 import { clearQuizFingerprintCache } from './quiz-db'
-import { calculateQuizGrade, isOk } from '@montree/contracts'
+import { calculateQuizGrade, isOk } from '@yitom/contracts'
 import type {
   QuizAnswerSubmission,
   QuizConfig,
@@ -25,7 +25,7 @@ import type {
   QuizQuestion,
   QuizQuestionType,
   QuizSessionRecord,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 function extractJsonFromResponse<T>(raw: string): T | null {
   try {

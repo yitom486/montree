@@ -2,9 +2,9 @@
  * workspace 服务主机：stdio 帧循环 + 方法分发 + 并发上限 + 取消注册表。
  * stdin/stdout 只走协议帧；日志与 fatal 收尾走 stderr。
  */
-import type { AppError } from "@montree/contracts/core/errors";
-import type { GitCommitOptions, GitPushOptions } from "@montree/contracts/types/git";
-import type { Result } from "@montree/contracts/core/result";
+import type { AppError } from "@yitom/contracts/core/errors";
+import type { GitCommitOptions, GitPushOptions } from "@yitom/contracts/types/git";
+import type { Result } from "@yitom/contracts/core/result";
 import {
   DEFAULT_WORKSPACE_LIMITS,
   WORKSPACE_PROTOCOL_MAJOR,
@@ -12,8 +12,8 @@ import {
   type WorkspaceLimits,
   type WorkspaceServerHandshake,
   type WorkspaceWatchEvent,
-} from "@montree/contracts/types/workspace";
-import { err, ok } from "@montree/contracts/core/result";
+} from "@yitom/contracts/types/workspace";
+import { err, ok } from "@yitom/contracts/core/result";
 import {
   decodeWorkspaceFrames,
   encodeWorkspaceFrame,

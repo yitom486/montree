@@ -1,8 +1,8 @@
 import type { IQuizRepository } from './quiz-repository'
-import type { QuizSessionRecord } from '@montree/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 import { quizApi } from '@/api/quiz-api'
-import { isOk, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
+import { isOk, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
 
 export class JsonlQuizRepository implements IQuizRepository {
   async appendSession(session: QuizSessionRecord): Promise<Result<void, AppError>> {

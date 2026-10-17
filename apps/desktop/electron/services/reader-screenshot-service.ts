@@ -1,5 +1,5 @@
 import type { WebContents } from 'electron'
-import type { ReaderVisualContext, ReaderViewportImage } from '@montree/contracts'
+import type { ReaderVisualContext, ReaderViewportImage } from '@yitom/contracts'
 
 /** 只截图 owner 窗口的阅读区；像素留在内存，不落盘。 */
 export async function captureReaderViewport(target: Pick<WebContents, 'capturePage'>, raw: string): Promise<ReaderViewportImage> {

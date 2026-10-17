@@ -1,8 +1,8 @@
 import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { buildAcpPromptBlocks, type ComposerAttachment } from '@/lib/agent/acp-composer'
-import type { AcpConfigOption } from '@montree/contracts'
+import type { AcpConfigOption } from '@yitom/contracts'
 import {
   accumulateSubsessionUpdate,
   ensureSubsessionSession,

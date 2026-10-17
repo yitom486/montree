@@ -1,4 +1,4 @@
-import { ChatActivityGroup, type ChatWorkLogItem, type ChapterMarkPlanSelectPayload } from '@montree/chat-ui'
+import { ChatActivityGroup, type ChatWorkLogItem, type ChapterMarkPlanSelectPayload } from '@yitom/chat-ui'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
 import { respondPermissionRequest } from '@/lib/agent/permission-respond'
 import { openChapterForMarkRecovery, promptSelectTextForMarkRecovery } from '@/lib/agent/mark-proposal-failure'

@@ -8,8 +8,8 @@ import type {
 import { registerAcpClientHandlers, pickAllowOptionId } from './client-handlers'
 import { AcpTerminalManager } from './acp-terminal'
 import { resolveAcpPromptCapabilities } from './acp-connection'
-import type { AcpPermissionOutcome } from '@montree/contracts'
-import type { MontreeVirtualResource } from '@montree/contracts'
+import type { AcpPermissionOutcome } from '@yitom/contracts'
+import type { MontreeVirtualResource } from '@yitom/contracts'
 
 const liveConnections: Array<{ close: () => void }> = []
 

@@ -1,4 +1,4 @@
-import type { ReaderImageReference } from '@montree/contracts'
+import type { ReaderImageReference } from '@yitom/contracts'
 
 /** 单次返回给 Agent 的正文上限：一章再长也不该一次灌满上下文 */
 export const READER_TEXT_MAX_CHARS = 35_000

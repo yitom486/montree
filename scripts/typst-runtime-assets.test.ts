@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getTypstAsset, isSafeArchiveMember, TINYMIST_ASSETS, TINYMIST_VERSION } from './typst-runtime-assets'
-import { TINYMIST_VERSION as SERVICE_VERSION } from '@montree/contracts'
+import { TINYMIST_VERSION as SERVICE_VERSION } from '@yitom/contracts'
 import { createRequire } from 'node:module'
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { createHash } from 'node:crypto'

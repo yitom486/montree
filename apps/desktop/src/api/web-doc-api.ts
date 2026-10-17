@@ -3,11 +3,11 @@ import type {
   WebDocDiscoverTocResult,
   WebDocFetchPayload,
   WebDocFetchResult,
-} from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { Result } from '@montree/contracts'
-import type { ElectronAPI } from '@montree/contracts'
-import { err } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { Result } from '@yitom/contracts'
+import type { ElectronAPI } from '@yitom/contracts'
+import { err } from '@yitom/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined

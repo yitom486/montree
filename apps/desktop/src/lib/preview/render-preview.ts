@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify'
 import { fileApi } from '@/api/file-api'
 import { workspaceApi } from '@/api/workspace-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { renderMarkdown, type MarkdownRenderEnv } from '@/lib/editor/markdown'
 import { resolveLocalImagePath, resolveWorkspaceImageRef } from '@/lib/editor/markdown-images'
 import { PREVIEW_SANITIZE_OPTIONS } from './preview-sanitize'

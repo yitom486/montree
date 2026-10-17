@@ -18,7 +18,7 @@ import {
   createReadingMark,
   listReadingMarks,
 } from './reading-marks-service'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 afterEach(() => {
   closeAllBookDbs()

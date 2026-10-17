@@ -16,7 +16,7 @@ import {
   type MontreePresentResult,
   type PresentChapterRef,
   type PresentComparisonItem,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { useActiveDocumentStore } from '@/stores/active-document-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { getReaderContentProvider, type ReaderContentProvider } from './reader-content-registry'

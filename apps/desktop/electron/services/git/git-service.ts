@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { isWslPath, parseWslPath, ok, err, type Result, type AppError, type GitBranchInfo, type GitCommitOptions, type GitCommitResult, type GitDiffResult, type GitFileStatus, type GitFileStatusCode, type GitPushOptions, type GitPushResult, type GitStatusResult } from '@montree/contracts'
+import { isWslPath, parseWslPath, ok, err, type Result, type AppError, type GitBranchInfo, type GitCommitOptions, type GitCommitResult, type GitDiffResult, type GitFileStatus, type GitFileStatusCode, type GitPushOptions, type GitPushResult, type GitStatusResult } from '@yitom/contracts'
 
 export interface SpawnGitExecution {
   command: string

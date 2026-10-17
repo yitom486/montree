@@ -1,5 +1,5 @@
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
-import type { SlideSelection, SlideChart } from '@montree/contracts'
+import type { SlideSelection, SlideChart } from '@yitom/contracts'
 import { presentationAppearance, presentationPreviewContext, type PresentationAppearance } from './presentation-preview'
 import { editPresentationText } from './presentation-text-edit'
 import { shapeTree, child, POINT, C, R as REL, relation, batches, object, parsePart } from './presentation-xml'

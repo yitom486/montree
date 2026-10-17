@@ -1,4 +1,4 @@
-import type { ReaderUnit } from '@montree/reader-core'
+import type { ReaderUnit } from '@yitom/reader-core'
 
 export interface PdfOcrPrefetchRange {
   start: number

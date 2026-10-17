@@ -21,7 +21,7 @@ function sanitizeAgentHtml(html: string): string {
 
 /**
  * Agent markdown-it 渲染（S2 起仅供阅读器批注/知识卡片等一次性正文使用；
- * 聊天主时间线已切 Streamdown 入口 `@montree/chat-ui` 的 `ChatMarkdown`）。
+ * 聊天主时间线已切 Streamdown 入口 `@yitom/chat-ui` 的 `ChatMarkdown`）。
  * 流式补全未闭合 fence/公式，避免半截内容被吞。
  */
 export function renderAgentMarkdown(

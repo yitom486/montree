@@ -3,8 +3,8 @@ import type {
   QuizAnswerSubmission,
   QuizQuestion,
   QuizSessionRecord,
-} from '@montree/contracts'
-import { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
+} from '@yitom/contracts'
+import { parseQuizJsonl, serializeQuizSession } from '@yitom/contracts'
 import { openMontreeDb } from './app-db/open-app-db'
 import { resolveFingerprintForFile } from './marks-db'
 

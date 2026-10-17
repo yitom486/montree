@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
-import { scopeDocumentKey } from '@montree/contracts'
+import { scopeDocumentKey } from '@yitom/contracts'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { applyThemeWithViewTransition } from '@/lib/editor/theme-transition'
 

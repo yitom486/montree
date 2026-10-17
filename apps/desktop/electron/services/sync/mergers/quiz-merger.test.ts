@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mergeQuizSessions } from './quiz-merger'
-import type { QuizSessionRecord } from '@montree/contracts'
-import { serializeQuizSession } from '@montree/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
+import { serializeQuizSession } from '@yitom/contracts'
 
 describe('quiz-merger', () => {
   const session1: QuizSessionRecord = {

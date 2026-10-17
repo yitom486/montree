@@ -7,7 +7,7 @@ import {
   isHeadingLabelMatch,
   scrollToViewportEntry,
   type ViewportNavEntry,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { mockRelativeOffsetTop, mockScrollDocument } from '@/lib/reader/reader-viewport-test-helpers'
 
 describe('isHeadingLabelMatch wrapper guard', () => {

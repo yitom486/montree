@@ -1,7 +1,7 @@
 import type { InkdownMcpToolDefinition } from '@yitom/acp-client'
-import type { MontreeSnapshotResource } from '@montree/contracts'
+import type { MontreeSnapshotResource } from '@yitom/contracts'
 import type { ReaderVisualToolContext } from './reader-visual-tools'
-import { DIAGRAM_TYPES, diagramDesignGuide, MARKDOWN_COMPONENT_GUIDE } from '@montree/contracts'
+import { DIAGRAM_TYPES, diagramDesignGuide, MARKDOWN_COMPONENT_GUIDE } from '@yitom/contracts'
 
 const documentPath = { type: 'string', description: '当前文档完整路径，必须与读取结果一致' }
 const revision = { type: 'integer', minimum: 0, description: '最近读取返回的文档版本；版本过期则拒绝修改' }

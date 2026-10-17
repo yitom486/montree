@@ -14,9 +14,9 @@ import type {
   WorkspaceHostWriteResult,
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
-} from '@montree/contracts'
-import { err, isCancelled, ok, type Result } from '@montree/contracts'
-import { isLocalWorkspaceId } from '@montree/contracts'
+} from '@yitom/contracts'
+import { err, isCancelled, ok, type Result } from '@yitom/contracts'
+import { isLocalWorkspaceId } from '@yitom/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   if (!window.electronAPI) {

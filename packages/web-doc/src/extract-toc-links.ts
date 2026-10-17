@@ -1,4 +1,4 @@
-import type { WebDocTocEntry } from '@montree/contracts'
+import type { WebDocTocEntry } from '@yitom/contracts'
 
 const MAX_TOC_ENTRIES = 240
 

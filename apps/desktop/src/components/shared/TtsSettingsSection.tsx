@@ -24,7 +24,7 @@ import { useTtsStore } from '@/stores/tts-store'
 import { ttsApi } from '@/api/tts-api'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { TtsProviderType, TtsRemoteModelItem, TtsVoiceInfo } from '@montree/contracts'
+import type { TtsProviderType, TtsRemoteModelItem, TtsVoiceInfo } from '@yitom/contracts'
 
 const FALLBACK_GEMINI_MODELS = [
   {

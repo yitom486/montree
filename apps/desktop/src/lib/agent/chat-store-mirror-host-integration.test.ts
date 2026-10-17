@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_ACP_RUNTIME_ID, MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID, MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import { mirrorSessionUpdateToPackageStore } from './chat-store-mirror'

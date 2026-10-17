@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { RendererErrorPayload } from '@montree/contracts'
+import type { RendererErrorPayload } from '@yitom/contracts'
 
 const MAX_ENTRIES = 100
 

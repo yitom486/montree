@@ -1,5 +1,5 @@
-import type { AppError } from '@montree/contracts'
-import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '@montree/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { SaveBinaryDocumentPayload, SaveBinaryDocumentResult } from '@yitom/contracts'
 import type {
   ExportDocumentPayload,
   ExportDocumentResult,
@@ -23,9 +23,9 @@ import type {
   WorkspaceFsRenamePayload,
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
-} from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
-import type { ElectronAPI } from '@montree/contracts'
+} from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { ElectronAPI } from '@yitom/contracts'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   if (!window.electronAPI) {

@@ -1,4 +1,4 @@
-import type { WebDocSiteId } from '@montree/contracts'
+import type { WebDocSiteId } from '@yitom/contracts'
 import { isHrttNewsHost } from '@montree/web-doc'
 import { isPeopleDailyPaperHost } from '@montree/web-doc'
 

@@ -1,5 +1,5 @@
-import type { ChatTransportPort } from '@montree/chat-session'
-import { isOk } from '@montree/contracts'
+import type { ChatTransportPort } from '@yitom/chat-session'
+import { isOk } from '@yitom/contracts'
 import { acpApi } from '@/api/acp-api'
 import {
   buildAcpPromptBlocks,
@@ -16,7 +16,7 @@ import { reportAppError } from '@/lib/workspace/report-error'
 import { threadAgentSessionForRuntime, useAcpUiStore } from '@/stores/acp-ui-store'
 
 /**
- * P0 宿主侧 `ChatTransportPort` 实现（`@montree/chat-session` 传输端口）。
+ * P0 宿主侧 `ChatTransportPort` 实现（`@yitom/chat-session` 传输端口）。
  *
  * 只委托现有宿主链路，不自创语义；成功失败都只 resolve/reject Promise，
  * 不写时间线、不弹 toast——时间线写入由调用方经新 store ingest 完成，

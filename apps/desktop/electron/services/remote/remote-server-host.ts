@@ -14,7 +14,7 @@ import {
   type RemoteServerInvokePayload,
   type Result,
   type WorkspaceMethod,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { RemoteServerPipeClient } from './remote-server-client'
 import {
   resolveRemoteServerBundlePath,

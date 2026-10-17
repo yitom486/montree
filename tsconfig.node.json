@@ -2,17 +2,13 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@montree/contracts": ["./packages/contracts/src/index.ts"],
-      "@montree/contracts/*": ["./packages/contracts/src/*"],
-      "@montree/reader-core": ["./packages/reader-core/src/index.ts"],
       "@montree/pdf": ["./packages/pdf/src/index.ts"],
       "@montree/ocr-core": ["./packages/ocr-core/src/index.ts"],
-      "@montree/annotations": ["./packages/annotations/src/index.ts"],
       "@montree/web-doc": ["./packages/web-doc/src/index.ts"],
       "@montree/workspace-core": ["./packages/workspace-core/src/index.ts"],
       "@montree/remote-server": ["./packages/remote-server/src/index.ts"]
     },
     "types": ["electron-vite/node"]
   },
-  "include": ["apps/desktop/electron/**/*", "apps/desktop/electron.vite.config.ts", "packages/contracts/src/**/*", "packages/reader-core/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/annotations/src/**/*", "packages/web-doc/src/**/*", "packages/workspace-core/src/**/*", "packages/remote-server/src/**/*"]
+  "include": ["apps/desktop/electron/**/*", "apps/desktop/electron.vite.config.ts", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/web-doc/src/**/*", "packages/workspace-core/src/**/*", "packages/remote-server/src/**/*"]
 }

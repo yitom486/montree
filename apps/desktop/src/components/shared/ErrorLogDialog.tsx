@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { appApi } from '@/api/app-api'
 import { formatErrorLogEntry } from '@/lib/workspace/error-reporter'
 import { useErrorLogStore } from '@/stores/error-log-store'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 interface ErrorLogDialogProps {
   open: boolean

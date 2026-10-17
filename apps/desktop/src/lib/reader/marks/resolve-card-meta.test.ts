@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import { filterRedundantKeyPoints, parseNoteToCardMeta, resolveCardMeta } from './resolve-card-meta'
 
 describe('resolveCardMeta', () => {

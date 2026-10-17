@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist'
 import { openPdfDocument } from '@/lib/reader/pdf/pdf-document'
-import { loadPdfOutlineInfo, formatPdfOutlineNotice, type PdfOutlineSource } from '@montree/reader-core'
+import { loadPdfOutlineInfo, formatPdfOutlineNotice, type PdfOutlineSource } from '@yitom/reader-core'
 import { detectPdfDocumentProfile } from '@/lib/reader/pdf/pdf-scan-detector'
 import { canUseOcrToc } from '@/lib/reader/pdf-ocr/pdf-ocr-toc-gate'
 import { getPdfOcrToc, listPdfOcrPages, getPdfOcrPage } from '@/api/ocr-api'
@@ -19,7 +19,7 @@ import {
   resolvePdfChapterByPage,
   type PdfPageCssSize,
   type ReaderUnit,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
@@ -27,7 +27,7 @@ import { pdfStructureClient } from '@/lib/reader/pdf/pdf-structure-client'
 import { pdfInspectorClient } from '@/lib/reader/pdf/pdf-inspector-client'
 import { reportAppError } from '@/lib/workspace/report-error'
 import { isLiveLoadSession, TocDocLifecycle } from '@/lib/reader/pdf-ocr/ocr-toc-op'
-import type { OcrTocEntry } from '@montree/contracts'
+import type { OcrTocEntry } from '@yitom/contracts'
 import type { usePdfPageOcr } from '@/hooks/reader/usePdfPageOcr'
 
 export interface UsePdfDocumentSessionOptions {

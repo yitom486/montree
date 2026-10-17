@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
-import { toToolDisplayModel } from '@montree/chat-core'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
+import { toToolDisplayModel } from '@yitom/chat-core'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import { formatTurnContextBlock } from '@/lib/agent/context/turn-context'
 import {

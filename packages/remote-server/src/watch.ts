@@ -5,10 +5,10 @@
  */
 import { watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import type { AppError } from "@montree/contracts/core/errors";
-import type { Result } from "@montree/contracts/core/result";
-import type { WorkspaceWatchChange, WorkspaceWatchEvent } from "@montree/contracts/types/workspace";
-import { err, ok } from "@montree/contracts/core/result";
+import type { AppError } from "@yitom/contracts/core/errors";
+import type { Result } from "@yitom/contracts/core/result";
+import type { WorkspaceWatchChange, WorkspaceWatchEvent } from "@yitom/contracts/types/workspace";
+import { err, ok } from "@yitom/contracts/core/result";
 import { confineWorkspacePath } from "./root-guard";
 
 export const WATCH_COALESCE_MS = 400;

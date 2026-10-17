@@ -1,11 +1,11 @@
-import { isReaderDocumentKind } from '@montree/contracts'
-import type { DocumentKind } from '@montree/contracts'
+import { isReaderDocumentKind } from '@yitom/contracts'
+import type { DocumentKind } from '@yitom/contracts'
 import { readingMarksApi } from '@/api/reading-marks-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import {
   collectHighlightPassages,
   serializeMarkPassage,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import { collectActiveDocument } from './collect-turn-context'
 import { getReaderMarksProvider } from './reader-marks-registry'
 
@@ -13,7 +13,7 @@ export {
   collectHighlightPassages,
   isHighlightPassage,
   serializeMarkPassage as serializeMarkForAgent,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 
 function supportsMontreeMarks(kind: DocumentKind): boolean {
   return kind === 'web' || isReaderDocumentKind(kind)

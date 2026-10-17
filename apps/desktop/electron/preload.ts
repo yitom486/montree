@@ -1,18 +1,18 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { SaveBinaryDocumentPayload } from '@montree/contracts'
-import { IPC } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { Result } from '@montree/contracts'
-import type { ExportDocumentPayload, ExportMarkdownPayload, OpenDialogOptions, SaveFilePayload, SavePastedImagePayload } from '@montree/contracts'
-import type { RendererErrorPayload } from '@montree/contracts'
-import type { WindowInit } from '@montree/contracts'
-import type { ElectronAPI } from '@montree/contracts'
-import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@montree/contracts'
-import type { DetectPdfTocPagesPayload, GetPdfOcrTocPayload, GetPdfOcrPagePayload, ListPdfOcrPagesPayload, RecognizePdfPagePayload, RecognizePdfTocPayload, SavePdfOcrTocPayload } from '@montree/contracts'
-import type { ClassifyPdfDocumentPayload, ExtractPdfBookMarkdownPayload } from '@montree/contracts'
-import type { RosettaActiveImport, RosettaBodyWatermarkApplyPayload, RosettaBodyWatermarkPreviewPayload, RosettaImportPayload, RosettaImportStatus, RosettaInspectContentPayload, RosettaQuery, RosettaTocRebuildPayload } from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
-import type { WindowWorkspaceStatus, WorkspaceChangedEvent, WorkspaceConnectPayload } from '@montree/contracts'
+import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
+import { IPC } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { Result } from '@yitom/contracts'
+import type { ExportDocumentPayload, ExportMarkdownPayload, OpenDialogOptions, SaveFilePayload, SavePastedImagePayload } from '@yitom/contracts'
+import type { RendererErrorPayload } from '@yitom/contracts'
+import type { WindowInit } from '@yitom/contracts'
+import type { ElectronAPI } from '@yitom/contracts'
+import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@yitom/contracts'
+import type { DetectPdfTocPagesPayload, GetPdfOcrTocPayload, GetPdfOcrPagePayload, ListPdfOcrPagesPayload, RecognizePdfPagePayload, RecognizePdfTocPayload, SavePdfOcrTocPayload } from '@yitom/contracts'
+import type { ClassifyPdfDocumentPayload, ExtractPdfBookMarkdownPayload } from '@yitom/contracts'
+import type { RosettaActiveImport, RosettaBodyWatermarkApplyPayload, RosettaBodyWatermarkPreviewPayload, RosettaImportPayload, RosettaImportStatus, RosettaInspectContentPayload, RosettaQuery, RosettaTocRebuildPayload } from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
+import type { WindowWorkspaceStatus, WorkspaceChangedEvent, WorkspaceConnectPayload } from '@yitom/contracts'
 
 const windowInit = ipcRenderer.sendSync(IPC.APP_GET_WINDOW_INIT) as WindowInit
 const isFreshWindow = windowInit?.isFreshWindow ?? false
@@ -29,7 +29,7 @@ const electronAPI: ElectronAPI = {
   typstClose: sessionId => ipcRenderer.invoke(IPC.TYPST_CLOSE, sessionId),
   typstExportPdf: payload => ipcRenderer.invoke(IPC.TYPST_EXPORT_PDF, payload),
   onTypstEvent: callback => {
-    const handler = (_event: Electron.IpcRendererEvent, event: import('@montree/contracts').TypstEvent) => callback(event)
+    const handler = (_event: Electron.IpcRendererEvent, event: import('@yitom/contracts').TypstEvent) => callback(event)
     ipcRenderer.on(IPC.TYPST_EVENT, handler)
     return () => { ipcRenderer.removeListener(IPC.TYPST_EVENT, handler) }
   },

@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@yitom/contracts'
 import { resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'
 import { KnowledgeCardItem } from './KnowledgeCardItem'
 import { BracketConnector } from './BracketConnector'

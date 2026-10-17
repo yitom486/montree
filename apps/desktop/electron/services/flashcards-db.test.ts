@@ -32,7 +32,7 @@ import {
   listDueFlashcards,
 } from './marks-db'
 import { countDueFlashcards, deriveFlashcard, getFlashcardRow, listReviewRows } from './flashcards-db'
-import { isOk, toChapterKey } from '@montree/contracts'
+import { isOk, toChapterKey } from '@yitom/contracts'
 
 describe('flashcards-db（[2]-02b 记忆卡片复习态）', () => {
   beforeEach(async () => {

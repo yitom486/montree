@@ -28,7 +28,7 @@ import {
   type WorkspaceMethod,
   type WorkspaceServerHandshake,
   type WorkspaceWatchEvent,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 export interface RemotePipeClientOptions {
   nodePath: string

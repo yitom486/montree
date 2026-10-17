@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { MONTREE_SETTLE_COMPLETE_KIND } from '@montree/contracts'
-import type { ChatMessage } from '@montree/chat-core'
+import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
+import type { ChatMessage } from '@yitom/chat-core'
 import {
   createChatSessionStore,
   type ChatSessionStore,
-} from '@montree/chat-session'
+} from '@yitom/chat-session'
 import {
   parsePermissionOptions,
   permissionSummaryFromToolCall,

@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { DiagramViewerCard, type DiagramPayload } from '@montree/chat-ui'
+import { DiagramViewerCard, type DiagramPayload } from '@yitom/chat-ui'
 import { MermaidBlock } from '@/components/markdown/MermaidBlock'
 
 export interface DiagramModalProps {

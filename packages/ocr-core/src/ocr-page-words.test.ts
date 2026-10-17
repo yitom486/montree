@@ -6,7 +6,7 @@ import {
   pageHasNativeText,
   splitCjkUnits,
 } from './ocr-page-words'
-import type { OcrPageWord, PdfOcrPageCache } from '@montree/contracts'
+import type { OcrPageWord, PdfOcrPageCache } from '@yitom/contracts'
 
 describe('ocr-page-words', () => {
   it('pageHasNativeText 阈值', () => {

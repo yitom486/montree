@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BookDbBlockHit } from '@montree/contracts'
+import type { BookDbBlockHit } from '@yitom/contracts'
 
 const { mockQueryBook } = vi.hoisted(() => ({ mockQueryBook: vi.fn() }))
 

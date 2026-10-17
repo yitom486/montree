@@ -1,4 +1,4 @@
-import { scopeDocumentKey } from '@montree/contracts'
+import { scopeDocumentKey } from '@yitom/contracts'
 
 /** 崩溃恢复草稿：未命名文档使用固定键 */
 export const UNTITLED_DRAFT_KEY = '__untitled__'

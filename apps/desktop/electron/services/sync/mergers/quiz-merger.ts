@@ -1,5 +1,5 @@
-import type { QuizSessionRecord } from '@montree/contracts'
-import { parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
+import { parseQuizJsonl, serializeQuizSession } from '@yitom/contracts'
 
 export interface QuizMergeResult {
   mergedSessions: QuizSessionRecord[]

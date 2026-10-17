@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_DOCUMENT_EXTENSIONS, getDocumentKind, isTextDocumentKind, isWorkspaceFileExtension } from '@montree/contracts'
+import { ALL_DOCUMENT_EXTENSIONS, getDocumentKind, isTextDocumentKind, isWorkspaceFileExtension } from '@yitom/contracts'
 
 describe('document-types', () => {
   it('Typst is a distinct editable text kind, included in workspace scans but not Markdown', () => {

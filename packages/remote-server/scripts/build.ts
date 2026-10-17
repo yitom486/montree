@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { WORKSPACE_MIN_NODE_MAJOR, WORKSPACE_PROTOCOL_MAJOR, WORKSPACE_PROTOCOL_MINOR } from "@montree/contracts/types/workspace";
+import { WORKSPACE_MIN_NODE_MAJOR, WORKSPACE_PROTOCOL_MAJOR, WORKSPACE_PROTOCOL_MINOR } from "@yitom/contracts/types/workspace";
 
 const root = resolve(import.meta.dir, "..", "..", "..");
 const defaultOut = join(root, "apps", "desktop", "resources", "remote-server");

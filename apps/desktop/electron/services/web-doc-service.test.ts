@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,

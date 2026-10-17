@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_ACP_RUNTIME_ID, err, ok } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID, err, ok } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 vi.mock('@/api/acp-api', () => ({
@@ -16,7 +16,7 @@ vi.mock('sonner', () => ({
 }))
 
 import { acpApi } from '@/api/acp-api'
-import type { AcpContentBlock } from '@montree/contracts'
+import type { AcpContentBlock } from '@yitom/contracts'
 import { createChatTransportPort } from './chat-transport-port'
 import { resetSessionBootstrap } from '@/lib/agent/context/session-bootstrap'
 import {

@@ -41,8 +41,8 @@ import type {
   WorkspaceKind,
   WorkspaceSearchMarkdownPayload,
   WorkspaceSearchMarkdownResult,
-} from '@montree/contracts'
-import { err, ok } from '@montree/contracts'
+} from '@yitom/contracts'
+import { err, ok } from '@yitom/contracts'
 import {
   exportHtmlDocument,
   exportMarkdownDocument,

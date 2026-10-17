@@ -1,5 +1,5 @@
-import type { FileTreeNode } from '@montree/contracts'
-import { getFileExtension, getDocumentKind, type DocumentKind } from '@montree/contracts'
+import type { FileTreeNode } from '@yitom/contracts'
+import { getFileExtension, getDocumentKind, type DocumentKind } from '@yitom/contracts'
 
 export interface QuickOpenFileItem {
   path: string

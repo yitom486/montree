@@ -1,6 +1,6 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { pageHasNativeText } from '@montree/ocr-core'
-import type { PdfOcrPageCache } from '@montree/contracts'
+import type { PdfOcrPageCache } from '@yitom/contracts'
 
 export async function readPdfPageNativeText(
   pdf: PDFDocumentProxy,

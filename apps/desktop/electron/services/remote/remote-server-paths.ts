@@ -9,7 +9,7 @@ import {
   type AppError,
   type Result,
   type WorkspaceServerManifest,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 /** 远端服务产物目录：打包后为 resources/remote-server，开发期为仓库资源目录 */
 export function resolveRemoteServerDir(): string {

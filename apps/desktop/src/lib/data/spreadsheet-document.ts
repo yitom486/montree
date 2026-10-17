@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
-import type { CellInput, TableSelection, TableTarget } from '@montree/contracts'
+import type { CellInput, TableSelection, TableTarget } from '@yitom/contracts'
 import { FormulaEvaluator } from './formula-evaluator'
 
 export const TABLE_CELL_LIMIT = 5000

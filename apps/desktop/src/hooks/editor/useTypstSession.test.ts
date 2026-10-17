@@ -2,7 +2,7 @@
 import { act, createElement, StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ok, err, type TypstEvent } from '@montree/contracts'
+import { ok, err, type TypstEvent } from '@yitom/contracts'
 import { typstApi } from '@/api/typst-api'
 import { useTypstSession } from './useTypstSession'
 

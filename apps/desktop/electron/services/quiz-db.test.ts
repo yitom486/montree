@@ -29,8 +29,8 @@ import {
   importQuizJsonl,
   listQuizSessionsByFile,
 } from './quiz-db'
-import { isOk, parseQuizJsonl, serializeQuizSession } from '@montree/contracts'
-import type { QuizSessionRecord } from '@montree/contracts'
+import { isOk, parseQuizJsonl, serializeQuizSession } from '@yitom/contracts'
+import type { QuizSessionRecord } from '@yitom/contracts'
 import { mergeQuizSessions } from './sync/mergers/quiz-merger'
 
 function sampleSession(overrides: Partial<QuizSessionRecord> = {}): QuizSessionRecord {

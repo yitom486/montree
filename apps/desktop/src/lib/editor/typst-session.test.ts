@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ok, err, type TypstEvent, type TypstSession } from '@montree/contracts'
+import { ok, err, type TypstEvent, type TypstSession } from '@yitom/contracts'
 import { TypstSessionController, type TypstSessionPort, type TypstSessionState } from './typst-session'
 
 function deferred<T>() {

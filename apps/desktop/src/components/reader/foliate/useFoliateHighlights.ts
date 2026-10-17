@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { FoliateViewElement } from '@foliate/view.js'
-import type { ReadingMark } from '@montree/contracts'
-import type { EpubChapter } from '@montree/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
+import type { EpubChapter } from '@yitom/reader-core'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import {
   findMarkForSelection,
   MARK_CATEGORY_SWATCH_FALLBACK,
   resolveMarkCategorySwatch,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import {
   buildChapterSectionMap,
   buildMarkFlag,

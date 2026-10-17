@@ -3,7 +3,7 @@ import {
   DEFAULT_ACP_RUNTIME_ID,
   isSameWorkspace,
   MONTREE_SETTLE_COMPLETE_KIND,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   type AcpChatMessage,
   type AcpChatRole,
@@ -21,11 +21,11 @@ import {
   summarizePlanProgress,
   type ChatFeedToolCall,
   parseToolCallMetadata,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
 import { mirrorHostSnapshotToPackageStore, mirrorHostThreadToPackageStore, mirrorThreadActionToPackageStore } from '@/lib/agent/chat-store-mirror'
-import type { ChatSessionStore } from '@montree/chat-session'
+import type { ChatSessionStore } from '@yitom/chat-session'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import {
   hasReplayScaffoldingMarkers,
@@ -37,9 +37,9 @@ import {
 } from '@/lib/agent/promote-mark-proposals'
 import {
   selectChapterMarkPlanOnMessages,
-} from '@montree/chat-core'
-import { isProposeMarkToolTitle } from '@montree/chat-core'
-import type { MarkProposalStatus } from '@montree/annotations'
+} from '@yitom/chat-core'
+import { isProposeMarkToolTitle } from '@yitom/chat-core'
+import type { MarkProposalStatus } from '@yitom/annotations'
 import {
   MAX_THREADS,
   type AcpChatThread,

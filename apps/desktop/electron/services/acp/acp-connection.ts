@@ -7,14 +7,14 @@ import {
   findBuiltinAcpRuntime,
   isWslPath,
   windowsToLinuxPath,
-} from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+} from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 import type {
   AcpConnectResult,
   AcpPromptCapabilities,
   AcpRuntimeInfo,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   methods,
   type InitializeResponse,

@@ -7,7 +7,7 @@ import { bracketMatching, foldGutter, indentOnInput, indentUnit, LanguageSupport
 import { lintGutter, setDiagnostics } from '@codemirror/lint'
 import { search, searchKeymap } from '@codemirror/search'
 import { typst_lezer, typstLezerFoldService, typstLezerIndentService, typstLezerListKeymap } from 'codemirror-lang-typst/lezer'
-import type { TypstRequestMethod } from '@montree/contracts'
+import type { TypstRequestMethod } from '@yitom/contracts'
 import { buildThemeExtensions } from '@/lib/editor/codemirror-theme'
 import type { TextDocument } from '@/lib/editor/text-document'
 import { typstDiagnostics, typstDocumentation, typstEditChanges, typstOffset, typstPosition, type TypstDiagnostic, type TypstRange, type TypstTextEdit } from '@/lib/editor/typst-lsp'

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { ChatMessage } from '@montree/chat-core'
+import type { ChatMessage } from '@yitom/chat-core'
 import {
   createChatSessionStore,
   type ChatSessionStore,
-} from '@montree/chat-session'
+} from '@yitom/chat-session'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import {
   mirrorSessionUpdateToPackageStore,

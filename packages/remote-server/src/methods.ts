@@ -7,10 +7,10 @@ import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cp, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, sep } from "node:path";
-import type { AppError } from "@montree/contracts/core/errors";
-import type { GitCommitOptions, GitPushOptions } from "@montree/contracts/types/git";
-import type { Result } from "@montree/contracts/core/result";
-import { err, ok } from "@montree/contracts/core/result";
+import type { AppError } from "@yitom/contracts/core/errors";
+import type { GitCommitOptions, GitPushOptions } from "@yitom/contracts/types/git";
+import type { Result } from "@yitom/contracts/core/result";
+import { err, ok } from "@yitom/contracts/core/result";
 import type {
   WorkspaceEntry,
   WorkspaceLimits,
@@ -21,7 +21,7 @@ import type {
   WorkspaceSearchResult,
   WorkspaceStatResult,
   WorkspaceWriteTextResult,
-} from "@montree/contracts/types/workspace";
+} from "@yitom/contracts/types/workspace";
 import { formatWorkspaceRevision, joinWorkspaceRelPath } from "@montree/workspace-core";
 import { confineWorkspacePath } from "./root-guard";
 

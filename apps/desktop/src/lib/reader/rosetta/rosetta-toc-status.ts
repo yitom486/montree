@@ -1,4 +1,4 @@
-import { computeTocSignature } from '@montree/reader-core'
+import { computeTocSignature } from '@yitom/reader-core'
 import { resolveRosettaTocEntries } from '@/lib/reader/rosetta/rosetta-toc'
 
 /**

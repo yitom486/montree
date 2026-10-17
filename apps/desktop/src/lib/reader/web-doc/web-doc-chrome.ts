@@ -1,4 +1,4 @@
-import type { WebDocSiteId } from '@montree/contracts'
+import type { WebDocSiteId } from '@yitom/contracts'
 import { stripDisallowedWebDocEmbeds } from '@/lib/reader/web-doc/web-doc-embeds'
 import { stripHrttChrome } from '@/lib/reader/web-doc/hrtt-extract'
 import { MONTREE_SOURCE_HREF_ATTR } from '@/lib/reader/web-doc/web-doc-link'

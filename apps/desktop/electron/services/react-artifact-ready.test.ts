@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REACT_ARTIFACT_MOUNT_TOKEN } from '@montree/contracts'
+import { REACT_ARTIFACT_MOUNT_TOKEN } from '@yitom/contracts'
 import { buildReactWrapper } from './react-artifact-service'
 import { runInNewContext } from 'node:vm'
 

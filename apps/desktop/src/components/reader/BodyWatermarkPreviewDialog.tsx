@@ -10,12 +10,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { rosettaApi } from '@/api/rosetta-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { validateCustomEdgeToken } from '@montree/ocr-core'
 import type {
   RosettaBodyWatermarkApplyResult,
   RosettaBodyWatermarkPreviewResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 interface BodyWatermarkPreviewDialogProps {
   open: boolean

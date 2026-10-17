@@ -3,9 +3,9 @@ import { webDocApi } from '@/api/web-doc-api'
 import { queryKeys } from '@/api/query-keys'
 import { buildWebDocPageContent } from '@/lib/reader/web-doc/web-doc-html'
 import { resolveWebDocSiteId, stripWebDocFragment } from '@montree/web-doc'
-import { isOk } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { WebDocPageContent } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { WebDocPageContent } from '@yitom/contracts'
 
 export interface WebDocPageData {
   pageUrl: string

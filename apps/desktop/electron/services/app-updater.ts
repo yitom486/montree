@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { BrowserWindow, app } from 'electron'
-import { IPC } from '@montree/contracts'
-import type { AppUpdateStatus } from '@montree/contracts'
+import { IPC } from '@yitom/contracts'
+import type { AppUpdateStatus } from '@yitom/contracts'
 
 const cjsRequire = createRequire(import.meta.url)
 

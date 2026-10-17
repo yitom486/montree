@@ -10,8 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { acpApi } from '@/api/acp-api'
-import { isOk } from '@montree/contracts'
-import type { AcpProviderStatus } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import type { AcpProviderStatus } from '@yitom/contracts'
 
 interface AgentProviderDialogProps {
   open: boolean

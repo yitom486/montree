@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerReaderContent } from './reader-content-registry'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
-import { EMPTY_READER_NAV } from '@montree/reader-core'
+import { EMPTY_READER_NAV } from '@yitom/reader-core'
 import { buildPresentResult, stripHostileHtmlHead } from './present-result-builder'
-import { parsePresentResult } from '@montree/contracts'
+import { parsePresentResult } from '@yitom/contracts'
 
 function setupBook() {
   useReaderNavigationStore.setState({

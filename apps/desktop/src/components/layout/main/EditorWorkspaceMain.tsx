@@ -57,7 +57,7 @@ import {
 } from '@/lib/editor/markdown-headings'
 import { useEditorUiStore, useFileUiState, type EditorViewMode } from '@/stores/editor-ui-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
-import { getDocumentKind, getFileExtension, type FileTreeNode } from '@montree/contracts'
+import { getDocumentKind, getFileExtension, type FileTreeNode } from '@yitom/contracts'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
 const JsonTreeViewer = lazy(() =>

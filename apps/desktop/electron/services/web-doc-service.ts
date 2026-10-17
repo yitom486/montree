@@ -1,13 +1,13 @@
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import { toAppError } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import { toAppError } from '@yitom/contracts'
 import type {
   WebDocDiscoverTocPayload,
   WebDocDiscoverTocResult,
   WebDocFetchPayload,
   WebDocFetchResult,
   WebDocTocEntry,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   extractGenericWebDocToc,
   extractMdBookToc,

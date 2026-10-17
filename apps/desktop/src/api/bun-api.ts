@@ -1,6 +1,6 @@
-import type { BunRuntimeStatus } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { Result } from '@montree/contracts'
+import type { BunRuntimeStatus } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { Result } from '@yitom/contracts'
 
 function api() {
   if (!window.electronAPI) {

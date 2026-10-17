@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import {
   buildAnkiCardsExport,
   buildAnkiExportFileName,
@@ -10,7 +10,7 @@ import {
   findCurrentChapterRef,
   tocFromEpubUnits,
   resolveEpubChapter,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 
 function createMark(overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' | 'anchor'>): ReadingMark {
   return {

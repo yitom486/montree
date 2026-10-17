@@ -10,7 +10,7 @@ import {
   replaceImageSrcInHtml,
 } from '@/lib/editor/markdown-images'
 import { renderMarkdown } from '@/lib/editor/markdown'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 
 const PREVIEW_SANITIZE_OPTIONS: Config = {
   ALLOWED_URI_REGEXP:

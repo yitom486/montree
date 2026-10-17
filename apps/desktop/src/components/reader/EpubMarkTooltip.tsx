@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReadingMark } from '@montree/contracts'
+import type { ReadingMark } from '@yitom/contracts'
 import { AnchoredSurface } from '@/components/shared/AnchoredSurface'
 
 interface EpubMarkTooltipProps { mark: ReadingMark | null; x: number; y: number; disabled?: boolean }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { AcpAuthMethod, CodexAuthPreflight } from '@montree/contracts'
+import type { AcpAuthMethod, CodexAuthPreflight } from '@yitom/contracts'
 import type { GenericRuntimeAdapter } from '../index'
 
 /**

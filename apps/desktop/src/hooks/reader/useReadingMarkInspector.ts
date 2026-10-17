@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ReadingMark } from '@montree/contracts'
-import { rankVisualMarks, uniqueMarksById } from '@montree/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
+import { rankVisualMarks, uniqueMarksById } from '@yitom/reader-core'
 
 export function useReadingMarkInspector(marks: ReadingMark[]) {
   const [active, setActive] = useState<ReadingMark | null>(null)

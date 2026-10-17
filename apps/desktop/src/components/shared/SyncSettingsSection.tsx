@@ -17,7 +17,7 @@ import { syncApi } from '@/api/sync-api'
 import { appApi } from '@/api/app-api'
 import { queryKeys } from '@/api/query-keys'
 import { useSyncConfig, useSyncStatus } from '@/hooks/sync/useSyncConfigStatus'
-import type { SyncConfig, SyncProviderType } from '@montree/contracts'
+import type { SyncConfig, SyncProviderType } from '@yitom/contracts'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 

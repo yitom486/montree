@@ -14,10 +14,10 @@ import {
 } from '@/lib/workspace/file-tree-ops'
 import { buildExportHtml, getSuggestedExportName } from '@/lib/editor/export-document'
 import { reportAppError } from '@/lib/workspace/report-error'
-import { CROSS_WORKSPACE_MOVE_MESSAGE, isOk } from '@montree/contracts'
-import { LOCAL_WORKSPACE_ID } from '@montree/contracts'
-import type { FileTreeNode } from '@montree/contracts'
-import { getDocumentKind } from '@montree/contracts'
+import { CROSS_WORKSPACE_MOVE_MESSAGE, isOk } from '@yitom/contracts'
+import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
+import type { FileTreeNode } from '@yitom/contracts'
+import { getDocumentKind } from '@yitom/contracts'
 
 interface UseFileTreeActionsOptions {
   workspaceRoot?: string

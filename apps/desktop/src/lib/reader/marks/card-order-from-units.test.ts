@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingMark } from '@montree/contracts'
-import { toCanonicalChapter, tocFromEpubUnits, tocFromPdfUnits } from '@montree/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
+import { toCanonicalChapter, tocFromEpubUnits, tocFromPdfUnits } from '@yitom/reader-core'
 import {
   chapterKeyOfCard,
   chapterOrderFromNavUnits,

@@ -1,4 +1,4 @@
-import type { DocumentSelection } from '@montree/contracts'
+import type { DocumentSelection } from '@yitom/contracts'
 
 export interface StickyReaderSelection {
   filePath: string

@@ -23,8 +23,8 @@ import {
   type ComposerAttachment,
 } from '@/lib/agent/acp-composer'
 import { cn } from '@/lib/utils'
-import { isOk } from '@montree/contracts'
-import type { AcpContentBlock, AcpPromptCapabilities } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import type { AcpContentBlock, AcpPromptCapabilities } from '@yitom/contracts'
 import { toast } from 'sonner'
 import { ArrowUp, Square } from 'lucide-react'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'

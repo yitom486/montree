@@ -1,4 +1,4 @@
-import type { SlideTextEdit, SlideTextPatch } from '@montree/contracts'
+import type { SlideTextEdit, SlideTextPatch } from '@yitom/contracts'
 
 const A = 'http://schemas.openxmlformats.org/drawingml/2006/main'
 const P = 'http://schemas.openxmlformats.org/presentationml/2006/main'

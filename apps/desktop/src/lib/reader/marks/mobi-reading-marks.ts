@@ -1,7 +1,7 @@
-import type { PdfTextRect, ReadingAnchor, ReadingMark } from '@montree/contracts'
-import { applyHighlightSurface } from '@montree/reader-core'
-import { getMarkLayerMetrics, normalizeRectsInScrollDocument } from '@montree/reader-core'
-import { normalizeWebDocNavUrl } from '@montree/reader-core'
+import type { PdfTextRect, ReadingAnchor, ReadingMark } from '@yitom/contracts'
+import { applyHighlightSurface } from '@yitom/reader-core'
+import { getMarkLayerMetrics, normalizeRectsInScrollDocument } from '@yitom/reader-core'
+import { normalizeWebDocNavUrl } from '@yitom/reader-core'
 
 const MARK_SELECTOR = '.mobi-mark-highlight, .mobi-mark-note, .mobi-mark-note-hit'
 

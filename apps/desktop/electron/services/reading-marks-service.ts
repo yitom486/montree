@@ -3,8 +3,8 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { app } from 'electron'
-import { toAppError, type AppError } from '@montree/contracts'
-import { err, ok, type Result } from '@montree/contracts'
+import { toAppError, type AppError } from '@yitom/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
 import type {
   AppendFlashcardReviewPayload,
   CreateReadingMarkPayload,
@@ -14,14 +14,14 @@ import type {
   MarksSearchPayload,
   ReadingMark,
   UpdateReadingMarkPayload,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   applyReadingMarkDelete,
   applyReadingMarkUpdate,
   buildReadingMark,
   normalizeMarkFilePath as normalizeMarkFilePathCore,
   validateReadingAnchor,
-} from '@montree/annotations'
+} from '@yitom/annotations'
 import {
   appendFlashcardReview as appendFlashcardReviewInDb,
   dropFlashcardForMark,

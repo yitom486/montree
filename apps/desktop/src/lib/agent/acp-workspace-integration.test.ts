@@ -14,7 +14,7 @@ import {
   DEFAULT_ACP_RUNTIME_ID,
   isSameWorkspace,
   ok,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 const connectCalls: Array<{
   runtimeId: string

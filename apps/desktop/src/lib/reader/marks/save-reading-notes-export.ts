@@ -1,5 +1,5 @@
 import { fileApi } from '@/api/file-api'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import { reportAppError } from '@/lib/workspace/report-error'
 import {
   bookTitleFromPath,
@@ -7,8 +7,8 @@ import {
   type ReadingNotesChapterRef,
   type ReadingNotesContentKind,
   type ReadingNotesScope,
-} from '@montree/reader-core'
-import type { ReadingMark } from '@montree/contracts'
+} from '@yitom/reader-core'
+import type { ReadingMark } from '@yitom/contracts'
 import { toast } from 'sonner'
 
 export async function saveReadingNotesExport(options: {

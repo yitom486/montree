@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@montree/contracts": "workspace:*"
+    "@yitom/contracts": "^0.1.0"
   },
   "exports": {
     ".": "./src/index.ts",

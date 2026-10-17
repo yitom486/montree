@@ -1,8 +1,8 @@
 import githubTheme from 'highlight.js/styles/github.min.css?inline'
 import githubDarkTheme from 'highlight.js/styles/github-dark.min.css?inline'
 import { highlightCode, hljs, normalizeHighlightLanguage } from '@/lib/editor/code-highlight'
-import type { EpubThemeMode } from '@montree/reader-core'
-import { READER_PALETTE } from '@montree/reader-core'
+import type { EpubThemeMode } from '@yitom/reader-core'
+import { READER_PALETTE } from '@yitom/reader-core'
 import { buildCodeBlockToolbarHtml } from '@/lib/preview/code-block-chrome'
 import { stripCodeBlockLineNumbers } from '@/lib/reader/web-doc/web-doc-chrome'
 

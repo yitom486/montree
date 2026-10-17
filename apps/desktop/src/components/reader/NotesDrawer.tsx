@@ -20,8 +20,8 @@ import {
   Workflow,
   X,
 } from 'lucide-react'
-import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
-import { isOk } from '@montree/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@yitom/contracts'
+import { isOk } from '@yitom/contracts'
 import { queryKeys } from '@/api/query-keys'
 import { readingMarksApi } from '@/api/reading-marks-api'
 import { filterRedundantKeyPoints, resolveCardMeta } from '@/lib/reader/marks/resolve-card-meta'

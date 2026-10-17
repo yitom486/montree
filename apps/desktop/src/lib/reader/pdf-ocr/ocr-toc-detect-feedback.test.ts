@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { DetectPdfTocPagesResult } from '@montree/contracts'
+import type { DetectPdfTocPagesResult } from '@yitom/contracts'
 import {
   feedbackForDetection,
   reduceDetectFeedback,

@@ -1,4 +1,4 @@
-import { DIAGRAM_TYPES, type DiagramType } from '@montree/contracts'
+import { DIAGRAM_TYPES, type DiagramType } from '@yitom/contracts'
 
 type EntityField = { name: string; type: string; key: string; details: string }
 type Node = { id: string; label: string; kind: string; layer: number; details: string; lane: string; when: string; fields: EntityField[] }

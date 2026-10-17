@@ -1,9 +1,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { webDocApi } from '@/api/web-doc-api'
 import { queryKeys } from '@/api/query-keys'
-import { isOk } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { WebDocDiscoverTocResult } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { WebDocDiscoverTocResult } from '@yitom/contracts'
 
 async function fetchWebDocToc(discoveryUrl: string): Promise<WebDocDiscoverTocResult> {
   const result = await webDocApi.discoverToc({ url: discoveryUrl })

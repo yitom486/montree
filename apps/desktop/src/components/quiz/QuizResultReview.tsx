@@ -15,7 +15,7 @@ import type {
   QuizAnswerSubmission,
   QuizGrade,
   QuizQuestion,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 export interface QuizResultReviewProps {
   questions: QuizQuestion[]

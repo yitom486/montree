@@ -1,12 +1,12 @@
 import type { StateCreator } from 'zustand'
-import { DEFAULT_ACP_RUNTIME_ID, isSameWorkspace } from '@montree/contracts'
+import { DEFAULT_ACP_RUNTIME_ID, isSameWorkspace } from '@yitom/contracts'
 import type {
   AcpConfigOption,
   AcpConnectionStatus,
   AcpPromptCapabilities,
   AcpPromptMode,
   AppErrorCode,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import {
   rememberPreferredConfig,
   type AcpPreferredConfigMap,

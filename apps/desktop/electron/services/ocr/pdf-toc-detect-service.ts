@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
-import { err, ok, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import { DEFAULT_PDF_TOC_DETECT_SCALE } from '@montree/contracts'
-import type { DetectPdfTocPagesPayload, DetectPdfTocPagesResult } from '@montree/contracts'
+import { err, ok, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import { DEFAULT_PDF_TOC_DETECT_SCALE } from '@yitom/contracts'
+import type { DetectPdfTocPagesPayload, DetectPdfTocPagesResult } from '@yitom/contracts'
 import {
   resolveDetectWindow,
   scoreTocPageMarkdown,

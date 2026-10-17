@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { MontreeMcpServerHandle } from './montree-mcp-server'
-import { isWslPath, windowsToLinuxPath } from '@montree/contracts'
+import { isWslPath, windowsToLinuxPath } from '@yitom/contracts'
 import { logAcpDiagnostic } from './diagnostics'
 
 /** Agent owns the stdio child; Montree owns the window broker it connects to. */

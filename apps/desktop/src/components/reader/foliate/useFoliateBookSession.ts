@@ -14,7 +14,7 @@ import {
   scrollFoliateSectionToFragment,
   splitChapterFragment,
   type EpubChapter,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import {
   locateExcerptInDocuments,
   runRevealPlan,
@@ -38,7 +38,7 @@ import { isNavIntentLocked, useReaderNavigationStore } from '@/stores/reader-nav
 import { useReadingProgressStore } from '@/stores/reading-progress-store'
 import { appApi } from '@/api/app-api'
 import type { AppTheme } from '@/stores/editor-ui-store'
-import type { ReadingMark, AppError } from '@montree/contracts'
+import type { ReadingMark, AppError } from '@yitom/contracts'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'
 import {
   applyDocTheme,

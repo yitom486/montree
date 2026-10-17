@@ -3,13 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { rosettaApi } from '@/api/rosetta-api'
 import { queryKeys } from '@/api/query-keys'
-import { isOk } from '@montree/contracts'
+import { isOk } from '@yitom/contracts'
 import type {
   RosettaBookInfo,
   RosettaImportPhase,
   RosettaImportState,
   RosettaTocEntryInput,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 
 export interface RosettaImportStartArgs {
   filePath: string

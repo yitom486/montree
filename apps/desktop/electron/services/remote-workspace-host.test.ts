@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWorkspaceServer } from '@montree/remote-server'
-import type { WorkspaceWatchEvent } from '@montree/contracts'
+import type { WorkspaceWatchEvent } from '@yitom/contracts'
 import {
   bindRemoteHostToWindow,
   getRemoteHost,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReaderUnit } from '@montree/reader-core'
+import type { ReaderUnit } from '@yitom/reader-core'
 import {
   orderPagesForPrefetch,
   resolvePdfOcrChapterRange,

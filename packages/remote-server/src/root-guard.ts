@@ -5,7 +5,7 @@
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
-import type { AppError } from "@montree/contracts/core/errors";
+import type { AppError } from "@yitom/contracts/core/errors";
 import { normalizeWorkspaceRelPath } from "@montree/workspace-core";
 
 export function resolveRootReal(root: string): string {

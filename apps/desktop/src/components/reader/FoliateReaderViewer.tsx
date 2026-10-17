@@ -28,13 +28,13 @@ import {
   resolveEpubChapter,
   resolveMobiChapter,
   tocFromEpubUnits,
-} from '@montree/reader-core'
-import { isOk, type ReadingMark } from '@montree/contracts'
+} from '@yitom/reader-core'
+import { isOk, type ReadingMark } from '@yitom/contracts'
 import { toast } from 'sonner'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import type { FoliateViewElement } from '@foliate/view.js'
 import type { FoliateBookAdapter } from '@/lib/reader/adapter/foliate-book-adapter'
-import type { EpubChapter } from '@montree/reader-core'
+import type { EpubChapter } from '@yitom/reader-core'
 import { useFoliateHighlights } from './foliate/useFoliateHighlights'
 import { useFoliateInteractions } from './foliate/useFoliateInteractions'
 import { useFoliateBookSession, type FoliateReaderEvents } from './foliate/useFoliateBookSession'

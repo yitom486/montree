@@ -14,7 +14,7 @@ import {
   type WorkspaceMethod,
   type WorkspaceServerManifest,
   type WorkspaceStatResult,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import type { RemoteWorkspaceTransport } from '../remote-workspace-host'
 import { RemoteServerPipeClient } from './remote-server-client'
 import {

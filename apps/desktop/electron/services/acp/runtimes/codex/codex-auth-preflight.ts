@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { CodexAuthPreflight } from '@montree/contracts'
+import type { CodexAuthPreflight } from '@yitom/contracts'
 
 export type { CodexAuthPreflight }
 

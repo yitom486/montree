@@ -1,4 +1,4 @@
-import type { ComponentUiNode } from '@montree/contracts'
+import type { ComponentUiNode } from '@yitom/contracts'
 import { buildDiagramHtml } from './present-diagram'
 
 function text(value: unknown, label: string, maximum: number): string {

@@ -7,7 +7,7 @@ export type {
   AcpMessageAttachment,
   DiffLineKind,
   DiffLine,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'
 export {
   extractTextFromContent,
   parseToolDiffs,
@@ -17,4 +17,4 @@ export {
   isToolActiveStatus,
   formatDuration,
   buildSimpleDiffLines,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'

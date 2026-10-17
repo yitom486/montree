@@ -1,1 +1,1 @@
-export * from '@montree/chat-session'
+export * from '@yitom/chat-session'

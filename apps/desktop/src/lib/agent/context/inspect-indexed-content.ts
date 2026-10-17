@@ -1,7 +1,7 @@
-import { isOk, type Result } from '@montree/contracts'
-import type { AppError } from '@montree/contracts'
-import type { RosettaInspectContentResult } from '@montree/contracts'
-import type { WorkspaceSearchMarkdownResult } from '@montree/contracts'
+import { isOk, type Result } from '@yitom/contracts'
+import type { AppError } from '@yitom/contracts'
+import type { RosettaInspectContentResult } from '@yitom/contracts'
+import type { WorkspaceSearchMarkdownResult } from '@yitom/contracts'
 import {
   CONTENT_AUDIT_HIT_TEXT_BUDGET,
   CONTENT_AUDIT_RESPONSE_TEXT_BUDGET,
@@ -10,7 +10,7 @@ import {
   resolveContentAuditMatchPosition,
   windowContentAuditText,
   type ContentAuditHit,
-} from '@montree/contracts'
+} from '@yitom/contracts'
 import { rosettaApi } from '@/api/rosetta-api'
 import { fileApi } from '@/api/file-api'
 import { useAppSettingsStore } from '@/stores/app-settings-store'

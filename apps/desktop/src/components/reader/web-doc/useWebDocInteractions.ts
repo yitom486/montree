@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReadingMark, ReadingMarkCategory } from '@montree/contracts'
-import { isOk } from '@montree/contracts'
+import type { ReadingMark, ReadingMarkCategory } from '@yitom/contracts'
+import { isOk } from '@yitom/contracts'
 import { subscribeTtsHighlight } from '@/lib/reader/marks/mark-linkage'
 import { toast } from 'sonner'
 import { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
 import { useReaderSelectionActions } from '@/hooks/reader/useReaderSelectionActions'
 import { parseNoteToCardMeta } from '@/lib/reader/marks/resolve-card-meta'
-import { findMarkForSelection } from '@montree/reader-core'
+import { findMarkForSelection } from '@yitom/reader-core'
 import {
   clearWindowSelection,
   toCanonicalChapter,
@@ -14,7 +14,7 @@ import {
   type PdfSelectionSnapshot,
   DEFAULT_HIGHLIGHT_COLOR,
   type ReaderUnit,
-} from '@montree/reader-core'
+} from '@yitom/reader-core'
 import {
   applyMobiPendingSelectionHighlight,
   removeMobiPendingSelectionHighlight,
@@ -22,7 +22,7 @@ import {
 import { clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { waitForDom } from '@/lib/reader/wait-for-dom'
-import { buildMobiSnapshotFromRange } from '@montree/reader-core'
+import { buildMobiSnapshotFromRange } from '@yitom/reader-core'
 import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useTtsStore } from '@/stores/tts-store'
 import type { CreateMarkAtParams } from '@/lib/agent/context/reader-marks-registry'

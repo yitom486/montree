@@ -3,7 +3,7 @@ import {
   type ChatSessionSnapshot,
   type ChatSessionStore,
   type ChatStoragePort,
-} from '@montree/chat-session'
+} from '@yitom/chat-session'
 import { appApi } from '@/api/app-api'
 import { windowStorageKey } from '@/stores/acp/window-storage'
 

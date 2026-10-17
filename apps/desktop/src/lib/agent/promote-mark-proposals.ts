@@ -1,22 +1,22 @@
-import { toProposedMark } from '@montree/annotations'
+import { toProposedMark } from '@yitom/annotations'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
-import type { ChatMarkProposal } from '@montree/chat-core'
+import type { ChatMarkProposal } from '@yitom/chat-core'
 
-export type { ChatMarkProposal } from '@montree/chat-core'
+export type { ChatMarkProposal } from '@yitom/chat-core'
 export {
   isPendingMarkProposalEntry,
   isProposalPromotedToAgent,
   resolveMarkProposalOnMessages,
   shouldHideProposeToolMessage,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'
 
 import {
   collectToolProposals,
   currentTurnStart,
   mergeProposals,
   promoteMarkProposalsToLastAgent as promoteCore,
-} from '@montree/chat-core'
+} from '@yitom/chat-core'
 
 export function collectStoreFallbackProposal(): ChatMarkProposal | null {
   const store = useAnnotationAgentStore.getState()
