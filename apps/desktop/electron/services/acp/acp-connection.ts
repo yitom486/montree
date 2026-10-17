@@ -781,6 +781,21 @@ export async function authenticateAcp(payload: {
   }
 }
 
+/**
+ * 同步摘桥接（幂等、永不抛）：unpipe + destroy 垫层 PassThrough。
+ * App 退出时必须在进程 kill（先 `child.stdin.end()`）之前同步调用——
+ * 否则排队的 SDK 收尾写入经 pipe 直达已 end 的 stdin，
+ * 抛 ERR_STREAM_WRITE_AFTER_END（主进程 Uncaught Exception 弹窗，关应用必现）。
+ */
+export function detachSdkStreamNow(): void {
+  try {
+    acpState.sdkStream?.dispose()
+  } catch {
+    // 退出/竞态路径：忽略一切
+  }
+  acpState.sdkStream = null
+}
+
 export function disconnectAcp(
   reason?: string,
   opts?: { killProcess?: boolean },
@@ -814,12 +829,7 @@ async function disconnectAcpNow(
   acpState.sdkApp = null
 
   // 摘桥接：只吃掉垫层，保住温进程 stdio 给下次复用
-  try {
-    acpState.sdkStream?.dispose()
-  } catch {
-    // 忽略竞态关闭
-  }
-  acpState.sdkStream = null
+  detachSdkStreamNow()
 
   if (acpState.processHandle) {
     // 已死句柄一律回收；存活进程默认保温（killProcess=false），下次同 runtime

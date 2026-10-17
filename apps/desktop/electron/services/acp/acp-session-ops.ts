@@ -24,7 +24,7 @@ import {
   requireAgent,
   toProtocolError,
 } from './acp-bridges'
-import { disconnectAcp } from './acp-connection'
+import { detachSdkStreamNow, disconnectAcp } from './acp-connection'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
 function sessionPromptMode(nativeSessionAccepted:boolean, restored:boolean) {
@@ -238,12 +238,16 @@ export function cancelAcp(payload: { sessionId: string }): Result<void, AppError
 }
 
 export function disposeAllAcp(): void {
-  // App 退出：整树杀干净，不保温
+  // App 退出：先同步摘掉各上下文桥接（unpipe + destroy），再整树杀干净，不保温。
+  // 顺序即修复——kill 同步先 `stdin.end()`，而 disconnect 排队后执行；
+  // 桥若还连着，排队的收尾写入必抛 ERR_STREAM_WRITE_AFTER_END（主进程弹窗）。
+  // 退出期 best-effort：后两步的拒绝一律吞掉，不许变成 unhandledRejection 弹窗。
   for (const context of listAcpContexts()) {
     context.closed = true
     runInAcpContext(context, () => {
-      void disconnectAcp(undefined, { killProcess: true })
-      void stopWindowMcpServers()
+      detachSdkStreamNow()
+      void disconnectAcp(undefined, { killProcess: true }).catch(() => undefined)
+      void stopWindowMcpServers().catch(() => undefined)
     })
   }
   disposeAllAcpProcesses()

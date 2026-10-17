@@ -26,10 +26,17 @@ export interface SdkStreamHandle {
  * 垫 PassThrough 的原因：SDK connection.close() 会一路 cancel 到字节流，
  * 直连 child stdio 会把温进程的 fd 一并销毁，下次复用即死；垫层让 close
  * 只吃掉桥，child stdio 原样保留给下次 connect。
+ *
+ * 退出期防弹窗：桥上错误的唯一合法来源是收尾竞态（kill 先 `stdin.end()`，
+ * 排队的 SDK 收尾写入随后到达），此处吞掉，绝不允许冒成主进程 uncaught。
+ * 同步抛（write-after-end）靠退出路径“先摘桥再杀进程”的顺序根治，见
+ * `detachSdkStreamNow` / `disposeAllAcp`。
  */
 export function createSdkStreamHandle(child: ChildProcessWithoutNullStreams): SdkStreamHandle {
   const stdoutBridge = new PassThrough()
   const stdinBridge = new PassThrough()
+  stdoutBridge.on('error', () => {})
+  stdinBridge.on('error', () => {})
   child.stdout.pipe(stdoutBridge)
   stdinBridge.pipe(child.stdin, { end: false })
   const output = Writable.toWeb(stdinBridge) as WritableStream<Uint8Array>
