@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getTypstAsset, isSafeArchiveMember, TINYMIST_ASSETS, TINYMIST_VERSION } from './typst-runtime-assets'
+import { getTypstAsset, isSafeArchiveMember, normalizeTinymistLicense, TINYMIST_ASSETS, TINYMIST_LICENSE_SHA256, TINYMIST_VERSION } from './typst-runtime-assets'
 import { TINYMIST_VERSION as SERVICE_VERSION } from '@yitom/contracts'
 import { createRequire } from 'node:module'
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
@@ -12,6 +12,14 @@ const { verifyTypstResource } = createRequire(import.meta.url)('./verify-typst-b
 }
 
 describe('Typst runtime distribution', () => {
+  it('ships identical verified license bytes from LF and Windows CRLF checkouts', () => {
+    const source = readFileSync('LICENSES/Tinymist.txt', 'utf8')
+    const lf = normalizeTinymistLicense(source)
+    for (const checkout of [lf, lf.replace(/\n/g, '\r\n')]) {
+      expect(createHash('sha256').update(normalizeTinymistLicense(checkout)).digest('hex')).toBe(TINYMIST_LICENSE_SHA256)
+    }
+    expect(createHash('sha256').update(normalizeTinymistLicense(lf + 'altered')).digest('hex')).not.toBe(TINYMIST_LICENSE_SHA256)
+  })
   it('selects only a supported platform and never silently ships a different architecture', () => {
     expect(TINYMIST_VERSION).toBe(SERVICE_VERSION)
     expect(getTypstAsset('win32', 'x64').executable).toBe('tinymist.exe')
@@ -37,7 +45,7 @@ describe('Typst runtime distribution', () => {
       writeFileSync(join(directory, 'manifest.json'), JSON.stringify(manifest))
       writeFileSync(join(directory, 'tinymist.exe'), bytes)
       // Apache text is a tracked source file, so this check also runs before prepare:typst.
-      writeFileSync(join(directory, 'LICENSE'), readFileSync('LICENSES/Tinymist.txt'))
+      writeFileSync(join(directory, 'LICENSE'), normalizeTinymistLicense(readFileSync('LICENSES/Tinymist.txt', 'utf8')))
       expect(verifyTypstResource(directory, 'win32', 'x64')).toEqual(manifest)
       expect(() => verifyTypstResource(directory, 'linux', 'x64')).toThrow('不匹配')
       expect(() => verifyTypstResource(directory, 'win32', 'arm64')).toThrow('不匹配')

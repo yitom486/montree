@@ -2,9 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { inside, localAbsolute, TypstService } from './typst-service'
+import { inside, localAbsolute, runtimeVersion, TypstService } from './typst-service'
 
 describe('Typst path and runtime boundaries', () => {
+  it('accepts missing Linux build metadata only for a verified bundle and preserves explicit mismatches', () => {
+    const linux = 'tinymist \nBuild Git Describe:  VERGEN_IDEMPOTENT_OUTPUT\nTypst Version: 0.15.1\n'
+    expect(runtimeVersion(linux)).toBeNull()
+    expect(runtimeVersion(linux, '0.15.8')).toBe('0.15.8')
+    expect(runtimeVersion('tinymist 0.15.7', '0.15.8')).toBe('0.15.7')
+    expect(runtimeVersion('tinymist \nBuild Git Describe: v0.15.8\n')).toBe('0.15.8')
+    expect(runtimeVersion('some other tool\nBuild Git Describe: VERGEN_IDEMPOTENT_OUTPUT\n', '0.15.8')).toBeNull()
+    expect(runtimeVersion('tinymist \nTypst Version: 0.15.1\n', '0.15.8')).toBeNull()
+  })
   it('rejects relative, remote/UNC and NUL paths', () => {
     for (const value of ['relative.typ', '\\\\server\\share\\test.typ', '//server/share/test.typ', 'ssh://host/test.typ', '\0bad']) expect(() => localAbsolute(value)).toThrow()
     const root = path.resolve('workspace')

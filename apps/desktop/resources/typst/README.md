@@ -9,7 +9,7 @@
 | `LICENSE` | 上游 Apache-2.0 许可证 |
 | `README.md` | 资源准备与分发说明 |
 
-除 README 外资源不提交 Git。打包通过 `extraResources` 复制到 `resources/typst`，不能在 ASAR 内执行。`pack*` 会先准备运行时，开发时首次使用 Typst 也需执行准备命令；已有资源命中校验后不会重复下载。
+除 README 外资源不提交 Git。打包通过 `extraResources` 复制到 `resources/typst`，不能在 ASAR 内执行。`pack*` 会先准备运行时，开发时首次使用 Typst 也需执行准备命令；已有资源命中校验后不会重复下载。准备脚本先将许可证源文本的 CRLF 换行为 LF，再校验并分发，避免 Git 换行配置影响跨平台构建；打包仍严格校验生成的许可证字节。
 
 固定版本和三平台校验见根目录 `scripts` 中的资源脚本；许可证源为根目录 `LICENSES` 中的 Tinymist 文本。升级时一起更新并验证。可用 `MONTREE_TYPST_ARCHIVE` 指向预先下载的**同版本官方归档**，仍须通过相同 SHA-256 校验。该变量只用于构建期，不是运行时工具路径。electron-builder 的 beforePack 还会再次校验目标平台、可执行文件与许可证，拒绝缺失或不匹配的资源。
 

@@ -22,6 +22,13 @@ export interface TypstServiceOptions {
 }
 
 function invalid(message: string, code = 'INVALID_ARGUMENT'): never { throw Object.assign(new Error(message), { code }) }
+export function runtimeVersion(stdout: string, verifiedBundleVersion: string | null = null): string | null {
+  const reported = /(?:tinymist\s+|Build Git Describe:\s*v)(\d+\.\d+\.\d+)/i.exec(stdout)?.[1]
+  if (reported) return reported
+  // The official Linux release omits Vergen metadata; only a verified bundle can use its manifest.
+  return /^tinymist\s*\r?\n/i.test(stdout) && /^Build Git Describe:\s+VERGEN_IDEMPOTENT_OUTPUT\s*$/m.test(stdout)
+    ? verifiedBundleVersion : null
+}
 export function localAbsolute(value: unknown): string {
   if (typeof value !== 'string' || !value || !path.isAbsolute(value) || /^[/\\]{2}/.test(value) || value.includes('\0')) invalid('Typst 仅支持本机绝对路径，远端及 UNC 路径尚未支持')
   return path.resolve(value)
@@ -89,13 +96,15 @@ export class TypstService {
     const executablePath = await this.executable()
     if (!existsSync(executablePath)) return { available: false, executablePath, version: null, message: 'Typst 运行时尚未准备，请配置 Tinymist 0.15.8 路径或准备随包资源' }
     try {
+      let verifiedBundleVersion: string | null = null
       if (!(await this.getConfig()).executablePath) {
         const manifest = JSON.parse(await readFile(path.join(path.dirname(executablePath), 'manifest.json'), 'utf8')) as { version: string; platform: string; arch: string; sha256: string; size: number; executable: string }
         const bytes = await readFile(executablePath)
         if (manifest.version !== TINYMIST_VERSION || manifest.platform !== process.platform || manifest.arch !== process.arch || manifest.executable !== path.basename(executablePath) || bytes.length !== manifest.size || createHash('sha256').update(bytes).digest('hex') !== manifest.sha256) invalid('Typst 随包运行时校验失败', 'VERSION_MISMATCH')
+        verifiedBundleVersion = manifest.version
       }
       const { stdout } = await execFileAsync(executablePath, ['--version'], { windowsHide: true, timeout: 5000, maxBuffer: 65536 })
-      const version = /(?:tinymist\s+|Build Git Describe:\s*v)(\d+\.\d+\.\d+)/i.exec(stdout)?.[1] ?? null
+      const version = runtimeVersion(stdout, verifiedBundleVersion)
       return { available: version === TINYMIST_VERSION, executablePath, version, message: version === TINYMIST_VERSION ? 'Typst 运行时已就绪' : `需要 Tinymist ${TINYMIST_VERSION}，当前版本 ${version ?? '未知'}` }
     } catch (error) { return { available: false, executablePath, version: null, message: error instanceof Error ? error.message : '运行时无法启动' } }
   }

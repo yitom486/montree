@@ -5,7 +5,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { unzipSync } from 'fflate'
-import { getTypstAsset, isSafeArchiveMember, TINYMIST_LICENSE_SHA256, TINYMIST_VERSION } from './typst-runtime-assets'
+import { getTypstAsset, isSafeArchiveMember, normalizeTinymistLicense, TINYMIST_LICENSE_SHA256, TINYMIST_VERSION } from './typst-runtime-assets'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const resourceDir = join(root, 'apps/desktop/resources/typst')
@@ -56,7 +56,7 @@ if (await prepared()) {
       if (!extracted.startsWith((await realpath(staging)) + sep) || !(await stat(extracted)).isFile()) throw new Error('归档可执行文件路径无效')
       executableBytes = await readFile(extracted)
     }
-    const license = await readFile(join(root, 'LICENSES/Tinymist.txt'))
+    const license = Buffer.from(normalizeTinymistLicense(await readFile(join(root, 'LICENSES/Tinymist.txt'), 'utf8')))
     if (sha256(license) !== TINYMIST_LICENSE_SHA256) throw new Error('Tinymist 许可证 SHA-256 不匹配')
     const manifest = {
       version: TINYMIST_VERSION, platform: process.platform, arch: process.arch,
