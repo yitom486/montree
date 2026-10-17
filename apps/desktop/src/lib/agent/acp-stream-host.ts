@@ -5,6 +5,7 @@ import {
   mirrorConnectionStatusToPackageStore,
   mirrorSessionUpdateToPackageStore,
 } from '@/lib/agent/chat-store-mirror'
+import { collectStoreFallbackProposal } from '@/lib/agent/promote-mark-proposals'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
 import { useAcpUiStore, selectActiveThreadAgentSessionId } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore, annotationOwnsSessionId } from '@/stores/annotation-agent-store'
@@ -62,7 +63,9 @@ export function flushAcpStreamBuffer(): void {
     const pkg = getOwnedChatSessionStore()
     useAcpUiStore.getState().applySessionUpdate(update)
     // P4a 对账：同一合成增量再喂包 store（只加法，不影响主链路）
-    mirrorSessionUpdateToPackageStore(pkg, update, undefined, hostThreadId)
+    mirrorSessionUpdateToPackageStore(pkg, update, undefined, hostThreadId, {
+      proposalFallback: collectStoreFallbackProposal(),
+    })
   }
 }
 
@@ -103,6 +106,14 @@ export function startAcpStreamHost(): () => void {
     const updateKind =
       typeof event.update?.sessionUpdate === 'string' ? event.update.sessionUpdate : ''
     if (updateKind === MONTREE_SETTLE_COMPLETE_KIND) {
+      // C2b1：定居早退同样受会话归属保护——过期会话的迟到标记直接丢弃，
+      // 否则冲刷会把旧会话尾巴写进新线程、冻结也会落在错误的线程。
+      // 与下方常规路径同一判定（两者都无 sessionId 时不拦截）。
+      const mainStore = useAcpUiStore.getState()
+      const activeMainSid = selectActiveThreadAgentSessionId(mainStore) ?? mainStore.sessionId
+      if (event.sessionId && activeMainSid && event.sessionId !== activeMainSid) {
+        return
+      }
       flushAcpStreamBuffer()
       useAcpUiStore.getState().applySessionUpdate(event.update)
       // 宿主先落定待处理用户回放再同步包；再次映射为 finish-turn 会错误地终结恢复回合。
@@ -151,6 +162,9 @@ export function startAcpStreamHost(): () => void {
       event.update,
       undefined,
       mainStore.activeThreadId,
+      // 与宿主同一 tick 内读取同一批注 store，值与宿主分支内采集的一致；
+      // 纯桥自身不读应用 store，只收显式参数。
+      { proposalFallback: collectStoreFallbackProposal() },
     )
   })
 

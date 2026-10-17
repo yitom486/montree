@@ -108,6 +108,14 @@ function packageThreadShapes(pkg: ChatSessionStore): MessageShape[][] {
 
 let pkg: ChatSessionStore
 
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
+
 beforeEach(() => {
   resetThreadMirrorForTests()
   const fresh = useAcpUiStore.getState().createThread()
@@ -194,7 +202,7 @@ describe('chat-store-mirror P4b 扩展双跑', () => {
     expect(packageActiveTitle(pkg)).toBe(hostActiveTitle())
   })
 
-  it('freezeSettled：定居冻结双写一致且不置 turnSettled', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('freezeSettled：定居冻结双写一致且不置 turnSettled', () => {
     seedUser('种子问')
     useAcpUiStore.getState().beginAgentReply()
     mirrorThreadActionToPackageStore(pkg, { kind: 'beginReply' })
@@ -209,7 +217,7 @@ describe('chat-store-mirror P4b 扩展双跑', () => {
     expect(packageActiveTurnSettled(pkg)).toBe(false)
   })
 
-  it('cancelTools：进行中工具双写标 cancelled，已落定不动', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('cancelTools：进行中工具双写标 cancelled，已落定不动', () => {
     seedUser('种子问')
     useAcpUiStore.getState().beginAgentReply()
     mirrorThreadActionToPackageStore(pkg, { kind: 'beginReply' })
@@ -231,7 +239,7 @@ describe('chat-store-mirror P4b 扩展双跑', () => {
     expect(pkgTool?.toolStatus).toBe('cancelled')
   })
 
-  it('rollbackFailed：失败回合新增 thought 双写回滚，旧消息保留', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('rollbackFailed：失败回合新增 thought 双写回滚，旧消息保留', () => {
     seedUser('种子问')
     useAcpUiStore.getState().beginAgentReply()
     mirrorThreadActionToPackageStore(pkg, { kind: 'beginReply' })

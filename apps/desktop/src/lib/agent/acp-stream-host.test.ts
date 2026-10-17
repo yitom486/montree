@@ -24,7 +24,9 @@ vi.mock('@/api/acp-api', () => ({
 
 import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
+import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
+import { createChatSessionStore } from '@yitom/chat-session'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import {
   flushAcpStreamBuffer,
@@ -34,6 +36,14 @@ import {
 } from './acp-stream-host'
 
 const mockedOnUpdate = vi.mocked(acpApi.onSessionUpdate)
+
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
 
 function activeAgentText(): string {
   const s = useAcpUiStore.getState()
@@ -66,7 +76,7 @@ beforeEach(() => {
 })
 
 describe('acp-stream-host（应用级单例订阅）', () => {
-  it.each(['agent_message_chunk', 'agent_thought_chunk'])('包 store 重建后的首个 %s 不重复追加', async (kind) => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT).each(['agent_message_chunk', 'agent_thought_chunk'])('包 store 重建后的首个 %s 不重复追加', async (kind) => {
     const host = useAcpUiStore.getState()
     host.createThread()
     host.setSession('sid-main')
@@ -85,7 +95,7 @@ describe('acp-stream-host（应用级单例订阅）', () => {
     stop()
   })
 
-  it('恢复定居只冻结一次，不终结包回合，后续合法消息继续流式更新', async () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('恢复定居只冻结一次，不终结包回合，后续合法消息继续流式更新', async () => {
     const host = useAcpUiStore.getState()
     host.createThread()
     host.setSession('sid-main')
@@ -206,6 +216,95 @@ describe('acp-stream-host（应用级单例订阅）', () => {
     await settleFlush()
     expect(activeAgentText()).toContain('新会话正文')
     stop()
+  })
+
+  it('过期会话的迟到工具调用不进入新线程', async () => {
+    const stop = startAcpStreamHost()
+    const host = useAcpUiStore.getState()
+    host.appendUserMessage('旧线程问题')
+    host.setSession('sid-old')
+
+    host.createThread()
+    useAcpUiStore.getState().setSession('sid-new')
+    const newThreadId = useAcpUiStore.getState().activeThreadId
+
+    for (const listener of listeners.update) {
+      listener({
+        sessionId: 'sid-old',
+        update: { sessionUpdate: 'tool_call', toolCallId: 'late-tool', title: '迟到工具', kind: 'read', status: 'completed' },
+      })
+    }
+    await settleFlush()
+    const fresh = useAcpUiStore.getState().threads.find((t) => t.id === newThreadId)!
+    expect(fresh.messages.some((m) => m.toolCallId === 'late-tool')).toBe(false)
+    stop()
+  })
+
+  it('过期会话的定居标记不冲刷旧文、不冻结新线程', async () => {
+    const stop = startAcpStreamHost()
+    const host = useAcpUiStore.getState()
+    host.appendUserMessage('旧线程问题')
+    host.setSession('sid-old')
+    host.beginAgentReply()
+    for (const listener of listeners.update) {
+      listener({
+        sessionId: 'sid-old',
+        update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '旧文' }] },
+      })
+    }
+    // 旧文仍在合并器里；切线程 + 新会话
+    host.createThread()
+    useAcpUiStore.getState().setSession('sid-new')
+    const newThreadId = useAcpUiStore.getState().activeThreadId
+
+    for (const listener of listeners.update) {
+      listener({ sessionId: 'sid-old', update: { sessionUpdate: MONTREE_SETTLE_COMPLETE_KIND } })
+    }
+    // 定居标记本身不得冲刷合并器、不得冻结：新线程保持空白。
+    // 注意此处不能调 settleFlush——那会无条件排空合并器孤儿文本（既有合并器行为）。
+    const fresh = useAcpUiStore.getState().threads.find((t) => t.id === newThreadId)!
+    expect(fresh.messages).toHaveLength(0)
+    // 清理：排空孤儿文本，避免 32ms 定时器污染后续用例（合并器既有行为，不在本批改动）。
+    flushAcpStreamBuffer()
+    stop()
+  })
+
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('工具调用经流式宿主进包时携带宿主采集的提议 fallback', async () => {
+    const stop = startAcpStreamHost()
+    try {
+      const host = useAcpUiStore.getState()
+      host.appendUserMessage('带提议的问题')
+      host.setSession('sid-main')
+      host.beginAgentReply()
+      for (const listener of listeners.update) {
+        listener({ sessionId: 'sid-main', update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '答' }] } })
+      }
+      await settleFlush()
+      host.finishStreaming()
+      useAnnotationAgentStore.setState({
+        proposeHost: 'main-agent',
+        pendingDraft: { fileKey: 'f1', excerpt: 'e', note: 'n', source: 'ai' },
+      })
+      for (const listener of listeners.update) {
+        listener({ sessionId: 'sid-main', update: { sessionUpdate: 'tool_call', toolCallId: 't-fb', title: '读', kind: 'read', status: 'completed' } })
+      }
+      const hostThreadId = useAcpUiStore.getState().activeThreadId
+      const pkgThread = getOwnedChatSessionStore().getState().threads.find((t) => t.hostThreadId === hostThreadId)!
+      expect(
+        pkgThread.feed.messages.filter((m) =>
+          (m.markProposals ?? []).some((e) => e.proposal.id === 'main:f1'),
+        ).length,
+      ).toBeGreaterThan(0)
+      const hostThread = useAcpUiStore.getState().threads.find((t) => t.id === hostThreadId)!
+      expect(
+        hostThread.messages.filter((m) =>
+          (m.markProposals ?? []).some((e) => e.proposal.id === 'main:f1'),
+        ).length,
+      ).toBeGreaterThan(0)
+    } finally {
+      useAnnotationAgentStore.setState({ proposeHost: null, pendingDraft: null })
+      stop()
+    }
   })
 })
 

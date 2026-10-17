@@ -1,11 +1,11 @@
+import { classifyAcpUpdate } from '@/lib/agent/acp-update-adapter'
 import {
   mapConnectionStatus,
   mapPermissionRequest,
-  mapSessionUpdate,
   type ChatSessionStore,
 } from '@yitom/chat-session'
 import type { MarkProposalStatus } from '@yitom/annotations'
-import type { AcpMessageAttachment, ChatMessage } from '@yitom/chat-core'
+import type { AcpMessageAttachment, ChatMarkProposal, ChatMessage } from '@yitom/chat-core'
 import { DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
 
@@ -72,8 +72,21 @@ export function mirrorHostSnapshotToPackageStore(
  */
 
 /**
- * 会话增量镜像：经包 `mapSessionUpdate` 得 `ChatFeedEvent[]`，逐个按事件类型调包 store
- * 对应 ingest 方法。线程路由 hostThreadId（provision 自动建线程并记映射，
+ * 会话增量镜像（C2b1）：经 C1 `classifyAcpUpdate` 得宿主分发意图，再按事件类型
+ * 统一调包 `dispatchFeedEvent`（显式包线程目标），不再维护第二套事件 switch
+ * 与分散 ingest 映射，不自建标准 kind 名单。
+ *
+ * 意图→事件对照（与宿主 `applySessionUpdate` 同语义）：
+ * - settle-complete → `freezeSettled` 只冻结（绝不置 turnSettled=true）；
+ * - tool-call（含 call）/tool-content-chunk → 带宿主显式注入的 proposalFallback；
+ *   无 id 工具（快照旁路）只留宿主，包归约器同样 no-op；
+ * - plan / plan-remove（含镜像此前漏掉的删除）/ text（含未知 kind 文本兼容）；
+ * - ignored / usage → 无 feed 事件，线程解析之前直接跳过（不建线程）。
+ * 厂商工具分块沿用宿主 camelCase-only 口径（空 id 不回退 snake_case）；
+ * 未知 ACP kind 留痕仍由宿主统一负责，本桥不重复日志。
+ * 用户回放仍只沿宿主清洗后的 `syncHostThread` 进入包，不新增未清洗通路。
+ *
+ * 线程路由 hostThreadId（provision 自动建线程并记映射，
  * reload 存量线程无 create 事件时的补齐口）优先，显式 threadId（包线程直写，
  * 未知即 store 侧 no-op）次之，缺省 active。
  * 未知线程由 store 侧 no-op（与宿主“丢弃过时会话”语义对齐：绝不污染其它线程）。
@@ -84,10 +97,13 @@ export function mirrorSessionUpdateToPackageStore(
   update: Record<string, unknown>,
   threadId?: string,
   hostThreadId?: string,
+  opts?: { proposalFallback?: ChatMarkProposal | null },
 ): void {
   try {
-    const events = mapSessionUpdate(update)
-    if (events.length === 0) return
+    const intent = classifyAcpUpdate(update)
+    // 空映射（未知种类无文本 / config / usage 等）直接跳过：
+    // 不解析线程、不建线程（旧桥 `events.length === 0` 早退同语义）。
+    if (intent.type === 'ignored' || intent.type === 'usage') return
     let target: string | undefined
     if (hostThreadId !== undefined) {
       target = resolvePackageThreadId(pkg, hostThreadId, undefined, true)
@@ -95,39 +111,51 @@ export function mirrorSessionUpdateToPackageStore(
     } else {
       target = threadId ?? pkg.getState().activeThreadId ?? undefined
     }
-    for (const event of events) {
-      switch (event.type) {
-        case 'text-chunk':
-          if (event.role === 'thought') pkg.ingestThoughtChunk(event.text, target)
-          else if (event.role === 'agent') pkg.ingestTextChunk(event.text, target)
-          else pkg.appendUser(event.text, { threadId: target })
-          break
-        case 'tool-call':
-          pkg.ingestToolCall(event.call, target)
-          break
-        case 'tool-chunk':
-          pkg.ingestToolChunk(event.toolCallId, event.text, target)
-          break
-        case 'plan':
-          pkg.ingestPlan(event.entries, event.active, target)
-          break
-        case 'finish-turn':
-          pkg.finishTurn(target)
-          break
-        case 'begin-reply':
-          pkg.beginReply(target)
-          break
-        case 'cancel-tools':
-          pkg.cancelTools(target)
-          break
-        case 'freeze-light':
-          pkg.freezeLight(target)
-          break
-        case 'user-append':
-          pkg.appendUser(event.text, { threadId: target, attachments: event.attachments })
-          break
-        default:
-          break
+    if (!target) return
+    const proposalFallback = opts?.proposalFallback ?? null
+    switch (intent.type) {
+      case 'settle-complete':
+        pkg.freezeSettled(target)
+        return
+      case 'tool-content-chunk':
+        pkg.dispatchFeedEvent(target, {
+          type: 'tool-chunk',
+          toolCallId: intent.toolCallId,
+          text: intent.text,
+          proposalFallback,
+        })
+        return
+      case 'tool-call':
+        // 无 id 时归约器 no-op，但宿主仍需消费快照旁路（保原语义）；
+        // 包侧不建幽灵工具消息，与旧桥 `mapSessionUpdate → []` 等价。
+        if (!intent.call) return
+        pkg.dispatchFeedEvent(target, {
+          type: 'tool-call',
+          call: intent.call,
+          proposalFallback,
+        })
+        return
+      case 'plan':
+        pkg.dispatchFeedEvent(target, {
+          type: 'plan',
+          entries: intent.entries,
+          active: intent.active,
+        })
+        return
+      case 'plan-remove':
+        pkg.dispatchFeedEvent(target, { type: 'plan-remove' })
+        return
+      case 'text':
+        pkg.dispatchFeedEvent(target, {
+          type: 'text-chunk',
+          role: intent.role,
+          text: intent.text,
+        })
+        return
+      default: {
+        // 到达即覆盖缺口（编译期）：适配层意图新增而未接线时此处报错。
+        const _exhaustive: never = intent
+        return _exhaustive
       }
     }
   } catch (error) {

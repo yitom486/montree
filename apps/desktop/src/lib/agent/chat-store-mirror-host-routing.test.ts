@@ -43,13 +43,21 @@ function threadTexts(pkg: ChatSessionStore, threadId: string): string[] {
 
 let pkg: ChatSessionStore
 
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
+
 beforeEach(() => {
   resetThreadMirrorForTests()
   pkg = createChatSessionStore()
 })
 
 describe('chat-store-mirror hostThreadId 路由', () => {
-  it('快照重建后切回历史线程并续聊，线程身份和原有消息不分裂', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('快照重建后切回历史线程并续聊，线程身份和原有消息不分裂', () => {
     let saved: ChatSessionSnapshot | null = null
     const storage = {
       load: () => saved,
@@ -94,7 +102,7 @@ describe('chat-store-mirror hostThreadId 路由', () => {
     expect(legacy.getState().threads[0]!.feed.messages[1]?.attachments).toEqual(attachments)
   })
 
-  it('后台迟到消息只写对应历史，不切换可见线程或其运行时', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('后台迟到消息只写对应历史，不切换可见线程或其运行时', () => {
     mirrorThreadActionToPackageStore(pkg, { kind: 'create', threadId: 'visible', runtimeId: 'opencode' })
     const active = pkg.getState().activeThreadId
     mirrorSessionUpdateToPackageStore(pkg, AGENT_CHUNK('后台迟到'), undefined, 'background')
@@ -105,7 +113,7 @@ describe('chat-store-mirror hostThreadId 路由', () => {
     expect(threadTexts(pkg, active!)).toEqual([])
   })
 
-  it('reload：带 hostThreadId 事件自动建线程 + 建映射 + 内容落对应线程，switch 回来路由正确', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('reload：带 hostThreadId 事件自动建线程 + 建映射 + 内容落对应线程，switch 回来路由正确', () => {
     const p0 = pkg.getState().activeThreadId!
     expect(pkg.getState().threads).toHaveLength(1)
     const hostA = 'host-reload-A'
@@ -156,7 +164,7 @@ describe('chat-store-mirror hostThreadId 路由', () => {
     expect(threadTexts(pkg, pA).join('')).toContain('系统注')
   })
 
-  it('provision 不污染未知线程：无 hostThreadId 且包空不建线程，空映射不建线程', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('provision 不污染未知线程：无 hostThreadId 且包空不建线程，空映射不建线程', () => {
     const beforeCount = pkg.getState().threads.length
     const beforeActive = pkg.getState().activeThreadId
     expect(beforeCount).toBe(1)

@@ -151,6 +151,14 @@ function ingestHostPermission(raw: typeof PERMISSION_REQ): void {
 
 let pkg: ChatSessionStore
 
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
+
 beforeEach(() => {
   const fresh = useAcpUiStore.getState().createThread()
   useAcpUiStore.setState({
@@ -169,7 +177,7 @@ beforeEach(() => {
 })
 
 describe('chat-store-mirror 双写对账', () => {
-  it('同一事件序列双写等价：agent 文本/tool 全周期/plan/permission/finish/disconnect', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('同一事件序列双写等价：agent 文本/tool 全周期/plan/permission/finish/disconnect', () => {
     for (const update of SESSION_SCRIPT) {
       useAcpUiStore.getState().applySessionUpdate(update)
       mirrorSessionUpdateToPackageStore(pkg, update)

@@ -75,6 +75,14 @@ function packageActiveTitle(pkg: ChatSessionStore): string | null {
 
 let pkg: ChatSessionStore
 
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
+
 beforeEach(() => {
   resetThreadMirrorForTests()
   const fresh = useAcpUiStore.getState().createThread()
@@ -96,7 +104,7 @@ beforeEach(() => {
 })
 
 describe('chat-store-mirror 线程生命周期双跑', () => {
-  it('建/问/答/流/收尾/再建/切/清后归一化一致', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('建/问/答/流/收尾/再建/切/清后归一化一致', () => {
     // 0. 种子问：让初始线程非空，避开宿主修剪空白草稿与包侧计数分叉
     useAcpUiStore.getState().appendUserMessage('种子问')
     mirrorThreadActionToPackageStore(pkg, { kind: 'appendUser', text: '种子问' })

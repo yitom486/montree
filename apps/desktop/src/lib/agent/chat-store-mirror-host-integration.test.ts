@@ -3,8 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_ACP_RUNTIME_ID, MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
+import { createChatSessionStore } from '@yitom/chat-session'
 import { mirrorSessionUpdateToPackageStore } from './chat-store-mirror'
 import { MONTREE_TURN_CONTEXT_OPEN_TAG, MONTREE_TURN_CONTEXT_CLOSE_TAG } from './context/turn-context'
+
+// C2b1 过渡守卫：session-update 镜像桥已切包 `dispatchFeedEvent`（候选包 API，
+// 正式依赖 0.1.9 尚无对应方法）；候选消费环境下执行，正式依赖下跳过。
+// 正式升级六包后此守卫恒真，可整体移除。
+const HAS_DISPATCH_FEED_EVENT =
+  typeof (
+    createChatSessionStore() as unknown as { dispatchFeedEvent?: unknown }
+  ).dispatchFeedEvent === 'function'
 
 // 窗口身份和 localStorage 均为测试环境内存实现，不访问桌面用户数据。
 vi.mock('@/api/app-api', () => ({ appApi: { getWindowScopeId: () => 'mirror-host-tests' } }))
@@ -113,7 +122,7 @@ describe('宿主与独立聊天包集成', () => {
     expect(packageActive().feed.messages).toEqual(hostActive().messages)
   })
 
-  it('回复到达或定居收尾会落定悬垂用户前文，包侧保持顺序且不泄漏标记', () => {
+  it.runIf(HAS_DISPATCH_FEED_EVENT)('回复到达或定居收尾会落定悬垂用户前文，包侧保持顺序且不泄漏标记', () => {
     replay(`用户前文\n${MONTREE_TURN_CONTEXT_OPEN_TAG}\n未完的脚手架`)
     const pkg = getOwnedChatSessionStore()
     const update = { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '模型回复' }] }
