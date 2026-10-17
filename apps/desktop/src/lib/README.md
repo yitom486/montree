@@ -1,6 +1,6 @@
 # src/lib
 
-渲染进程**纯逻辑**（无 React Hook）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@montree/reader-core`（`packages/reader-core/src/`）。  
+渲染进程**纯逻辑**（无 React Hook）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@yitom/reader-core`（`node_modules/@yitom/reader-core/dist/`）。  
 **不要**在根目录再堆新文件。例外：`utils.ts` 是 shadcn 的 `cn()`，必须留在 `@/lib/utils`。
 
 组件胶水在 `src/hooks/`，IPC 在 `src/api/`，UI 状态在 `src/stores/`。
@@ -61,7 +61,7 @@
 
 ## reader/
 
-通用导航/选区/标记/排版等 27 模块已迁 `@montree/reader-core`（`packages/reader-core/src/`，见该包 `packages/reader-core/src/index.ts` 分组注释）。
+通用导航/选区/标记/排版等 27 模块已迁 `@yitom/reader-core`（`node_modules/@yitom/reader-core/dist/`，入口见该包 `node_modules/@yitom/reader-core/dist/index.js`；源码分组注释在 montree-chat 仓同路径文件）。
 本目录已按域分子目录（2026-09 重构），逐文件说明见 [reader/README.md](./reader/README.md)：
 
 | 子目录 | 管什么 |
@@ -97,7 +97,7 @@
 | `quiz-evaluator` | AI 出题 Prompt 构造、解析、批量多题判卷打分与离线启发式考官 |
 | `quiz-acp-session` | 持续性考官独立副会话管理（2小时生命周期轮转、物理流式拦截与分流隔离） |
 
-`parseQuizJsonl` / `serializeQuizSession` 已下沉 `@montree/contracts`（`packages/contracts/src/types/quiz.ts`）。
+`parseQuizJsonl` / `serializeQuizSession` 已下沉 `@yitom/contracts`（`node_modules/@yitom/contracts/dist/types/quiz.js`）。
 
 ## agent/
 
