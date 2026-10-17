@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
+import { getDocumentKind, SUPPORTED_WORKSPACE_EXTENSION_LABEL } from '@montree/contracts'
 import {
   BookMarked,
   BookOpen,
@@ -100,6 +100,8 @@ const FileIcon = memo(function FileIcon({ documentKind }: { documentKind?: FileT
       return <BookMarked className="size-3.5 shrink-0 text-amber-500/90" />
     case 'markdown':
       return <FileText className="size-3.5 shrink-0 text-emerald-500/80" />
+    case 'typst':
+      return <FileType className="size-3.5 shrink-0 text-foreground/80" />
     case 'csv':
     case 'tsv':
       return <Table2 className="size-3.5 shrink-0 text-teal-500/90" />
@@ -450,11 +452,11 @@ export function FileExplorer({
     setMenu(null)
   }
 
-  const beginNew = (mode: 'new-file' | 'new-folder', parentDir: string) => {
+  const beginNew = (mode: 'new-file' | 'new-folder', parentDir: string, extension?: 'typ') => {
     if (!treeActions || !workspaceRoot) return
     const value =
       mode === 'new-file'
-        ? treeActions.defaultNewFileName(parentDir)
+        ? treeActions.defaultNewFileName(parentDir, extension)
         : treeActions.defaultNewFolderName(parentDir)
     setPinnedReveal(parentDir)
     setInlineEdit({ mode, parentDir, initial: value })
@@ -562,9 +564,11 @@ export function FileExplorer({
           <FileExplorerOverflowMenu
             canWrite={Boolean(workspaceRoot && treeActions)}
             readOnly={readOnly}
+            markdownExport={!activeFilePath || getDocumentKind(activeFilePath) === 'markdown'}
             isRescanning={isRescanning}
             isRemoteWorkspace={isRemoteWorkspace}
             onNewFile={() => workspaceRoot && beginNew('new-file', workspaceRoot)}
+            onNewTypstFile={isRemoteWorkspace ? undefined : () => workspaceRoot && beginNew('new-file', workspaceRoot, 'typ')}
             onNewFolder={() => workspaceRoot && beginNew('new-folder', workspaceRoot)}
             onOpenFile={onOpenFile ?? (() => undefined)}
             onOpenFolder={onOpenFolder}

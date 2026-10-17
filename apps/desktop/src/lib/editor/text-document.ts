@@ -31,7 +31,7 @@ export class TextDocument {
   previewUnitIndex?: () => number
   onSelectionChange?: () => void
 
-  constructor(readonly filePath: string, text: string, savedText: string, diskText: string,
+  constructor(public filePath: string, text: string, savedText: string, diskText: string,
     private readonly changed: (text: string) => void,
     private readonly notify: () => void,
     private readonly persist: (text: string, expectedContent: string) => Promise<void>) {
@@ -64,6 +64,13 @@ export class TextDocument {
   }
   sync(text: string): void {
     if (text !== this.text) this.dispatch({ changes: { from: 0, to: this.state.doc.length, insert: text }, annotations: [Transaction.remote.of(true), isolateHistory.of('full')] })
+  }
+  /** LSP 行列均为零基 UTF-16；交由同一事务定位，支持未挂载编辑面板。 */
+  revealPosition(line: number, character: number): void {
+    const target = this.state.doc.line(Math.min(this.state.doc.lines, Math.max(1, Math.floor(line) + 1)))
+    const anchor = target.from + Math.min(target.length, Math.max(0, Math.floor(character)))
+    this.dispatch({ selection: { anchor }, scrollIntoView: true })
+    this.view?.focus()
   }
   undo = (): void => {
     const undone = undo({ state: this.state, dispatch: (transaction) => {
@@ -99,7 +106,7 @@ export class TextDocument {
   }
   private buildUnits() {
     const doc = this.state.doc
-    if (/\.txt$/i.test(this.filePath)) return Array.from({ length: Math.ceil(doc.lines / 200) }, (_, index) => {
+    if (/\.(txt|typ)$/i.test(this.filePath)) return Array.from({ length: Math.ceil(doc.lines / 200) }, (_, index) => {
       const startLine = index * 200 + 1, endLine = Math.min(doc.lines, startLine + 199)
       return { label: `第 ${startLine}–${endLine} 行`, level: 0, from: doc.line(startLine).from, to: doc.line(endLine).to }
     })
@@ -132,7 +139,7 @@ export class TextDocument {
   read = (args: Record<string, unknown>) => {
     keys(args, ['documentPath', 'target', 'from', 'to', 'startLine', 'endLine', 'flatIndex', 'title', 'maxChars'])
     const doc = this.state.doc
-    const base = { documentPath: this.filePath, format: /\.txt$/i.test(this.filePath) ? 'txt' : 'markdown', revision: this.revision,
+    const base = { documentPath: this.filePath, format: /\.typ$/i.test(this.filePath) ? 'typst' : /\.txt$/i.test(this.filePath) ? 'txt' : 'markdown', revision: this.revision,
       source: 'editor-buffer', offsetUnit: 'UTF-16', lineBase: 1, length: doc.length, lineCount: doc.lines, dirty: this.isDirty(), selection: this.selectionSnapshot() }
     const target = args.target ?? 'metadata'
     const maxChars = args.maxChars === undefined ? MAX_TEXT : integer(args.maxChars, 'maxChars', 1, MAX_TEXT)

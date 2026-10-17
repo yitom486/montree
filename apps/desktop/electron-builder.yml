@@ -42,13 +42,21 @@ files:
   - node_modules/@google/genai/**/*
   - node_modules/gemini-tts-studio/**/*
   - node_modules/microsoft-cognitiveservices-speech-sdk/**/*
-  - '!node_modules/{@codemirror,codemirror,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
+  - '!node_modules/{@codemirror,codemirror,codemirror-lang-typst,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
 electronLanguages:
   - zh-CN
   - en-US
 # 远端工作区 Node 服务：自包含 bundle + manifest（`bun run build:remote-server` 产物），
 # main 在 resourcesPath/remote-server（开发期为本目录）定位并校验后启动
+beforePack: ./scripts/verify-typst-before-pack.cjs
 extraResources:
+  - from: apps/desktop/resources/typst
+    to: typst
+    filter:
+      - tinymist.exe
+      - tinymist
+      - manifest.json
+      - LICENSE
   - from: apps/desktop/resources/remote-server
     to: remote-server
   # 应用级原生规则与隔离 Skills 默认资源（主进程 resourcesPath/agent，开发期为本目录）

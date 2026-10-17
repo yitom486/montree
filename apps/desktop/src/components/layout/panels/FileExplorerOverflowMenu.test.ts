@@ -109,6 +109,19 @@ describe('FileExplorerOverflowMenu', () => {
     }
   })
 
+  it('Typst keeps save actions, offers a dedicated new file entry and hides Markdown exporters', async () => {
+    const onNewTypstFile = vi.fn()
+    await openMenu({ ...handlers(), canWrite: true, markdownExport: false, onNewTypstFile })
+    const names = itemNames()
+    expect(names.some((name) => name.startsWith('保存'))).toBe(true)
+    expect(names.some((name) => name.startsWith('另存为'))).toBe(true)
+    expect(names.some((name) => name.includes('导出HTML') || name.includes('导出PDF'))).toBe(false)
+    const item = menuItems().find((element) => element.textContent?.includes('新建 Typst 文档'))!
+    expect(item).toBeDefined()
+    await act(async () => { item.click() })
+    expect(onNewTypstFile).toHaveBeenCalledOnce()
+  })
+
   it('只读模式隐藏文档组', async () => {
     await openMenu({ ...handlers(), canWrite: true, readOnly: true })
     const names = itemNames()

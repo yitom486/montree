@@ -12,9 +12,9 @@ import { isCancelled, type AppError } from '@montree/contracts'
 import { DEFAULT_SAVE_FILENAME, isLocalWorkspaceId } from '@montree/contracts'
 import {
   getDocumentKind,
-  isDataDocumentKind,
   isOfficeDocumentKind,
   isReaderDocumentKind,
+  isTextDocumentKind,
   type ReaderDocumentKind,
 } from '@montree/contracts'
 import type { FileTreeNode, OpenDocumentResult, OpenFolderResult } from '@montree/contracts'
@@ -71,8 +71,9 @@ export function useFileOperations(onError?: (error: AppError) => void) {
     ? documentKind
     : undefined
   const isMarkdownDocument = documentKind === 'markdown'
-  const isEditableDocument =
-    isMarkdownDocument || isDataDocumentKind(documentKind) || documentKind === 'html'
+  const isTypstDocument = documentKind === 'typst'
+  const isSourceDocument = isMarkdownDocument || isTypstDocument
+  const isEditableDocument = isTextDocumentKind(documentKind)
   const toolDirty = useSyncExternalStore(subscribeDocumentTools, () => getDocumentTools(filePath)?.isDirty() ?? false)
   const isDirty = getDocumentTools(filePath) ? toolDirty : isEditableDocument && content !== savedContent
   const fileName = getFileName(filePath)
@@ -111,7 +112,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const loadFile = useCallback(
     (result: { filePath: string; content: string; revision?: string | null }) => {
       useWebDocStore.getState().closePage()
-      const content = getDocumentKind(result.filePath) === 'markdown' ? normalizeNewlines(result.content) : result.content
+      const kind = getDocumentKind(result.filePath)
+      const content = kind === 'markdown' || kind === 'typst' ? normalizeNewlines(result.content) : result.content
       setFilePath(result.filePath)
       setContent(content)
       setSavedContent(content)
@@ -207,7 +209,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const openPathMutation = useMutation({
     mutationFn: async (path: string): Promise<Result<OpenDocumentResult & { revision?: string }, AppError>> => {
       const kind = getDocumentKind(path)
-      if (kind === 'markdown' || isDataDocumentKind(kind) || kind === 'html') {
+      if (isTextDocumentKind(kind)) {
         // B2：经宿主读（带 revision；旧构建缺新 IPC 时回落 fileApi，revision 置空）。
         // P1：远端绑定下裸相对路径转 workspaceId + relativePath，直达远端会话。
         const hosted = await workspaceApi.readText(toHostTextRef(workspaceIdRef.current, path))
@@ -308,7 +310,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
         setPendingDiskRevision(null)
         return ok({ filePath: written.value.filePath })
       }
-      return fileApi.saveFile(payload)
+      return fileApi.saveFile({ ...payload, expectedContent: payload.filePath ? diskContentRef.current : undefined,
+        documentKind: isTypstDocument ? 'typst' : 'markdown' })
     },
     onSuccess: (result, variables) => {
       if (!isOk(result)) {
@@ -336,18 +339,21 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const saveFileAsMutation = useMutation({
     mutationFn: (payload: { content: string; silent?: boolean }) => {
       const defaultDir = getOpenDialogDefaultPath()
-      const defaultPath = defaultDir
-        ? joinPath(defaultDir, DEFAULT_SAVE_FILENAME)
-        : DEFAULT_SAVE_FILENAME
+      const suggestedName = isTypstDocument ? getFileName(filePath) : DEFAULT_SAVE_FILENAME
+      const defaultPath = defaultDir ? joinPath(defaultDir, suggestedName) : suggestedName
 
-      return fileApi.saveFileAs({ content: payload.content, defaultPath })
+      return fileApi.saveFileAs({ content: payload.content, defaultPath, documentKind: isTypstDocument ? 'typst' : 'markdown' })
     },
     onSuccess: (result, variables) => {
       if (!isOk(result)) {
         reportError(result.error)
         return
       }
+      clearDraftForFile(filePath, workspaceId)
       setFilePath(result.value.filePath)
+      setDocRevision(null)
+      setPendingDiskRevision(null)
+      setExternalChange(null)
       setSavedContent(variables.content)
       setDiskContent(variables.content)
       syncTitle(result.value.filePath, false)
@@ -627,7 +633,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       } else if (key === 'o' || code === 'KeyO') {
         event.preventDefault()
         void openFile()
-      } else if (isMarkdownDocument && (key === 's' || code === 'KeyS') && event.shiftKey) {
+      } else if (isSourceDocument && (key === 's' || code === 'KeyS') && event.shiftKey) {
         event.preventDefault()
         void saveFileAs()
       } else if ((isEditableDocument || getDocumentTools(filePath)) && (key === 's' || code === 'KeyS') && !event.shiftKey) {
@@ -638,7 +644,7 @@ export function useFileOperations(onError?: (error: AppError) => void) {
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [filePath, isEditableDocument, isMarkdownDocument, openFile, openFolder, saveFile, saveFileAs])
+  }, [filePath, isEditableDocument, isSourceDocument, openFile, openFolder, saveFile, saveFileAs])
 
   const notifyPathDeleted = useCallback(
     (path: string) => {
@@ -792,6 +798,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
     documentKind,
     readerDocumentKind,
     isMarkdownDocument,
+    isTypstDocument,
+    isSourceDocument,
     isEditableDocument,
     // B2：宿主 revision（null = 遗留路径）与外部修改提示状态。
     docRevision,

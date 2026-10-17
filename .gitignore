@@ -36,6 +36,10 @@ apps/desktop/src/public/pdfjs
 apps/desktop/resources/remote-server/*
 !apps/desktop/resources/remote-server/README.md
 
+# Tinymist platform runtime (bun run prepare:typst); pin hashes in scripts.
+apps/desktop/resources/typst/*
+!apps/desktop/resources/typst/README.md
+
 # Agent 粘贴图片落盘目录（工作区内）
 .inkdown/
 

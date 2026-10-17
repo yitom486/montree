@@ -20,6 +20,19 @@ const e2eFoliateReader = windowInit?.e2eFoliateReader ?? false
 const e2ePdfStructure = windowInit?.e2ePdfStructure ?? false
 
 const electronAPI: ElectronAPI = {
+  typstGetConfig: filePath => ipcRenderer.invoke(IPC.TYPST_GET_CONFIG, filePath),
+  typstSaveConfig: (config, filePath) => ipcRenderer.invoke(IPC.TYPST_SAVE_CONFIG, config, filePath),
+  typstStatus: () => ipcRenderer.invoke(IPC.TYPST_STATUS),
+  typstOpen: payload => ipcRenderer.invoke(IPC.TYPST_OPEN, payload),
+  typstSync: payload => ipcRenderer.invoke(IPC.TYPST_SYNC, payload),
+  typstRequest: payload => ipcRenderer.invoke(IPC.TYPST_REQUEST, payload),
+  typstClose: sessionId => ipcRenderer.invoke(IPC.TYPST_CLOSE, sessionId),
+  typstExportPdf: payload => ipcRenderer.invoke(IPC.TYPST_EXPORT_PDF, payload),
+  onTypstEvent: callback => {
+    const handler = (_event: Electron.IpcRendererEvent, event: import('@montree/contracts').TypstEvent) => callback(event)
+    ipcRenderer.on(IPC.TYPST_EVENT, handler)
+    return () => { ipcRenderer.removeListener(IPC.TYPST_EVENT, handler) }
+  },
   compileReactArtifact: (payload) => ipcRenderer.invoke(IPC.COMPILE_REACT_ARTIFACT, payload),
   platform: process.platform,
   isFreshWindow,

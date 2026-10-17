@@ -42,3 +42,4 @@ export * from "./constants/images";
 export * from "./constants/acp-agents";
 export * from "./utils/path";
 export * from "./utils/wsl-path";
+export * from "./types/typst";

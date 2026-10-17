@@ -86,6 +86,8 @@ function App() {
     isDirty,
     readerDocumentKind,
     isMarkdownDocument,
+    isTypstDocument,
+    isSourceDocument,
     workspaceRoot,
     fileTree,
     unsavedPromptOpen,
@@ -128,11 +130,11 @@ function App() {
   })
 
   useDraftPersistence({
-    filePath: isMarkdownDocument ? filePath : undefined,
+    filePath: isSourceDocument ? filePath : undefined,
     workspaceId,
     content,
     savedContent,
-    isDirty,
+    isDirty: isSourceDocument && isDirty,
   })
   useGlobalErrorHandlers(filePath)
   useSyncProgressBridge()
@@ -143,12 +145,12 @@ function App() {
   useAcpStreamHost()
 
   const handleAutoSave = useCallback(async () => {
-    if (!isMarkdownDocument || !filePath || !isDirty || isFileBusy) return
+    if (!isSourceDocument || !filePath || !isDirty || isFileBusy) return
     await saveFile({ silent: true })
-  }, [filePath, isDirty, isFileBusy, isMarkdownDocument, saveFile])
+  }, [filePath, isDirty, isFileBusy, isSourceDocument, saveFile])
 
   useAutoSave({
-    enabled: autoSaveEnabled && isMarkdownDocument,
+    enabled: autoSaveEnabled && isSourceDocument,
     intervalMs: autoSaveIntervalMs,
     isDirty,
     filePath,
@@ -157,12 +159,27 @@ function App() {
   })
 
   const handleExportHtml = useCallback(() => {
+    if (filePath && !isMarkdownDocument) return
     void exportHtml().catch(reportUnknownError)
-  }, [exportHtml])
+  }, [exportHtml, filePath, isMarkdownDocument])
 
   const handleExportPdf = useCallback(() => {
+    if (filePath && !isMarkdownDocument) return
     void exportPdf().catch(reportUnknownError)
-  }, [exportPdf])
+  }, [exportPdf, filePath, isMarkdownDocument])
+
+  const pendingTypstLocation = useRef<{ path: string; line: number; character: number } | null>(null)
+  const handleOpenTypstFile = useCallback((path: string, line = 0, character = 0) => {
+    if (textDocument?.filePath === path) { textDocument.revealPosition(line, character); return }
+    pendingTypstLocation.current = { path, line, character }
+    void openFileFromTree(path)
+  }, [openFileFromTree, textDocument])
+  useEffect(() => {
+    const target = pendingTypstLocation.current
+    if (!target || !textDocument || target.path !== textDocument.filePath) return
+    textDocument.revealPosition(target.line, target.character)
+    pendingTypstLocation.current = null
+  }, [textDocument])
 
   const handleRestoreDraft = useCallback(() => {
     if (!recoveryDraft || !recoveryDraftKey) return
@@ -363,14 +380,14 @@ function App() {
         void openFolder()
       } else if (action === 'save') {
         void saveFile()
-      } else if (action === 'save-as' && isMarkdownDocument) {
+      } else if (action === 'save-as' && isSourceDocument) {
         void saveFileAs()
       } else if (action.startsWith('deep-link:')) {
         const deepUrl = action.slice('deep-link:'.length)
         void handleOpenDeepLink(deepUrl)
       }
     })
-  }, [handleOpenDeepLink, handleOpenFind, handleOpenReplace, handleToggleQuickOpen, openFile, openFolder, saveFile, saveFileAs, isMarkdownDocument])
+  }, [handleOpenDeepLink, handleOpenFind, handleOpenReplace, handleToggleQuickOpen, openFile, openFolder, saveFile, saveFileAs, isSourceDocument])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -405,6 +422,7 @@ function App() {
         return
       }
       if (key === 'f' || code === 'KeyF') {
+        if (isTypstDocument) return
         event.preventDefault()
         handleOpenFind()
         return
@@ -420,7 +438,7 @@ function App() {
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [filePath, handleOpenFind, handleOpenReplace, handleToggleQuickOpen, isMarkdownDocument, toggleSidebar])
+  }, [filePath, handleOpenFind, handleOpenReplace, handleToggleQuickOpen, isMarkdownDocument, isTypstDocument, toggleSidebar])
 
   useEffect(() => {
     if (readerDocumentKind && filePath) {
@@ -566,6 +584,7 @@ function App() {
             onOpenFile={() => void openFile()}
             onOpenFolder={() => void openFolder()}
             onOpenRecentFile={(path) => void openRecentFile(path)}
+            onOpenTypstFile={handleOpenTypstFile}
             onOpenWebDoc={handleOpenWebDoc}
             onOutlineChange={handleOutlineChange}
           />

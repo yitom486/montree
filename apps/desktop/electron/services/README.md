@@ -98,3 +98,12 @@
 | 文件 | 功能 |
 |------|------|
 | `react-artifact-service.ts` / `.test.ts` | 96KiB 单文件 JSX/TSX 离线转换；Sucrase 独立懒块内联打包，不执行模型源码；生成预置 React 运行库 HTML，由 iframe CSP 限制运行 |
+
+## Typst
+
+- `typst/typst-service.ts`：Tinymist 0.15.8 校验、窗口/项目语言进程、未保存文本同步、隔离预览与内存 PDF 导出；配置及包缓存位于 userData/typst。
+- `typst/lsp-process.ts`：受限 Content-Length UTF-8 字节分帧、请求超时与进程清理。
+- `typst/typst-live.test.ts`：有运行时时执行真实 Unicode 缓冲区、补全、诊断、预览和 PDF 内容回归；工具缺失时跳过，不能据此宣称真实验证通过。
+
+- `typst/lsp-process.test.ts`：UTF-8 每字节断点、粘包、非法/超长消息、超时与子进程退出回归。
+- `typst/typst-service.test.ts`：本机路径边界、缺失工具与损坏随包 manifest 拒绝。

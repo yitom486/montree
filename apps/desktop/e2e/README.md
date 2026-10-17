@@ -27,6 +27,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-rich-result.spec.ts` | 富结果生产链路：真实 MCP `montree_present` 调用→回放→章节比较卡筛选/证据（Markdown 编辑/预览实际章节滚动与原文选区、跨文档禁止）；EPUB 目录就绪、真实跨章节滚动及选区可见；HTML 预览交互/隔离探针（前置脚本禁网、脚本与链接/改名自导航阻止）、静默取消及真实点击导出逐字回读、深色壳截图和主题变化保持 iframe；发现/复放/拒绝回归；不调用真实模型 |
 | `agent-generative-ui.spec.ts` | 生成式 UI 生产链路：SVG 图解（真实输入框→模拟模型参数→真实 MCP→内联 SVG，流程/时序/架构/思维导图/泳道图/时间线/鱼骨图/循环图/ER、缩放/节点键盘、亮暗主题不重建、320/390/480 容纳、固定区/浮窗、居中放大同一 iframe、输入拒绝与隔离）+ React artifact 内联（真实工具结果经 codex-acp rawOutput.result→同卡构建→聊天内直接 iframe 可交互，计数/输入状态在宿主更新及放大弹窗中保持，iframe 内 Esc 关闭后状态保留，同一镜像单实例，固定区与悬浮窗均验证点击；编译/运行错误卡内降级，晚到 ready 不覆盖失败；伪造挂载/超高钳制 640/320-390-480 无溢出/超高内部滚动/亮暗截图）+ component-ui 全流程（选维度提交→原 session 回显→证据定位；内置章节对比、单章引用导航与阅读测验经真实工具生成，定位/选择提交均实测）+ 线程隔离；不调用真实模型 |
 | `export-pdf.spec.ts` | Markdown 导出 PDF（`E2E_AUTO_EXPORT_PATH`） |
+| `typst-editor.spec.ts` | 真实随包 Tinymist：中文路径/CRLF 打开、LSP 补全/诊断修复、未保存 SVG 文字标记及同修订 PDF 回读、iframe 无 preload/无浏览器错误、原生缩放、三种视图宽度、撤销/保存重开/端口释放；另验证工作区 A 保持打开时独立文件 B、另存为 C 的各自根目录与相对 include（仅桩原生对话框）；运行前须准备锁定版本 `apps/desktop/resources/typst/tinymist(.exe)`，缺失会失败，不静默跳过 |
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开；路径栏定位/窄栏/未保存提示；右键菜单、Shift+F10、禁用项、Escape 与复制路径参数（剪贴板边界桩） |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
 | `text-tools-integration.spec.ts` | mock 模型输出 → 真实 HTTP MCP → IPC → Markdown/TXT CodeMirror 缓冲区；精确选区、重复原文、批量拒绝原子性、全部视图/共享撤销、未保存手动输入、CRLF 保存重开、跨文档及外部冲突校验 |
@@ -72,7 +73,7 @@ apps/desktop/e2e/fixtures/ocr/
 
 | 文件 | 说明 |
 |------|------|
-| `helpers/launch-app.ts` | 启动已构建应用 |
+| `helpers/launch-app.ts` | 启动已构建应用；设置 `E2E_PACKAGED_EXE` 可对指定打包可执行文件运行相同测试 |
 | `helpers/web-doc-fixture.ts` | fixture 目录与测试 URL 常量 |
 | `helpers/ebook-fixture.ts` | 自研最小 PDF / EPUB / Markdown 生成器（无新依赖） |
 | `../src/lib/data/presentation-test-fixture.ts` | 模型与 Electron 测试共用的真实 PPTX 图表/内嵌工作簿/母版/嵌套组合 fixture |

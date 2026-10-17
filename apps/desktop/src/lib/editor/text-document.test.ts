@@ -11,6 +11,22 @@ function fixture(text = 'same\n\nsame\n<!-- Page 1 -->\n[[note]]', path = 'D:/no
 }
 
 describe('loaded Markdown/TXT tool document', () => {
+  it('Typst shares undo/history while keeping Markdown-looking code as literal source', () => {
+    const text = '#let title = "中文😀"\n= Heading\n$ x^2 $'
+    const { doc, persist } = fixture(text, 'D:/论文/主文档.typ')
+    expect(doc.units().map((unit) => unit.label)).toEqual(['第 1–3 行'])
+    doc.accept(doc.state.update({ changes: { from: doc.state.doc.length, insert: '\n追加' } }).state)
+    const restored = doc.createEditorState({ extensions: [history()] })
+    doc.accept(restored)
+    doc.filePath = 'D:/论文/另存为.typ'
+    doc.revealPosition(1, 2)
+    expect(doc.state.selection.main.anchor).toBe(doc.state.doc.line(2).from + 2)
+    expect(doc.isDirty()).toBe(true)
+    doc.undo()
+    expect(doc.text).toBe(text)
+    expect(doc.isDirty()).toBe(false)
+    expect(persist).not.toHaveBeenCalled()
+  })
   it('reads original blank lines and whitespace with bounded offsets', () => {
     const { doc } = fixture('  hi  \n\n\nend\n')
     expect(doc.read({ target: 'lines', startLine: 1, endLine: 4 })).toMatchObject({ from: 0, to: 12, text: '  hi  \n\n\nend', startLine: 1, endLine: 4, truncated: false })

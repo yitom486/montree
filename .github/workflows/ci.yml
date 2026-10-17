@@ -56,8 +56,16 @@ jobs:
       - name: 构建应用
         run: bun run build:remote-server && bun run build
 
+      - name: 准备 Typst 运行时
+        run: bun run prepare:typst
+
+      - name: Typst 真实编译集成测试
+        run: bunx vitest run apps/desktop/electron/services/typst/typst-live.test.ts
+
       - name: 体积与打包清单检查
         run: bun run check:bundle
+        env:
+          MONTREE_REQUIRE_TYPST: '1'
 
       - name: 安装 Playwright 系统依赖
         run: bunx playwright install-deps

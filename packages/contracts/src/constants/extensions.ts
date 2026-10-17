@@ -1,6 +1,10 @@
 /** 编辑器支持的 Markdown 相关扩展名（不含点） */
 export const MARKDOWN_EXTENSIONS = ['md', 'markdown', 'txt'] as const
 
+/** Typst 排版源码（不含点） */
+export const TYPST_EXTENSIONS = ['typ'] as const
+export const TYPST_EXTENSION_SET = new Set<string>(TYPST_EXTENSIONS.map((ext) => `.${ext}`))
+
 /** 只读阅读器支持的扩展名（不含点） */
 export const READER_EXTENSIONS = ['pdf', 'epub', 'mobi', 'azw3', 'azw'] as const
 
@@ -36,6 +40,7 @@ export const HTML_EXTENSION_SET = new Set<string>(
 
 export const ALL_DOCUMENT_EXTENSIONS = [
   ...MARKDOWN_EXTENSIONS,
+  ...TYPST_EXTENSIONS,
   ...READER_EXTENSIONS,
   ...DATA_EXTENSIONS,
   ...OFFICE_EXTENSIONS,

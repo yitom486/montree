@@ -20,7 +20,8 @@
 | 文件 | 功能 |
 |------|------|
 | `useMarkdownPreview` | 把 Markdown debounce 渲染成消毒后的 HTML（含本地图片转 data URL） |
-| `useTextDocumentTools` | Markdown/TXT 当前缓冲区 MCP 注册、精确选区、共享 CodeMirror 历史与磁盘原文冲突校验保存 |
+| `useTypstSession` / `.test.ts` | Typst 本机编辑会话：未保存正文同步、LSP 请求、诊断推送；同文件异步打开/关闭按序，覆盖 StrictMode 与清理竞态；异常退出自动恢复至多一次，失败可手动重启；正文不为预览自动落盘 |
+| `useTextDocumentTools` / `.test.ts` | Markdown/TXT 当前缓冲区 MCP 注册、精确选区；Typst 仅共享 CodeMirror 文本/撤销模型，另存为保留历史，不注册 Markdown Agent 工具 |
 | `useScrollSync` | 编辑器 ↔ 预览滚动同步，并记住各文件滚动位置 |
 | `usePasteImage` | 粘贴图片写入文档旁目录，返回 Markdown 相对路径 |
 | `useExportDocument` | 当前文档导出 HTML / PDF |

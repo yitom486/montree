@@ -1,3 +1,4 @@
+import type { TypstConfig, TypstRuntimeStatus, TypstOpenPayload, TypstSession, TypstSyncPayload, TypstRequestPayload, TypstExportPayload, TypstExportResult, TypstEvent } from '../types/typst'
 import type {
   ExportDocumentPayload,
   ExportDocumentResult,
@@ -189,6 +190,15 @@ import type {
  * （interface 内成员顺序无语义，仅作阅读分区；通道字符串见 ../ipc/channels.ts）
  */
 export interface ElectronAPI {
+  typstGetConfig(filePath?: string): Promise<Result<TypstConfig, AppError>>
+  typstSaveConfig(config: TypstConfig, filePath?: string): Promise<Result<TypstConfig, AppError>>
+  typstStatus(): Promise<Result<TypstRuntimeStatus, AppError>>
+  typstOpen(payload: TypstOpenPayload): Promise<Result<TypstSession, AppError>>
+  typstSync(payload: TypstSyncPayload): Promise<Result<void, AppError>>
+  typstRequest(payload: TypstRequestPayload): Promise<Result<unknown, AppError>>
+  typstClose(sessionId: string): Promise<Result<void, AppError>>
+  typstExportPdf(payload: TypstExportPayload): Promise<Result<TypstExportResult, AppError>>
+  onTypstEvent(callback: (event: TypstEvent) => void): () => void
   compileReactArtifact: (payload: { source: string; css?: string }) => Promise<Result<string, AppError>>
   /* ===== 应用与窗口：静态注入 + 窗口生命周期 ===== */
   /** 当前操作系统：`win32` / `darwin` / `linux` */

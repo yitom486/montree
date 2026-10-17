@@ -45,8 +45,10 @@
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
-| `text-document` / `.test.ts` | Markdown/TXT 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区、跨视图 CodeMirror 撤销历史 |
+| `text-document` / `.test.ts` | Markdown/TXT 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区；Typst 复用文本与跨视图撤销历史，源码按行保留，不解析为 Markdown 章节 |
 | `theme-transition` / `.test.ts` | View Transitions 原生主题平滑切换（GPU 贴图合成、180ms 交叉淡化、两帧延迟卸载屏蔽类） |
+| `typst-lsp` / `.test.ts` | Typst UTF-16 位置/文本修改/诊断映射、预览 loopback URL 校验；按 Windows/POSIX 路径边界选择项目根，独立文件与跨目录另存为回落自身目录 |
+| `typst-session` / `.test.ts` | Typst 会话生命周期与有序内存同步：版本守卫、初始诊断缓存、过期请求丢弃、显式导出与延迟打开清理 |
 
 ## preview/
 

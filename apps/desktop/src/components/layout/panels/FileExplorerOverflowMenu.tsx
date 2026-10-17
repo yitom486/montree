@@ -37,9 +37,12 @@ export interface FileExplorerOverflowMenuProps {
   canWrite?: boolean
   /** 只读模式（阅读器/在线文档）：文档组隐藏 */
   readOnly?: boolean
+  /** Typst 在自身工作区导出，不调用 Markdown HTML/PDF 导出。 */
+  markdownExport?: boolean
   isRescanning?: boolean
   isRemoteWorkspace?: boolean
   onNewFile: () => void
+  onNewTypstFile?: () => void
   onNewFolder: () => void
   onOpenFile: () => void
   onOpenFolder: () => void
@@ -62,9 +65,11 @@ export interface FileExplorerOverflowMenuProps {
 export function FileExplorerOverflowMenu({
   canWrite = false,
   readOnly = false,
+  markdownExport = true,
   isRescanning = false,
   isRemoteWorkspace = false,
   onNewFile,
+  onNewTypstFile,
   onNewFolder,
   onOpenFile,
   onOpenFolder,
@@ -101,6 +106,10 @@ export function FileExplorerOverflowMenu({
           <FilePlus className="size-4" />
           新建文件
         </DropdownMenuItem>
+        {onNewTypstFile && <DropdownMenuItem disabled={!canWrite} onClick={onNewTypstFile}>
+          <FileCode2 className="size-4" />
+          新建 Typst 文档
+        </DropdownMenuItem>}
         <DropdownMenuItem disabled={!canWrite} onClick={onNewFolder}>
           <FolderPlus className="size-4" />
           新建文件夹
@@ -159,14 +168,14 @@ export function FileExplorerOverflowMenu({
               另存为
               <DropdownMenuShortcut>Ctrl+Shift+S</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportHtml}>
+            {markdownExport && <DropdownMenuItem onClick={onExportHtml}>
               <FileCode2 className="size-4" />
               导出 HTML
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportPdf}>
+            </DropdownMenuItem>}
+            {markdownExport && <DropdownMenuItem onClick={onExportPdf}>
               <FileText className="size-4" />
               导出 PDF
-            </DropdownMenuItem>
+            </DropdownMenuItem>}
           </>
         ) : null}
         <DropdownMenuSeparator />

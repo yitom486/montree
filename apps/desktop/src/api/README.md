@@ -28,3 +28,5 @@
 新增能力顺序（见 AGENTS.md）：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。
 
 - React artifact 编译 API：`react-artifact-api.ts`，仅通过 preload 请求主进程转换 JSX/TSX，返回离线 HTML；模型代码只在隔离 iframe 运行。
+
+- `typst-api.ts`：Typst 配置、运行时状态、会话、全文同步、受控语言请求、预览事件与 PDF 导出。

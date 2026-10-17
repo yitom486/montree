@@ -78,6 +78,9 @@ const PptxViewer = lazy(() =>
 const HtmlViewer = lazy(() =>
   import('@/components/html/HtmlViewer').then((m) => ({ default: m.HtmlViewer })),
 )
+const TypstWorkspace = lazy(() =>
+  import('@/components/typst/TypstWorkspace').then((m) => ({ default: m.TypstWorkspace })),
+)
 
 export interface EditorWorkspaceMainHandle {
   navigateToUnit: (index: number, excerpt?: string) => Promise<boolean>
@@ -106,6 +109,7 @@ interface EditorWorkspaceMainProps {
   onOpenFile: () => void
   onOpenFolder: () => void
   onOpenRecentFile: (path: string) => void
+  onOpenTypstFile?: (path: string, line?: number, character?: number) => void
   onOpenWebDoc: (url: string) => void
   onOutlineChange?: (state: EditorOutlineState) => void
   /**
@@ -137,6 +141,7 @@ export const EditorWorkspaceMain = forwardRef<
     onOpenFile,
     onOpenFolder,
     onOpenRecentFile,
+    onOpenTypstFile,
     onOpenWebDoc,
     onOutlineChange,
     externalConflict,
@@ -161,9 +166,10 @@ export const EditorWorkspaceMain = forwardRef<
   const toggleMarkdownEditorMode = useAppSettingsStore((state) => state.toggleMarkdownEditorMode)
 
   const viewMode = fileState.viewMode
-  const previewHtml = useMarkdownPreview(content, filePath, previewDebounceMs)
+  const previewHtml = useMarkdownPreview(filePath && getDocumentKind(filePath) !== 'markdown' ? '' : content, filePath, previewDebounceMs)
   const { handlePasteImage } = usePasteImage(filePath)
   const headings = useMemo(() => {
+    if (filePath && getDocumentKind(filePath) !== 'markdown') return []
     try {
       return parseMarkdownHeadings(content)
     } catch (error) {
@@ -172,7 +178,7 @@ export const EditorWorkspaceMain = forwardRef<
     }
   }, [content, filePath])
   useEffect(() => {
-    if (!textDocument) return
+    if (!textDocument || getDocumentKind(textDocument.filePath) !== 'markdown') return
     textDocument.previewUnitIndex = () => {
       const activeId = previewRef.current?.getActiveHeadingId()
       const heading = headings.find((item) => item.id === activeId)
@@ -356,6 +362,7 @@ export const EditorWorkspaceMain = forwardRef<
       const code = event.code
 
       if (key === 'f' || code === 'KeyF') {
+        if (filePath && getDocumentKind(filePath) === 'typst') return
         if (filePath) {
           event.preventDefault()
           setFindReplace({ open: true, mode: 'find' })
@@ -363,6 +370,7 @@ export const EditorWorkspaceMain = forwardRef<
         return
       }
       if (key === 'h' || code === 'KeyH') {
+        if (filePath && getDocumentKind(filePath) === 'typst') return
         if (filePath) {
           event.preventDefault()
           setFindReplace({ open: true, mode: 'replace' })
@@ -479,6 +487,12 @@ export const EditorWorkspaceMain = forwardRef<
             onOpenRecentFile={onOpenRecentFile}
             onOpenWebDoc={onOpenWebDoc}
           />
+        ) : documentKind === 'typst' && filePath ? (
+          <Suspense fallback={<div className="flex flex-1 items-center justify-center"><Loader2 className="size-5 animate-spin" aria-label="正在加载 Typst 编辑器" /></div>}>
+            <TypstWorkspace filePath={filePath} textDocument={textDocument} content={content}
+              onContentChange={onContentChange} workspaceRoot={workspaceRoot} viewMode={viewMode}
+              onOpenFile={onOpenTypstFile} />
+          </Suspense>
         ) : documentKind === 'html' && filePath ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 HTML 视图…</div>}>
             <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} />

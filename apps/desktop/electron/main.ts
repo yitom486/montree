@@ -1,3 +1,4 @@
+import { disposeAllTypst } from './ipc/typst-handlers'
 import { initializeAgentResources } from './services/acp/agent-resources'
 import { agentResourceTemplateDir } from './services/acp/native-binding'
 import { app, BrowserWindow } from 'electron'
@@ -113,11 +114,13 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   closeAllBookDbs()
   disposeAllAcp()
+  disposeAllTypst()
 })
 
 app.on('window-all-closed', () => {
   disposeAllWorkspaceWatches()
   disposeAllAcp()
+  disposeAllTypst()
   if (process.platform !== 'darwin') {
     app.quit()
   }

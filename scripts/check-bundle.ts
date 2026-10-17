@@ -8,7 +8,8 @@
  *     apps/desktop/electron-builder.yml 的 files node_modules 白名单里——主进程构建默认
  *     externalize，漏配的包在打包版运行时 require 即崩溃。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,6 +28,7 @@ const REQUIRED_LAZY_CHUNKS = [
   'FoliateReaderViewer-',
   'pdf-structure.worker-',
   'UniverSheetViewer-',
+  'TypstWorkspace-',
 ]
 
 let failures = 0
@@ -90,6 +92,26 @@ if (total.bytes > OUT_TOTAL_BUDGET_BYTES) {
   fail(`out/ 总量 ${mb(total.bytes)} 超过预算 ${mb(OUT_TOTAL_BUDGET_BYTES)}`)
 } else {
   pass(`out/ 总量 ${mb(total.bytes)} / ${total.files} 文件（预算 ${mb(OUT_TOTAL_BUDGET_BYTES)}）`)
+}
+
+// Native resources live outside out/ and have a separate, explicit budget.
+const typstResources = join(root, 'apps/desktop/resources/typst')
+const typstManifestPath = join(typstResources, 'manifest.json')
+if (existsSync(typstManifestPath)) {
+  try {
+    const manifest = JSON.parse(readFileSync(typstManifestPath, 'utf8'))
+    if (!['tinymist', 'tinymist.exe'].includes(manifest.executable)) throw new Error('无效的执行文件名')
+    if (manifest.platform !== process.platform || manifest.arch !== process.arch) throw new Error('资源平台与构建宿主不一致')
+    const executable = readFileSync(join(typstResources, manifest.executable))
+    if (createHash('sha256').update(executable).digest('hex') !== manifest.sha256 || executable.length !== manifest.size) throw new Error('资源校验失败')
+    const size = dirSizeBytes(typstResources).bytes
+    if (size > 180 * 1024 * 1024) fail(`Typst 原生资源 ${mb(size)} 超过 180MB 独立预算`)
+    else pass(`Typst 原生资源 ${mb(size)}（独立于 out/，版本 ${manifest.version}）`)
+  } catch (error) { fail(`Typst 运行时资源不完整：${error instanceof Error ? error.message : error}`) }
+} else if (process.env.MONTREE_REQUIRE_TYPST === '1') {
+  fail('缺失 Typst 运行时；先执行 bun run prepare:typst')
+} else {
+  pass('Typst 原生资源未准备；源码构建可用，打包前必须执行 prepare:typst')
 }
 
 // ---- 6.3 主进程依赖白名单 ----

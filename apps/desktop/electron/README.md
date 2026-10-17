@@ -18,3 +18,5 @@
 `webPreferences`：preload + `contextIsolation: true` + `nodeIntegration: false`。渲染端禁止 Node / `@electron/remote`。
 
 新增能力顺序见 [AGENTS.md](../../AGENTS.md)：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ **本目录 services** → ipc → `electron-api.types`（已迁 contracts）→ preload → `apps/desktop/src/api` → hooks。
+
+Typst 集成由 `services/typst/` 与 `ipc/typst-handlers.ts` 管理，退出/关窗释放 Tinymist。

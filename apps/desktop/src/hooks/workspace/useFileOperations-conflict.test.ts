@@ -162,11 +162,11 @@ beforeEach(() => {
 })
 
 describe('P1 冲突基线保护（§11-3）', () => {
-  it('连续两次普通保存都不覆盖外部修改；显式覆盖后写入；重载载入磁盘版', async () => {
+  it.each([PATH, 'C:\\ws\\论文.typ'])('连续两次普通保存都不覆盖外部修改；显式覆盖后写入；重载载入磁盘版 (%s)', async (path) => {
     const hook = renderFileOperations()
     try {
       await act(async () => {
-        await hook.current.openFileFromTree(PATH)
+        await hook.current.openFileFromTree(path)
       })
       expect(hook.current.content).toBe('A')
 
@@ -223,6 +223,25 @@ describe('P1 冲突基线保护（§11-3）', () => {
     } finally {
       hook.unmount()
     }
+  })
+
+  it('Typst save-as uses its own extension/filter and drops the old disk revision', async () => {
+    const hook = renderFileOperations()
+    try {
+      await act(async () => { await hook.current.openFileFromTree('C:\\ws\\论文.typ') })
+      expect(hook.current.documentKind).toBe('typst')
+      expect(hook.current.isSourceDocument).toBe(true)
+      act(() => { hook.current.setContent('#let x = "中文😀"') })
+      vi.mocked(fileApi.saveFileAs).mockResolvedValueOnce({ ok: true, value: { filePath: 'C:\\ws\\副本.typ' } })
+      await act(async () => { await hook.current.saveFileAs() })
+      expect(fileApi.saveFileAs).toHaveBeenCalledWith(expect.objectContaining({
+        documentKind: 'typst', defaultPath: expect.stringMatching(/论文\.typ$/), content: '#let x = "中文😀"',
+      }))
+      expect(hook.current.filePath).toBe('C:\\ws\\副本.typ')
+      expect(hook.current.docRevision).toBeNull()
+      expect(hook.current.isDirty).toBe(false)
+      expect(hook.current.isMarkdownDocument).toBe(false)
+    } finally { hook.unmount() }
   })
 
   it('静默自动保存遇冲突不抛错误打扰，只亮横幅', async () => {

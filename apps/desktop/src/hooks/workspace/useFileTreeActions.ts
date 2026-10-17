@@ -135,7 +135,7 @@ export function useFileTreeActions({
         return null
       }
       if (getDocumentKind(result.value.path) === 'unknown') {
-        toast.message('已创建，但该后缀不在侧栏扫描范围（建议 .md / .txt）')
+        toast.message('已创建，但该后缀不在侧栏扫描范围（建议 .md / .txt / .typ）')
       } else {
         toast.success('已创建文件')
       }
@@ -246,10 +246,11 @@ export function useFileTreeActions({
   )
 
   const defaultNewFileName = useCallback(
-    (parentDir: string) => {
-      if (!workspaceRoot) return 'untitled.md'
+    (parentDir: string, extension: 'md' | 'typ' = 'md') => {
+      const baseName = `untitled.${extension}`
+      if (!workspaceRoot) return baseName
       const names = listChildNames(tree, parentDir, workspaceRoot)
-      return getBaseName(buildUniqueChildPath(parentDir, 'untitled.md', names))
+      return getBaseName(buildUniqueChildPath(parentDir, baseName, names))
     },
     [tree, workspaceRoot],
   )

@@ -6,6 +6,15 @@
  * 应用与窗口 → 应用更新 → Bun → 文件与工作区 → 阅读书签 → ACP → 在线文档 → OCR → PDF 解析 → 罗盘 → 测验 → 云同步
  */
 export const IPC = {
+  TYPST_GET_CONFIG: 'typst:get-config',
+  TYPST_SAVE_CONFIG: 'typst:save-config',
+  TYPST_STATUS: 'typst:status',
+  TYPST_OPEN: 'typst:open',
+  TYPST_SYNC: 'typst:sync',
+  TYPST_REQUEST: 'typst:request',
+  TYPST_CLOSE: 'typst:close',
+  TYPST_EXPORT_PDF: 'typst:export-pdf',
+  TYPST_EVENT: 'typst:event',
   COMPILE_REACT_ARTIFACT: 'artifact:compile-react',
   /* ================================================================
    * 应用与窗口（app:*）

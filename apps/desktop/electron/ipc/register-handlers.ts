@@ -1,3 +1,4 @@
+import { registerTypstHandlers } from './typst-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
@@ -531,6 +532,7 @@ export function registerIpcHandlers(): void {
   // P1：wsl/ssh 描述符分发到远端会话表；无会话时显式 unavailable（不回落）
   setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()
+  registerTypstHandlers()
   if (process.env.E2E_READER_VISUAL === '1') {
     Object.assign(globalThis, {
       __montreeE2eVisualTools: (name: string, args?: Record<string, unknown>) =>

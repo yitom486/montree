@@ -7,9 +7,10 @@ import {
   DEFAULT_SAVE_FILENAME,
   HTML_EXTENSIONS,
   MARKDOWN_EXTENSIONS,
+  TYPST_EXTENSIONS,
   OFFICE_EXTENSIONS,
   getDocumentKind,
-  isDataDocumentKind,
+  isTextDocumentKind,
   isOfficeDocumentKind,
 } from '@montree/contracts'
 import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@montree/contracts'
@@ -45,6 +46,7 @@ export const DOCUMENT_DIALOG_FILTERS = [
   { name: '所有支持格式', extensions: [...ALL_DOCUMENT_EXTENSIONS] },
   { name: 'Markdown', extensions: [...MARKDOWN_EXTENSIONS] },
   { name: 'HTML 网页', extensions: [...HTML_EXTENSIONS] },
+  { name: 'Typst', extensions: [...TYPST_EXTENSIONS] },
   { name: 'PDF', extensions: ['pdf'] },
   { name: 'EPUB', extensions: ['epub'] },
   { name: 'MOBI / Kindle', extensions: ['mobi', 'azw3', 'azw'] },
@@ -80,7 +82,7 @@ export async function openDocumentDialog(
     const filePath = filePaths[0]!
     const kind = getDocumentKind(filePath)
 
-    if (kind === 'markdown' || isDataDocumentKind(kind) || kind === 'html') {
+    if (isTextDocumentKind(kind)) {
       const content = await readFile(filePath, 'utf-8')
       return ok({ filePath, kind, content })
     }
@@ -156,10 +158,10 @@ export async function readFileByPath(
 ): Promise<Result<OpenFileResult, AppError>> {
   try {
     const kind = getDocumentKind(filePath)
-    if (kind !== 'markdown' && !isDataDocumentKind(kind) && kind !== 'html') {
+    if (!isTextDocumentKind(kind)) {
       return err({
         code: 'UNSUPPORTED_FORMAT',
-        message: '该文件不是可读取的 Markdown、HTML 或数据文档',
+        message: '该文件不是可读取的 Markdown、Typst、HTML 或数据文档',
       })
     }
 
@@ -218,9 +220,9 @@ export async function saveFileDialog(
 
     if (!filePath) {
       const { canceled, filePath: selectedPath } = await dialog.showSaveDialog({
-        title: '保存 Markdown 文件',
-        filters: markdownFilters,
-        defaultPath: payload.defaultPath ?? DEFAULT_SAVE_FILENAME,
+        title: payload.documentKind === 'typst' ? '保存 Typst 文件' : '保存 Markdown 文件',
+        filters: payload.documentKind === 'typst' ? [{ name: 'Typst', extensions: [...TYPST_EXTENSIONS] }] : markdownFilters,
+        defaultPath: payload.defaultPath ?? (payload.documentKind === 'typst' ? '未命名.typ' : DEFAULT_SAVE_FILENAME),
       })
 
       if (canceled || !selectedPath) {

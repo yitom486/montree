@@ -46,6 +46,9 @@ export const queryKeys = {
   /** TTS 语音配置与缓存统计 */
   ttsConfig: ['tts', 'config'] as const,
   ttsCacheStats: ['tts', 'cache-stats'] as const,
+  typstConfigPrefix: ['typst', 'config'] as const,
+  typstConfig: (filePath: string) => ['typst', 'config', filePath] as const,
+  typstStatus: ['typst', 'status'] as const,
   /** Git 仓库状态（按工作区身份 + cwd 缓存，防串库）。 */
   gitStatus: (cwd: string, workspaceId: string = LOCAL_WORKSPACE_ID) =>
     ['git-status', workspaceId, cwd] as const,
