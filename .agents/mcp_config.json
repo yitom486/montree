@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "studio-ui": {
+      "serverUrl": "http://127.0.0.1:13920/mcp"
+    }
+  }
+}
