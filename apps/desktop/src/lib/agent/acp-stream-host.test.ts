@@ -174,5 +174,38 @@ describe('acp-stream-host（应用级单例订阅）', () => {
     expect(activeAgentText()).toBe(before)
     stop()
   })
+
+  it('切线程后旧会话的迟到事件不进入新线程', async () => {
+    const stop = startAcpStreamHost()
+    const host = useAcpUiStore.getState()
+    host.appendUserMessage('旧线程问题')
+    host.setSession('sid-old')
+    const oldThreadId = useAcpUiStore.getState().activeThreadId
+
+    host.createThread()
+    useAcpUiStore.getState().setSession('sid-new')
+    const newThreadId = useAcpUiStore.getState().activeThreadId
+    expect(newThreadId).not.toBe(oldThreadId)
+
+    const before = activeAgentText()
+    for (const listener of listeners.update) {
+      listener({
+        sessionId: 'sid-old',
+        update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '旧会话迟到' }] },
+      })
+    }
+    await settleFlush()
+    expect(activeAgentText()).toBe(before)
+
+    for (const listener of listeners.update) {
+      listener({
+        sessionId: 'sid-new',
+        update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '新会话正文' }] },
+      })
+    }
+    await settleFlush()
+    expect(activeAgentText()).toContain('新会话正文')
+    stop()
+  })
 })
 

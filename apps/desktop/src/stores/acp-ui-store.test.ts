@@ -975,3 +975,104 @@ describe('失败回合回滚（额度/网络报错不粘气泡）', () => {
     expect(messages.find((m) => m.toolCallId === 'tk-1')?.toolStatus).toBe('completed')
   })
 })
+
+describe('C1 协议适配分发（同一事件只应用一次、各状态不串位）', () => {
+  beforeEach(() => {
+    const fresh = useAcpUiStore.getState().createThread()
+    useAcpUiStore.setState({
+      prompting: false,
+      sessionId: null,
+      status: 'disconnected',
+      pendingMarkProposalSnapshotContents: [],
+      pendingReplayUserText: null,
+    })
+    const thread = useAcpUiStore.getState().threads.find((t) => t.id === fresh)
+    useAcpUiStore.setState({
+      threads: thread ? [thread] : useAcpUiStore.getState().threads.slice(0, 1),
+      activeThreadId: fresh,
+    })
+  })
+
+  function activeThread() {
+    const s = useAcpUiStore.getState()
+    return s.threads.find((t) => t.id === s.activeThreadId)!
+  }
+
+  it('一条 update 只落一次：正文、工具、计划、usage 各归其位', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('跑一遍')
+    store.beginAgentReply()
+
+    store.applySessionUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: [{ type: 'text', text: '唯一正文' }],
+    })
+    expect(activeThread().messages.filter((m) => m.role === 'agent')).toHaveLength(1)
+    expect(activeThread().messages.filter((m) => m.role === 'agent')[0]?.text).toBe('唯一正文')
+
+    store.applySessionUpdate({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'c1-tool',
+      title: '读文件',
+      status: 'in_progress',
+    })
+    expect(activeThread().messages.filter((m) => m.toolCallId === 'c1-tool')).toHaveLength(1)
+
+    store.applySessionUpdate({
+      sessionUpdate: 'plan',
+      entries: [{ content: '第一步', status: 'in_progress' }],
+    })
+    expect(activeThread().messages.filter((m) => m.role === 'plan')).toHaveLength(1)
+
+    const beforeUsage = activeThread().messages.length
+    store.applySessionUpdate({
+      sessionUpdate: 'usage_update',
+      used: 12,
+      size: 100,
+    })
+    // usage 是线程字段，不新增消息、不改正文
+    expect(activeThread().messages).toHaveLength(beforeUsage)
+    expect(activeThread().usage).toEqual({ used: 12, size: 100 })
+    expect(activeThread().messages.find((m) => m.role === 'agent')?.text).toBe('唯一正文')
+    expect(activeThread().messages.find((m) => m.toolCallId === 'c1-tool')?.text ?? '').not.toContain(
+      '第一步',
+    )
+  })
+
+  it('工具内容分块只进工具气泡，不进正文/计划', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('跑一遍')
+    store.beginAgentReply()
+    store.applySessionUpdate({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'c1-chunk',
+      title: '读文件',
+      status: 'in_progress',
+    })
+    store.applySessionUpdate({
+      sessionUpdate: 'tool_call_content_chunk',
+      toolCallId: 'c1-chunk',
+      content: { type: 'text', text: '分块正文' },
+    })
+    const messages = activeThread().messages
+    expect(messages.filter((m) => m.role === 'tool' && m.toolCallId === 'c1-chunk')).toHaveLength(1)
+    expect(messages.find((m) => m.toolCallId === 'c1-chunk')?.text).toContain('分块正文')
+    expect(messages.filter((m) => m.role === 'agent').map((m) => m.text).join('')).not.toContain(
+      '分块正文',
+    )
+  })
+
+  it('空 camelCase id 的更新不误写 snake_case 指向的已有工具', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('继续处理')
+    store.beginAgentReply()
+    store.applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: '处理中' })
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'existing-tool', title: '原工具', status: 'in_progress' })
+
+    store.applySessionUpdate({ sessionUpdate: 'tool_call_update', toolCallId: '', tool_call_id: 'existing-tool', title: '不应覆盖', status: 'completed' })
+    const tools = activeThread().messages.filter((message) => message.role === 'tool')
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({ toolCallId: 'existing-tool', toolTitle: '原工具', toolStatus: 'in_progress' })
+    expect(activeThread().messages.find((message) => message.role === 'agent')?.text).toBe('处理中')
+  })
+})

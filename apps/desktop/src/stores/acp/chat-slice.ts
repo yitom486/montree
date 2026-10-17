@@ -1,32 +1,14 @@
 import type { StateCreator } from 'zustand'
-import type { SessionUpdate } from '@agentclientprotocol/sdk'
-import {
-  STD_SESSION_UPDATE_KIND,
-  type StandardSessionUpdateKind,
-} from '@yitom/chat-session'
-import {
-  DEFAULT_ACP_RUNTIME_ID,
-  isSameWorkspace,
-  MONTREE_SETTLE_COMPLETE_KIND,
-} from '@yitom/contracts'
-import {
-  type AcpChatMessage,
-  type AcpChatRole,
-  extractTextFromContent,
-  flattenToolContent,
-  parseToolDiffs,
-  parseToolLocations,
-  toolUpdateContentText,
-} from '@/stores/acp-chat-types'
+import { DEFAULT_ACP_RUNTIME_ID, isSameWorkspace } from '@yitom/contracts'
+import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import {
   applyChatEvent,
   finalizeFeedMessages,
-  parseAcpPlanEntries,
-  summarizePlanProgress,
-  type ChatFeedToolCall,
-  parseToolCallMetadata,
+  isProposeMarkToolTitle,
+  selectChapterMarkPlanOnMessages,
 } from '@yitom/chat-core'
+import { classifyAcpUpdate } from '@/lib/agent/acp-update-adapter'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
 import { mirrorHostSnapshotToPackageStore, mirrorHostThreadToPackageStore, mirrorThreadActionToPackageStore } from '@/lib/agent/chat-store-mirror'
@@ -40,10 +22,6 @@ import {
   collectStoreFallbackProposal,
   resolveMarkProposalOnMessages,
 } from '@/lib/agent/promote-mark-proposals'
-import {
-  selectChapterMarkPlanOnMessages,
-} from '@yitom/chat-core'
-import { isProposeMarkToolTitle } from '@yitom/chat-core'
 import type { MarkProposalStatus } from '@yitom/annotations'
 import {
   MAX_THREADS,
@@ -57,50 +35,6 @@ import {
   patchActiveThread,
   titleFromMessages,
 } from './chat-helpers'
-
-/**
- * ACP 线路命名翻译（E1b adapter，就近小函数，纯翻译无 store）：
- * 宿主把 `toolCallId|tool_call_id` 双拼、`content/rawOutput/locations`
- * 用 core 解析函数算成干净字段，再组归约器事件。归约器只收干净输入。
- */
-function toolCallIdFromUpdate(update: Record<string, unknown>): string | undefined {
-  return typeof update.toolCallId === 'string'
-    ? update.toolCallId
-    : typeof update.tool_call_id === 'string'
-      ? update.tool_call_id
-      : undefined
-}
-
-/**
- * 协议对齐总表（与包内 `STD_SESSION_UPDATE_KIND` 同一张表，宿主不得自建名单）：
- * 官方 SDK `SessionUpdate` 联合类型是唯一真源；下式在 SDK 新增协议成员
- * 而宿主未补分支时编译报错。厂商扩展（定居标记/复数 config/tool 内容分块）
- * 不在 union 内，各自早退，见 `applySessionUpdate` 头部。
- */
-type VendorHostKind =
-  | typeof MONTREE_SETTLE_COMPLETE_KIND
-  | 'config_options_update'
-  | 'tool_call_content_chunk'
-type AssertHostCovered = Exclude<SessionUpdate['sessionUpdate'], StandardSessionUpdateKind | VendorHostKind>
-const _assertHostCovered: AssertHostCovered extends never ? true : AssertHostCovered = true
-
-/** 表值数组（未知 kind 判定用；分配一次，热路径复用）。 */
-const STD_KIND_VALUES = Object.values(STD_SESSION_UPDATE_KIND) as string[]
-
-function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | undefined {
-  const toolCallId = toolCallIdFromUpdate(update)
-  if (!toolCallId) return undefined
-  const call: ChatFeedToolCall = { toolCallId }
-  Object.assign(call, parseToolCallMetadata(update))
-  if (typeof update.title === 'string') call.title = update.title
-  if (typeof update.kind === 'string') call.kind = update.kind
-  if (typeof update.status === 'string') call.status = update.status
-  const contentText = toolUpdateContentText(update)
-  if (contentText !== undefined) call.contentText = contentText
-  if ('content' in update) call.diffs = parseToolDiffs(update.content)
-  if ('locations' in update) call.locations = parseToolLocations(update.locations)
-  return call
-}
 
 /** 切线程轻冻（E1b）：只收 streaming + 300 裁剪 + blob 脱钩，行为同旧 freezeMessages。 */
 function freezeLightMessages(
@@ -700,265 +634,201 @@ export const createChatSlice: StateCreator<
 
   applySessionUpdate: (update) => {
     const pkg = getOwnedChatSessionStore()
-    const kind =
-      typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
-    // 下方统一分发以 `STD_SESSION_UPDATE_KIND` 单表为准（与包内同名单）；
-    // 厂商扩展（定居标记/复数 config/tool 内容分块）不在表内，各自早退，行为不变。
-    const stdKind = kind as StandardSessionUpdateKind
-
-    if (kind === MONTREE_SETTLE_COMPLETE_KIND) {
-      // 主进程定居收尾：先把回放清洗悬垂落定（有则成泡、无则丢），再冻结残留，
-      // 不新增空泡，不碰 prompting
-      const st = get()
-      const pending = st.pendingReplayUserText
-      if (pending && pending.threadId === st.activeThreadId && pending.raw) {
-        set((s) => ({
-          pendingReplayUserText: null,
-          ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
-        }))
-        mirrorCanonicalActiveThread(pkg, get())
-      } else if (pending) {
-        set({ pendingReplayUserText: null })
-      }
-      get().freezeSettledStreaming()
-      return
+    // 协议识别与字段归一化全在 `classifyAcpUpdate`（纯适配，复用包 mapper）；
+    // 本层只按意图落宿主状态，线程归属/回放清洗/快照旁路顺序一律不变。
+    const intent = classifyAcpUpdate(update)
+    if ('unknownKind' in intent && intent.unknownKind !== undefined) {
+      acpDevLog('unknown session update kind', { kind: intent.unknownKind })
     }
 
-    if (kind === 'config_option_update' || kind === 'config_options_update') {
-      return
-    }
+    switch (intent.type) {
+      case 'ignored':
+        return
 
-    // 厂商扩展：tool 内容分块（非协议成员，早退，行为不变；位置从后挪前，
-    // 使下方标准分发链连续，else-if 不被打断）。
-    if (kind === 'tool_call_content_chunk') {
-      const toolCallId =
-        typeof update.toolCallId === 'string' ? update.toolCallId : ''
-      if (!toolCallId) return
-      const chunkText = flattenToolContent(
-        update.content !== undefined ? [update.content] : update.content,
-      )
-      if (!chunkText) return
-      set((s) => {
-        const proposalFallback = collectStoreFallbackProposal()
-        return patchActiveThread(s, (t) => {
-          const feed = applyChatEvent(
-            { messages: t.messages, turnSettled: s.turnSettled },
-            { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback },
-            { createId: newId },
-          )
-          return { ...t, messages: feed.messages, updatedAt: Date.now() }
-        })
-      })
-      return
-    }
-
-    // ACP usage_update：线程级纯记录（used/size/cost + `_meta.thinkingTokens`，
-    // 缺省不写该键），只写当前线程的 `usage`，不新建消息，不碰其他分支。
-    // 包镜像不管：包 `mapSessionUpdate` 对 usage_update 本就返回 []（无 feed 事件），
-    // 包 `ChatThread` 也是刻意最小提炼（非 feed 宿主态不进包），显示直读宿主线程。
-    // 标准分发链（条件一律走单表字面量；尾部 else 有 never 断言兜底）：
-    // usage → plan → tool → planRemoved → 明确丢弃 → 文本（含未知兼容）。
-    if (stdKind === STD_SESSION_UPDATE_KIND.usage) {
-      const used = typeof update.used === 'number' && Number.isFinite(update.used)
-        ? update.used
-        : undefined
-      const size = typeof update.size === 'number' && Number.isFinite(update.size)
-        ? update.size
-        : undefined
-      if (used === undefined || size === undefined) return
-      let cost: { amount: number; currency: string } | undefined
-      const rawCost: unknown = update.cost
-      if (typeof rawCost === 'object' && rawCost !== null && !Array.isArray(rawCost)) {
-        const row = rawCost as Record<string, unknown>
-        if (
-          typeof row.amount === 'number' && Number.isFinite(row.amount) &&
-          typeof row.currency === 'string'
-        ) {
-          cost = { amount: row.amount, currency: row.currency }
+      case 'settle-complete': {
+        // 主进程定居收尾：先把回放清洗悬垂落定（有则成泡、无则丢），再冻结残留，
+        // 不新增空泡，不碰 prompting
+        const st = get()
+        const pending = st.pendingReplayUserText
+        if (pending && pending.threadId === st.activeThreadId && pending.raw) {
+          set((s) => ({
+            pendingReplayUserText: null,
+            ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
+          }))
+          mirrorCanonicalActiveThread(pkg, get())
+        } else if (pending) {
+          set({ pendingReplayUserText: null })
         }
+        get().freezeSettledStreaming()
+        return
       }
-      let thinkingTokens: number | undefined
-      const rawMeta: unknown = update._meta
-      if (typeof rawMeta === 'object' && rawMeta !== null && !Array.isArray(rawMeta)) {
-        const tt = (rawMeta as Record<string, unknown>).thinkingTokens
-        if (typeof tt === 'number' && Number.isFinite(tt)) thinkingTokens = tt
-      }
-      const usage: AcpChatThread['usage'] = {
-        used,
-        size,
-        ...(cost !== undefined ? { cost } : {}),
-        ...(thinkingTokens !== undefined ? { thinkingTokens } : {}),
-      }
-      set((s) =>
-        patchActiveThread(s, (t) => ({ ...t, usage, updatedAt: Date.now() })),
-      )
-      return
-    } else if (stdKind === STD_SESSION_UPDATE_KIND.plan || stdKind === STD_SESSION_UPDATE_KIND.planUpdate) {
-      const entries = parseAcpPlanEntries(update)
-      if (entries.length === 0 && kind === 'plan_update') {
-        // 空 entries 视为清空该计划卡片
-      }
-      const summary = summarizePlanProgress(entries)
-      set((s) =>
-        patchActiveThread(s, (t) => {
-          const feed = applyChatEvent(
-            { messages: t.messages, turnSettled: s.turnSettled },
-            { type: 'plan', entries, active: summary.active },
-            { createId: newId },
-          )
-          return { ...t, messages: feed.messages, updatedAt: Date.now() }
-        }),
-      )
-      return
-    } else if (stdKind === STD_SESSION_UPDATE_KIND.toolCall || stdKind === STD_SESSION_UPDATE_KIND.toolCallUpdate) {
-      const call = buildToolFeedCall(update)
-      const toolCallId = call?.toolCallId
-      // 无 id 时归约器 no-op，但仍需消费快照旁路并按 quiet 收尾（保原语义）
-      set((s) => {
-        let remaining = s.pendingMarkProposalSnapshotContents
-        let attachedCount = 0
-        let proposalToolTitle: string | undefined
-        const proposalFallback = collectStoreFallbackProposal()
-        const patched = patchActiveThread(s, (t) => {
-          const base = call
-            ? applyChatEvent(
-                { messages: t.messages, turnSettled: s.turnSettled },
-                { type: 'tool-call', call, proposalFallback },
-                { createId: newId },
-              ).messages
-            : t.messages
-          const currentTool = [...base]
-            .reverse()
-            .find(
-              (message) =>
-                message.role === 'tool' &&
-                message.toolCallId === toolCallId,
+
+      case 'tool-content-chunk': {
+        const { toolCallId, text: chunkText } = intent
+        set((s) => {
+          const proposalFallback = collectStoreFallbackProposal()
+          return patchActiveThread(s, (t) => {
+            const feed = applyChatEvent(
+              { messages: t.messages, turnSettled: s.turnSettled },
+              { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback },
+              { createId: newId },
             )
-          proposalToolTitle = currentTool?.toolTitle
-          const attached = attachPendingMarkProposals(base, remaining)
-          remaining = attached.remaining
-          attachedCount = attached.attachedCount
-          // 归约器已内聚 tool 更新的 finalize-if-quiet；此处仅为快照挂载后的
-          // 增量收尾（幂等， streaming agent 存在则延迟）。
-          const hasStreamingAgent = attached.messages.some(
-            (message) => message.role === 'agent' && message.streaming,
-          )
-          return {
-            ...t,
-            messages: hasStreamingAgent
-              ? attached.messages
-              : finalizeFeedMessages(attached.messages, proposalFallback),
-            updatedAt: Date.now(),
-          }
-        })
-        if (isProposeMarkToolTitle(proposalToolTitle)) {
-          acpDevLog('mark-proposal tool update', {
-            toolCallId,
-            title: proposalToolTitle,
-            status: update.status,
-            queuedBefore: s.pendingMarkProposalSnapshotContents.length,
-            attachedCount,
-            queuedAfter: remaining.length,
+            return { ...t, messages: feed.messages, updatedAt: Date.now() }
           })
+        })
+        return
+      }
+
+      // ACP usage_update：线程级纯记录（used/size/cost + `_meta.thinkingTokens`，
+      // 缺省不写该键），只写当前线程的 `usage`，不新建消息，不碰其他分支。
+      // 包镜像不管：包 `mapSessionUpdate` 对 usage_update 本就返回 []（无 feed 事件），
+      // 包 `ChatThread` 也是刻意最小提炼（非 feed 宿主态不进包），显示直读宿主线程。
+      case 'usage': {
+        const { usage } = intent
+        set((s) =>
+          patchActiveThread(s, (t) => ({ ...t, usage, updatedAt: Date.now() })),
+        )
+        return
+      }
+      case 'plan': {
+        const { entries, active } = intent
+        set((s) =>
+          patchActiveThread(s, (t) => {
+            const feed = applyChatEvent(
+              { messages: t.messages, turnSettled: s.turnSettled },
+              { type: 'plan', entries, active },
+              { createId: newId },
+            )
+            return { ...t, messages: feed.messages, updatedAt: Date.now() }
+          }),
+        )
+        return
+      }
+
+      case 'tool-call': {
+        const call = intent.call
+        const toolCallId = intent.toolCallId
+        // 无 id 时归约器 no-op，但仍需消费快照旁路并按 quiet 收尾（保原语义）
+        set((s) => {
+          let remaining = s.pendingMarkProposalSnapshotContents
+          let attachedCount = 0
+          let proposalToolTitle: string | undefined
+          const proposalFallback = collectStoreFallbackProposal()
+          const patched = patchActiveThread(s, (t) => {
+            const base = call
+              ? applyChatEvent(
+                  { messages: t.messages, turnSettled: s.turnSettled },
+                  { type: 'tool-call', call, proposalFallback },
+                  { createId: newId },
+                ).messages
+              : t.messages
+            const currentTool = [...base]
+              .reverse()
+              .find(
+                (message) =>
+                  message.role === 'tool' &&
+                  message.toolCallId === toolCallId,
+              )
+            proposalToolTitle = currentTool?.toolTitle
+            const attached = attachPendingMarkProposals(base, remaining)
+            remaining = attached.remaining
+            attachedCount = attached.attachedCount
+            // 归约器已内聚 tool 更新的 finalize-if-quiet；此处仅为快照挂载后的
+            // 增量收尾（幂等， streaming agent 存在则延迟）。
+            const hasStreamingAgent = attached.messages.some(
+              (message) => message.role === 'agent' && message.streaming,
+            )
+            return {
+              ...t,
+              messages: hasStreamingAgent
+                ? attached.messages
+                : finalizeFeedMessages(attached.messages, proposalFallback),
+              updatedAt: Date.now(),
+            }
+          })
+          if (isProposeMarkToolTitle(proposalToolTitle)) {
+            acpDevLog('mark-proposal tool update', {
+              toolCallId,
+              title: proposalToolTitle,
+              status: update.status,
+              queuedBefore: s.pendingMarkProposalSnapshotContents.length,
+              attachedCount,
+              queuedAfter: remaining.length,
+            })
+          }
+          return { ...patched, pendingMarkProposalSnapshotContents: remaining }
+        })
+        return
+      }
+
+      case 'plan-remove': {
+        // 计划删除：经包归约器 plan-remove 删单例卡（与包 ingest 同语义）。
+        set((s) =>
+          patchActiveThread(s, (t) => {
+            const feed = applyChatEvent(
+              { messages: t.messages, turnSettled: s.turnSettled },
+              { type: 'plan-remove' },
+              { createId: newId },
+            )
+            if (feed.messages === t.messages) return t
+            return { ...t, messages: feed.messages, updatedAt: Date.now() }
+          }),
+        )
+        return
+      }
+
+      case 'text': {
+        const { role, text } = intent
+        // cursor load 回放清洗（第二道网）：仅 user-chunk 分支洗脚手架。
+        // 悬垂（defer）时暂缓渲染、缓存原文等下一 chunk；洗空（drop）即丢弃该消息。
+        let effectiveText = text
+        if (role === 'user') {
+          const outcome = consumeReplayUserChunk(get(), text)
+          if (outcome.kind === 'defer') {
+            set({ pendingReplayUserText: outcome.pending })
+            return
+          }
+          if (outcome.kind === 'drop') {
+            if (get().pendingReplayUserText) set({ pendingReplayUserText: null })
+            return
+          }
+          effectiveText = outcome.text
+        } else {
+          // 非 user chunk 到达时若有同线程悬垂，先落定以保到达顺序
+          //（同消息的撕裂 chunk 总是连续同 role，这是纯防御）
+          const st = get()
+          const pending = st.pendingReplayUserText
+          if (pending && pending.threadId === st.activeThreadId && pending.raw) {
+            set((s) => ({
+              pendingReplayUserText: null,
+              ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
+            }))
+            mirrorCanonicalActiveThread(pkg, get())
+          } else if (pending) {
+            set({ pendingReplayUserText: null })
+          }
         }
-        return { ...patched, pendingMarkProposalSnapshotContents: remaining }
-      })
-      return
-    } else if (stdKind === STD_SESSION_UPDATE_KIND.planRemoved) {
-      // 计划删除：经包归约器 plan-remove 删单例卡（与包 ingest 同语义）。
-      set((s) =>
-        patchActiveThread(s, (t) => {
-          const feed = applyChatEvent(
-            { messages: t.messages, turnSettled: s.turnSettled },
-            { type: 'plan-remove' },
-            { createId: newId },
-          )
-          if (feed.messages === t.messages) return t
-          return { ...t, messages: feed.messages, updatedAt: Date.now() }
-        }),
-      )
-      return
-    } else if (
-      stdKind === STD_SESSION_UPDATE_KIND.configOption ||
-      stdKind === STD_SESSION_UPDATE_KIND.availableCommands ||
-      stdKind === STD_SESSION_UPDATE_KIND.currentMode ||
-      stdKind === STD_SESSION_UPDATE_KIND.sessionInfo ||
-      stdKind === STD_SESSION_UPDATE_KIND.notice ||
-      stdKind === STD_SESSION_UPDATE_KIND.compaction ||
-      stdKind === STD_SESSION_UPDATE_KIND.compactionSummary ||
-      stdKind === STD_SESSION_UPDATE_KIND.subagent
-    ) {
-      // 已知但本层无 feed 表达：usage 走线程字段（上分支），其余为产品缺口，
-      // 明确丢弃（此前为静默，行为一致，仅留痕位置变化见未知分支）。
-      return
-    } else if (
-      stdKind === STD_SESSION_UPDATE_KIND.agentMessage ||
-      stdKind === STD_SESSION_UPDATE_KIND.agentThought ||
-      stdKind === STD_SESSION_UPDATE_KIND.userMessage ||
-      stdKind === STD_SESSION_UPDATE_KIND.sessionMessage ||
-      stdKind === STD_SESSION_UPDATE_KIND.sessionMessageChunk ||
-      !STD_KIND_VALUES.includes(kind)
-    ) {
-      // 未知 kind（非表成员）落此分支：留痕 + 旧兼容（有文本走 agent）。
-      if (!STD_KIND_VALUES.includes(kind)) acpDevLog('unknown session update kind', { kind })
-      const text = extractTextFromContent(update.content)
-      if (!text) return
 
-      const role: AcpChatRole =
-        stdKind === STD_SESSION_UPDATE_KIND.agentThought
-          ? 'thought'
-          : stdKind === STD_SESSION_UPDATE_KIND.userMessage
-            ? 'user'
-            : 'agent'
-
-      // cursor load 回放清洗（第二道网）：仅 user-chunk 分支洗脚手架。
-    // 悬垂（defer）时暂缓渲染、缓存原文等下一 chunk；洗空（drop）即丢弃该消息。
-    let effectiveText = text
-    if (role === 'user') {
-      const outcome = consumeReplayUserChunk(get(), text)
-      if (outcome.kind === 'defer') {
-        set({ pendingReplayUserText: outcome.pending })
-        return
-      }
-      if (outcome.kind === 'drop') {
-        if (get().pendingReplayUserText) set({ pendingReplayUserText: null })
-        return
-      }
-      effectiveText = outcome.text
-    } else {
-      // 非 user chunk 到达时若有同线程悬垂，先落定以保到达顺序
-      //（同消息的撕裂 chunk 总是连续同 role，这是纯防御）
-      const st = get()
-      const pending = st.pendingReplayUserText
-      if (pending && pending.threadId === st.activeThreadId && pending.raw) {
         set((s) => ({
-          pendingReplayUserText: null,
-          ...patchActiveThread(s, (t) => appendFlushedReplayUserText(t, pending.raw)),
+          ...(role === 'user' ? { pendingReplayUserText: null } : {}),
+          ...patchActiveThread(s, (t) => {
+            const feed = applyChatEvent(
+              { messages: t.messages, turnSettled: s.turnSettled },
+              { type: 'text-chunk', role, text: effectiveText },
+              { createId: newId },
+            )
+            return { ...t, messages: feed.messages, updatedAt: Date.now() }
+          }),
         }))
-        mirrorCanonicalActiveThread(pkg, get())
-      } else if (pending) {
-        set({ pendingReplayUserText: null })
+        if (role === 'user') mirrorCanonicalActiveThread(pkg, get())
+        return
+      }
+
+      default: {
+        // 到达即覆盖缺口（编译期）：适配层意图新增而未接线时此处报错。
+        const _exhaustive: never = intent
+        return _exhaustive
       }
     }
-
-    set((s) => ({
-      ...(role === 'user' ? { pendingReplayUserText: null } : {}),
-      ...patchActiveThread(s, (t) => {
-        const feed = applyChatEvent(
-          { messages: t.messages, turnSettled: s.turnSettled },
-          { type: 'text-chunk', role, text: effectiveText },
-          { createId: newId },
-        )
-        return { ...t, messages: feed.messages, updatedAt: Date.now() }
-      }),
-    }))
-    if (role === 'user') mirrorCanonicalActiveThread(pkg, get())
-    return
-  } else {
-    // 到达即覆盖缺口（编译期）：运行时不可能——厂商扩展早退，
-    // 表成员全部分支覆盖，非表成员由文本分支兜底。
-    const _exhaustive: never = stdKind
-    return _exhaustive
-  }
   },
 })

@@ -126,6 +126,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `annotation-note-prompts` | 批注 AI 意图/改写 chip 与草稿抽取 |
 | `toc-ai-session` | 目录 AI 整理专用副会话（每次新建防跨书串扰、无头累积、不进时间线） |
 | `acp-stream-host` | ACP 流式推送应用级宿主（单订阅单合并器 + 认证清理回调注册表；`acp-transport` 直连等待） |
+| `acp-update-adapter` / `.test.ts` | ACP `session/update` → 宿主分发意图的**纯适配**（C1）：标准成员经 `@yitom/chat-session` `mapSessionUpdate` 复用单表与 SDK 联合穷尽校验，宿主只保留 `montree_settle_complete`、`usage_update`（线程字段）、`tool_call_content_chunk`（camelCase-only）与无 id 工具调用（快照旁路）等独有语义；不读 store、不做回放清洗，线程归属/清洗时序仍在 `apps/desktop/src/stores/acp/chat-slice.ts` |
 | `chat-store-mirror` / `agent/chat-store-mirror-thread.test.ts` + `agent/chat-store-mirror-p4b.test.ts` + `agent/chat-store-mirror-host-routing.test.ts` + `agent/chat-store-mirror-host-integration.test.ts` | 宿主→包增量与生命周期镜像；线程 hostThreadId 随快照持久化，启动/恢复历史权威迁入，后台补建不切 active；附件完整透传，用户回放只同步清洗后的单线程 feed；覆盖旧快照迁入、重启续聊、运行时切换、删除后新草稿与撕裂脚手架回归（持有口见 chat-session-owner） |
 | `chat-session-owner` / `.test.ts` | P4c 包 store 按窗口持有单例（`getOwnedChatSessionStore` + `registerOwnedChatHostSnapshotProvider` 恢复宿主关联）；localStorage 持久化 `ChatStoragePort`：main 兼容旧键、副窗口独立分区，版本/快照形状校验 + 按键内存回落；共享底层存储的双实例交错流式写入与重启恢复回归 |
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |

@@ -10,6 +10,7 @@ import type { AcpPermissionOptionView } from '@/lib/agent/acp-permission'
 import type { AcpChatMessage, AcpChatRole } from '@/stores/acp-chat-types'
 import type { AcpMessageAttachment } from '@/lib/agent/acp-composer'
 import type { AcpPreferredConfigMap } from '@/lib/agent/acp-config-preferences'
+import type { AcpThreadUsage } from '@/lib/agent/acp-update-adapter'
 import type { MarkProposalStatus } from '@yitom/annotations'
 import type { ChatScrollState } from './chat-slice'
 
@@ -43,15 +44,11 @@ export interface AcpChatThread {
   messages: AcpChatMessage[]
   /**
    * ACP `usage_update` 落库（线程级纯记录，不新建消息）：
-   * used=已用 tokens，size=上下文窗口大小，cost=费用（可空），
-   * thinkingTokens=思考 tokens（取自 `update._meta.thinkingTokens`，缺省不写）。
+   * 形状与归一化同源，见 `lib/agent/acp-update-adapter` 的 `AcpThreadUsage`
+   * （used=已用 tokens，size=上下文窗口大小，cost=费用（可空），
+   * thinkingTokens=思考 tokens，取自 `update._meta.thinkingTokens`，缺省不写）。
    */
-  usage?: {
-    used: number
-    size: number
-    cost?: { amount: number; currency: string } | null
-    thinkingTokens?: number | null
-  }
+  usage?: AcpThreadUsage
 }
 
 export interface AcpUiStore {
