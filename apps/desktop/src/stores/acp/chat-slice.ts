@@ -1,4 +1,9 @@
 import type { StateCreator } from 'zustand'
+import type { SessionUpdate } from '@agentclientprotocol/sdk'
+import {
+  STD_SESSION_UPDATE_KIND,
+  type StandardSessionUpdateKind,
+} from '@yitom/chat-session'
 import {
   DEFAULT_ACP_RUNTIME_ID,
   isSameWorkspace,
@@ -65,6 +70,22 @@ function toolCallIdFromUpdate(update: Record<string, unknown>): string | undefin
       ? update.tool_call_id
       : undefined
 }
+
+/**
+ * 协议对齐总表（与包内 `STD_SESSION_UPDATE_KIND` 同一张表，宿主不得自建名单）：
+ * 官方 SDK `SessionUpdate` 联合类型是唯一真源；下式在 SDK 新增协议成员
+ * 而宿主未补分支时编译报错。厂商扩展（定居标记/复数 config/tool 内容分块）
+ * 不在 union 内，各自早退，见 `applySessionUpdate` 头部。
+ */
+type VendorHostKind =
+  | typeof MONTREE_SETTLE_COMPLETE_KIND
+  | 'config_options_update'
+  | 'tool_call_content_chunk'
+type AssertHostCovered = Exclude<SessionUpdate['sessionUpdate'], StandardSessionUpdateKind | VendorHostKind>
+const _assertHostCovered: AssertHostCovered extends never ? true : AssertHostCovered = true
+
+/** 表值数组（未知 kind 判定用；分配一次，热路径复用）。 */
+const STD_KIND_VALUES = Object.values(STD_SESSION_UPDATE_KIND) as string[]
 
 function buildToolFeedCall(update: Record<string, unknown>): ChatFeedToolCall | undefined {
   const toolCallId = toolCallIdFromUpdate(update)
@@ -681,21 +702,9 @@ export const createChatSlice: StateCreator<
     const pkg = getOwnedChatSessionStore()
     const kind =
       typeof update.sessionUpdate === 'string' ? update.sessionUpdate : ''
-
-    // 未知 kind 留痕：曾因静默丢弃导致新能力（如 usage_update/available_commands_update）
-    // 无从查起。有文本的未知 kind 仍按旧语义走 agent 文本，不改行为；
-    // acpDevLog 仅开发环境输出，生产构建为 no-op。
-    if (
-      kind !== MONTREE_SETTLE_COMPLETE_KIND &&
-      kind !== 'config_option_update' && kind !== 'config_options_update' &&
-      kind !== 'usage_update' &&
-      kind !== 'plan' && kind !== 'plan_update' &&
-      kind !== 'tool_call' && kind !== 'tool_call_update' &&
-      kind !== 'tool_call_content_chunk' &&
-      kind !== 'agent_message_chunk' && kind !== 'agent_thought_chunk' && kind !== 'user_message_chunk'
-    ) {
-      acpDevLog('unknown session update kind', { kind })
-    }
+    // 下方统一分发以 `STD_SESSION_UPDATE_KIND` 单表为准（与包内同名单）；
+    // 厂商扩展（定居标记/复数 config/tool 内容分块）不在表内，各自早退，行为不变。
+    const stdKind = kind as StandardSessionUpdateKind
 
     if (kind === MONTREE_SETTLE_COMPLETE_KIND) {
       // 主进程定居收尾：先把回放清洗悬垂落定（有则成泡、无则丢），再冻结残留，
@@ -719,11 +728,37 @@ export const createChatSlice: StateCreator<
       return
     }
 
+    // 厂商扩展：tool 内容分块（非协议成员，早退，行为不变；位置从后挪前，
+    // 使下方标准分发链连续，else-if 不被打断）。
+    if (kind === 'tool_call_content_chunk') {
+      const toolCallId =
+        typeof update.toolCallId === 'string' ? update.toolCallId : ''
+      if (!toolCallId) return
+      const chunkText = flattenToolContent(
+        update.content !== undefined ? [update.content] : update.content,
+      )
+      if (!chunkText) return
+      set((s) => {
+        const proposalFallback = collectStoreFallbackProposal()
+        return patchActiveThread(s, (t) => {
+          const feed = applyChatEvent(
+            { messages: t.messages, turnSettled: s.turnSettled },
+            { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback },
+            { createId: newId },
+          )
+          return { ...t, messages: feed.messages, updatedAt: Date.now() }
+        })
+      })
+      return
+    }
+
     // ACP usage_update：线程级纯记录（used/size/cost + `_meta.thinkingTokens`，
     // 缺省不写该键），只写当前线程的 `usage`，不新建消息，不碰其他分支。
     // 包镜像不管：包 `mapSessionUpdate` 对 usage_update 本就返回 []（无 feed 事件），
     // 包 `ChatThread` 也是刻意最小提炼（非 feed 宿主态不进包），显示直读宿主线程。
-    if (kind === 'usage_update') {
+    // 标准分发链（条件一律走单表字面量；尾部 else 有 never 断言兜底）：
+    // usage → plan → tool → planRemoved → 明确丢弃 → 文本（含未知兼容）。
+    if (stdKind === STD_SESSION_UPDATE_KIND.usage) {
       const used = typeof update.used === 'number' && Number.isFinite(update.used)
         ? update.used
         : undefined
@@ -758,9 +793,7 @@ export const createChatSlice: StateCreator<
         patchActiveThread(s, (t) => ({ ...t, usage, updatedAt: Date.now() })),
       )
       return
-    }
-
-    if (kind === 'plan' || kind === 'plan_update') {
+    } else if (stdKind === STD_SESSION_UPDATE_KIND.plan || stdKind === STD_SESSION_UPDATE_KIND.planUpdate) {
       const entries = parseAcpPlanEntries(update)
       if (entries.length === 0 && kind === 'plan_update') {
         // 空 entries 视为清空该计划卡片
@@ -777,9 +810,7 @@ export const createChatSlice: StateCreator<
         }),
       )
       return
-    }
-
-    if (kind === 'tool_call' || kind === 'tool_call_update') {
+    } else if (stdKind === STD_SESSION_UPDATE_KIND.toolCall || stdKind === STD_SESSION_UPDATE_KIND.toolCallUpdate) {
       const call = buildToolFeedCall(update)
       const toolCallId = call?.toolCallId
       // 无 id 时归约器 no-op，但仍需消费快照旁路并按 quiet 收尾（保原语义）
@@ -833,50 +864,54 @@ export const createChatSlice: StateCreator<
         return { ...patched, pendingMarkProposalSnapshotContents: remaining }
       })
       return
-    }
-
-    if (kind === 'tool_call_content_chunk') {
-      const toolCallId =
-        typeof update.toolCallId === 'string' ? update.toolCallId : ''
-      if (!toolCallId) return
-      const chunkText = flattenToolContent(
-        update.content !== undefined ? [update.content] : update.content,
-      )
-      if (!chunkText) return
-      set((s) => {
-        const proposalFallback = collectStoreFallbackProposal()
-        return patchActiveThread(s, (t) => {
+    } else if (stdKind === STD_SESSION_UPDATE_KIND.planRemoved) {
+      // 计划删除：经包归约器 plan-remove 删单例卡（与包 ingest 同语义）。
+      set((s) =>
+        patchActiveThread(s, (t) => {
           const feed = applyChatEvent(
             { messages: t.messages, turnSettled: s.turnSettled },
-            { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback },
+            { type: 'plan-remove' },
             { createId: newId },
           )
+          if (feed.messages === t.messages) return t
           return { ...t, messages: feed.messages, updatedAt: Date.now() }
-        })
-      })
+        }),
+      )
       return
-    }
-
-    const text = extractTextFromContent(update.content)
-    if (
-      !text &&
-      kind !== 'agent_message_chunk' &&
-      kind !== 'agent_thought_chunk' &&
-      kind !== 'user_message_chunk'
+    } else if (
+      stdKind === STD_SESSION_UPDATE_KIND.configOption ||
+      stdKind === STD_SESSION_UPDATE_KIND.availableCommands ||
+      stdKind === STD_SESSION_UPDATE_KIND.currentMode ||
+      stdKind === STD_SESSION_UPDATE_KIND.sessionInfo ||
+      stdKind === STD_SESSION_UPDATE_KIND.notice ||
+      stdKind === STD_SESSION_UPDATE_KIND.compaction ||
+      stdKind === STD_SESSION_UPDATE_KIND.compactionSummary ||
+      stdKind === STD_SESSION_UPDATE_KIND.subagent
     ) {
+      // 已知但本层无 feed 表达：usage 走线程字段（上分支），其余为产品缺口，
+      // 明确丢弃（此前为静默，行为一致，仅留痕位置变化见未知分支）。
       return
-    }
+    } else if (
+      stdKind === STD_SESSION_UPDATE_KIND.agentMessage ||
+      stdKind === STD_SESSION_UPDATE_KIND.agentThought ||
+      stdKind === STD_SESSION_UPDATE_KIND.userMessage ||
+      stdKind === STD_SESSION_UPDATE_KIND.sessionMessage ||
+      stdKind === STD_SESSION_UPDATE_KIND.sessionMessageChunk ||
+      !STD_KIND_VALUES.includes(kind)
+    ) {
+      // 未知 kind（非表成员）落此分支：留痕 + 旧兼容（有文本走 agent）。
+      if (!STD_KIND_VALUES.includes(kind)) acpDevLog('unknown session update kind', { kind })
+      const text = extractTextFromContent(update.content)
+      if (!text) return
 
-    const role: AcpChatRole =
-      kind === 'agent_thought_chunk'
-        ? 'thought'
-        : kind === 'user_message_chunk'
-          ? 'user'
-          : 'agent'
+      const role: AcpChatRole =
+        stdKind === STD_SESSION_UPDATE_KIND.agentThought
+          ? 'thought'
+          : stdKind === STD_SESSION_UPDATE_KIND.userMessage
+            ? 'user'
+            : 'agent'
 
-    if (!text) return
-
-    // cursor load 回放清洗（第二道网）：仅 user-chunk 分支洗脚手架。
+      // cursor load 回放清洗（第二道网）：仅 user-chunk 分支洗脚手架。
     // 悬垂（defer）时暂缓渲染、缓存原文等下一 chunk；洗空（drop）即丢弃该消息。
     let effectiveText = text
     if (role === 'user') {
@@ -918,5 +953,12 @@ export const createChatSlice: StateCreator<
       }),
     }))
     if (role === 'user') mirrorCanonicalActiveThread(pkg, get())
+    return
+  } else {
+    // 到达即覆盖缺口（编译期）：运行时不可能——厂商扩展早退，
+    // 表成员全部分支覆盖，非表成员由文本分支兜底。
+    const _exhaustive: never = stdKind
+    return _exhaustive
+  }
   },
 })

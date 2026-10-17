@@ -823,6 +823,75 @@ describe('usage_update 落库（线程级纯记录）', () => {
   })
 })
 
+describe('SDK 联合分发（plan_removed/新成员/未知兼容）', () => {
+  beforeEach(() => {
+    const fresh = useAcpUiStore.getState().createThread()
+    useAcpUiStore.setState({
+      prompting: false,
+      sessionId: null,
+      status: 'disconnected',
+      pendingMarkProposalSnapshotContents: [],
+    })
+    const thread = useAcpUiStore.getState().threads.find((t) => t.id === fresh)
+    useAcpUiStore.setState({
+      threads: thread ? [thread] : useAcpUiStore.getState().threads.slice(0, 1),
+      activeThreadId: fresh,
+    })
+  })
+
+  function activeThread() {
+    const s = useAcpUiStore.getState()
+    return s.threads.find((t) => t.id === s.activeThreadId)!
+  }
+
+  it('plan_removed 删掉计划卡', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    store.applySessionUpdate({ sessionUpdate: 'plan', entries: [{ content: '做', status: 'in_progress' }] })
+    expect(activeThread().messages.some((m) => m.role === 'plan')).toBe(true)
+    store.applySessionUpdate({ sessionUpdate: 'plan_removed', planId: 'p1' })
+    expect(activeThread().messages.some((m) => m.role === 'plan')).toBe(false)
+  })
+
+  it('session_message 系列转 agent 文本', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    store.applySessionUpdate({ sessionUpdate: 'session_message', content: [{ type: 'text', text: '子会话说' }] })
+    store.applySessionUpdate({ sessionUpdate: 'session_message_chunk', content: { type: 'text', text: '续' } })
+    const texts = activeThread().messages.filter((m) => m.role === 'agent').map((m) => m.text).join('')
+    expect(texts).toContain('子会话说')
+    expect(texts).toContain('续')
+  })
+
+  it('notice/compaction/subagent/mode/session_info 明确丢弃不进历史', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    const before = activeThread().messages.length
+    store.applySessionUpdate({ sessionUpdate: 'notice', title: 't' })
+    store.applySessionUpdate({ sessionUpdate: 'compaction_update', status: 'completed' })
+    store.applySessionUpdate({ sessionUpdate: 'subagent_update', sessionId: 's1' })
+    store.applySessionUpdate({ sessionUpdate: 'current_mode_update', currentModeId: 'm' })
+    store.applySessionUpdate({ sessionUpdate: 'session_info_update', title: 't' })
+    store.applySessionUpdate({ sessionUpdate: 'available_commands_update', availableCommands: [] })
+    expect(activeThread().messages).toHaveLength(before)
+  })
+
+  it('compaction_summary_chunk 不再污染 agent 正文', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    const before = activeThread().messages.length
+    store.applySessionUpdate({ sessionUpdate: 'compaction_summary_chunk', content: { type: 'text', text: '摘要' } })
+    expect(activeThread().messages).toHaveLength(before)
+  })
+
+  it('未来未知 kind 有文本仍走 agent（前向兼容）', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('hi')
+    store.applySessionUpdate({ sessionUpdate: 'future_kind_xyz', content: 't' })
+    expect(activeThread().messages.some((m) => m.role === 'agent' && m.text.includes('t'))).toBe(true)
+  })
+})
+
 describe('会话 prompt 模式（native/compatibility）', () => {
   it('缺省兼容：写入 native 后断开回落', () => {
     expect(useAcpUiStore.getState().sessionPromptMode).toBe('compatibility')

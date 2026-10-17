@@ -12,12 +12,13 @@
   ],
   "overrides": {
     "@firecrawl/pdf-inspector": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-1.18.0.tgz",
-    "@yitom/contracts": "0.1.6",
-    "@yitom/reader-core": "0.1.6",
-    "@yitom/annotations": "0.1.6",
-    "@yitom/chat-core": "0.1.6",
-    "@yitom/chat-ui": "0.1.6",
-    "@yitom/chat-session": "0.1.6",
+    "@yitom/contracts": "0.1.7",
+    "@yitom/reader-core": "0.1.7",
+    "@yitom/annotations": "0.1.7",
+    "@yitom/chat-core": "0.1.7",
+    "@yitom/chat-ui": "0.1.7",
+    "@yitom/chat-session": "0.1.7",
+    "@agentclientprotocol/sdk": "1.9.0",
     "@firecrawl/pdf-inspector-win32-x64-msvc": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-win32-x64-msvc-1.18.0.tgz",
     "@firecrawl/pdf-inspector-darwin-arm64": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-darwin-arm64-1.18.0.tgz",
     "@firecrawl/pdf-inspector-linux-x64-gnu": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-linux-x64-gnu-1.18.0.tgz"
@@ -46,7 +47,7 @@
     "postinstall": "bun node_modules/electron/install.js"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.0.0",
+    "@agentclientprotocol/sdk": "^1.9.0",
     "@assistant-ui/react": "^0.15.27",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.0",
