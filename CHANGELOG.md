@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.15] - 2026-10-17
+
 - **Typst 编辑与语言提示**：新增 `.typ` 文档的新建、打开、保存、另存为与草稿恢复；提供语法高亮、代码补全、参数提示、悬浮文档、定义跳转、格式化和错误诊断，保留撤销历史与外部修改冲突保护。
 - **实时排版与 PDF 导出**：编辑未保存内容即可更新分栏预览，支持源码/分屏/预览切换、缩放、中文与公式、相对图片和多文件项目；可配置字体目录与固定入口，导出 PDF 使用当前编辑内容，跨目录另存为后正确切换相对依赖。
 - **Typst 本地运行时**：按平台准备并校验固定版本 Tinymist，随应用分发，支持会话隔离、关闭清理和一次自动恢复；Windows 开发构建与打包应用、WSL Ubuntu 的 Linux 编译与界面流程已通过真实验证，兼容许可证换行和官方 Linux 构建缺失版本元数据的差异。社区包首次使用可能需要联网，远程工作区暂不提供 Typst 编译与代码提示。
@@ -532,7 +536,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.14...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.15...HEAD
+[0.4.15]: https://github.com/yitom486/montree/compare/v0.4.14...v0.4.15
 [0.4.14]: https://github.com/yitom486/montree/compare/v0.4.12...v0.4.14
 [0.4.12]: https://github.com/yitom486/montree/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/yitom486/montree/compare/v0.4.10...v0.4.11
