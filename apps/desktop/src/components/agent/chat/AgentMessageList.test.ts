@@ -2,7 +2,7 @@
 import { act, createElement, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AgentMessageList } from './AgentMessageList'
+import { AgentMessageList, formatUsageText } from './AgentMessageList'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
@@ -228,6 +228,16 @@ describe('AgentMessageList 历史分页', () => {
 
     const text = container.textContent ?? ''
     expect(text).toContain('新用户问题m13')
+  })
+})
+
+describe('formatUsageText 用量后缀', () => {
+  it('无思考数只显示已用', () => {
+    expect(formatUsageText({ used: 8281 })).toBe('已用 8.3k tokens')
+    expect(formatUsageText({ used: 46 })).toBe('已用 46 tokens')
+  })
+  it('有思考数缀思考量', () => {
+    expect(formatUsageText({ used: 8281, thinkingTokens: 2000 })).toBe('已用 8.3k tokens · 思考 2.0k')
   })
 })
 

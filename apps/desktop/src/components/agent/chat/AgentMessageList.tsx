@@ -59,6 +59,12 @@ function formatUsageTokens(used: number): string {
   return used >= 1000 ? `${(used / 1000).toFixed(1)}k` : `${used}`
 }
 
+/** 用量后缀文案：`已用 8.3k tokens`，有思考 token 数再缀 `· 思考 2.0k`（纯函数，单测锁定）。 */
+export function formatUsageText(usage: { used: number; thinkingTokens?: number | null }): string {
+  const base = `已用 ${formatUsageTokens(usage.used)} tokens`
+  return usage.thinkingTokens != null ? `${base} · 思考 ${formatUsageTokens(usage.thinkingTokens)}` : base
+}
+
 interface AgentMessageListProps {
   bottomRef: RefObject<HTMLDivElement | null>
   messagesRef: RefObject<HTMLDivElement | null>
@@ -123,7 +129,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   // 线程用量后缀：只有 thinking/composing 相且 usage 存在时才传，其他相不传（零视觉变化）
   const usageText =
     threadUsage != null && (runStatus.phase === 'thinking' || runStatus.phase === 'composing')
-      ? `已用 ${formatUsageTokens(threadUsage.used)} tokens`
+      ? formatUsageText(threadUsage)
       : undefined
   const runStartedAt = messages.findLast(message => message.role === 'user')?.createdAt
   const viewportRef = useRef<HTMLDivElement>(null)
