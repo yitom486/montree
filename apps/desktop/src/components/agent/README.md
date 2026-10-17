@@ -28,10 +28,10 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 
 | 文件 | 功能 |
 |------|------|
-| `AgentMessageList` | 消息列表容器（`@yitom/chat-core` 的 `chat-timeline` 回合分组、社区 Conversation 跟随、线程窗口/位置恢复、可见窗口内孤立审批兜底；memo 隔离流式刷新；生成式提交经 `onGenerativeSubmit` 透传面板 `sendPrompt` 链路；统一 `useAcpActiveMessages` 包权威 feed，删除 host/package 开关与双订阅；回合分组复用包 `useChatTimeline`） |
+| `AgentMessageList` | 消息列表宿主薄适配（C6）：只保留包 feed/宿主元数据订阅、滚动快照落盘、空态/usage 文案、业务槽位（`ToolBusinessResult`/`AgentPlanCard`）、权限执行、章节/批注/恢复/生成式/编辑/引用回调、右键外壳与外部 ref；通用编排（assistant-ui runtime/viewport、历史窗口与分页、时间线/气泡编排、贴底跟滚/上滑保持/滚动恢复、回到底部、运行状态行）由 `@yitom/chat-ui` 的 `ChatMessageList` 实现，切线程改 `key` 重挂载 |
 | `AgentContextMenu` | 聊天/输入框右键：选区快照、复制原文、引用草稿、剪切/粘贴文本/全选与回底；异步编辑校验线程与当前草稿 |
-| `AgentActivityGroup` | 工作记录宿主适配器（读取审批/主题/导航/批注 store，传业务与恢复回调）；折叠、进度摘要、最新工具行和完成历史已迁到 `@montree/chat-ui` 的 `ChatActivityGroup`，与包内 `ChatPanel` 共用实现，DOM/aria/交互保持一致 |
-| `chat/AgentWorkLog.test.ts` | 工作记录/结果入口组件回归（最新工具稳定行、完成收起与手动回看、单次渲染、失败摘要、审批外置） |
+| `chat/AgentMessageList.test.ts` | 宿主接线回归（包 feed 渲染、空态、图表业务槽单次渲染、孤立审批单次、章节点选回调、ref/右键接线、滚动快照按线程落盘；`formatUsageText` 纯函数） |
+| `chat/AgentWorkLog.test.ts` | 结果入口组件回归（单次渲染、失败摘要、审批外置；工作记录行为已随宿主适配器退出，由包侧工作记录测试覆盖） |
 | `AgentResultEntry` | 富业务结果独立入口（紧凑过程行 + 独立业务卡，单次调用只渲染一处，`probe="result"`；component-ui 经 `threadId`/`prompting`/`onGenerativeSubmit` 透传选择提交链）（已迁 `@montree/chat-ui`，见包内 `agent-result-entry`；`ToolBusinessResult` 改可选 `businessResultSlot` 回宿主，内卡 store props 透传） |
 | `tools/result-card`（已迁 chat-ui，见包内 `result-card`） | 六张业务卡统一外壳（单层中性描边/浅底头/primary 图标/11px 摘要；去装饰标签与 teal 独走；跨章水墨热力与朱砂印属卡内数据可视化保留；比较卡 `@container` 留各自文件）（已迁 `@montree/chat-ui`，见包内 `result-card`；宿主 present 卡改包内相对引用） |
 | `AgentChatItem` | AI Elements Message 的产品布局/探针桥接（卡片与系统提示共用约束；`bare` 供自带气泡的子组件使用，避免双层外观；已迁 @montree/chat-ui） |
@@ -42,13 +42,13 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | `BeuiAgentProgress` | BeUI 受控耗时、像素加载、ThinkingShimmer；复用宿主计时与 CSS，减少动画停动效，无虚构轮播阶段；已迁 @montree/chat-ui |
 | `BeuiAgentActivity` | BeUI Activity 时间线表面与工具行；复用现有聚合、折叠、审批槽与详情，保留失败/取消/未知状态；已迁 @montree/chat-ui |
 | `BeuiCitations` / `.test.ts` | 折叠结构化来源；章节比较仅列已验证摘录，内容审计列明确检索证据；文档定位走宿主原守卫，网页限 http/https，无远程 favicon；未扩普通回复协议；已迁 @montree/chat-ui |
-| `AgentMessageBubble`（已迁，见包内 `agent-message-bubble`） | 用户/助手气泡已迁 @montree/chat-ui（导出 `ChatMessageBubble`；`resolveMarkProposal` 必填去 store fallback、`pendingPermission` 改 prop、`onDismissProposedMark` 回宿主；M3c 收敛全部 R4（4 件改包内相对，`GenerativeSubmitPayload` 改包 barrel 待 M3d，stays 改 `renderBusinessResult/renderPlanCard` 槽；M4 主题 prop 化（`theme` 缺省 `light`，宿主传 `theme`，R4 清零）；宿主 `AgentMessageList/AgentActivityGroup` 传齐槽与恢复回调，其余渲染逻辑不变） |
+| `AgentMessageBubble`（已迁，见包内 `agent-message-bubble`） | 用户/助手气泡已迁 @montree/chat-ui（导出 `ChatMessageBubble`；`resolveMarkProposal` 必填去 store fallback、`pendingPermission` 改 prop、`onDismissProposedMark` 回宿主；M3c 收敛全部 R4（4 件改包内相对，`GenerativeSubmitPayload` 改包 barrel 待 M3d，stays 改 `renderBusinessResult/renderPlanCard` 槽；M4 主题 prop 化（`theme` 缺省 `light`，宿主传 `theme`，R4 清零）；宿主 `AgentMessageList` 传齐槽与恢复回调，其余渲染逻辑不变） |
 
 ## tools/ 工具调用展示
 
 | 文件 | 功能 |
 |------|------|
-| `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；运行/成功/失败默认收起，保留用户展开选择；失败摘要行内可见、提议恢复操作在折叠外；审批经 `ToolApprovalSlot` 外挂且唯一；`detailsOnly` 让工作记录一次点击直接查看详情；`suppressBusinessResult`/`bare` 供结果入口复用过程行，业务卡不双挂；工作记录行目标 chip pill 借 Beautiful UI ToolChips 语法）（已迁 `@montree/chat-ui`，见包内 `agent-tool-call-card`；`pending` 改 prop + `onRespond` 回宿主，恢复操作改 `onRecoverChapter/onPromptSelectText` + `navFlatIndex`，业务卡改 `businessResultSlot`；宿主 `AgentMessageList/AgentActivityGroup` 传原 store 值与 `ToolBusinessResult` 槽） |
+| `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；运行/成功/失败默认收起，保留用户展开选择；失败摘要行内可见、提议恢复操作在折叠外；审批经 `ToolApprovalSlot` 外挂且唯一；`detailsOnly` 让工作记录一次点击直接查看详情；`suppressBusinessResult`/`bare` 供结果入口复用过程行，业务卡不双挂；工作记录行目标 chip pill 借 Beautiful UI ToolChips 语法）（已迁 `@montree/chat-ui`，见包内 `agent-tool-call-card`；`pending` 改 prop + `onRespond` 回宿主，恢复操作改 `onRecoverChapter/onPromptSelectText` + `navFlatIndex`，业务卡改 `businessResultSlot`；宿主 `AgentMessageList` 传原 store 值与 `ToolBusinessResult` 槽） |
 | `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议/章节比较/HTML Artifact/生成式 UI 卡 + 知识卡片沉淀/原文定位；`compactResults` 下图表默认紧凑预览；component-ui 经 `generative/` 懒加载卡渲染，选择提交与定位回调透传） |
 | `generative/ComponentUiCard` + `.lazy` + `.test.ts` | 生成式 UI 卡（官方 `GenerativeUIRender` + 白名单 Card/Row/Column/Text/Select/Button/Evidence，shadcn/主题复用；本地选择态按结果 ID 隔离；提交/定位只经宿主回调；未知组件 Fallback + 卡内错误边界；懒加载约 7KB，首屏不进包。详见 `generative/README.md`）（M3d 已迁 `@montree/chat-ui`，见包内 `component-ui-card`；宿主 `ToolBusinessResult`/`MarkdownArtifact` 改引 barrel，props 零增） |
 | `ChapterComparisonCard` / `.test.ts` | 章节比较卡（章节筛选、证据展开、原文定位；按结果 ID 隔离局部状态）（M3d 已迁 `@montree/chat-ui`，见包内 `chapter-comparison-card`） |
@@ -91,4 +91,4 @@ React artifact 经 `montree_present(kind=react-artifact)` 的真实工具结果�
 
 R3 文本请求协议见 `node_modules/@yitom/contracts/dist/agent/react-artifact-actions.js`：仅文本提议、1536字节上限；业务发送仍需 iframe 外用户确认，沿原 ACP 归属/忙碌/防重复链路。React 内联卡提供继续分析和请求修复，HTML artifact 未开放请求桥。
 
-助手正文支持 `montree-present` 围栏（正文只写成功工具返回的 id）：AgentMessageList 派生当前回合引用归属，AgentMessageBubble 在段落之间复用 ToolBusinessResult；完成后隐藏原工具位置的业务卡，保留过程记录。流式期间保留原卡片并显示 BeUI 像素加载占位（复用同一加载组件，无额外计时器），缺失或重复引用给出说明。普通正文与旧消息布局不变。
+助手正文支持 `montree-present` 围栏（正文只写成功工具返回的 id）：包 `ChatMessageList` 派生当前回合引用归属，`ChatMessageBubble` 在段落之间复用 ToolBusinessResult；完成后隐藏原工具位置的业务卡，保留过程记录。流式期间保留原卡片并显示 BeUI 像素加载占位（复用同一加载组件，无额外计时器），缺失或重复引用给出说明。普通正文与旧消息布局不变。

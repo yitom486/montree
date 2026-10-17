@@ -151,12 +151,12 @@
     "@firecrawl/pdf-inspector-darwin-arm64": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-darwin-arm64-1.18.0.tgz",
     "@firecrawl/pdf-inspector-linux-x64-gnu": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-linux-x64-gnu-1.18.0.tgz",
     "@firecrawl/pdf-inspector-win32-x64-msvc": "https://github.com/yitom486/pdf-inspector/releases/download/inkdown-napi-v1.18.0/firecrawl-pdf-inspector-win32-x64-msvc-1.18.0.tgz",
-    "@yitom/annotations": "0.1.12",
-    "@yitom/chat-core": "0.1.12",
-    "@yitom/chat-session": "0.1.12",
-    "@yitom/chat-ui": "0.1.12",
-    "@yitom/contracts": "0.1.12",
-    "@yitom/reader-core": "0.1.12",
+    "@yitom/annotations": "0.1.13",
+    "@yitom/chat-core": "0.1.13",
+    "@yitom/chat-session": "0.1.13",
+    "@yitom/chat-ui": "0.1.13",
+    "@yitom/contracts": "0.1.13",
+    "@yitom/reader-core": "0.1.13",
   },
   "packages": {
     "@agentclientprotocol/sdk": ["@agentclientprotocol/sdk@1.9.0", "", { "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-saCOTPYBK1iqWqJFAYHXbg3+zCoFXyZZFoqQAwdTWkbrZZPpAETr80QOnYr2l+dzPwL0jpNhn3eDY8MoEIDbUA=="],
@@ -1001,17 +1001,17 @@
 
     "@yitom/acp-client": ["@yitom/acp-client@0.1.11", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.0.0" }, "bin": { "acp-engine": "dist/sidecar.cjs" } }, "sha512-BX3MK+npV0LMiHnbAzWpXD6GUrwfJbqy4ZgjUwTZ4wasPsDfoTJNrO0X7d8pRX83XyRFtVErgqWotXbMLSaV0A=="],
 
-    "@yitom/annotations": ["@yitom/annotations@0.1.12", "", { "dependencies": { "@yitom/contracts": "^0.1.0", "@yitom/reader-core": "^0.1.0" } }, "sha512-LKZX0J+G+98rYAmUvaj65KjoAMkf/dhxZF3Pvz643RiNzNH0SOF6CyBqBFomj9ZFS0Lwvz4Ui8+nrdcR2gB0GQ=="],
+    "@yitom/annotations": ["@yitom/annotations@0.1.13", "", { "dependencies": { "@yitom/contracts": "^0.1.0", "@yitom/reader-core": "^0.1.0" } }, "sha512-E1qzcCHevQgx7vHFyOxVBXTsLtPDxuHhC9CJTqX/OIQZVrbM3cAVUDulr5DH2kLaqlSZSZZj+YCkWqM+Tbjqeg=="],
 
-    "@yitom/chat-core": ["@yitom/chat-core@0.1.12", "", { "dependencies": { "@yitom/annotations": "^0.1.0", "@yitom/contracts": "^0.1.0", "hast-util-sanitize": "^5.0.2", "remark-github-blockquote-alert": "^2.1.0" } }, "sha512-C0KRjHV3ZTUz0OimnjUjxJvXJm1IbfP4/WWGPECXbCYz9gJB5Sfmujzz/NjoeIlYsqqAwLjo+cUAg9Av/krn8w=="],
+    "@yitom/chat-core": ["@yitom/chat-core@0.1.13", "", { "dependencies": { "@yitom/annotations": "^0.1.0", "@yitom/contracts": "^0.1.0", "hast-util-sanitize": "^5.0.2", "remark-github-blockquote-alert": "^2.1.0" } }, "sha512-3m8nfflryGzHQ/+bpkdQKYDpJXUin3q3W+b35KrWMnY5ziNTXHphGRqSTToKYcFz9HnabQp8JNqOxkr7+hXp9g=="],
 
-    "@yitom/chat-session": ["@yitom/chat-session@0.1.12", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.9.0", "@yitom/annotations": "^0.1.0", "@yitom/chat-core": "^0.1.0", "@yitom/chat-ui": "^0.1.0", "@yitom/contracts": "^0.1.0" }, "peerDependencies": { "react": "^19.2.8", "react-dom": "^19.2.8" } }, "sha512-9EhIFXF52UCo6C4jqYvYxzVLY/FJy4/qFereITqeX+DPDZG1kXI/T74u94OrgXeyH4omBbLdryJLBfDUigaN7Q=="],
+    "@yitom/chat-session": ["@yitom/chat-session@0.1.13", "", { "dependencies": { "@agentclientprotocol/sdk": "^1.9.0", "@yitom/annotations": "^0.1.0", "@yitom/chat-core": "^0.1.0", "@yitom/chat-ui": "^0.1.0", "@yitom/contracts": "^0.1.0" }, "peerDependencies": { "react": "^19.2.8", "react-dom": "^19.2.8" } }, "sha512-r/2qgw4mBEBLDkuJefEEqDA+3LvUVU3tJOCQsLszixrz7VdGLyga6SpatHpJoZCupZuGiBNTDvs+z2uZmD69kg=="],
 
-    "@yitom/chat-ui": ["@yitom/chat-ui@0.1.12", "", { "dependencies": { "@assistant-ui/react": "^0.15.27", "@base-ui-components/react": "^1.0.0-rc.0", "@streamdown/cjk": "^1.0.4", "@streamdown/code": "2.0.0", "@streamdown/math": "^1.0.3", "@streamdown/mermaid": "1.0.3", "@yitom/annotations": "^0.1.0", "@yitom/chat-core": "^0.1.0", "@yitom/contracts": "^0.1.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "katex": "^0.16.47", "lucide-react": "^1.35.0", "mermaid": "^11.17.2", "rehype-raw": "^7.0.0", "rehype-sanitize": "^6.0.0", "remark-breaks": "^4.0.0", "remark-gfm": "^4.0.1", "streamdown": "^2.7.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "react": "^19.2.8", "react-dom": "^19.2.8" } }, "sha512-sXt0ewz4AUj2U9kc3Jm2PFsciPwUKfkt8LAdf9z0p6Zb0mnpoQTm+iA4BghggYqYM2utAQmMubevHTjo1mgPyw=="],
+    "@yitom/chat-ui": ["@yitom/chat-ui@0.1.13", "", { "dependencies": { "@assistant-ui/react": "^0.15.27", "@base-ui-components/react": "^1.0.0-rc.0", "@streamdown/cjk": "^1.0.4", "@streamdown/code": "2.0.0", "@streamdown/math": "^1.0.3", "@streamdown/mermaid": "1.0.3", "@yitom/annotations": "^0.1.0", "@yitom/chat-core": "^0.1.0", "@yitom/contracts": "^0.1.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "katex": "^0.16.47", "lucide-react": "^1.35.0", "mermaid": "^11.17.2", "rehype-raw": "^7.0.0", "rehype-sanitize": "^6.0.0", "remark-breaks": "^4.0.0", "remark-gfm": "^4.0.1", "streamdown": "^2.7.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "react": "^19.2.8", "react-dom": "^19.2.8" } }, "sha512-U4VGG1dfGwsSKnaWcUPzsw7ABkJWIZGOcVT/5d2VvbCjdMF4GUNH0EFbxueYT276MGsmXw2DSSUrqlEFJrxMJw=="],
 
-    "@yitom/contracts": ["@yitom/contracts@0.1.12", "", {}, "sha512-Xt411FDJneEUlHVlTdLkre/TbmZiB1mTs+kkR+Efj40BBCO2MJpY5BaIblftyvuPuWQowsN4ZCtxWqGU4Y8+3w=="],
+    "@yitom/contracts": ["@yitom/contracts@0.1.13", "", {}, "sha512-wA1rlAtd1gijZlULp8fTmDEq+c1C8DGxFSY5VJ91gQ6WCvK8hH2w7ey6u5Vwshl2DA/6D1R6MLb/dU7sg/HoKA=="],
 
-    "@yitom/reader-core": ["@yitom/reader-core@0.1.12", "", { "dependencies": { "@yitom/contracts": "^0.1.0", "pdfjs-dist": "^6.2.108" } }, "sha512-pm412Q7vQ/4vEcWw1nCrlJC1h1mSFXARdoaIj7cxiHnftF6jBKe76XyToAIitTSZuG+weKarpCC45fj0FJNGsQ=="],
+    "@yitom/reader-core": ["@yitom/reader-core@0.1.13", "", { "dependencies": { "@yitom/contracts": "^0.1.0", "pdfjs-dist": "^6.2.108" } }, "sha512-HQutK3qOOXoT2RQ2bz6cCf56pPNwh1kkQIYp0Kjn19gG843JRvAibKKdVJ0eJGssETD0b1P1S6BC9QndkQ5RZg=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 

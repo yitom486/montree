@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act, createElement, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentMessageList, formatUsageText } from './AgentMessageList'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
@@ -11,12 +12,15 @@ import type { AcpChatMessage } from '@/stores/acp-chat-types'
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
- * 聊天历史分页窗：初次只看末 5 条，上滑/按钮 5 条 5 条向前补，
- * 离底冻结不移位，切线程重置。消息以 AcpChatMessage 原样进 store（真结构）。
+ * AgentMessageList 宿主薄适配接线（C6）：通用列表编排由包 `ChatMessageList` 实现，
+ * 此处只锁定宿主职责——包 feed 渲染、业务槽位、审批执行、章节回调、ref/右键接线与滚动落盘。
+ * 分页/跟滚/恢复行为由包侧单测覆盖，不在此重复；右键菜单打开由真实 Electron（E2E）覆盖，
+ * 此处只断言接线（ref 落点 + 事件无异常），不断言 happy-dom 下环境相关的 Radix 提交时序。
  */
-describe('AgentMessageList 历史分页', () => {
+describe('AgentMessageList 宿主接线', () => {
   let container: HTMLDivElement
   let root: Root
+  const queryClient = new QueryClient()
 
   const makeMessages = (count: number, prefix = 'm'): AcpChatMessage[] =>
     Array.from({ length: count }, (_, i) => {
@@ -51,171 +55,131 @@ describe('AgentMessageList 历史分页', () => {
       root.unmount()
     })
     container.remove()
+    queryClient.clear()
     useAcpUiStore.setState({
       threads: [],
       activeThreadId: '',
       chatScrollByThread: {},
+      pendingPermission: null,
     } as never)
   })
 
-  async function renderList() {
-    const hostRef = createRef<HTMLDivElement>()
+  async function renderList(props: {
+    onChapterPlanSelect?: (payload: { entry: { id: string } }) => void
+    onQuote?: (text: string) => void
+    authHint?: string | null
+    runtimeName?: string
+  } = {}) {
+    const messagesRef = createRef<HTMLDivElement>()
     await act(async () => {
       root.render(
         createElement(
-          'div',
-          { ref: hostRef },
+          QueryClientProvider,
+          { client: queryClient },
           createElement(AgentMessageList, {
-            messagesRef: hostRef,
+            messagesRef,
             bottomRef: createRef<HTMLDivElement>(),
-            authHint: null,
+            authHint: props.authHint ?? null,
+            runtimeName: props.runtimeName,
+            onChapterPlanSelect: props.onChapterPlanSelect as never,
+            onQuote: props.onQuote,
           }),
         ),
       )
     })
+    return messagesRef
   }
 
   function viewport(): HTMLElement {
-    return (
-      (container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement | null) ??
-      container
-    )
+    const el = container.querySelector('[data-testid="chat-viewport"]')
+    if (!(el instanceof HTMLElement)) throw new Error('viewport 缺失')
+    return el
   }
 
-  function loadMoreButton(): HTMLElement | null {
-    return container.querySelector('[data-testid="chat-load-more"]')
-  }
-
-  async function scrollContainerTo(top: number) {
-    // 监听与 hook 都回落到外层 container（happy-dom 无排版，手动给几何量）
-    Object.defineProperty(container, 'scrollHeight', { value: 3000, configurable: true })
-    Object.defineProperty(container, 'clientHeight', { value: 500, configurable: true })
-    container.scrollTop = top
-    await act(async () => {
-      container.dispatchEvent(new Event('scroll', { bubbles: true }))
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-    })
-  }
-
-  it('12 条初次只看末 5 条，按钮显示剩余 7 条', async () => {
-    seedThread('t1', makeMessages(12))
-    await renderList()
-    const text = container.textContent ?? ''
-    expect(text).toContain('正文m12')
-    expect(text).toContain('正文m08')
-    expect(text).not.toContain('正文m07')
-    expect(text).not.toContain('正文m01')
-    expect(loadMoreButton()?.textContent).toContain('还剩 7 条')
-  })
-
-  it('点加载更早补 5 条，再点全量后按钮消失', async () => {
-    seedThread('t1', makeMessages(12))
-    await renderList()
-    const click = async () => {
-      await act(async () => {
-        loadMoreButton()!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
-    }
-    await click()
-    let text = container.textContent ?? ''
-    expect(text).toContain('正文m03')
-    expect(text).not.toContain('正文m02')
-    expect(loadMoreButton()?.textContent).toContain('还剩 2 条')
-    await click()
-    text = container.textContent ?? ''
-    expect(text).toContain('正文m01')
-    expect(loadMoreButton()).toBeNull()
-  })
-
-  it('滑到顶部自动向前补', async () => {
-    seedThread('t1', makeMessages(12))
-    await renderList()
-    await scrollContainerTo(0)
-    const text = container.textContent ?? ''
-    expect(text).toContain('正文m03')
-    expect(text).not.toContain('正文m02')
-  })
-
-  it('不足 5 条全显无按钮；切线程重置窗口', async () => {
+  it('包 feed 正文正常渲染', async () => {
     seedThread('t1', makeMessages(3))
     await renderList()
     expect(container.textContent).toContain('正文m01')
-    expect(loadMoreButton()).toBeNull()
-
-    seedThread('t2', makeMessages(12))
-    await act(async () => {})
-    const text = container.textContent ?? ''
-    expect(text).toContain('正文m12')
-    expect(text).not.toContain('正文m07')
-    expect(loadMoreButton()?.textContent).toContain('还剩 7 条')
+    expect(container.textContent).toContain('正文m03')
   })
 
-  it('离底冻结：中部加载更多后窗口起点固定', async () => {
-    seedThread('t1', makeMessages(12))
-    await renderList()
-    // 滚到中部离底 → 冻结末 5 条窗口 [m8..m12]
-    await scrollContainerTo(1500)
-    // 此时自动补可能已触发（顶部阈值外，不会）；点按钮向前补到 [m3..m12]
-    const button = loadMoreButton()
-    expect(button).not.toBeNull()
-    await act(async () => {
-      button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    const text = container.textContent ?? ''
-    expect(text).toContain('正文m03')
-    expect(text).not.toContain('正文m02')
+  it('空态展示运行时名与认证提示', async () => {
+    seedThread('t1', [])
+    await renderList({ authHint: '已检测到本机 Codex 登录', runtimeName: 'Codex' })
+    expect(container.textContent).toContain('开始与 Codex 对话')
+    expect(container.textContent).toContain('已检测到本机 Codex 登录')
   })
 
-  it('贴底状态下新增消息自然可见，绝不被历史切片截断', async () => {
-    seedThread('t1', makeMessages(12))
+  it('图表业务槽接入且只渲染一次', async () => {
+    const diagram = JSON.stringify({ diagramId: 'd1', diagramType: 'flowchart', title: '推演', summary: '摘要', mermaidCode: 'graph TD; A-->B' })
+    seedThread('t1', [
+      { id: 'u1', role: 'user', text: '画图', createdAt: 1 },
+      { id: 't1', role: 'tool', text: diagram, createdAt: 2, updatedAt: 3, streaming: false, toolCallId: 'tc-1', toolKind: 'other', toolTitle: 'montree_generate_diagram', toolStatus: 'completed', toolContentText: diagram },
+    ] as AcpChatMessage[])
     await renderList()
-    expect(container.textContent).toContain('正文m12')
-
-    // 追加 m13 与 m14
-    await act(async () => {
-      const thread = useAcpUiStore.getState().threads.find(t => t.id === 't1')!
-      updateOwnedChatThreadMessages(thread, [
-        ...thread.messages,
-        { id: 'm13', role: 'user', text: '新问题m13', createdAt: 2000 },
-        { id: 'm14', role: 'agent', text: '回答正文m14', createdAt: 2001 },
-      ])
-    })
-
-    const text = container.textContent ?? ''
-    expect(text).toContain('新问题m13')
-    expect(text).toContain('回答正文m14')
+    expect(container.querySelectorAll('[data-testid="diagram-viewer-card"]')).toHaveLength(1)
   })
 
-  it('上滑看历史后点击回到底部可恢复贴底，新消息可见', async () => {
+  it('孤立审批经宿主执行且只出现一次', async () => {
+    seedThread('t1', makeMessages(2))
+    useAcpUiStore.setState({
+      pendingPermission: {
+        requestId: 9,
+        toolCallId: 'ghost-tool',
+        summary: '执行命令',
+        options: [{ optionId: 'allow', name: '允许', kind: 'allow_once' }],
+      },
+    } as never)
+    await renderList()
+    expect(container.querySelectorAll('[data-testid="agent-permission-card"]')).toHaveLength(1)
+  })
+
+  it('章节计划点选回调用宿主回调', async () => {
+    const onChapterPlanSelect = vi.fn()
+    seedThread('t1', [
+      { id: 'u1', role: 'user', text: '划重点', createdAt: 1 },
+      {
+        id: 'a1', role: 'agent', text: '建议', createdAt: 2, streaming: false,
+        chapterMarkPlan: [{ id: 'ch-3', flatIndex: 3, title: '第三章', reason: '核心', status: 'pending' }],
+      },
+    ] as AcpChatMessage[])
+    await renderList({ onChapterPlanSelect })
+    const entry = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('第三章')) as HTMLElement
+    expect(entry).toBeTruthy()
+    await act(async () => {
+      entry.click()
+    })
+    expect(onChapterPlanSelect).toHaveBeenCalledTimes(1)
+    expect(onChapterPlanSelect.mock.calls[0]![0].entry.id).toBe('ch-3')
+  })
+
+  it('外部 messagesRef 落在消息容器，右键事件可达根容器', async () => {
+    seedThread('t1', makeMessages(2))
+    const messagesRef = await renderList({ onQuote: () => {} })
+    // ref 透传进包：落在带 message-list 探针的消息容器
+    expect(messagesRef.current?.getAttribute('data-acp-probe')).toBe('message-list')
+    // 右键外壳经 Slot 把 onContextMenu 注入包组件根 div（包侧单测锁定透传）；
+    // 此处只断言事件可达且无异常，菜单打开由真实 Electron（E2E 右键引用）覆盖。
+    await act(async () => {
+      messagesRef.current!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 }))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    })
+    expect(messagesRef.current?.isConnected).toBe(true)
+  })
+
+  it('滚动快照按线程落盘，不串线程', async () => {
     seedThread('t1', makeMessages(12))
     await renderList()
-
-    // 向上滑动滚轮，触发上滑标记
-    const el = container.querySelector('.flex-1.overflow-y-auto') ?? container
+    const el = viewport()
+    Object.defineProperty(el, 'scrollHeight', { value: 3000, configurable: true })
+    Object.defineProperty(el, 'clientHeight', { value: 500, configurable: true })
+    el.scrollTop = 456
     await act(async () => {
-      el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -100 }))
+      el.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
-
-    // 用户发出新提问
-    await act(async () => {
-      const thread = useAcpUiStore.getState().threads.find(t => t.id === 't1')!
-      updateOwnedChatThreadMessages(thread, [
-        ...thread.messages,
-        { id: 'm13', role: 'user', text: '新用户问题m13', createdAt: 2000 },
-      ])
-    })
-
-    // 点击回到底部
-    const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('回到底部'))
-    if (btn) {
-      await act(async () => {
-        btn.click()
-      })
-    }
-
-    const text = container.textContent ?? ''
-    expect(text).toContain('新用户问题m13')
+    expect(useAcpUiStore.getState().chatScrollByThread['t1']?.scrollTop).toBe(456)
+    expect(useAcpUiStore.getState().chatScrollByThread['t2']).toBeUndefined()
   })
 })
 
@@ -228,4 +192,3 @@ describe('formatUsageText 用量后缀', () => {
     expect(formatUsageText({ used: 8281, thinkingTokens: 2000 })).toBe('已用 8.3k tokens · 思考 2.0k')
   })
 })
-

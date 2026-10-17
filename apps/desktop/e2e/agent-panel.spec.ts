@@ -69,6 +69,8 @@ test.describe('Agent 面板壳', () => {
       await expect(inputMenu).toBeVisible()
       await inputMenu.getByRole('menuitem', { name: '粘贴文本', exact: true }).click()
       await expect(input).toHaveValue('粘贴内容')
+      // 粘贴在下一帧恢复光标；等待完成后再建立剪切选区，避免被旧恢复覆盖。
+      await expect.poll(() => input.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([4, 4])
       await input.evaluate((element) => { element.focus(); element.setSelectionRange(0, 2) })
       await input.dispatchEvent('contextmenu')
       await inputMenu.getByRole('menuitem', { name: '剪切', exact: true }).click()

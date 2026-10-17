@@ -3,15 +3,17 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AgentActivityGroup, type WorkLogItem } from './AgentActivityGroup'
 import { AgentResultEntry } from '@yitom/chat-ui'
 import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
 import { ChatMessageBubble } from '@yitom/chat-ui'
-import { groupChatTimeline } from '@yitom/chat-core'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+
+// 注：工作记录行为（U2）已随 `AgentActivityGroup` 宿主适配器退出，由包
+// `ChatActivityGroup` 及包侧工作记录测试覆盖；此处仅保留
+// 结果独立入口与业务槽位（U3，仍是宿主接线职责）。
 
 let seq = 0
 function toolMsg(overrides: Partial<AcpChatMessage>): AcpChatMessage {
@@ -30,146 +32,6 @@ function toolMsg(overrides: Partial<AcpChatMessage>): AcpChatMessage {
     ...overrides,
   }
 }
-
-function workLogOf(messages: AcpChatMessage[]): WorkLogItem {
-  const user: AcpChatMessage = { id: 'u-9', role: 'user', text: '查', createdAt: 1 }
-  const timeline = groupChatTimeline([user, ...messages], { nowMs: 9999 })
-  const group = timeline.find((i) => i.kind === 'work-log')
-  if (!group || group.kind !== 'work-log') throw new Error('expected work-log')
-  return group
-}
-
-describe('AgentActivityGroup 工作记录（U2）', () => {
-  let container: HTMLDivElement
-  let root: Root
-  const queryClient = new QueryClient()
-
-  beforeEach(() => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-  })
-
-  afterEach(() => {
-    act(() => {
-      root.unmount()
-    })
-    container.remove()
-    queryClient.clear()
-  })
-
-  function render(group: WorkLogItem) {
-    act(() => {
-      root.render(
-        createElement(
-          QueryClientProvider,
-          { client: queryClient },
-          createElement(AgentActivityGroup, { group }),
-        ),
-      )
-    })
-  }
-
-  it('运行中展示最新工具行，详情保持收起', () => {
-    const running = toolMsg({ toolStatus: 'in_progress', streaming: true, toolTitle: 'read_text_file' })
-    render(workLogOf([running]))
-    expect(container.textContent).toContain('读取文件')
-    // 收起：详情输出不可见
-    expect(container.textContent).not.toContain('输出')
-    expect(container.querySelector('[aria-expanded="false"]')).not.toBeNull()
-  })
-
-  it('真实思考自动展示，用户收起后增量更新不抢回展开', () => {
-    const thought: AcpChatMessage = { id: 'thinking', role: 'thought', text: '正在读取证据', createdAt: Date.now(), streaming: true }
-    render(workLogOf([thought]))
-    const header = container.querySelector('button')!
-    expect(header.getAttribute('aria-expanded')).toBe('true')
-    expect(container.querySelector('[data-part-key="thought-thinking"]')).not.toBeNull()
-    act(() => header.click())
-    render(workLogOf([{ ...thought, text: '继续读取证据' }]))
-    expect(header.getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('BeUI Activity 不把取消或未知工具标成完成', () => {
-    render(workLogOf([toolMsg({ toolStatus: 'cancelled' })]))
-    expect(container.querySelector('[data-slot="agent-activity"]')?.getAttribute('data-state')).toBe('cancelled')
-    render(workLogOf([toolMsg({ toolStatus: 'unrecognized', streaming: false })]))
-    expect(container.querySelector('[data-slot="agent-activity"]')?.getAttribute('data-state')).toBe('unknown')
-  })
-
-  it('运行摘要显示进度，过程区只保留最新工具', () => {
-    const running = toolMsg({ id: 't-r', toolCallId: 'tc-r', toolStatus: 'in_progress', streaming: true, toolTitle: 'read_text_file' })
-    const done = toolMsg({ id: 't-d', toolCallId: 'tc-d', toolStatus: 'completed', streaming: false, toolTitle: 'search' })
-    render(workLogOf([running, done]))
-    // 进度仍来自全部事件；展示只保留最新工具，不重复累加过程行。
-    expect(container.textContent).toContain('1/2')
-    expect(container.textContent).toContain('搜索文档')
-    expect(container.querySelectorAll('[data-slot="agent-activity-row"]')).toHaveLength(1)
-    const latestRow = container.querySelector('[data-slot="agent-activity-row"]')
-    render(workLogOf([running, done, toolMsg({ id: 't-new', streaming: true, toolStatus: 'in_progress' })]))
-    expect(container.querySelector('[data-slot="agent-activity-row"]')).toBe(latestRow)
-    // 运行中整卡光环（落定即卸）；旧底栏扫光条已删除
-    expect(container.querySelector('.agent-beam-ring-amber')).not.toBeNull()
-    expect(container.querySelector('.agent-stream-sweep')).toBeNull()
-    render(workLogOf([{ ...running, streaming: false, toolStatus: 'completed' }, done]))
-    expect(container.querySelector('.agent-beam-ring-amber')).toBeNull()
-  })
-
-  it('回合落定自动收起，之后可手动展开完整记录', () => {
-    const running = toolMsg({ id: 't-run', toolCallId: 'tc-run', toolStatus: 'in_progress', streaming: true })
-    const group = workLogOf([running])
-    render(group)
-    const toggle = container.querySelector('button[aria-expanded]') as HTMLElement
-    expect(container.querySelector('[aria-expanded="true"]')).not.toBeNull()
-    // 再打开行内单个调用（排除组汇总行：含“历时”的是组按钮）
-    const row = [...container.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('读取文件') && !b.textContent?.includes('历时'),
-    ) as HTMLElement
-    act(() => {
-      row.click()
-    })
-    expect(container.textContent).toContain('输出')
-    // 落定只收起一次，用户之后可以重新查看。
-    const settled = workLogOf([{ ...running, streaming: false, toolStatus: 'completed' }])
-    expect(settled.key).toBe(group.key)
-    render(settled)
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    act(() => toggle.click())
-    render(settled)
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(container.querySelectorAll('button').length).toBe(2)
-  })
-
-  it('取消/未知在摘要可见，不判成功', () => {
-    const group = workLogOf([
-      toolMsg({ toolStatus: 'cancelled' }),
-      toolMsg({ toolTitle: 'mystery-tool', toolStatus: undefined }),
-    ])
-    render(group)
-    expect(container.textContent).toContain('已取消 1')
-    expect(container.textContent).toContain('未知 1')
-    expect(container.textContent).not.toContain('已完成')
-  })
-
-  it('详情行按需展开单个调用，不套整组气泡', () => {
-    const group = workLogOf([toolMsg({ toolTitle: 'read_text_file' })])
-    render(group)
-    act(() => {
-      ;(container.querySelector('button[aria-expanded]') as HTMLElement).click()
-    })
-    const row = [...container.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('读取文件') && !b.textContent?.includes('历时'),
-    ) as HTMLElement
-    expect(row).toBeTruthy()
-    act(() => {
-      row.click()
-    })
-    // 一次展开直接看到详情，没有第二层需要点击的工具头。
-    expect(container.querySelectorAll('button').length).toBe(2)
-    expect(container.textContent).toContain('输出')
-    expect(container.querySelector('pre')).not.toBeNull()
-  })
-})
 
 describe('AgentResultEntry 结果独立入口（U3）', () => {
   let container: HTMLDivElement
