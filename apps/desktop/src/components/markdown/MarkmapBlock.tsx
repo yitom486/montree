@@ -26,6 +26,10 @@ export interface MarkmapBlockProps {
   title?: string
   initialHeight?: number
   allowFullscreen?: boolean
+  /** 初始展开到的层级（markmap `initialExpandLevel`；-1 为全部展开）。仅首次创建实例时生效。 */
+  initialExpandLevel?: number
+  /** 充满父容器（全屏弹窗内使用），替代固定 initialHeight */
+  fillHeight?: boolean
 }
 
 // 惰性单例 Transformer，解析 Markdown AST 为 Markmap 树节点
@@ -44,6 +48,8 @@ export function MarkmapBlock({
   title,
   initialHeight = 420,
   allowFullscreen = true,
+  initialExpandLevel,
+  fillHeight = false,
 }: MarkmapBlockProps) {
   const theme = useEditorUiStore((s) => s.theme)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -99,6 +105,7 @@ export function MarkmapBlock({
           maxWidth: 260,
           spacingHorizontal: 80,
           spacingVertical: 12,
+          ...(initialExpandLevel !== undefined ? { initialExpandLevel } : {}),
           style: (id: string) =>
             theme === 'dark'
               ? `#${id}.markmap { --markmap-code-bg: #1f2937; --markmap-code-color: #e5e7eb; --markmap-circle-open-bg: #374151; --markmap-text-color: #f3f4f6; --markmap-a-color: #60a5fa; --markmap-a-hover-color: #93c5fd; }`
@@ -174,6 +181,7 @@ export function MarkmapBlock({
     <div
       className={cn(
         'group relative my-3 flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card/60 shadow-xs transition-all',
+        fillHeight && 'my-0 h-full min-h-0',
         className,
       )}
       data-testid="markmap-block"
@@ -263,8 +271,8 @@ export function MarkmapBlock({
 
       {/* 视图内容区 */}
       <div
-        className="relative w-full overflow-hidden bg-background/50"
-        style={{ height: `${initialHeight}px` }}
+        className={cn('relative w-full overflow-hidden bg-background/50', fillHeight && 'min-h-0 flex-1')}
+        style={fillHeight ? undefined : { height: `${initialHeight}px` }}
       >
         {renderError ? (
           <div className="flex h-full flex-col items-center justify-center p-6 text-center text-xs text-destructive">
@@ -302,7 +310,7 @@ export function MarkmapBlock({
               <MarkmapBlock
                 source={source}
                 showToolbar={true}
-                initialHeight={typeof window !== 'undefined' ? Math.max(300, Math.floor(window.innerHeight * 0.72)) : 500}
+                fillHeight
                 title={title}
                 allowFullscreen={false}
               />

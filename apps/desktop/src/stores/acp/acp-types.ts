@@ -37,6 +37,11 @@ export interface AcpChatThread {
   /** 所属 Agent 运行时，默认为 DEFAULT_ACP_RUNTIME_ID ('codex-acp') */
   runtimeId?: string
   /**
+   * 会话级 Code Mode（PTC）：仅对声明 `_meta.toolsMode` 的 Agent 显示。
+   * 只影响下一次 session/new|resume；已激活的会话不会中途切换。
+   */
+  codeMode?: boolean
+  /**
    * 每个 ACP 运行时最近一次的 sessionId：断开后仍保留，供同运行时重连 resume/load。
    * 按运行时分桶：切换 Agent 不覆盖其他 Agent 的会话 id。
    */
@@ -66,6 +71,8 @@ export interface AcpUiStore {
   prompting: boolean
   /** 当前连接 Agent 的 prompt 能力（不持久化） */
   promptCapabilities: AcpPromptCapabilities
+  /** 当前连接 Agent 是否声明会话级 code mode（PTC）；内存态，断线/切换清空 */
+  codeModeSupported: boolean
   /**
    * Cursor 横杠 canonical 模型目录（内存态，不持久化）：
    * connect 成功写入，disconnect/切换清空。见 session-slice。
@@ -140,6 +147,7 @@ export interface AcpUiStore {
   setPromptMode: (mode: AcpPromptMode, reason?: string) => void
   setConfigOptions: (options: AcpConfigOption[]) => void
   setPromptCapabilities: (caps: AcpPromptCapabilities) => void
+  setCodeModeSupported: (supported: boolean) => void
   setPrompting: (prompting: boolean) => void
   setModelCatalog: (runtimeId: string, catalog: string[] | null) => void
   rememberConfigPreference: (
@@ -178,6 +186,7 @@ export interface AcpUiStore {
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
   createThread: (workspaceRoot?: string | null, runtimeId?: string) => string
+  setThreadCodeMode: (threadId: string, enabled: boolean) => void
   switchThread: (threadId: string) => void
   /** 切换活动工作区：对齐活跃线程至该工作区历史对话，无历史则自动创建专属空白线程 */
   switchWorkspace: (workspaceRoot?: string) => string

@@ -4,9 +4,9 @@ ACP 智能体交互与次世代伴读 HUD 专职状态管理。由原 1182 行�
 
 | 文件 | 职责说明 |
 | :--- | :--- |
-| `acp-types.ts` | 会话线程、权限审批卡与 HUD 模态通用数据类型定义与线程会话辅助 |
-| `session-slice.ts` | 协议连接状态（status）、运行时切换、会话 ID、模型与配置项偏好（preferredConfig） |
-| `chat-slice.ts` | 宿主线程业务元数据、工作区路由、回放清洗与快照提议；通用消息/回合意图经 `chat-session-authority` 仅在包内归约，宿主 messages 是包 feed 的兼容投影 |
+| `acp-types.ts` | 会话线程、权限审批卡与 HUD 模态通用数据类型定义与线程会话辅助；线程带可选的 `codeMode`（PTC 请求，仅对下次 new/resume 生效） |
+| `session-slice.ts` | 协议连接状态（status）、运行时切换、会话 ID、模型与配置项偏好（preferredConfig）；`codeModeSupported` 来自 initialize 声明，断线/切换清空 |
+| `chat-slice.ts` | 宿主线程业务元数据、工作区路由、回放清洗与快照提议；`setThreadCodeMode` 只改线程请求，不重连当前会话；通用消息/回合意图经 `chat-session-authority` 仅在包内归约，宿主 messages 是包 feed 的兼容投影 |
 | `chat-helpers.ts` | 线程草稿修剪、提议挂载与工具调用卡片解析纯逻辑辅助；线程↔运行时绑定防线（`ensureActiveThreadForRuntime` + `patchActiveThread` 错位纠偏） |
 | `permission-slice.ts` | 工具调用权限审批拦截（pendingPermission）与审批记录同步 |
 | `hud-slice.ts` | 伴读 HUD 面板开闭与输入框调度 |

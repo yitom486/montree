@@ -12,7 +12,7 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 |------|------|
 | `AgentPanel` | 右侧 Agent 主面板（壳 + 接线；配置项分类纯逻辑已出库 `lib/agent/acp-config-menu`，模型尾缀思考档只读徽标见 `lib/agent/acp-model-thinking`，fast 类 boolean 在输入栏给可见开关（`findFastToggle` 单列，不进 secondary），其余 boolean 仍在 secondary；运行时切换器全量读 `BUILTIN_ACP_RUNTIMES`，下游 8 项落地后零改动展示，非 codex 走中性认证提示；生成式 UI 提交经 `handleGenerativeSubmit` 做线程归属校验后沿 `sendPrompt` 回到同一会话；消息列表统一通过 `useAcpActiveMessages` 读取包权威 feed） |
 | `DockedAgentPane` | 阅读器内停靠态面板壳（左侧拉伸分隔线，宽持久化，三端 viewer 共用；与悬浮窗、WorkspaceShell 共用单一包权威消息读源） |
-| `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换） |
+| `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换）；仅当 Agent 在 initialize 声明 `_meta.toolsMode.values` 含 `ptc` 时显示「Code mode（PTC）」复选，按线程保存，只对下一次新建/恢复会话生效 |
 | `FloatingAIHud` | 悬浮 AI 伴读浮窗与微型药丸胶囊（支持 docked / floating / capsule 三态切换、四大 Tab 与自由拖拽） |
 | `CompactConfigMenu` | 输入栏旁的紧凑配置下拉（primary 配置项） |
 | `AgentComposer` | BeUI Prompt Input 布局适配：可换行参数与独立 32px 发送/停止；受控发送/停止、草稿清空、附件可发送判定与焦点由包 `useChatComposerController` 共用；附件获取、ACP payload、右键编辑留宿主；社区 PromptInput 保持唯一 IME/Enter 入口 |
@@ -49,7 +49,8 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | 文件 | 功能 |
 |------|------|
 | `AgentToolCallCard` | 通用工具 UI（社区 `ai-elements/Tool` 折叠外壳 + Montree 状态/中文标题映射；运行/成功/失败默认收起，保留用户展开选择；失败摘要行内可见、提议恢复操作在折叠外；审批经 `ToolApprovalSlot` 外挂且唯一；`detailsOnly` 让工作记录一次点击直接查看详情；`suppressBusinessResult`/`bare` 供结果入口复用过程行，业务卡不双挂；工作记录行目标 chip pill 借 Beautiful UI ToolChips 语法）（已迁 `@montree/chat-ui`，见包内 `agent-tool-call-card`；`pending` 改 prop + `onRespond` 回宿主，恢复操作改 `onRecoverChapter/onPromptSelectText` + `navFlatIndex`，业务卡改 `businessResultSlot`；宿主 `AgentMessageList` 传原 store 值与 `ToolBusinessResult` 槽） |
-| `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议/章节比较/HTML Artifact/生成式 UI 卡 + 知识卡片沉淀/原文定位；`compactResults` 下图表默认紧凑预览；component-ui 经 `generative/` 懒加载卡渲染，选择提交与定位回调透传） |
+| `ToolBusinessResult` | 阅读业务结果渲染（图表/跨章互引/内容审计/章节建议/章节比较/HTML Artifact/思维导图/生成式 UI 卡 + 知识卡片沉淀/原文定位；`compactResults` 下图表默认紧凑预览；思维导图快照交给 `MindmapPresentCard`，其余 HTML Artifact 走隔离 iframe；component-ui 经 `generative/` 懒加载卡渲染，选择提交与定位回调透传） |
+| `MindmapPresentCard` / `.test.ts` | 对话内思维导图卡：把 `mindmap-artifact` 还原的大纲交给懒加载 `MarkmapBlock`（树布局、自动 fit、缩放拖拽、节点折叠、全屏、导出 SVG），解析失败时由 `ToolBusinessResult` 回退 `HtmlArtifactCard` |
 | `generative/ComponentUiCard` + `.lazy` + `.test.ts` | 生成式 UI 卡（官方 `GenerativeUIRender` + 白名单 Card/Row/Column/Text/Select/Button/Evidence，shadcn/主题复用；本地选择态按结果 ID 隔离；提交/定位只经宿主回调；未知组件 Fallback + 卡内错误边界；懒加载约 7KB，首屏不进包。详见 `generative/README.md`）（M3d 已迁 `@montree/chat-ui`，见包内 `component-ui-card`；宿主 `ToolBusinessResult`/`MarkdownArtifact` 改引 barrel，props 零增） |
 | `ChapterComparisonCard` / `.test.ts` | 章节比较卡（章节筛选、证据展开、原文定位；按结果 ID 隔离局部状态）（M3d 已迁 `@montree/chat-ui`，见包内 `chapter-comparison-card`） |
 | `tools/ArtifactZoomSurface` | 居中放大预览；同一 portal 容器以原子移动保留 iframe/组件状态，关闭返回原位置，Esc 与焦点恢复；不创建第二个 iframe（M3d 已迁 `@montree/chat-ui`，见包内 `artifact-zoom-surface`） |

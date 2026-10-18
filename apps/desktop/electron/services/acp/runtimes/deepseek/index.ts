@@ -1,3 +1,6 @@
+import { existsSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { AcpAuthMethod, CodexAuthPreflight } from '@yitom/contracts'
 import { DEEPSEEK_DSH_NPM_PACKAGE } from '@yitom/contracts'
 import type { GenericRuntimeAdapter } from '../index'
@@ -5,28 +8,46 @@ import type { GenericRuntimeAdapter } from '../index'
 /**
  * DeepSeek 运行时适配器（`bunx @deepseek-ai/dsh --profile acp`）。
  *
- * 凭证复用：harness 自身凭证（`DEEPSEEK_API_KEY` / harness 配置，
- * 全部留在官方位置，我方不存）。harness 的 ACP `authMethods` 为空，
+ * 凭证复用：harness 自身凭证（`DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`，
+ * 全部留在官方位置，我方不存、不读内容）。harness 的 ACP `authMethods` 为空，
  * 连接门闩天然走 `skip_auth`；此处探测仅供诊断展示。
  * 模型经 session 到达（顶层 `models` 方言由 session-open 合成 model 选项），无需额外动作。
  *
  * 缺 key 预检（仿 cursor `resolveSpawnCommand` 为 null 即拦的 precedent）：
- * 本机缺 key 时 harness 极可能直接退出（stdio 关闭→传输层报 connection
- * closed），故经 `resolveSpawnBlocker` 在 spawn 前判停，回带中文动作指引。
- * 同族 `DSH_*` 仅认文档明确的变量——当前仅认 `DEEPSEEK_API_KEY`（预检）
- * 与 `DSH_PACKAGE`（包定位符覆盖，见 `resolveDeepseekSpawnCommand`）。
+ * 本机既无 env key 也无 DSH 本地登录时 harness 极可能直接退出（stdio 关闭→传输层报
+ * connection closed），故经 `resolveSpawnBlocker` 在 spawn 前判停，回带中文动作指引。
+ * 同族 `DSH_*` 仅认文档明确的变量——`DSH_HOME`（本地登录位置）、`DEEPSEEK_API_KEY`
+ * （预检）与 `DSH_PACKAGE`（包定位符覆盖，见 `resolveDeepseekSpawnCommand`）。
  *
  * 上游坏包逃生（实锤：dsh 0.1.5-rc.2 内依赖 `…-documentpreview@^0.1.5-rc.3`，
  * 而该包最高仅 0.1.6-alpha.1，上游缺 rc.3，自解析依赖失败退出）：
  * 设 `DSH_PACKAGE` pin 旧版（如 `@deepseek-ai/dsh@0.1.4`）即可绕过。
  */
 export function buildDeepseekMissingKeyMessage(): string {
-  return '未检测到 DEEPSEEK_API_KEY：请先在终端导出该变量（或完成 harness 自身登录）后再连接'
+  return '未检测到 DEEPSEEK_API_KEY，也未找到 DSH 本地登录（~/.dsh/.credentials.yaml）：请先在终端导出该变量，或先完成 DeepSeek Harness 自身登录后再连接'
+}
+
+/** DSH 的 home；沿用 harness 自己的 DSH_HOME 约定，缺省 ~/.dsh。 */
+export function resolveDeepseekHarnessHome(env?: NodeJS.ProcessEnv): string {
+  const source = env ?? process.env
+  const configured = source.DSH_HOME?.trim()
+  return configured || join(homedir(), '.dsh')
+}
+
+/** 只检查 DSH 本地凭据文件是否存在且非空，绝不读取/记录其中内容。 */
+export function hasDeepseekHarnessCredentials(env?: NodeJS.ProcessEnv): boolean {
+  const file = join(resolveDeepseekHarnessHome(env), '.credentials.yaml')
+  try {
+    return existsSync(file) && statSync(file).size > 0
+  } catch {
+    return false
+  }
 }
 
 export function resolveDeepseekSpawnBlocker(env?: NodeJS.ProcessEnv): string | null {
   const source = env ?? process.env
   if (source.DEEPSEEK_API_KEY?.trim()) return null
+  if (hasDeepseekHarnessCredentials(source)) return null
   return buildDeepseekMissingKeyMessage()
 }
 
@@ -59,13 +80,15 @@ export function resolveDeepseekSpawnCommand(env?: NodeJS.ProcessEnv): {
 }
 export function probeDeepseekAuth(): CodexAuthPreflight {
   const hasApiKeyEnv = Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  const harnessHome = resolveDeepseekHarnessHome()
+  const hasAuthFile = hasDeepseekHarnessCredentials()
 
   return {
-    codexHome: '',
-    hasCodexHome: false,
-    hasAuthFile: false,
+    codexHome: harnessHome,
+    hasCodexHome: existsSync(harnessHome),
+    hasAuthFile,
     hasApiKeyEnv,
-    looksLoggedIn: hasApiKeyEnv,
+    looksLoggedIn: hasApiKeyEnv || hasAuthFile,
   }
 }
 

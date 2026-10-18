@@ -193,4 +193,56 @@ describe('ACP reconnect', () => {
     expect(getAcpState(scope).sessionId).toBe('main')
   })
 
+  it('声明 ptc 时把 _meta.toolsMode 合并进 new/resume 并回带能力', async () => {
+    mocks.initialize.mockResolvedValue({
+      ...initialized,
+      agentCapabilities: {
+        loadSession: true,
+        sessionCapabilities: { resume: {} },
+        _meta: { toolsMode: { values: ['native', 'ptc'] } },
+      },
+    })
+    mocks.restore.mockResolvedValue({ sessionId: 'code-mode', restoreMethod: 'new', sessionRestored: false, restoreAttempts: [], nativeSessionAccepted: true, configOptions: [] })
+    const result = await runInAcpContext(scope, () => connectAcp({ runtimeId: 'deepseek', codeMode: true }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect((result.value as { codeModeSupported?: boolean }).codeModeSupported).toBe(true)
+    const input = mocks.restore.mock.calls.at(-1)?.[0] as { sessionMeta?: Record<string, unknown> }
+    expect(input.sessionMeta).toMatchObject({ toolsMode: 'ptc' })
+  })
+
+  it('只声明 native 时不注入 code mode', async () => {
+    mocks.initialize.mockResolvedValue({
+      ...initialized,
+      agentCapabilities: {
+        loadSession: true,
+        sessionCapabilities: { resume: {} },
+        _meta: { toolsMode: { values: ['native'] } },
+      },
+    })
+    mocks.restore.mockResolvedValue({ sessionId: 'native', restoreMethod: 'new', sessionRestored: false, restoreAttempts: [], configOptions: [] })
+    const result = await runInAcpContext(scope, () => connectAcp({ runtimeId: 'deepseek', codeMode: true }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect((result.value as { codeModeSupported?: boolean }).codeModeSupported).toBe(false)
+    const input = mocks.restore.mock.calls.at(-1)?.[0] as { sessionMeta?: Record<string, unknown> }
+    expect(input.sessionMeta?.toolsMode).toBeUndefined()
+  })
+
+  it('不把 code mode 元数据被拒后的 native 回退当成成功', async () => {
+    mocks.initialize.mockResolvedValue({
+      ...initialized,
+      agentCapabilities: {
+        loadSession: true,
+        sessionCapabilities: { resume: {} },
+        _meta: { toolsMode: { values: ['native', 'ptc'] } },
+      },
+    })
+    mocks.restore.mockResolvedValue({ sessionId: 'downgraded', restoreMethod: 'new', sessionRestored: false, restoreAttempts: [], nativeSessionAccepted: false, configOptions: [] })
+    const result = await runInAcpContext(scope, () => connectAcp({ runtimeId: 'deepseek', codeMode: true }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('拒绝了 code mode')
+  })
+
 })

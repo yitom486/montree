@@ -216,4 +216,20 @@ describe('useAcpSession shared turn controller', () => {
     await act(async () => { next.resolve(ok({ stopReason: 'end_turn' })); await nextSending })
     expect(useAcpUiStore.getState().prompting).toBe(false)
   })
+
+  it('passes the active thread code mode to connect and records the declared capability', async () => {
+    const state = useAcpUiStore.getState()
+    state.setThreadCodeMode(state.activeThreadId, true)
+    useAcpUiStore.setState({ status: 'disconnected', sessionId: null })
+    vi.mocked(acpApi.connect).mockResolvedValue(ok({
+      phase: 'ready',
+      runtimeId: 'deepseek',
+      protocolVersion: 1,
+      sessionId: 'code-mode-session',
+      codeModeSupported: true,
+    }))
+    await act(async () => { await session.connect('deepseek') })
+    expect(acpApi.connect).toHaveBeenCalledWith(expect.objectContaining({ codeMode: true }))
+    expect(useAcpUiStore.getState().codeModeSupported).toBe(true)
+  })
 })

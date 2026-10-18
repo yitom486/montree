@@ -1,7 +1,8 @@
-import { Columns2, Ellipsis, ExternalLink, Minimize2, Plus, Trash2 } from 'lucide-react'
+import { Code2, Columns2, Ellipsis, ExternalLink, Minimize2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -17,6 +18,11 @@ export interface AgentHeaderOverflowMenuProps {
   floating: boolean
   /** 对话进行中：新建/清空致灰 */
   actionDisabled?: boolean
+  /** Agent 是否声明会话级 code mode（PTC）；未声明时不显示开关 */
+  codeModeSupported?: boolean
+  /** 当前线程的 code mode 请求；只影响下一次 new/resume */
+  codeMode?: boolean
+  onToggleCodeMode?: (enabled: boolean) => void
   onNewThread: () => void
   onClearMessages: () => void
   onMinimizeToCapsule?: () => void
@@ -27,6 +33,9 @@ export interface AgentHeaderOverflowMenuProps {
 export function AgentHeaderOverflowMenu({
   floating,
   actionDisabled = false,
+  codeModeSupported = false,
+  codeMode = false,
+  onToggleCodeMode,
   onNewThread,
   onClearMessages,
   onMinimizeToCapsule,
@@ -56,6 +65,16 @@ export function AgentHeaderOverflowMenu({
           <Trash2 className="size-4" />
           清空当前对话
         </DropdownMenuItem>
+        {codeModeSupported ? (
+          <DropdownMenuCheckboxItem
+            checked={codeMode}
+            onCheckedChange={(checked) => onToggleCodeMode?.(checked === true)}
+            title="模型改为写代码，通过 tools.<name>() 调用全部工具；仅对下次新建/恢复会话生效"
+          >
+            <Code2 className="size-4" />
+            Code mode（PTC）
+          </DropdownMenuCheckboxItem>
+        ) : null}
         {floating ? (
           <>
             {onMinimizeToCapsule ? (

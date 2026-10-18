@@ -52,6 +52,12 @@ function activeThreadHasLocalHistory(): boolean {
   return selectActiveThreadHasSubstantiveMessages(useAcpUiStore.getState())
 }
 
+/** 会话级 code mode（PTC）按线程保存；只影响下一次 new/resume。 */
+function activeThreadCodeMode(): boolean {
+  const state = useAcpUiStore.getState()
+  return state.threads.find((thread) => thread.id === state.activeThreadId)?.codeMode === true
+}
+
 /** 连接就绪后：把 Zustand 里记住的 Mode/Model 等写回当前 ACP session */
 async function applyStoredConfigPreferences(
   sessionId: string,
@@ -93,6 +99,7 @@ export function useAcpSession(workspaceRoot?: string) {
   const beginAgentReply = useAcpUiStore((s) => s.beginAgentReply)
   const setPrompting = useAcpUiStore((s) => s.setPrompting)
   const setPromptCapabilities = useAcpUiStore((s) => s.setPromptCapabilities)
+  const setCodeModeSupported = useAcpUiStore((s) => s.setCodeModeSupported)
   const setPromptMode = useAcpUiStore((s) => s.setPromptMode)
   const clearMessagesInStore = useAcpUiStore((s) => s.clearMessages)
   const sessionId = useAcpUiStore((s) => s.sessionId)
@@ -293,6 +300,7 @@ export function useAcpSession(workspaceRoot?: string) {
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
+      ...(activeThreadCodeMode() ? { codeMode: true } : {}),
         recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
     })
     // 滞后响应：连接期间用户已切走（新流程 bump 了 epoch），一律丢弃
@@ -304,6 +312,7 @@ export function useAcpSession(workspaceRoot?: string) {
       return
     }
 
+    setCodeModeSupported(result.value.codeModeSupported === true)
     if (result.value.phase === 'needs_auth') {
       // 防串 runtime：只接受归属当前选中运行时的认证请求
       if (result.value.runtimeId !== useAcpUiStore.getState().selectedRuntimeId) return
@@ -358,9 +367,10 @@ export function useAcpSession(workspaceRoot?: string) {
       setAuthOpen(false)
       setAuthMethods([])
       setAuthRuntimeId(null)
+      setCodeModeSupported((result.value as { codeModeSupported?: boolean }).codeModeSupported === true)
       await finalizeConnected(result.value, '已认证并连接')
     },
-    [authRuntimeId, finalizeConnected],
+    [authRuntimeId, finalizeConnected, setCodeModeSupported],
   )
 
   const cancelAuth = useCallback(async () => {
@@ -428,6 +438,7 @@ export function useAcpSession(workspaceRoot?: string) {
           cwd,
           resumeSessionId,
           hasLocalHistory: activeThreadHasLocalHistory(),
+      ...(activeThreadCodeMode() ? { codeMode: true } : {}),
         recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
         })
         if (epoch !== connectionEpochRef.current) return
@@ -438,6 +449,7 @@ export function useAcpSession(workspaceRoot?: string) {
           return
         }
 
+        setCodeModeSupported(result.value.codeModeSupported === true)
         if (result.value.phase === 'needs_auth') {
           // 防串 runtime：旧流程滞后返回的 needs_auth 直接丢弃
           if (result.value.runtimeId !== useAcpUiStore.getState().selectedRuntimeId) return
@@ -546,6 +558,7 @@ export function useAcpSession(workspaceRoot?: string) {
       cwd,
       resumeSessionId,
       hasLocalHistory: activeThreadHasLocalHistory(),
+      ...(activeThreadCodeMode() ? { codeMode: true } : {}),
         recoverToolCallIds: presentRecoveryToolCallIds(useAcpUiStore.getState().threads.find(t => t.id === useAcpUiStore.getState().activeThreadId)?.messages ?? []),
     })
     if (epoch !== connectionEpochRef.current || !isAcpTurnRouteCurrent(route)) return false
@@ -557,6 +570,7 @@ export function useAcpSession(workspaceRoot?: string) {
       return false
     }
 
+    setCodeModeSupported(result.value.codeModeSupported === true)
     if (result.value.phase === 'needs_auth') {
       if (result.value.runtimeId !== useAcpUiStore.getState().selectedRuntimeId) {
         // 滞后于切换的旧响应：静默丢弃

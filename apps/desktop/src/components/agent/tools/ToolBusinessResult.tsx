@@ -43,6 +43,8 @@ import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { fileApi } from '@/api/file-api'
 import { compileReactArtifact } from '@/api/react-artifact-api'
 import { upgradeLegacyMindmapHtml } from '@/lib/agent/context/upgrade-legacy-mindmap'
+import { parseMindmapArtifactHtml } from '@/lib/agent/context/mindmap-artifact'
+import { MindmapPresentCard } from './MindmapPresentCard'
 
 const ReactArtifactCardLazy = lazy(() => import('@yitom/chat-ui').then(module => ({ default: module.ReactArtifactCard })))
 
@@ -292,6 +294,15 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
     () => parsePresentPayload(detail, message.toolTitle, message.presentResult),
     [detail, message.toolTitle, message.presentResult],
   )
+  // 思维导图快照：先补全旧快照的父子标记，再判断能否交给 Markmap；解析失败仍回退隔离 iframe
+  const presentArtifactHtml = useMemo(
+    () => (presentPayload?.kind === 'html-artifact' ? upgradeLegacyMindmapHtml(presentPayload.html) : null),
+    [presentPayload],
+  )
+  const presentMindmap = useMemo(
+    () => (presentArtifactHtml ? parseMindmapArtifactHtml(presentArtifactHtml) : null),
+    [presentArtifactHtml],
+  )
   const presentUnparsable = useMemo(
     () => isUnparsablePresentResult(detail, message.toolTitle),
     [detail, message.toolTitle],
@@ -499,15 +510,19 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
       ) : null}
       {presentPayload?.kind === 'html-artifact' ? (
         <div className="mt-1">
-          <HtmlArtifactCard
-            key={presentPayload.id}
-            result={{
-              ...presentPayload,
-              html: upgradeLegacyMindmapHtml(presentPayload.html),
-            }}
-            colorScheme={colorScheme}
-            onExport={() => void handleArtifactExport(presentPayload.html, presentPayload.title)}
-          />
+          {presentMindmap ? (
+            <MindmapPresentCard key={presentPayload.id} artifact={presentMindmap} />
+          ) : (
+            <HtmlArtifactCard
+              key={presentPayload.id}
+              result={{
+                ...presentPayload,
+                html: presentArtifactHtml ?? presentPayload.html,
+              }}
+              colorScheme={colorScheme}
+              onExport={() => void handleArtifactExport(presentPayload.html, presentPayload.title)}
+            />
+          )}
         </div>
       ) : null}
       {presentPayload?.kind === 'react-artifact' ? <Suspense fallback={<p role="status">正在加载交互界面…</p>}><ReactArtifactCardLazy key={presentPayload.id} result={presentPayload} toolStreaming={message.streaming} toolStatus={message.toolStatus} threadId={threadId} prompting={prompting} onSubmit={onGenerativeSubmit} onCompile={compileReactArtifact} onExport={(html, title) => void handleArtifactExport(html, title)} /></Suspense> : null}

@@ -49,7 +49,7 @@
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |
-| `text-document` / `.test.ts` | Markdown/TXT 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区；Typst 复用文本与跨视图撤销历史，源码按行保留，不解析为 Markdown 章节 |
+| `text-document` / `.test.ts` | Markdown/TXT/Typst 原始缓冲区行/章节/范围查询、版本与原文校验的原子编辑、精确多选区；Typst 复用文本与跨视图撤销历史，源码按行保留，不解析为 Markdown 章节 |
 | `theme-transition` / `.test.ts` | View Transitions 原生主题平滑切换（GPU 贴图合成、180ms 交叉淡化、两帧延迟卸载屏蔽类） |
 | `typst-lsp` / `.test.ts` | Typst UTF-16 位置/文本修改/诊断映射、预览 loopback URL 校验；按 Windows/POSIX 路径边界选择项目根，独立文件与跨目录另存为回落自身目录 |
 | `typst-session` / `.test.ts` | Typst 会话生命周期与有序内存同步：版本守卫、初始诊断缓存、过期请求丢弃、显式导出与延迟打开清理 |
@@ -105,7 +105,7 @@
 
 ## agent/
 
-生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解，历史快照由 `agent/context/upgrade-legacy-mindmap.ts` 动态热升级折叠支持），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
+生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解；思维导图快照经 `agent/context/mindmap-artifact.ts` 还原为大纲后交给 Markmap，其它类型或无法解析时仍走隔离 iframe；历史快照由 `agent/context/upgrade-legacy-mindmap.ts` 动态热升级折叠支持），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
 
 Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `@montree/chat-ui` 包内 `chat-markdown`（M3a 由原 components/markdown 下 `AgentMarkdown` 入口整搬改名）。
 
@@ -113,7 +113,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 |------|------|
 | `acp-composer` | 输入框附件、工作区路径拖入与 ACP payload；通用发送判定已由包 `useChatComposerController` 持有 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
-| `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
+| `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT/Typst、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
 | `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @montree/chat-core，见包内 `permission-ui`） |
 | `permission-respond` | 审批响应宿主实现（跨卡幂等领取 + 清理 + `acpApi.respondPermission` 发送；包内审批卡经 `onRespond` 回调到此） |
 | `chat-transport-port` / `.test.ts` | P0 宿主侧 `ChatTransportPort`（`sendText/cancel/respondPermission` 委托现有 `acpApi` 链路：工作区前缀 + bootstrap 一次语义 + 附件透传位；只 resolve/reject，不写时间线不弹 toast；P1 并跑用，现有调用链不动） |

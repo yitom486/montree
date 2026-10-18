@@ -4,8 +4,17 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToolBusinessResult } from './ToolBusinessResult'
+import { buildDiagramHtml } from '@/lib/agent/context/present-diagram'
 import { toast } from 'sonner'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
+
+vi.mock('@/components/markdown/MarkmapBlock', async () => {
+  const { createElement } = await import('react')
+  return {
+    MarkmapBlock: ({ source }: { source: string }) =>
+      createElement('div', { 'data-testid': 'markmap-block-mock' }, source),
+  }
+})
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -44,6 +53,27 @@ const ARTIFACT = JSON.stringify({
   id: 'present-html-artifact-e2e01',
   title: '计数器',
   html: '<button>按</button>',
+})
+
+const MINDMAP = JSON.stringify({
+  schemaVersion: 1,
+  kind: 'html-artifact',
+  id: 'present-html-artifact-mindmap',
+  title: '通知映射导图',
+  inline: true,
+  html: buildDiagramHtml({
+    diagramType: 'mindmap',
+    title: '通知映射导图',
+    nodes: [
+      { id: 'root', label: 'session/update 通知' },
+      { id: 'content', label: '内容流 (3 种)', details: '【a】正文\n【b】思考\n【c】回放' },
+      { id: 'tool', label: '工具活动 (2 种)' },
+    ],
+    edges: [
+      { from: 'root', to: 'content' },
+      { from: 'root', to: 'tool' },
+    ],
+  }),
 })
 
 describe('ToolBusinessResult present 分发', () => {
@@ -85,6 +115,19 @@ describe('ToolBusinessResult present 分发', () => {
   it('HTML 卡挂载且未打开不执行脚本', () => {
     render(toolMessage(ARTIFACT))
     expect(container.querySelector('[data-testid="html-artifact-card"]')).not.toBeNull()
+    expect(container.querySelector('iframe')).toBeNull()
+  })
+
+  it('思维导图快照走 Markmap 卡而不是隔离 iframe', async () => {
+    render(toolMessage(MINDMAP))
+    // 等待懒加载的 Markmap 卡落地，避免 Suspense 在 act 外完成
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const card = container.querySelector('[data-testid="mindmap-present-card"]')
+    expect(card).not.toBeNull()
+    expect(card?.getAttribute('data-node-count')).toBe('3')
+    expect(container.querySelector('[data-testid="html-artifact-card"]')).toBeNull()
     expect(container.querySelector('iframe')).toBeNull()
   })
 

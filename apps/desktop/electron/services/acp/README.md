@@ -8,6 +8,8 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 连接与断连按窗口串行，相同在途连接请求合并；断连立即取消在途 SDK 请求。温进程 initialize 失败时同一次连接仅冷启动回退一次，沿用原会话恢复参数，最终失败才报错。`acp-connection.test.ts` 覆盖自动回退、快速断连重连与重试上限。
 通用流桥接、请求超时/取消、会话恢复/新建、原生扩展回退与有界工具输出恢复统一由 `@yitom/acp-client` 实现。`sdk-client.ts` 仅补应用身份与失败诊断，`session-open.ts` 仅补诊断及阅读会话保留 MCP 的重试策略；窗口上下文、进程归属和文档操作留宿主。安装与更新参见根 README 的「聊天与 ACP 包依赖」。
 
+会话级 Code mode（PTC）：仅当 `initialize` 的 `agentCapabilities._meta.toolsMode.values` 显式包含 `ptc` 时，`openSessionAfterAuth` 才在 `sessionMeta` 合并 `{ toolsMode: 'ptc' }`，随 `session/new|load|resume` 下发；能力解析在 `code-mode-support.ts`（纯函数 + 单测），不从运行时 id 推断。渲染端按线程保存请求，只对下一次新建/恢复生效；`AgentHeaderOverflowMenu` 仅在声明支持时显示开关，连接结果回带 `codeModeSupported`。
+
 渲染端入口：`apps/desktop/src/api/acp-api.ts` + `AgentPanel`。设计备忘见本地 `.plan/`（若不在仓库中）。
 
 重连可携带当前线程至多 20 个缺失结果的 `recoverToolCallIds`，经可选会话 `_meta.toolOutputRecovery` 扩展由支持的桥接补偿。`session-open.ts` 限制响应条数/字节数并返回 `recoveredToolOutputs`；仅成功恢复同一会话时交回渲染，渲染只更新匹配的已有成功工具消息并重新校验呈现契约，不重放/新增历史、不重新调用模型。该扩展非 ACP 标准要求，不支持的运行时沿用现有恢复路径。
@@ -22,6 +24,7 @@ ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`�
 | 认证 | `codex-auth-preflight.ts` 留守（实现已归拢至 `runtimes/codex/`；类型单一源 `@montree/contracts`）；认证守门员已迁 `@yitom/acp-client`；接线层保留非认证会话失败的真实错误，禁止统一误报为需要登录 | 连接前探活、authMethods 顺序、`~/.codex` |
 | 代理与配置 | `acp-proxy-service.ts` / `provider-config-service.ts` | Agent 子进程代理设置（userData 下 `agent/proxy` JSON 持久化）：spawn 注入 HTTP(S)_PROXY / ALL_PROXY，关闭时清理代理键；供应商配置门面 |
 | 会话 | `session-open.ts` 留守；会话能力与选项解析已迁 `@yitom/acp-client` | `session/new`、能力、Mode/Model（resume→load→new + 瞬时错误重试 1 次，`session/new` 失败保留同一 MCP 配置重试 1 次（仍失败抛原错，禁止静默去掉工具），超时 120s 由 `sdk-client.ts` 显式透传；`session/new`（及 load/resume）返回顶层 `models` 方言（数组 string / `{id\|value/name}` 对象 / `{availableModels, currentModelId}` 对象）且无 model 类 configOption 时合成一项 `model` 选项；initialize 的 `clientCapabilities` 另带 `session: { configOptions: { boolean: {} } }` 以解锁按 boolean 门控下发选项的 Agent） |
+| Code mode | `code-mode-support.ts`（+ `.test.ts`） | 解析 `initialize.agentCapabilities._meta.toolsMode.values`，仅显式 `ptc` 才算支持；`openSessionAfterAuth` 按请求把 `toolsMode` 合并进 `sessionMeta`，`acp-state` 记录能力并由连接结果回带渲染；`acp-connection.test.ts` 覆盖声明/仅 native 两条路径 |
 | 原生规则 | `native-binding.ts`（+ `native-binding.test.ts`） | 用户 `~/.montree/AGENTS.md` 为运行入口；`agent-resources.ts`（+ `.test.ts`）在应用启动与连接时从随包模板补齐缺失规则/Skills，不覆盖用户文件；配置准备、原生 Skills 绑定与精确版本门全部委托 SDK。支持会话扩展的运行时优先按会话下发，新建/恢复/加载与批注副会话均回显自身送达结果；拒绝扩展只移除扩展并保留 MCP，未知版本继续兼容。目录副会话不携带完整宿主规则。温进程按资源与有效配置摘要匹配；自定义供应商 TOML 合并辅助保留，复杂结构不覆盖 |
 | 回调 | `client-handlers.ts` 留守（含 `registerAcpClientHandlers`，SDK `onRequest`/`onNotification` 原生签名） | Agent → 客户端：权限（无桥接直接 cancelled，禁静默 allow）、fs、终端等；错误抛 `RequestError` |
 | IO | `acp-fs.ts` / `acp-terminal.ts` 留守；终端输出缓冲已迁 `@yitom/acp-client` | 虚拟/真实读文件、终端（虚拟文件定义见 `@yitom/contracts`：`node_modules/@yitom/contracts/dist/agent/montree-virtual-fs.js`，快照类型同目录 `node_modules/@yitom/contracts/dist/agent/montree-snapshot.js`） |

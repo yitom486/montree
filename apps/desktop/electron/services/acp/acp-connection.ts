@@ -34,6 +34,8 @@ import { startWindowMcpServer } from './mcp/stdio-server'
 import { windowMcpEntry } from './mcp/session-config'
 import { logAcpDiagnostic } from './mcp/diagnostics'
 import { restoreOrCreateAcpSession, isAuthenticationRequired } from './session-open'
+import { supportsCodeModeCaps } from './code-mode-support'
+import { flattenGroupedConfigOptions } from './config-options'
 import { bindSessionMcp, cancelMcpRecovery } from './mcp-session-recovery'
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
@@ -172,7 +174,7 @@ function watchProcessExit(handle: SpawnedAcpProcess, gen: number): void {
 async function openSessionAfterAuth(
   cwd: string,
   options?: { keepAliveOnFailure?: boolean },
-): Promise<Result<Extract<AcpConnectResult, { phase: 'ready' }>, AppError>> {
+): Promise<Result<AcpConnectReadyResultWithCodeMode, AppError>> {
   const a = requireAgent(true)
   if (!a.ok) return err(a.error)
   if (!acpState.runtimeId) {
@@ -183,13 +185,17 @@ async function openSessionAfterAuth(
 
   try {
     const sessionCwd = isWslPath(cwd) ? windowsToLinuxPath(cwd) : cwd
+    const baseSessionMeta = acpState.pendingRecoverToolCallIds.length ? {
+      ...acpState.connectionBinding?.sessionMeta,
+      toolOutputRecovery: { toolCallIds: acpState.pendingRecoverToolCallIds },
+    } : acpState.connectionBinding?.sessionMeta
+    const sessionMeta = acpState.pendingCodeMode && acpState.codeModeSupported
+      ? { ...(baseSessionMeta ?? {}), toolsMode: 'ptc' }
+      : baseSessionMeta
     const opened = await restoreOrCreateAcpSession({
       request: (method, params) => sdkRequest<unknown, unknown>(a.value, method, params),
       cwd: sessionCwd,
-      sessionMeta: acpState.pendingRecoverToolCallIds.length ? {
-        ...acpState.connectionBinding?.sessionMeta,
-        toolOutputRecovery: { toolCallIds: acpState.pendingRecoverToolCallIds },
-      } : acpState.connectionBinding?.sessionMeta,
+      sessionMeta,
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
@@ -199,9 +205,14 @@ async function openSessionAfterAuth(
       },
     })
 
+    if (acpState.pendingCodeMode && acpState.codeModeSupported && !opened.nativeSessionAccepted) {
+      throw new Error('Agent 拒绝了 code mode 元数据，已回退 native；请关闭 Code mode 后重试')
+    }
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
     claimAcpSession(opened.sessionId)
-    bindSessionMcp(opened.sessionId, acpState.montreeMcp, cwd, opened.nativeSessionAccepted ? acpState.connectionBinding?.sessionMeta : undefined)
+    bindSessionMcp(opened.sessionId, acpState.montreeMcp, cwd, opened.nativeSessionAccepted
+      ? { ...acpState.connectionBinding?.sessionMeta, ...(acpState.pendingCodeMode && acpState.codeModeSupported ? { toolsMode: 'ptc' } : {}) }
+      : undefined)
     acpState.sessionId = opened.sessionId
     acpState.workspaceRoot = cwd
     acpState.pendingResumeSessionId = null
@@ -249,10 +260,11 @@ async function openSessionAfterAuth(
       protocolVersion: acpState.cachedProtocolVersion,
       agentName: acpState.cachedAgentName,
       agentVersion: acpState.cachedAgentVersion,
-      configOptions: parseAcpConfigOptions(opened.configOptions),
+      configOptions: parseAcpConfigOptions(flattenGroupedConfigOptions(opened.configOptions)),
       loadSessionSupported: acpState.loadSessionSupported,
       resumeSessionSupported: acpState.resumeSessionSupported,
       promptCapabilities: acpState.cachedPromptCapabilities,
+      codeModeSupported: acpState.codeModeSupported,
       sessionRestored: opened.sessionRestored,
       recoveredToolOutputs: opened.sessionRestored ? opened.recoveredToolOutputs : undefined,
       restoreMethod: opened.restoreMethod,
@@ -279,10 +291,18 @@ type ConnectPayload = {
   resumeSessionId?: string
   /** 渲染端激活线程是否有本地实质消息（空线程例外用，缺省按非空处理） */
   hasLocalHistory?: boolean
+  /** 会话级 code mode（PTC）；只在 Agent 声明支持时生效。 */
+  codeMode?: boolean
 }
 
+type AcpConnectReadyResultWithCodeMode = Extract<AcpConnectResult, { phase: 'ready' }> & {
+  codeModeSupported?: boolean
+}
+
+type AcpConnectResultWithCodeMode = AcpConnectResult & { codeModeSupported?: boolean }
+
 const connectionQueues = new WeakMap<AcpContext, Promise<unknown>>()
-const pendingConnections = new WeakMap<AcpContext, { key: string; promise: Promise<Result<AcpConnectResult, AppError>> }>()
+const pendingConnections = new WeakMap<AcpContext, { key: string; promise: Promise<Result<AcpConnectResultWithCodeMode, AppError>> }>()
 
 function enqueueConnection<T>(operation: () => Promise<T>): Promise<T> {
   const context = currentAcpContext()
@@ -292,9 +312,9 @@ function enqueueConnection<T>(operation: () => Promise<T>): Promise<T> {
   return next
 }
 
-export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectResult, AppError>> {
+export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectResultWithCodeMode, AppError>> {
   const context = currentAcpContext()
-  const key = JSON.stringify([payload.runtimeId, payload.cwd, payload.resumeSessionId, payload.hasLocalHistory])
+  const key = JSON.stringify([payload.runtimeId, payload.cwd, payload.resumeSessionId, payload.hasLocalHistory, payload.codeMode === true])
   const pending = pendingConnections.get(context)
   if (pending?.key === key) return pending.promise
   const gen = ++acpState.connectGeneration
@@ -305,9 +325,11 @@ export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectRe
   return promise
 }
 
-async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm = true): Promise<Result<AcpConnectResult, AppError>> {
+async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm = true): Promise<Result<AcpConnectResultWithCodeMode, AppError>> {
   if (currentAcpContext().closed) return err({ code: 'ACP_NOT_CONNECTED', message: 'Agent 所属窗口已关闭' })
   if (gen !== acpState.connectGeneration) return err({ code: 'ACP_PROTOCOL_ERROR', message: '连接已被更新的请求取代' })
+  acpState.pendingCodeMode = payload.codeMode === true
+  acpState.codeModeSupported = false
   // spawn 模板一律取自 findBuiltinAcpRuntime（经 resolveRuntimeTemplate），
   // 禁写死 codex bunx；command/args 缺失即判错，不触达 spawn。
   let runtime = resolveRuntimeTemplate(payload.runtimeId)
@@ -394,6 +416,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
   }
 
   acpState.runtimeId = runtime.id
+  acpState.pendingCodeMode = payload.codeMode === true
   acpState.pendingResumeSessionId = payload.resumeSessionId?.trim() || null
   acpState.pendingRecoverToolCallIds = (payload.recoverToolCallIds ?? []).filter(id => typeof id === 'string' && id.length <= 120).slice(-20)
   // 空线程提示直达 openSessionAfterAuth 的 arm 决策（缺省 null = 未知，按非空照常压制）
@@ -657,6 +680,8 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
     acpState.resumeSessionSupported = parseResumeSessionSupported(caps)
     // 多模态图片能力裁决：服务端显式声明优先；未显式禁用时默认开启并自动检测大模型/多模态证据
     acpState.cachedPromptCapabilities = resolveAcpPromptCapabilities(caps, initResult, runtime)
+    // 会话级 code mode（PTC）只认 initialize 的显式声明，不从运行时名推断。
+    acpState.codeModeSupported = supportsCodeModeCaps(caps)
 
     // stdio is mandatory in ACP; the window broker survives Agent reconnects.
     acpState.montreeMcp = await startWindowMcpServer({ readSnapshot: handleSnapshotRequest })
@@ -673,7 +698,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
       ? { codexHome: '', hasCodexHome: false, hasAuthFile: false, hasApiKeyEnv: false, looksLoggedIn: false }
       : safeProbeAuth(adapter)
     logAcpDiagnostic('acp.auth.probe', { runtime: runtime.id, environment: isWslPath(cwd) ? 'wsl' : 'native', fileProbeEnvironment: wslOpenCode ? 'agent-direct' : 'native', looksLoggedIn: preflight.looksLoggedIn })
-    let openedWithoutAuth: Extract<AcpConnectResult, { phase: 'ready' }> | null = null
+    let openedWithoutAuth: AcpConnectReadyResultWithCodeMode | null = null
     let directSessionError: AppError | undefined
     // keychain 化兜底：adapter 未声明 tryDirectSessionFirst 视为 false（防御性读取）。
     let tryDirectSessionFirst = false
@@ -723,6 +748,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
         loadSessionSupported: acpState.loadSessionSupported,
         resumeSessionSupported: acpState.resumeSessionSupported,
         promptCapabilities: acpState.cachedPromptCapabilities,
+        codeModeSupported: acpState.codeModeSupported,
       })
     }
 
@@ -761,7 +787,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
 export async function authenticateAcp(payload: {
   methodId: string
   force?: boolean
-}): Promise<Result<Extract<AcpConnectResult, { phase: 'ready' }>, AppError>> {
+}): Promise<Result<AcpConnectReadyResultWithCodeMode, AppError>> {
   const a = requireAgent(true)
   if (!a.ok) return err(a.error)
   const cwd = resolveAgentCwd(acpState.workspaceRoot).cwd
@@ -857,6 +883,8 @@ async function disconnectAcpNow(
   acpState.loadSessionSupported = false
   acpState.resumeSessionSupported = false
   acpState.cachedPromptCapabilities = {}
+  acpState.codeModeSupported = false
+  acpState.pendingCodeMode = false
   acpState.pendingResumeSessionId = null
   acpState.pendingHasLocalHistory = null
   acpState.suppressSessionUpdates = false

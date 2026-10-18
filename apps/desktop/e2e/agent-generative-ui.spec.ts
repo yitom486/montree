@@ -247,7 +247,30 @@ test.describe('生成式 UI 生产链路 G4', () => {
       expect(markdownGuide.result.content[0].text).toContain('本地')
       const rejected = await mcpCall(window, endpoint, 'montree_present', { kind: 'preset', preset: 'diagram', diagramType: 'flowchart', title: '错误端点', nodes: [{ id: 'a', label: '甲' }, { id: 'b', label: '乙' }], edges: [{ from: 'a', to: 'unknown' }] })
       expect(rejected.result.isError).toBe(true)
-      for (const type of ['flowchart', 'sequence', 'mindmap', 'swimlane', 'timeline', 'fishbone', 'cycle', 'er', 'architecture']) {
+      // 思维导图走 Markmap：树布局、自动 fit、折叠与全屏，不再使用固定画布的 SVG iframe。
+      // 放在图解循环之前，避免后续消息把 architecture 卡收进历史工作记录，影响主题回执检查。
+      await panel.getByRole('textbox', { name: '输入消息，Enter 发送，Shift+Enter 换行' }).fill('diagram:mindmap')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      await expect(panel.locator('[data-slot="streaming-response"]').last(), await panel.innerText()).toContainText('|mindmap')
+      const mindmapCard = panel.getByTestId('mindmap-present-card').filter({ hasText: '内置mindmap' })
+      await expect(mindmapCard, await panel.innerText()).toBeVisible()
+      const mindmap = mindmapCard.getByTestId('markmap-block')
+      await expect(mindmap).toBeVisible()
+      await expect(mindmap.locator('[data-testid="markmap-svg"]')).toBeVisible()
+      await expect(mindmap).toContainText('读者')
+      await expect(mindmap).toContainText('阅读方法')
+      // 等 Markmap 的 fit 过渡落定后再截图
+      await window.waitForTimeout(800)
+      await mindmapCard.screenshot({ path: info.outputPath('markmap-mindmap.png') })
+      await mindmapCard.getByTitle('全屏放大查看').click()
+      const mindmapDialog = window.getByRole('dialog', { name: '内置mindmap', exact: true })
+      await expect(mindmapDialog).toBeVisible()
+      await expect(mindmapDialog.getByTestId('markmap-block')).toBeVisible()
+      await expect(mindmapDialog).toContainText('点击圆圈节点折叠/展开分支')
+      await mindmapDialog.screenshot({ path: info.outputPath('markmap-mindmap-enlarged.png') })
+      await mindmapDialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(mindmapDialog).toHaveCount(0)
+      for (const type of ['flowchart', 'sequence', 'swimlane', 'timeline', 'fishbone', 'cycle', 'er', 'architecture']) {
         await panel.getByRole('textbox', { name: '输入消息，Enter 发送，Shift+Enter 换行' }).fill(`diagram:${type}`)
         await panel.getByRole('button', { name: '发送', exact: true }).click()
         await expect(panel.locator('[data-slot="streaming-response"]').last(), await panel.innerText()).toContainText(`|${type}`)
@@ -255,7 +278,6 @@ test.describe('生成式 UI 生产链路 G4', () => {
         await expect(card, await panel.innerText()).toBeVisible()
         const frame = card.frameLocator('[data-testid="svg-diagram-frame"]')
         await expect(frame.getByRole('img', { name: `内置${type}` })).toBeVisible()
-        if (type === 'mindmap') await expect(frame.locator('.node')).toHaveCount(5)
         if (type === 'swimlane') await expect(frame.locator('.lane')).toHaveCount(2)
         if (type === 'er') {
           await expect(frame.locator('.entity')).toHaveCount(3)
@@ -277,7 +299,7 @@ test.describe('生成式 UI 生产链路 G4', () => {
         expect(await frame.locator('body').evaluate(() => { try { void parent.document; return false } catch { return true } })).toBe(true)
         await frame.getByRole('button', { name: '适应宽度' }).click()
         await card.screenshot({ path: info.outputPath(`svg-${type}.png`) })
-        if (['mindmap', 'swimlane', 'timeline', 'fishbone', 'cycle', 'er'].includes(type)) {
+        if (['swimlane', 'timeline', 'fishbone', 'cycle', 'er'].includes(type)) {
           await card.getByRole('button', { name: `放大查看：内置${type}` }).click()
           const dialog = window.getByRole('dialog', { name: `内置${type}`, exact: true })
           await expect(dialog).toBeVisible()

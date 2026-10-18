@@ -114,4 +114,48 @@ test.describe('Agent 面板壳', () => {
       await app.close()
     }
   })
+
+  test('Code mode 开关把 _meta.toolsMode 透传到下一次新会话', async ({}) => {
+    const app = await launchBuiltApp({
+      E2E_ACP_WINDOW_TEST: '1',
+      E2E_ACP_COMMAND: process.execPath,
+      E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
+    })
+    try {
+      const window = await app.firstWindow()
+      await window.waitForLoadState('domcontentloaded')
+      await window.waitForTimeout(3000)
+      await window.evaluate(() => {
+        const scopeSuffix = (window.electronAPI?.windowScopeId && window.electronAPI.windowScopeId !== 'main' ? ':' + window.electronAPI.windowScopeId : '')
+        localStorage.setItem('markdown-editor-ui', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
+        localStorage.setItem('montree-acp-ui' + scopeSuffix, JSON.stringify({ version: 0, state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'code-mode-test' } }))
+        localStorage.setItem('montree-acp-metadata/v2' + scopeSuffix, JSON.stringify({ state: { panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'code-mode-test' } }))
+        localStorage.setItem('montree-chat-session/v1' + scopeSuffix, JSON.stringify({ version: 1, authorityVersion: 1, snapshot: {
+          threads: [{ id: 'code-mode-test', hostThreadId: 'code-mode-test', runtimeId: 'mock-window', title: 'Code mode 回归', feed: { messages: [], turnSettled: false } }],
+          activeThreadId: 'code-mode-test',
+          modelConfig: { runtimeId: 'mock-window' },
+        } }))
+        location.reload()
+      })
+      const panel = window.locator('aside[aria-label="Agent 聊天"]:visible').first()
+      const input = panel.locator('textarea')
+      await input.fill('identity')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      await expect(panel.locator('[data-slot="streaming-response"]').last()).toContainText('IDENTITY:')
+
+      const more = panel.getByRole('button', { name: '更多面板操作' })
+      await more.click()
+      const codeMode = window.getByRole('menuitemcheckbox', { name: /Code mode/ })
+      await expect(codeMode).toBeVisible()
+      await codeMode.click()
+      await more.click()
+      await window.getByRole('menuitem', { name: '新对话', exact: true }).click()
+
+      await input.fill('code-mode-meta')
+      await panel.getByRole('button', { name: '发送', exact: true }).click()
+      await expect(panel.locator('[data-slot="streaming-response"]').last()).toContainText('CODE_MODE:ptc')
+    } finally {
+      await app.close()
+    }
+  })
 })

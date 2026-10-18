@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { BUILTIN_ACP_RUNTIMES, DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { getAcpRuntimeAdapter } from './index'
 import { resolveCursorCommand } from './cursor'
@@ -57,5 +60,27 @@ describe('runtimes/index', () => {
     const resolved = resolveCursorCommand()
     expect(resolved.args).toEqual(['acp'])
     expect(resolved.command.toLowerCase()).toContain('agent')
+  })
+
+  it('DeepSeek 派发宿主适配器：复用 ~/.dsh 凭据，而非 SDK 旧预检', () => {
+    const savedKey = process.env.DEEPSEEK_API_KEY
+    const savedHome = process.env.DSH_HOME
+    const home = mkdtempSync(join(tmpdir(), 'montree-dsh-registry-'))
+    try {
+      delete process.env.DEEPSEEK_API_KEY
+      process.env.DSH_HOME = home
+      const adapter = getAcpRuntimeAdapter('deepseek')
+      expect(adapter.id).toBe('deepseek')
+      // 宿主文案会提到本地 credentials 文件；SDK baseline 只认 env key。
+      expect(adapter.resolveSpawnBlocker?.()).toContain('credentials.yaml')
+      writeFileSync(join(home, '.credentials.yaml'), 'token: fixture\n')
+      expect(adapter.resolveSpawnBlocker?.()).toBeNull()
+    } finally {
+      if (savedKey === undefined) delete process.env.DEEPSEEK_API_KEY
+      else process.env.DEEPSEEK_API_KEY = savedKey
+      if (savedHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = savedHome
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 })

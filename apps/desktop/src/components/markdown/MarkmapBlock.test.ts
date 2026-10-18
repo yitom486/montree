@@ -102,4 +102,26 @@ describe('MarkmapBlock', () => {
     expect(host.querySelector('button[title="查看源码"]')).toBeNull()
     expect(host.querySelector('[data-testid="markmap-svg"]')).not.toBeNull()
   })
+
+  it('fillHeight 充满父容器并交给 flex 分配高度', async () => {
+    await act(async () => {
+      root.render(createElement(MarkmapBlock, { source: '# 全屏导图', fillHeight: true }))
+    })
+    const block = host.querySelector('[data-testid="markmap-block"]')
+    expect(block?.className).toContain('h-full')
+    const canvas = host.querySelector('[data-testid="markmap-svg"]')?.parentElement
+    expect(canvas?.getAttribute('style')).toBeNull()
+    expect(canvas?.className).toContain('flex-1')
+  })
+
+  it('把 initialExpandLevel 传入 Markmap 选项', async () => {
+    const { Markmap } = await import('markmap-view')
+    const create = vi.mocked(Markmap.create)
+    create.mockClear()
+    await act(async () => {
+      root.render(createElement(MarkmapBlock, { source: '# 根\n- 分支', initialExpandLevel: 2 }))
+    })
+    expect(create).toHaveBeenCalled()
+    expect(create.mock.calls.at(-1)?.[1]).toMatchObject({ initialExpandLevel: 2 })
+  })
 })

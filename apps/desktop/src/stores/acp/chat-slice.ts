@@ -85,6 +85,7 @@ export interface ChatSlice {
   resolveMarkProposal: (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => void
   selectChapterMarkPlan: (entryId: string) => void
   createThread: (workspaceRoot?: string | null, runtimeId?: string) => string
+  setThreadCodeMode: (threadId: string, enabled: boolean) => void
   switchThread: (threadId: string) => void
   switchWorkspace: (workspaceRoot?: string) => string
   deleteThread: (threadId: string) => void
@@ -507,6 +508,16 @@ export const createChatSlice: StateCreator<
         t.id === threadId
           ? { ...t, title: title.trim() || '新对话', updatedAt: Date.now() }
           : t,
+      ),
+    }))
+    reconcileOwnedChatThreadMetadata(pkg, get())
+  },
+
+  setThreadCodeMode: (threadId, enabled) => {
+    const pkg = getOwnedChatSessionStore()
+    set((s) => ({
+      threads: s.threads.map((t) =>
+        t.id === threadId ? { ...t, codeMode: enabled === true, updatedAt: Date.now() } : t,
       ),
     }))
     reconcileOwnedChatThreadMetadata(pkg, get())

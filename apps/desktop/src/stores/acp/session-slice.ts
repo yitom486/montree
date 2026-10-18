@@ -25,6 +25,8 @@ export interface SessionSlice {
   configOptions: AcpConfigOption[]
   prompting: boolean
   promptCapabilities: AcpPromptCapabilities
+  /** 当前连接 Agent 是否声明会话级 code mode（PTC）；disconnect/切换清空。 */
+  codeModeSupported: boolean
   preferredConfigByRuntime: AcpPreferredConfigMap
   /**
    * 当前连接确认的 prompt 模式（内存态，不持久化）：
@@ -47,6 +49,7 @@ export interface SessionSlice {
   setPromptMode: (mode: AcpPromptMode, reason?: string) => void
   setConfigOptions: (options: AcpConfigOption[]) => void
   setPromptCapabilities: (caps: AcpPromptCapabilities) => void
+  setCodeModeSupported: (supported: boolean) => void
   setPrompting: (prompting: boolean) => void
   setModelCatalog: (runtimeId: string, catalog: string[] | null) => void
   rememberConfigPreference: (
@@ -79,6 +82,7 @@ export const createSessionSlice: StateCreator<
   configOptions: [],
   prompting: false,
   promptCapabilities: {},
+  codeModeSupported: false,
   preferredConfigByRuntime: {},
   modelCatalogByRuntime: {},
   sessionPromptMode: 'compatibility',
@@ -121,6 +125,7 @@ export const createSessionSlice: StateCreator<
         // 切换 Agent 后立即清空旧 Agent 遗留的模型选项与能力缓存（含横杠目录）
         configOptions: [],
         promptCapabilities: {},
+        codeModeSupported: false,
         modelCatalogByRuntime: {},
         // 连接模式随新连接重裁，未确认前回落兼容（防旧 native 标记串到新会话）
         sessionPromptMode: 'compatibility',
@@ -143,6 +148,7 @@ export const createSessionSlice: StateCreator<
             prompting: false,
             pendingPermission: null,
             promptCapabilities: {},
+            codeModeSupported: false,
             configOptions: [],
             modelCatalogByRuntime: {},
             sessionPromptMode: 'compatibility' as AcpPromptMode,
@@ -175,6 +181,7 @@ export const createSessionSlice: StateCreator<
       return { sessionPromptMode: mode, sessionPromptModeReason: reason }
     }),
   setPromptCapabilities: (caps) => set({ promptCapabilities: caps }),
+  setCodeModeSupported: (supported) => set({ codeModeSupported: supported === true }),
   setPrompting: (prompting) => set({ prompting }),
   setModelCatalog: (runtimeId, catalog) =>
     set((s) => {

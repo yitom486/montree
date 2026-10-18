@@ -18,11 +18,10 @@ export function useTextDocumentTools(options: {
   const model = useMemo(() => {
     const { filePath, content, savedContent, diskContent, session } = latest.current
     if (!filePath || !['markdown', 'typst'].includes(getDocumentKind(filePath))) return undefined
-    const isTypst = getDocumentKind(filePath) === 'typst'
     const model = new TextDocument(filePath, content, savedContent, diskContent,
       (text) => {
         if (latest.current.filePath === model.filePath && latest.current.session === session) {
-          if (getStickyReaderSelection()?.filePath === filePath) clearReaderSelection()
+          if (getStickyReaderSelection()?.filePath === model.filePath) clearReaderSelection()
           latest.current.onChange(text)
         }
       }, notifyDocumentTools,
@@ -33,12 +32,12 @@ export function useTextDocumentTools(options: {
         if (latest.current.filePath === targetPath && latest.current.session === session) latest.current.onSaved(text)
         clearDraftForFile(targetPath)
       })
-    if (isTypst) return model
+    // Typst 与 Markdown/TXT 共用源码、撤销历史与 Agent 选区/文本工具
     model.onSelectionChange = () => {
-      if (latest.current.filePath !== filePath || latest.current.session !== session) return
+      if (latest.current.filePath !== model.filePath || latest.current.session !== session) return
       const target = model.selectionSnapshot()
       if (target) commitDocumentSelection(target, target.ranges.map((range) => range.text).join('\n'))
-      else if (getStickyReaderSelection()?.filePath === filePath) clearReaderSelection()
+      else if (getStickyReaderSelection()?.filePath === model.filePath) clearReaderSelection()
     }
     return model
   }, [modelKey, options.session])
@@ -46,14 +45,14 @@ export function useTextDocumentTools(options: {
   useEffect(() => { model?.sync(options.content) }, [model, options.content])
   useEffect(() => { model?.markSaved(options.savedContent, options.diskContent) }, [model, options.savedContent, options.diskContent])
   useEffect(() => {
-    // Typst 目前只共享文本/历史，尚未声明 Agent 分段/编辑工具能力。
-    if (!model || kind !== 'markdown') return
-    const disposeTools = registerDocumentTools({ filePath: model.filePath, kind: 'text', isDirty: model.isDirty,
+    if (!model) return
+    const filePath = model.filePath
+    const disposeTools = registerDocumentTools({ filePath, kind: 'text', isDirty: model.isDirty,
       save: model.save, undo: model.undo, read: model.read, edit: model.edit })
-    const disposeSelection = registerSelectionProvider({ filePath: model.filePath,
+    const disposeSelection = registerSelectionProvider({ filePath,
       getSelectionText: () => model.selection()?.ranges.map((range) => range.text).join('\n') ?? null,
       getSelectionTarget: model.selectionSnapshot })
     return () => { disposeSelection(); disposeTools() }
-  }, [model, kind])
+  }, [model, kind, options.filePath])
   return model
 }

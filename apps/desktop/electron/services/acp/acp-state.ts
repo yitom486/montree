@@ -57,6 +57,10 @@ export interface AcpState {
   loadSessionSupported: boolean
   resumeSessionSupported: boolean
   cachedPromptCapabilities: AcpPromptCapabilities
+  /** 本次连接声明的会话级 code mode（PTC）能力；disconnect 清除。 */
+  codeModeSupported: boolean
+  /** 本次连接请求的 code mode；只影响 new/load/resume 建会话。 */
+  pendingCodeMode: boolean
   /** 本次连接周期内希望恢复的旧 session（来自 UI thread.agentSessionId） */
   pendingResumeSessionId: string | null
   pendingRecoverToolCallIds: string[]
@@ -134,6 +138,8 @@ function createAcpState(): AcpState {
     loadSessionSupported: false,
     resumeSessionSupported: false,
     cachedPromptCapabilities: {},
+    codeModeSupported: false,
+    pendingCodeMode: false,
     pendingResumeSessionId: null,
     pendingRecoverToolCallIds: [],
     pendingHasLocalHistory: null,

@@ -13,10 +13,11 @@ async function open(page: Page, file: string) {
 }
 async function fixture() {
   const workspace = await mkdtemp(join(tmpdir(), 'montree-text-tools-'))
-  const documentPath = join(workspace, 'notes.md'), txtPath = join(workspace, 'plain.txt')
+  const documentPath = join(workspace, 'notes.md'), txtPath = join(workspace, 'plain.txt'), typPath = join(workspace, 'main.typ')
   const source = '# First\n\nsame\n\n# Second\n\nsame\n\n<!-- Page 1 -->\n[[note]]\n![architecture](https://example.test/figure.png)\n'
   await writeFile(documentPath, source.replace(/\n/g, '\r\n'))
   await writeFile(txtPath, '# Literal heading\n![literal](picture.png)\nsecond\n')
+  await writeFile(typPath, '= Typst 标题\n正文 😀\n$ x^2 + y^2 = z^2 $\n')
   const app = await launchBuiltApp({ E2E_AUTO_OPEN_PATH: workspace, E2E_DOCUMENT_TOOLS: '1' })
   const page = await app.firstWindow()
   await page.getByRole('button', { name: '更多操作', exact: true }).click()
@@ -43,7 +44,7 @@ async function fixture() {
     expect(result.isError, result.content[0].text).not.toBe(true)
     return JSON.parse(result.content[0].text)
   }
-  return { app, page, workspace, documentPath, txtPath, source, rpc, call, value, transcript }
+  return { app, page, workspace, documentPath, txtPath, typPath, source, rpc, call, value, transcript }
 }
 async function close(app: ElectronApplication) {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))
@@ -151,5 +152,37 @@ test('TXT读取未保存手动输入、普通保存、跨文件目标拒绝、�
     expect(await readFile(txtPath, 'utf8')).toBe('external changes')
     expect((await value('montree_text_read', { documentPath: txtPath })).dirty).toBe(true)
     await value('montree_document_undo', { documentPath: txtPath, revision: state.revision })
+  } finally { await close(app) }
+})
+
+test('Typst源码接入统一MCP：format=typst、读取/选区/编辑/保存/撤销', async () => {
+  const { app, page, typPath, value } = await fixture()
+  try {
+    await open(page, 'main.typ')
+    await expect(page.locator('.cm-editor')).toBeVisible()
+    let state = await value('montree_text_read', { documentPath: typPath })
+    expect(state.format).toBe('typst')
+    expect(state.units[0].label).toContain('行')
+    const document = await value('montree_text_read', { documentPath: typPath, target: 'document' })
+    expect(document.text).toContain('= Typst 标题')
+    // The Typst editor selection feeds montree_get_selection through the same text selection provider.
+    await page.locator('.cm-content').click()
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Shift+End')
+    const selection = await value('montree_get_selection', {})
+    expect(selection.selection).toBe('= Typst 标题')
+    expect(selection.target).toMatchObject({ kind: 'text', documentPath: typPath })
+    // Plain-source UTF-16 edit, then explicit save and undo; no Markdown parsing is involved.
+    state = await value('montree_text_edit', {
+      documentPath: typPath,
+      revision: document.revision,
+      expectedCount: 1,
+      edits: [{ from: 0, to: 0, expectedText: '', text: '// ' }],
+    })
+    expect((await value('montree_text_read', { documentPath: typPath, target: 'document' })).text).toContain('// = Typst 标题')
+    await value('montree_document_save', { documentPath: typPath, revision: state.revision })
+    expect(await readFile(typPath, 'utf8')).toContain('// = Typst 标题')
+    await value('montree_document_undo', { documentPath: typPath, revision: state.revision })
+    expect((await value('montree_text_read', { documentPath: typPath, target: 'document' })).text).toContain('= Typst 标题')
   } finally { await close(app) }
 })

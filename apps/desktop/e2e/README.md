@@ -14,7 +14,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 |------|------|
 | `app-smoke.spec.ts` | 启动、欢迎页、菜单；真实 IPC 拒绝未绑定窗口凭 workspaceId 访问远端 |
 | `agent-community.spec.ts` | 社区滚动跟随/上滑逃离、历史窗口与位置恢复回归 |
-| `agent-panel.spec.ts` | Agent 面板壳；mock ACP 的 320/390/480 输入栏布局、选区复制/引用与输入框粘贴/剪切（剪贴板边界桩） |
+| `agent-panel.spec.ts` | Agent 面板壳；mock ACP 的 320/390/480 输入栏布局、选区复制/引用与输入框粘贴/剪切（剪贴板边界桩）；Code mode 开关经真实 IPC 透传 `_meta.toolsMode=ptc` 到下一次新会话 |
 | `agent-wsl-opencode.spec.ts` | 可选真实 Windows→WSL OpenCode 连接验证（设置 E2E_WSL_OPENCODE_CWD）：加载 Ubuntu 用户登录 shell、独立认证、stdio 工具发现；不发送模型 prompt |
 | `agent-window-isolation.spec.ts` / `fixtures/mock-window-agent.cjs` | 模拟 ACP Agent 经真实子进程/SDK/IPC/stdio MCP 验证多窗口聊天、制卡指针、权限、取消、恢复、关闭和 iframe 原生快捷键隔离；同时验证独立聊天包的窗口存储分区、主窗口旧历史迁入及副窗口重载不继承主历史；不调用真实模型；HTTP 仅保留专用测试钩子兼容 |
 | `agent-tool-timeline.spec.ts` | 聊天展示层定向回归：种子时间线（单回合一条工作记录/失败摘要/图表独立入口紧凑态/长内容，浅色+深色截图与默认态高度测量）、10 调用收敛基线（一条记录+2 结果入口）、流式工作记录（运行收起·展开后落定保持，需 mock `worklog`/`worklog-done` 台本）、真实 mock 审批 Allow/Reject 全链路（唯一可见·幂等消失）、分隔线三档宽度（约 320/390/480）与 JSON 内部滚动；不调用真实模型 |
@@ -30,7 +30,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `typst-editor.spec.ts` | 真实随包 Tinymist：中文路径/CRLF 打开、LSP 补全/诊断修复、未保存 SVG 文字标记及同修订 PDF 回读、iframe 无 preload/无浏览器错误、原生缩放、三种视图宽度、撤销/保存重开/端口释放；另验证工作区 A 保持打开时独立文件 B、另存为 C 的各自根目录与相对 include（仅桩原生对话框）；运行前须准备锁定版本 `apps/desktop/resources/typst/tinymist(.exe)`，缺失会失败，不静默跳过 |
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开；路径栏定位/窄栏/未保存提示；右键菜单、Shift+F10、禁用项、Escape 与复制路径参数（剪贴板边界桩） |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
-| `text-tools-integration.spec.ts` | mock 模型输出 → 真实 HTTP MCP → IPC → Markdown/TXT CodeMirror 缓冲区；精确选区、重复原文、批量拒绝原子性、全部视图/共享撤销、未保存手动输入、CRLF 保存重开、跨文档及外部冲突校验 |
+| `text-tools-integration.spec.ts` | mock 模型输出 → 真实 HTTP MCP → IPC → Markdown/TXT/**Typst** 缓冲区；精确选区、重复原文、批量拒绝原子性、全部视图/共享撤销、未保存手动输入、CRLF 保存重开、跨文档及外部冲突校验；Typst 验证 `format=typst`、行分段、选区和保存/撤销 |
 | `ppt-tools-integration.spec.ts` | mock 模型工具调用输出 → 真实 HTTP MCP → IPC → PPT 模型/预览/磁盘保存与重开；局部样式保留、拒绝原子性、外部冲突、可见页/选区页和按需检查器，附前后截图与工具记录 |
 | `ppt-advanced-tools.spec.ts` | mock 工具输出经真实 MCP 编辑嵌套组合、图表及内嵌工作簿、现有母版/版式、基础动画；预览/放映/定时翻页/退出清理/撤销/保存重开与拒绝原子性，附截图及调用记录 |
 | `ppt-slideshow.spec.ts` | 真实全屏单页放映、键盘/鼠标翻页、退出按钮/Esc/系统退出、AI 当前页同步、阅读模式与缩放恢复及全屏拒绝回退和宽高适配 |

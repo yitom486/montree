@@ -90,6 +90,11 @@ export const AgentPanel = memo(function AgentPanel({
   const setPanelOpen = useAcpUiStore((s) => s.setPanelOpen)
   const setHudDisplayMode = useAcpUiStore((s) => s.setHudDisplayMode)
   const createThread = useAcpUiStore((s) => s.createThread)
+  const setThreadCodeMode = useAcpUiStore((s) => s.setThreadCodeMode)
+  const codeModeSupported = useAcpUiStore((s) => s.codeModeSupported)
+  const codeMode = useAcpUiStore(
+    (s) => s.threads.find((thread) => thread.id === s.activeThreadId)?.codeMode === true,
+  )
   const {
     connect,
     disconnect,
@@ -517,8 +522,22 @@ export const AgentPanel = memo(function AgentPanel({
           <AgentHeaderOverflowMenu
             floating={floating}
             actionDisabled={view.prompting}
+            codeModeSupported={codeModeSupported}
+            codeMode={codeMode}
+            onToggleCodeMode={(enabled) => {
+              setThreadCodeMode(useAcpUiStore.getState().activeThreadId, enabled)
+              toast.message(
+                enabled
+                  ? 'Code mode 已开启；仅对下次新建/恢复会话生效'
+                  : 'Code mode 已关闭；仅对下次新建/恢复会话生效',
+              )
+            }}
             onNewThread={() => {
-              createThread(workspaceRoot)
+              const previousCodeMode = useAcpUiStore
+                .getState()
+                .threads.find((thread) => thread.id === useAcpUiStore.getState().activeThreadId)?.codeMode
+              const nextId = createThread(workspaceRoot)
+              if (previousCodeMode) setThreadCodeMode(nextId, true)
               void syncAgentSessionToActiveThread()
             }}
             onClearMessages={clearMessages}

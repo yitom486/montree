@@ -42,10 +42,10 @@ async function handle(message) {
   const { id, method, params = {} } = message
   if (!method) { permissions.get(id)?.(message.result); permissions.delete(id); return }
   if (method === 'initialize') {
-    result(id, { protocolVersion: 1, agentInfo: { name: 'mock-window', version: '1' }, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true }, promptCapabilities: { image: true } }, authMethods: [] })
+    result(id, { protocolVersion: 1, agentInfo: { name: 'mock-window', version: '1' }, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true }, promptCapabilities: { image: true }, _meta: { toolsMode: { values: ['native', 'ptc'] } } }, authMethods: [] })
   } else if (method === 'session/new' || method === 'session/load' || method === 'session/resume') {
     const sessionId = params.sessionId || `mock-${process.pid}-${++sequence}`
-    sessions.set(sessionId, { cwd: params.cwd, mcp: params.mcpServers?.[0] })
+    sessions.set(sessionId, { cwd: params.cwd, mcp: params.mcpServers?.[0], meta: params._meta })
     const recoveryFile = process.env.E2E_ACP_TOOL_RECOVERY_FILE
     const ids = params._meta?.toolOutputRecovery?.toolCallIds
     const outputs = recoveryFile && existsSync(recoveryFile) && Array.isArray(ids) ? JSON.parse(readFileSync(recoveryFile, 'utf8')).filter(row => ids.includes(row.toolCallId)) : []
@@ -78,6 +78,8 @@ async function handle(message) {
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
+    } else if (command === 'code-mode-meta') {
+      output = `CODE_MODE:${sessions.get(sessionId).meta?.toolsMode ?? 'none'}`
     } else if (command.startsWith('diagram:') || command === 'inline-diagram') {
       const diagramType = command === 'inline-diagram' ? 'flowchart' : command.slice('diagram:'.length)
       const { mcp } = sessions.get(sessionId)

@@ -38,6 +38,10 @@ function requireElectronAPI(): Result<ElectronAPI, AppError> {
   return ok(window.electronAPI)
 }
 
+/** Local extension until @yitom/contracts exposes session-level code mode. */
+export type AcpConnectPayloadWithCodeMode = AcpConnectPayload & { codeMode?: boolean }
+export type AcpConnectResultWithCodeMode = AcpConnectResult & { codeModeSupported?: boolean }
+
 /** preload 未热更新时，旧 electronAPI 缺少 ACP 方法；避免 TypeError 炸整页 */
 function hasAcpBridge(api: ElectronAPI): boolean {
   return (
@@ -81,10 +85,10 @@ export const acpApi = {
     return api.value.acpAuthPreflight(payload)
   },
 
-  async connect(payload: AcpConnectPayload): Promise<Result<AcpConnectResult, AppError>> {
+  async connect(payload: AcpConnectPayloadWithCodeMode): Promise<Result<AcpConnectResultWithCodeMode, AppError>> {
     const api = requireAcpBridge()
     if (!api.ok) return api
-    return api.value.acpConnect(payload)
+    return api.value.acpConnect(payload) as Promise<Result<AcpConnectResultWithCodeMode, AppError>>
   },
 
   async authenticate(

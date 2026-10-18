@@ -9,6 +9,7 @@ import type {
 } from '@yitom/contracts'
 import { methods, type McpServer, type PromptRequest } from '@agentclientprotocol/sdk'
 import { parseAcpConfigOptions } from "@yitom/acp-client"
+import { flattenGroupedConfigOptions } from './config-options'
 import { resolveAgentCwd } from './agent-sandbox-cwd'
 import {
   type MontreeMcpServerHandle,
@@ -93,7 +94,7 @@ export async function loadAcpSession(payload: {
     }
     return ok({
       sessionId: id,
-      configOptions: parseAcpConfigOptions(result.configOptions),
+      configOptions: parseAcpConfigOptions(flattenGroupedConfigOptions(result.configOptions)),
       promptMode:sessionPromptMode(opened.nativeSessionAccepted, true),
     })
   } catch (error) {
@@ -148,7 +149,7 @@ export async function createAcpSession(
     if (!acpState.workspaceRoot) acpState.workspaceRoot = resolvedCwd
     return ok({
       sessionId: id,
-      configOptions: parseAcpConfigOptions(result.configOptions),
+      configOptions: parseAcpConfigOptions(flattenGroupedConfigOptions(result.configOptions)),
       promptMode:toolScope === 'full' ? sessionPromptMode(opened.nativeSessionAccepted,false) : 'compatibility',
     })
   } catch (error) {
@@ -175,13 +176,13 @@ export async function setAcpConfigOption(payload: {
       },
     )
     const configOptions = parseAcpConfigOptions(
-      result.configOptions ?? result,
+      flattenGroupedConfigOptions(result.configOptions ?? result),
     )
     // 部分 Agent 直接返回数组
     const parsed =
       configOptions.length > 0
         ? configOptions
-        : parseAcpConfigOptions(Array.isArray(result) ? result : [])
+        : parseAcpConfigOptions(flattenGroupedConfigOptions(Array.isArray(result) ? result : []))
     return ok({ configOptions: parsed })
   } catch (error) {
     return err(toProtocolError(error, '设置配置项失败'))
