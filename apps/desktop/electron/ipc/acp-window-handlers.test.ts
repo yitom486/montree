@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
+import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { IPC, ok } from '@yitom/contracts'
 
@@ -9,13 +11,22 @@ vi.mock('electron', async () => {
   ipc.handle = (name, fn) => mocks.handlers.set(name, fn)
   return { ipcMain: ipc, app: { getPath: () => process.cwd(), getVersion: () => 'test' } }
 })
-vi.mock('../services/acp/acp-connection', () => ({ connectAcp: mocks.connect, disconnectAcp: vi.fn(async () => ok(undefined)), authenticateAcp: vi.fn() }))
+vi.mock('../services/acp/acp-connection', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/acp/acp-connection')>()
+  return { connectAcp: mocks.connect, disconnectAcp: vi.fn(async () => ok(undefined)), authenticateAcp: vi.fn(), detachSdkStreamNow: actual.detachSdkStreamNow }
+})
+vi.mock('../services/acp/process-manager', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/acp/process-manager')>(),
+  disposeContextAcpProcesses: vi.fn(),
+}))
 vi.mock('../services/reader-screenshot-service', () => ({ captureReaderViewport: vi.fn() }))
 import { ipcMain, type WebContents } from 'electron'
 import { registerAcpWindowHandlers, withAcpWindow, MAX_SNAPSHOT_IN_FLIGHT } from './acp-window-handlers'
 import { acpState, setStatus, getAcpState, claimAcpSession, ownsAcpSession } from '../services/acp/acp-state'
 import { handleSnapshotRequest, handlePermissionRequest, emitSessionUpdate } from '../services/acp/acp-bridges'
 import { currentAcpContext, getAcpContext, forgetAcpContext } from '../services/acp/acp-context'
+import { disposeContextAcpProcesses } from '../services/acp/process-manager'
+import { createSdkStreamHandle } from '../services/acp/sdk-client'
 
 let nextId = 800
 const windows: FakeWindow[] = []
@@ -35,9 +46,51 @@ afterEach(async () => {
   windows.splice(0).forEach((window) => { window.destroy(); forgetAcpContext(getAcpContext(`window-${window.id}`)) })
   await Promise.resolve()
   mocks.connect.mockReset()
+  vi.mocked(disposeContextAcpProcesses).mockReset()
 })
 
 describe('window-owned ACP IPC', () => {
+  it('窗口销毁后迟到的 SDK 写入不再到达已结束的子进程 stdin，也不影响其他窗口', async () => {
+    const a = window(), b = window()
+    const makeChild = () => ({ stdin: new PassThrough(), stdout: new PassThrough() }) as unknown as ChildProcessWithoutNullStreams
+    const childA = makeChild(), childB = makeChild()
+    const errors: Error[] = []
+    childA.stdin.on('error', error => errors.push(error))
+    const handleA = createSdkStreamHandle(childA), handleB = createSdkStreamHandle(childB)
+    withAcpWindow(a.webContents, () => { acpState.sdkStream = handleA })
+    withAcpWindow(b.webContents, () => { acpState.sdkStream = handleB })
+    const writerA = handleA.stream.writable.getWriter()
+    const writerB = handleB.stream.writable.getWriter()
+    const writesA = vi.spyOn(childA.stdin, 'write')
+    const writesB = vi.spyOn(childB.stdin, 'write')
+    vi.mocked(disposeContextAcpProcesses).mockImplementation(() => {
+      if (currentAcpContext().id === `window-${a.id}`) childA.stdin.end()
+    })
+    try {
+      a.destroy()
+      // SDK 收尾/权限响应在窗口 destroyed 之后才排到，模拟截图中的退出竞态。
+      await writerA.write({ jsonrpc: '2.0', id: 1, result: { outcome: 'cancelled' } } as never).catch(() => undefined)
+      await new Promise(resolve => setImmediate(resolve))
+      expect(writesA).not.toHaveBeenCalled()
+      expect(errors).toEqual([])
+      expect(getAcpState(getAcpContext(`window-${b.id}`)).sdkStream).toBe(handleB)
+      await writerB.write({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: 'b' } } as never)
+      expect(writesB).toHaveBeenCalled()
+      expect(childB.stdin.writableEnded).toBe(false)
+    } finally {
+      handleA.dispose()
+      handleB.dispose()
+      writerA.releaseLock()
+      writerB.releaseLock()
+      writesA.mockRestore()
+      writesB.mockRestore()
+      childA.stdin.destroy()
+      childB.stdin.destroy()
+      childA.stdout.destroy()
+      childB.stdout.destroy()
+    }
+  })
+
   it('status and streamed updates reach only their owner, even when another window connects last', () => {
     const a = window(), b = window()
     withAcpWindow(a.webContents, () => { acpState.sessionId = 'a' })

@@ -7,7 +7,7 @@ import type {
   AcpPromptResult,
   AcpSetConfigOptionResult,
 } from '@yitom/contracts'
-import { methods } from '@agentclientprotocol/sdk'
+import { methods, type McpServer, type PromptRequest } from '@agentclientprotocol/sdk'
 import { parseAcpConfigOptions } from "@yitom/acp-client"
 import { resolveAgentCwd } from './agent-sandbox-cwd'
 import {
@@ -34,7 +34,7 @@ function sessionPromptMode(nativeSessionAccepted:boolean, restored:boolean) {
     restoreMethod:restored ? 'load' : 'new',nativeSessionAccepted}).mode
 }
 
-function mcpServerEntry(handle: MontreeMcpServerHandle, name: string, cwd?: string): unknown[] {
+function mcpServerEntry(handle: MontreeMcpServerHandle, name: string, cwd?: string): McpServer[] {
   return windowMcpEntry(handle, name, cwd)
 }
 
@@ -201,13 +201,13 @@ export async function promptAcp(payload: {
   // 真实用户 prompt 发起前放行：load 重放定居窗口到此结束，后续 updates 均为真实增量
   disarmSuppressSettle()
   try {
-    const result = await sdkRequest<Record<string, unknown>, Record<string, unknown>>(
+    const result = await sdkRequest<typeof methods.agent.session.prompt>(
       a.value,
       methods.agent.session.prompt,
       {
         sessionId: payload.sessionId,
         prompt,
-      },
+      } satisfies PromptRequest,
       600_000, // prompt 涉及多步工具调用或视觉大模型解析，超时放宽至 600s（10分钟），避免大部头教材密集目录解析时前端过早判超时
     )
     const stopReason = typeof result.stopReason === 'string' ? result.stopReason : 'end_turn'

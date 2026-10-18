@@ -5,7 +5,7 @@ import {
   acpState, ownsAcpSession, claimAcpSession, releaseAcpSession, onAcpSessionUpdate, onAcpStatusChanged,
   setAcpPermissionBridge, setAcpSnapshotBridge,
   connectAcp, authenticateAcp, loadAcpSession, createAcpSession,
-  disconnectAcp, promptAcp, cancelAcp, setAcpConfigOption,
+  disconnectAcp, detachSdkStreamNow, promptAcp, cancelAcp, setAcpConfigOption,
 } from '../services/acp/acp-client'
 import { currentAcpContext, getAcpContext, listAcpContexts, runInAcpContext, forgetAcpContext, type AcpContext } from '../services/acp/acp-context'
 import { disposeContextAcpProcesses } from '../services/acp/process-manager'
@@ -122,6 +122,8 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
         context.closed = true
         void runInAcpContext(context, async () => {
           acpState.connectGeneration += 1
+          // destroyed 早于 window-all-closed：先摘桥，避免迟到响应写入 kill 已 end 的 stdin。
+          detachSdkStreamNow()
           disposeContextAcpProcesses()
           try { await disconnectAcp(undefined, { killProcess: true }) }
           finally {

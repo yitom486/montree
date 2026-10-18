@@ -557,7 +557,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
     // session.configOptions.boolean 解锁按 boolean 门控下发选项的 Agent
     // （对齐参考实现；未知字段按标准应被其余 Agent 忽略）。
     // _meta 是 ACP 标准扩展点，未知字段应被其余 Agent 忽略（codex 等仅多收一个字段）。
-    const initResult = await sdkRequest<InitializeResponse, Record<string, unknown>>(
+    const initResult = await sdkRequest(
       acpState.sdkConn.agent,
       methods.agent.initialize,
       {
@@ -685,7 +685,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
       preferDirectSession: true,
       tryDirectSessionFirst,
       authenticate: async (methodId) => {
-        await sdkRequest<unknown, Record<string, unknown>>(acpState.sdkConn!.agent, methods.agent.authenticate, {
+        await sdkRequest(acpState.sdkConn!.agent, methods.agent.authenticate, {
           methodId,
         })
       },
@@ -772,7 +772,7 @@ export async function authenticateAcp(payload: {
   }
 
   try {
-    await sdkRequest<unknown, Record<string, unknown>>(a.value, methods.agent.authenticate, {
+    await sdkRequest(a.value, methods.agent.authenticate, {
       methodId: payload.methodId,
     })
     return await openSessionAfterAuth(cwd)

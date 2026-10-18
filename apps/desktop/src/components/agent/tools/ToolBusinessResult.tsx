@@ -42,6 +42,7 @@ import { useReaderNavigationStore } from '@/stores/reader-navigation-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import { fileApi } from '@/api/file-api'
 import { compileReactArtifact } from '@/api/react-artifact-api'
+import { upgradeLegacyMindmapHtml } from '@/lib/agent/context/upgrade-legacy-mindmap'
 
 const ReactArtifactCardLazy = lazy(() => import('@yitom/chat-ui').then(module => ({ default: module.ReactArtifactCard })))
 
@@ -498,7 +499,15 @@ export function ToolBusinessResult({ message, compactResults, threadId, promptin
       ) : null}
       {presentPayload?.kind === 'html-artifact' ? (
         <div className="mt-1">
-          <HtmlArtifactCard key={presentPayload.id} result={presentPayload} colorScheme={colorScheme} onExport={() => void handleArtifactExport(presentPayload.html, presentPayload.title)} />
+          <HtmlArtifactCard
+            key={presentPayload.id}
+            result={{
+              ...presentPayload,
+              html: upgradeLegacyMindmapHtml(presentPayload.html),
+            }}
+            colorScheme={colorScheme}
+            onExport={() => void handleArtifactExport(presentPayload.html, presentPayload.title)}
+          />
         </div>
       ) : null}
       {presentPayload?.kind === 'react-artifact' ? <Suspense fallback={<p role="status">正在加载交互界面…</p>}><ReactArtifactCardLazy key={presentPayload.id} result={presentPayload} toolStreaming={message.streaming} toolStatus={message.toolStatus} threadId={threadId} prompting={prompting} onSubmit={onGenerativeSubmit} onCompile={compileReactArtifact} onExport={(html, title) => void handleArtifactExport(html, title)} /></Suspense> : null}

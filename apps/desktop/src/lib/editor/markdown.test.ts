@@ -44,6 +44,21 @@ describe('markdownParser', () => {
     expect(html).not.toContain('language-mermaid')
   })
 
+  it('将 markmap 代码块标记为思维导图待渲染容器', () => {
+    const html = markdownParser.render([
+      '```markmap',
+      '# 核心主题',
+      '## 分支一',
+      '## 分支二',
+      '```',
+    ].join('\n'))
+
+    expect(html).toContain('<pre class="markmap"')
+    expect(html).toContain('data-markmap-source=')
+    expect(html).toContain('# 核心主题')
+    expect(html).not.toContain('language-markmap')
+  })
+
   it('为代码块添加语法高亮与工具栏', () => {
     const html = markdownParser.render(['```ts', 'const answer = 42', '```'].join('\n'))
 

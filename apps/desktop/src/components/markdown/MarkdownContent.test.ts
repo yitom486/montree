@@ -8,6 +8,10 @@ vi.mock('./MermaidBlock', () => ({
   MermaidBlock: ({ source }: { source: string }) => createElement('div', { 'data-testid': 'diagram' }, source),
 }))
 
+vi.mock('./MarkmapBlock', () => ({
+  MarkmapBlock: ({ source }: { source: string }) => createElement('div', { 'data-testid': 'markmap' }, source),
+}))
+
 let container: HTMLDivElement
 let root: Root
 beforeEach(() => {
@@ -30,6 +34,11 @@ describe('MarkdownContent HTML containers', () => {
     expect(container.querySelector('details blockquote details [data-testid="diagram"]')?.textContent).toContain('A --> B')
     expect(container.querySelector('details blockquote code')?.textContent).toBe('代码')
     expect(container.querySelector('details')?.textContent).not.toContain('外部正文')
+  })
+  it('Markmap 原位挂载，支持思维导图大纲结构渲染', async () => {
+    const html = '<div class="section"><pre class="markmap" data-markmap-source="# 导图根\n## 子节点"># 导图根\n## 子节点</pre></div>'
+    await act(async () => root.render(createElement(MarkdownContent, { html })))
+    expect(container.querySelector('[data-testid="markmap"]')?.textContent).toContain('# 导图根')
   })
   it('正文更新及流式模式切换清理旧图表，折叠状态不因 portal 挂载重置', async () => {
     const html = '<details><summary>详情</summary><pre class="mermaid">graph TD\nA --> B</pre></details>'

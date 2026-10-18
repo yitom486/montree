@@ -123,6 +123,14 @@ function createConfiguredParser(options: { html: boolean }): InstanceType<typeof
     const rawLang = token.info?.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
     if ((MARKDOWN_ARTIFACT_KINDS as readonly string[]).includes(rawLang)) return markdownArtifactPlaceholder(parser, rawLang, token.content)
 
+    if (rawLang === 'markmap') {
+      let content = token.content.trim()
+      if (!content && token.info.trim().length > rawLang.length) {
+        content = token.info.trim().slice(rawLang.length).trim()
+      }
+      return `<pre class="markmap" data-markmap-source="${parser.utils.escapeHtml(content)}">${parser.utils.escapeHtml(content)}</pre>`
+    }
+
     const isMermaid =
       rawLang === 'mermaid' ||
       rawLang === 'flowchart' ||

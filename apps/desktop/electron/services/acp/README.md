@@ -4,6 +4,8 @@ ACP Agent 主进程侧 wiring：拉起 `codex-acp`、连接生命周期、权限
 ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`；渲染端零直接引用（`tsconfig.web` include 已剔除 acp）。
 `montree_diagram_guide` 返回 `node_modules/@yitom/contracts/dist/agent/diagram-design.js` 的按需图解规范；`montree_present(kind=preset,preset=diagram)` 沿用 present 快照链路生成参数化 SVG，不启动额外 Agent 或执行 skill 脚本。
 连接与断连按窗口串行，相同在途连接请求合并；断连立即取消在途 SDK 请求。温进程 initialize 失败时同一次连接仅冷启动回退一次，沿用原会话恢复参数，最终失败才报错。`acp-connection.test.ts` 覆盖自动回退、快速断连重连与重试上限。
+通用流桥接、请求超时/取消、会话恢复/新建、原生扩展回退与有界工具输出恢复统一由 `@yitom/acp-client` 实现。`sdk-client.ts` 仅补应用身份与失败诊断，`session-open.ts` 仅补诊断及阅读会话保留 MCP 的重试策略；窗口上下文、进程归属和文档操作留宿主。开发联调参见根 README 的「本地聊天与 ACP 包联调」。
+
 渲染端入口：`apps/desktop/src/api/acp-api.ts` + `AgentPanel`。设计备忘见本地 `.plan/`（若不在仓库中）。
 
 重连可携带当前线程至多 20 个缺失结果的 `recoverToolCallIds`，经可选会话 `_meta.toolOutputRecovery` 扩展由支持的桥接补偿。`session-open.ts` 限制响应条数/字节数并返回 `recoveredToolOutputs`；仅成功恢复同一会话时交回渲染，渲染只更新匹配的已有成功工具消息并重新校验呈现契约，不重放/新增历史、不重新调用模型。该扩展非 ACP 标准要求，不支持的运行时沿用现有恢复路径。

@@ -7,6 +7,7 @@ apps/desktop/out
 dist
 release
 *.tgz
+!vendor/chat-packages/*.tgz
 
 # code coverage
 coverage
@@ -57,6 +58,7 @@ playwright/.cache/
 
 # IntelliJ based IDEs
 .idea
+.workbuddy-ai/
 
 # Finder (MacOS) folder config
 .DS_Store

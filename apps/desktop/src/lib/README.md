@@ -105,7 +105,7 @@
 
 ## agent/
 
-生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
+生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解，历史快照由 `agent/context/upgrade-legacy-mindmap.ts` 动态热升级折叠支持），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
 
 Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `@montree/chat-ui` 包内 `chat-markdown`（M3a 由原 components/markdown 下 `AgentMarkdown` 入口整搬改名）。
 
@@ -130,7 +130,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `annotation-note-prompts` | 批注 AI 意图/改写 chip 与草稿抽取 |
 | `toc-ai-session` | 目录 AI 整理专用副会话（每次新建防跨书串扰、无头累积、不进时间线） |
 | `acp-stream-host` | ACP 流式推送应用级宿主（单订阅单合并器 + 认证清理回调注册表；`acp-transport` 直连等待） |
-| `acp-update-adapter` / `.test.ts` | ACP `session/update` → 宿主分发意图的**纯适配**（C1）：标准成员经 `@yitom/chat-session` `mapSessionUpdate` 复用单表与 SDK 联合穷尽校验，宿主只保留 `montree_settle_complete`、`usage_update`（线程字段）、`tool_call_content_chunk`（camelCase-only）与无 id 工具调用（快照旁路）等独有语义；不读 store、不做回放清洗，线程归属/清洗时序仍在 `apps/desktop/src/stores/acp/chat-slice.ts` |
+| `acp-update-adapter` / `.test.ts` | `@yitom/chat-session` 的 `classifyAcpUpdate`、`normalizeUsageUpdate` 与类型的兼容重导出；完整协议分类、usage 及厂商扩展意图解析已迁包内 ingest 模块；宿主测试验证接入行为，线程归属/回放清洗与意图执行仍在宿主 |
 | `chat-session-owner` / `.test.ts` | 包会话单例与唯一消息历史持久化：按窗口分区，`authorityVersion` 标记旧宿主历史的一次性迁入；保留旧键，包历史后续优先，最近成功副本与坏数据备份支持恢复 |
 | `chat-session-authority` / `.test.ts` | 宿主通用 feed 事件定向交给包单次归约；业务清洗/提议通过显式受控更新入口；线程元数据路由始终保留包 feed，宿主只读兼容投影不再反灌快照 |
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildReaderUnitTree,
+  readerUnitsToMarkmap,
   shouldExpandReaderUnitNode,
 } from '@/lib/reader/reader-unit-tree'
 import { estimatePageOffsetTop, PDF_PAGE_GAP_PX } from '@yitom/reader-core'
@@ -64,5 +65,14 @@ describe('reader-unit-tree', () => {
     // 5.1 按层级栈回到章节下（无号章节无法验编号，信任层级）
     expect(tree).toHaveLength(1)
     expect(tree[0]!.children.map((node) => node.unit.label)).toEqual(['5.6指令流水线', '5.1功能结构'])
+  })
+
+  it('将目录树转换为 Markmap 兼容 Markdown', () => {
+    const md = readerUnitsToMarkmap(units, '书籍全景')
+    expect(md).toContain('# 书籍全景')
+    expect(md).toContain('## Chapter 1')
+    expect(md).toContain('### 1.1')
+    expect(md).toContain('### 1.2')
+    expect(md).toContain('## Chapter 2')
   })
 })

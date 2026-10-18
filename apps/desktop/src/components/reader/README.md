@@ -12,7 +12,7 @@
 | `TocAiPolishControl` | 目录 AI 整理：独立副会话 + 运行时/模型/思考档三级级联选择 + 专属提示词与 montree-toc 工具隔离 + JSON 解析回填草稿 |
 | `TocAiLiveDashboard` | 目录 AI 整理实时动态面板：4 阶段进度条、脉冲指示灯、流式思考与工具调用终端卡片、计时器与取消控制 |
 | `ReaderContentShell` / `ReaderToolbarShell` / `ReaderFooterNav` | 阅读区壳、工具栏（纯粹目录/加书签导航 + 右侧卡片流/札记箱/「考考我」智考一级入口）、底栏翻页 |
-| `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲 |
+| `ReaderUnitOutline` / `EpubChapterOutline` | 目录大纲（支持层级树折叠、双轨目录切换、目录校正与 Markmap 全景思维导图视图） |
 | `FloatingTtsPlayer` | 自由拖拽微晶悬浮球与轻量展开控制面板（主体小球稳固锚定、紧凑卡片智能停靠侧翼展开收起、本章第0秒从头完整合成与自由拉动进度条、快退快进15秒与从头重播、无冗余文字干扰、纯净沉浸听书） |
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
 | `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层（共享 Morph 壳、边缘避让、键盘关闭） |

@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, ListTree, Pencil } from 'lucide-react'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, ListTree, Network, Pencil } from 'lucide-react'
 import type { ReaderUnit } from '@yitom/reader-core'
 import {
   buildReaderUnitTree,
+  readerUnitsToMarkmap,
   shouldExpandReaderUnitNode,
   type ReaderUnitTreeNode,
 } from '@/lib/reader/reader-unit-tree'
 import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+
+const MarkmapBlock = lazy(() => import('@/components/markdown/MarkmapBlock').then((m) => ({ default: m.MarkmapBlock })))
 
 export interface TocViewOption {
   id: string
@@ -101,7 +105,9 @@ export function ReaderUnitOutline({
   activeTocView,
   onSelectTocView,
 }: ReaderUnitOutlineProps) {
+  const [showMindmap, setShowMindmap] = useState(false)
   const tree = useMemo(() => buildReaderUnitTree(units), [units])
+  const mindmapSource = useMemo(() => readerUnitsToMarkmap(units), [units])
 
   return (
     <section
@@ -150,6 +156,15 @@ export function ReaderUnitOutline({
           </div>
         ) : units.length > 0 ? (
           <span className="flex shrink-0 items-center gap-1 text-[10px] font-normal normal-case text-muted-foreground/80">
+            <button
+              type="button"
+              className="rounded p-0.5 hover:bg-accent/50 hover:text-foreground"
+              aria-label="导图视图"
+              title="全景思维导图"
+              onClick={() => setShowMindmap(true)}
+            >
+              <Network className="size-3" />
+            </button>
             {onEditToc ? (
               <button
                 type="button"
@@ -189,6 +204,42 @@ export function ReaderUnitOutline({
             </ul>
           )}
         </div>
+      )}
+
+      {showMindmap && (
+        <Dialog open={showMindmap} onOpenChange={setShowMindmap}>
+          <DialogContent className="flex h-[90vh] w-[95vw] max-w-6xl flex-col p-4">
+            <DialogHeader className="shrink-0 pb-2">
+              <DialogTitle className="flex items-center gap-2">
+                <Network className="size-4 text-primary" />
+                书籍全景思维导图
+              </DialogTitle>
+              <DialogDescription>
+                支持滚轮无级缩放、自由拖动画布、点击圆圈节点折叠/展开章节分支。
+              </DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 rounded-lg border border-border/50 bg-background/50 p-2">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    正在加载思维导图引擎…
+                  </div>
+                }
+              >
+                <MarkmapBlock
+                  source={mindmapSource}
+                  showToolbar={true}
+                  initialHeight={
+                    typeof window !== 'undefined'
+                      ? Math.max(300, Math.floor(window.innerHeight * 0.72))
+                      : 500
+                  }
+                  title="书籍目录思维导图"
+                />
+              </Suspense>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </section>
   )

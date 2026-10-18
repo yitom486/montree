@@ -31,6 +31,66 @@ beforeEach(() => {
 })
 
 describe('聊天包单权威与宿主业务投影', () => {
+  it('空白回复占位前的连续思考保持同一消息，换行和时间间隔不拆块', () => {
+    const host = useAcpUiStore.getState()
+    host.appendUserMessage('分析当前章节')
+    host.beginAgentReply()
+    const chunks = ['先读', '当前章节。', '\n\n', ...Array.from({ length: 100 }, (_, i) => `分析 ${i}\n`)]
+    const clock = vi.spyOn(Date, 'now')
+    try {
+      let firstId: string | undefined
+      chunks.forEach((text, i) => {
+        clock.mockReturnValue(10000 + i * 500)
+        host.applySessionUpdate({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text } })
+        const thoughts = packageActive().feed.messages.filter(m => m.role === 'thought')
+        expect(thoughts).toHaveLength(1)
+        firstId ??= thoughts[0]!.id
+        expect(thoughts[0]).toMatchObject({ id: firstId, streaming: true, text: chunks.slice(0, i + 1).join('') })
+      })
+      expect(packageActive().feed.messages.at(-1)).toMatchObject({ role: 'agent', text: '' })
+      host.applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '结论' } })
+      expect(packageActive().feed.messages.find(m => m.role === 'thought')).toMatchObject({ id: firstId, streaming: false })
+      host.finishStreaming()
+      expect(packageActive().feed.messages.filter(m => m.role === 'thought')).toHaveLength(1)
+      expect(hostActive().messages).toEqual(packageActive().feed.messages)
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it('工具调用前后的思考各自合并，保留工具阶段边界', () => {
+    const host = useAcpUiStore.getState()
+    host.appendUserMessage('读完再分析')
+    host.beginAgentReply()
+    const thought = (text: string) => host.applySessionUpdate({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text } })
+    thought('调用前')
+    thought('继续')
+    host.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'reasoning-read', title: '读取章节', status: 'in_progress' })
+    host.applySessionUpdate({ sessionUpdate: 'tool_call_update', toolCallId: 'reasoning-read', status: 'completed' })
+    thought('调用后')
+    thought('继续')
+    const messages = packageActive().feed.messages
+    expect(messages.map(m => m.role)).toEqual(['user', 'thought', 'tool', 'thought', 'agent'])
+    expect(messages.filter(m => m.role === 'thought').map(m => [m.text, m.streaming])).toEqual([
+      ['调用前继续', false], ['调用后继续', true],
+    ])
+    host.finishStreaming()
+    expect(packageActive().feed.messages.filter(m => m.role === 'thought').every(m => !m.streaming)).toBe(true)
+  })
+
+  it('回放无回复占位时仍合并连续思考，正文形成新的阶段边界', () => {
+    const host = useAcpUiStore.getState()
+    const chunk = (kind: string, text: string) => host.applySessionUpdate({ sessionUpdate: kind, content: { type: 'text', text } })
+    chunk('agent_thought_chunk', '回放思考')
+    chunk('agent_thought_chunk', '\n继续')
+    chunk('agent_message_chunk', '正文')
+    chunk('agent_thought_chunk', '新的思考')
+    chunk('agent_thought_chunk', '继续')
+    expect(packageActive().feed.messages.map(m => [m.role, m.text])).toEqual([
+      ['thought', '回放思考\n继续'], ['agent', '正文'], ['thought', '新的思考继续'],
+    ])
+  })
+
   it('消息写入时线程元数据已落盘，立即重载不丢工作区或恢复会话绑定', () => {
     const host = useAcpUiStore.getState()
     host.createThread('D:/durable-workspace', DEFAULT_ACP_RUNTIME_ID)

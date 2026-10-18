@@ -18,8 +18,8 @@
 /*
  * 代码块去套娃：社区 chrome（外卡 bg-sidebar + 内盒 bg-background）已自带
  * 边框/底色/圆角，我们的 pre/code 通用底色与 padding 会叠出第三层盒子，
- * 在 agent 域内全部归零；外卡/内盒收紧到聊天密度（12px 字、行号 gutter
- * 收窄）。非 layered 作者样式优先于 Tailwind utilities 层，覆盖成立；
+ * 在 agent 域内全部归零；外卡/内盒收紧到聊天密度（正文 14px、代码块 13px、
+ * 行号 gutter 收窄）。非 layered 作者样式优先于 Tailwind utilities 层，覆盖成立；
  * markdown-it 旧 `.code-block*` 类不在此列，不受影响。
  */
 .agent-md [data-streamdown="code-block"] {
@@ -29,7 +29,7 @@
 }
 .agent-md [data-streamdown="code-block-body"] {
   padding: 0.625rem 0.75rem;
-  font-size: 12px;
+  font-size: 13px;
 }
 .agent-md [data-streamdown="code-block-body"] pre {
   background: transparent;
@@ -86,7 +86,7 @@
 .agent-md details > :not(summary) {
   border-top: 1px solid var(--border);
   padding: 0.625rem 0.75rem;
-  font-size: 12px;
+  font-size: 14px;
 }
 .agent-md kbd {
   display: inline-block;

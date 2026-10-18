@@ -4,26 +4,36 @@ import { MermaidBlock } from '@/components/markdown/MermaidBlock'
 import { cn } from '@/lib/utils'
 
 const MarkdownArtifact = lazy(() => import('./MarkdownArtifact').then((module) => ({ default: module.MarkdownArtifact })))
+const MarkmapBlock = lazy(() => import('./MarkmapBlock').then((module) => ({ default: module.MarkmapBlock })))
 
 interface MarkdownContentProps {
   html: string
   className?: string
-  /** 为 true 时不拆 Mermaid（流式中间态），整段 HTML 直出 */
+  /** 为 true 时不拆 Mermaid 与交互组件（流式中间态），整段 HTML 直出 */
   deferMermaid?: boolean
 }
 
 /**
  * 预览与 Agent 共用的 Markdown DOM 渲染：
- * 保留完整 HTML 容器，Mermaid 通过 React portal 原位出图。
+ * 保留完整 HTML 容器，Mermaid 与 Markmap 通过 React portal 原位出图。
  */
 export function MarkdownContent({ html, className, deferMermaid = false }: MarkdownContentProps) {
   const prepared = useMemo(() => {
-    if (!html || deferMermaid || typeof DOMParser === 'undefined') return { html, diagrams: [], artifacts: [] }
+    if (!html || deferMermaid || typeof DOMParser === 'undefined') {
+      return { html, diagrams: [], artifacts: [], markmaps: [] }
+    }
     const doc = new DOMParser().parseFromString(html, 'text/html')
     const diagrams = Array.from(doc.body.querySelectorAll('.mermaid, .mermaid-hydrating')).map((node, index) => {
       const source = (node.getAttribute('data-mermaid-source') || node.textContent || '').trim()
       const placeholder = doc.createElement('div')
       placeholder.setAttribute('data-montree-mermaid-slot', String(index))
+      node.replaceWith(placeholder)
+      return source
+    })
+    const markmaps = Array.from(doc.body.querySelectorAll('.markmap')).map((node, index) => {
+      const source = (node.getAttribute('data-markmap-source') || node.textContent || '').trim()
+      const placeholder = doc.createElement('div')
+      placeholder.setAttribute('data-montree-markmap-slot', String(index))
       node.replaceWith(placeholder)
       return source
     })
@@ -34,14 +44,29 @@ export function MarkdownContent({ html, className, deferMermaid = false }: Markd
       node.replaceWith(placeholder)
       return data
     })
-    return { html: diagrams.length || artifacts.length ? doc.body.innerHTML : html, diagrams, artifacts }
+    return {
+      html: diagrams.length || artifacts.length || markmaps.length ? doc.body.innerHTML : html,
+      diagrams,
+      artifacts,
+      markmaps,
+    }
   }, [html, deferMermaid])
   // Stable props prevent React from replacing the portal hosts or resetting native details.
   const innerHtml = useMemo(() => ({ __html: prepared.html }), [prepared.html])
   const container = useRef<HTMLDivElement>(null)
-  const [mounts, setMounts] = useState<{ prepared: typeof prepared; nodes: Element[]; artifacts: Element[] }>()
+  const [mounts, setMounts] = useState<{
+    prepared: typeof prepared
+    nodes: Element[]
+    artifacts: Element[]
+    markmaps: Element[]
+  }>()
   useEffect(() => {
-    setMounts({ prepared, nodes: Array.from(container.current?.querySelectorAll('[data-montree-mermaid-slot]') ?? []), artifacts: Array.from(container.current?.querySelectorAll('[data-montree-artifact-slot]') ?? []) })
+    setMounts({
+      prepared,
+      nodes: Array.from(container.current?.querySelectorAll('[data-montree-mermaid-slot]') ?? []),
+      artifacts: Array.from(container.current?.querySelectorAll('[data-montree-artifact-slot]') ?? []),
+      markmaps: Array.from(container.current?.querySelectorAll('[data-montree-markmap-slot]') ?? []),
+    })
   }, [prepared])
 
   if (!html) return null
@@ -51,6 +76,14 @@ export function MarkdownContent({ html, className, deferMermaid = false }: Markd
         dangerouslySetInnerHTML={innerHtml} />
       {mounts?.prepared === prepared && mounts.nodes.map((node, index) => prepared.diagrams[index]
         ? createPortal(<MermaidBlock source={prepared.diagrams[index]} />, node, `mmd-${index}`) : null)}
+      {mounts?.prepared === prepared && mounts.markmaps.map((node, index) => prepared.markmaps[index]
+        ? createPortal(
+            <Suspense fallback={<div className="my-3 flex h-32 items-center justify-center rounded-lg border border-border/40 bg-muted/20 text-xs text-muted-foreground">正在加载思维导图…</div>}>
+              <MarkmapBlock source={prepared.markmaps[index]} />
+            </Suspense>,
+            node,
+            `markmap-${index}`
+          ) : null)}
       {mounts?.prepared === prepared && mounts.artifacts.map((node, index) => {
         const artifact = prepared.artifacts[index]
         return artifact ? createPortal(<Suspense fallback={<div dangerouslySetInnerHTML={{ __html: artifact.fallback || '正在加载文档组件…' }} />}>

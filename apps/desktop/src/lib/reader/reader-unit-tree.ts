@@ -59,3 +59,26 @@ export function buildReaderUnitTree(units: ReaderUnit[]): ReaderUnitTreeNode[] {
 export function shouldExpandReaderUnitNode(depth: number, maxExpandedDepth = 1): boolean {
   return depth <= maxExpandedDepth
 }
+
+/**
+ * 将书籍目录（ReaderUnit 列表）转换为 Markmap 兼容的 Markdown 标题树
+ */
+export function readerUnitsToMarkmap(units: ReaderUnit[], title = '书籍全景导图'): string {
+  if (!units || units.length === 0) return `# ${title}\n## 暂无章节`
+  const tree = buildReaderUnitTree(units)
+  const lines: string[] = [`# ${title}`]
+
+  function traverse(nodes: ReaderUnitTreeNode[], depth: number) {
+    for (const node of nodes) {
+      const headingPrefix = '#'.repeat(Math.min(depth, 6))
+      lines.push(`${headingPrefix} ${node.unit.label.trim()}`)
+      if (node.children.length > 0) {
+        traverse(node.children, depth + 1)
+      }
+    }
+  }
+
+  traverse(tree, 2)
+  return lines.join('\n')
+}
+
