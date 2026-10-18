@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.16] - 2026-10-18
+
 - **聊天状态与历史迁移**：消息、工具和计划统一由聊天会话包处理，移除重复镜像；旧历史按窗口迁入，保留原数据备份和最近成功快照，侧栏与浮窗共用同一消息源。
 - **聊天输入与会话稳定性**：复用受控输入和发送/取消控制器，保留附件与中文输入体验；切换线程、运行时或会话后，旧缓存和迟到结果不会写入新对话。
 - **聊天列表渲染收尾**：通用列表编排（跟滚/分页/恢复/运行状态）迁入聊天 UI 包，宿主只保留状态订阅、滚动落盘与业务接线；视觉、文案与交互不变。
@@ -545,7 +549,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.15...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.16...HEAD
+[0.4.16]: https://github.com/yitom486/montree/compare/v0.4.15...v0.4.16
 [0.4.15]: https://github.com/yitom486/montree/compare/v0.4.14...v0.4.15
 [0.4.14]: https://github.com/yitom486/montree/compare/v0.4.12...v0.4.14
 [0.4.12]: https://github.com/yitom486/montree/compare/v0.4.11...v0.4.12
