@@ -116,17 +116,17 @@ Typst 文档可从文件树的新建菜单创建，或直接打开 `.typ` 文件
 
 ---
 
-### 本地聊天与 ACP 包联调
+### 聊天与 ACP 包依赖
 
-当前迁移中的通用代码分别位于 `../../montree-chat` 和 `../../acp-client`。本仓保留未发布包快照，新环境照常 `bun install`；修改外部包后，在本仓运行：
+通用聊天与协议实现分别由外部的 montree-chat、acp-client 仓库维护，Montree 从 npm 安装正式发布包。七个自有包的依赖及根 overrides 统一使用 `latest`，具体安装版本由 `bun.lock` 记录。
 
 ```bash
-bun run sync:chat-packages
+bun install
+# 更新到自有包最新发布版本
+bun update @yitom/contracts @yitom/reader-core @yitom/annotations @yitom/chat-core @yitom/chat-ui @yitom/chat-session @yitom/acp-client
 ```
 
-该命令构建外部包，将七个包打包到 `vendor/chat-packages/` 并通过 Bun 安装，避免 Windows 本地目录依赖递归复制以及多份契约类型。快照随仓库保存，CI 安装无需访问相邻仓库。更新快照时须先在两个外部仓库各自 `bun install`；可用 `MONTREE_CHAT_ROOT`、`MONTREE_ACP_ROOT` 指定其他位置。同步不会发布包；外部包正式发布后，再将本仓依赖与六包 overrides 切回对应发布版本并移除过渡快照。
-
-`scripts/sync-chat-packages.ts` 为联调入口；Electron 窗口、IPC、文档快照和业务操作仍在本仓。
+已移除迁移期的本地 tarball 快照及同步脚本，安装不再依赖相邻源码目录。Electron 窗口、IPC、文档快照和业务操作仍在本仓。
 
 ## 📜 许可证
 
