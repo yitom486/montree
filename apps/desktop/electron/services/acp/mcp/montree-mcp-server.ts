@@ -11,6 +11,7 @@ import type {
 } from "@yitom/acp-client"
 import { callReaderVisualTool, READER_VISUAL_TOOLS, type ReaderVisualToolContext } from './reader-visual-tools'
 import { callDocumentTool, DOCUMENT_TOOLS } from './document-tools'
+import type { McpConnectionHealth } from './connection-health'
 
 export type MontreeMcpToolContext = ReaderVisualToolContext
 export type MontreeMcpToolDefinition = InkdownMcpToolDefinition
@@ -37,6 +38,7 @@ export interface MontreeMcpServerHandle {
   url: string
   authToken: string
   close: () => Promise<void>
+  health?: McpConnectionHealth
 }
 
 interface WindowServers {

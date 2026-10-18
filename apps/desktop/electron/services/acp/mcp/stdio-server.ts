@@ -9,6 +9,7 @@ import { adaptMontreeTools, callAdaptedMontreeTool, stopMontreeMcpServer, type M
 import { READER_VISUAL_TOOLS, callReaderVisualTool } from './reader-visual-tools'
 import { DOCUMENT_TOOLS, callDocumentTool } from './document-tools'
 import { logAcpDiagnostic } from './diagnostics'
+import { McpConnectionHealth } from './connection-health'
 
 const states = new WeakMap<AcpContext, Map<string, Promise<MontreeMcpServerHandle>>>()
 
@@ -36,6 +37,7 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
   const token = randomBytes(24).toString('hex')
   const tools = scope === 'toc' ? INKDOWN_TOC_MCP_TOOLS : [...adaptMontreeTools(INKDOWN_MCP_TOOLS), ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS]
   const sockets = new Set<Socket>()
+  const health = new McpConnectionHealth()
   const server = createServer(bindAcpContext((socket) => {
     sockets.add(socket)
     let authenticated = false
@@ -45,6 +47,7 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
     socket.on('error', bindAcpContext(() => logAcpDiagnostic('mcp.pipe.error', { server: label })))
     socket.once('close', bindAcpContext(() => {
       sockets.delete(socket)
+      health.closed(socket)
       logAcpDiagnostic('mcp.client.closed', { server: label, authenticated })
     }))
     socket.on('data', bindAcpContext(async (chunk: string) => {
@@ -85,7 +88,10 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
           }
           // Only known tool names are logged; unknown names can contain untrusted text.
           logAcpDiagnostic('mcp.request', { server: label, method: ['initialize', 'tools/list', 'tools/call', 'ping'].includes(message.method ?? '') ? message.method : 'other', tool: tools.some((tool) => tool.name === name) ? name : undefined, durationMs: Date.now() - started, toolCount: message.method === 'tools/list' ? tools.length : undefined, failed: Boolean(response?.error || (response?.result as { isError?: boolean } | undefined)?.isError) })
-          if (response && !socket.destroyed) socket.write(JSON.stringify(response) + '\n')
+          if (response && !socket.destroyed) {
+            socket.write(JSON.stringify(response) + '\n')
+            if (message.method === 'tools/list' && !response.error) health.discovered(socket)
+          }
         }
         if (Buffer.byteLength(buffer) > 256 * 1024) socket.destroy()
       } catch { socket.destroy() }
@@ -97,6 +103,7 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
   logAcpDiagnostic('mcp.server.started', { server: label, transport: 'stdio', toolCount: tools.length })
   let closed = false
   const handle: MontreeMcpServerHandle = {
+    health,
     url: endpoint,
     authToken: token,
     close: async () => {

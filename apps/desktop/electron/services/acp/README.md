@@ -1,5 +1,7 @@
 # electron/services/acp
 
+MCP 长会话恢复由 `mcp-session-recovery.ts`（+ `.test.ts`）编排：新建/加载/恢复时记录会话自身的 cwd、完整/目录端点和已接受的元数据；`mcp/connection-health.ts` 跟踪窗口管道的工具发现及断连。检测到曾发现工具的客户端关闭后，下一轮 prompt 前仅尝试原会话 resume→load，保留 MCP 配置，并限时等待新的 tools/list；恢复失败则阻止该轮发送并提示重连，禁止 fallback 到新会话或重放 prompt。恢复期间压制历史回放，取消/切换连接会使旧恢复失效，主副会话恢复互斥。该观测确认 Agent 重新发现工具，不等同于模型目录或实际工具执行验证；从未发现工具的懒启动运行时仍按原路径发送首轮。
+
 ACP Agent 主进程侧 wiring：拉起 `codex-acp`、连接生命周期、权限/回调路由、会话开启、fs/终端、窗口文档服务与 stdio MCP 接入。
 ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`；渲染端零直接引用（`tsconfig.web` include 已剔除 acp）。
 `montree_diagram_guide` 返回 `node_modules/@yitom/contracts/dist/agent/diagram-design.js` 的按需图解规范；`montree_present(kind=preset,preset=diagram)` 沿用 present 快照链路生成参数化 SVG，不启动额外 Agent 或执行 skill 脚本。

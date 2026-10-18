@@ -15,6 +15,7 @@ import {
 } from './mcp/montree-mcp-server'
 import { startWindowMcpServer, stopWindowMcpServers } from './mcp/stdio-server'
 import { windowMcpEntry } from './mcp/session-config'
+import { bindSessionMcp, cancelMcpRecovery, ensureSessionMcp, McpRecoveryCancelledError } from './mcp-session-recovery'
 import { logAcpDiagnostic } from './mcp/diagnostics'
 import { sdkRequest } from './sdk-client'
 import { disposeAllAcpProcesses } from './process-manager'
@@ -82,6 +83,7 @@ export async function loadAcpSession(payload: {
       typeof result.sessionId === 'string' ? result.sessionId : payload.sessionId
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
     claimAcpSession(id)
+    bindSessionMcp(id, acpState.montreeMcp, cwd, opened.nativeSessionAccepted ? acpState.connectionBinding?.sessionMeta : undefined)
     if (!secondary) {
       acpState.sessionId = id
       acpState.workspaceRoot = cwd
@@ -140,6 +142,9 @@ export async function createAcpSession(
     }
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
     claimAcpSession(id)
+    bindSessionMcp(id, toolScope === 'toc' ? acpState.tocMcp : acpState.montreeMcp, resolvedCwd,
+      toolScope === 'full' && opened.nativeSessionAccepted ? acpState.connectionBinding?.sessionMeta : undefined,
+      toolScope === 'toc' ? 'montree-toc' : 'montree')
     if (!acpState.workspaceRoot) acpState.workspaceRoot = resolvedCwd
     return ok({
       sessionId: id,
@@ -196,11 +201,18 @@ export async function promptAcp(payload: {
   }
 
   const prevActiveSessionId = acpState.activePromptSessionId
-  logAcpDiagnostic('acp.prompt.started', { sessionId: payload.sessionId })
-  acpState.activePromptSessionId = payload.sessionId
-  // 真实用户 prompt 发起前放行：load 重放定居窗口到此结束，后续 updates 均为真实增量
-  disarmSuppressSettle()
+  const generation = acpState.connectGeneration
+  let sent = false
   try {
+    await ensureSessionMcp(payload.sessionId, (method, params) => sdkRequest<unknown, unknown>(a.value, method, params))
+    if (currentAcpContext().closed || acpState.connectGeneration !== generation) {
+      throw new McpRecoveryCancelledError('Agent 连接已变更，已取消发送消息')
+    }
+    logAcpDiagnostic('acp.prompt.started', { sessionId: payload.sessionId })
+    acpState.activePromptSessionId = payload.sessionId
+    // 恢复及 load 历史回放结束后才放行本轮真实增量。
+    disarmSuppressSettle()
+    sent = true
     const result = await sdkRequest<typeof methods.agent.session.prompt>(
       a.value,
       methods.agent.session.prompt,
@@ -216,17 +228,20 @@ export async function promptAcp(payload: {
   } catch (error) {
     logAcpDiagnostic('acp.prompt.failed', { sessionId: payload.sessionId })
     try {
-      void a.value.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
+      if (sent) void a.value.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
     } catch {
       // 忽略竞态
     }
-    return err(toProtocolError(error, '发送 prompt 失败'))
+    return err(error instanceof McpRecoveryCancelledError
+      ? { code: 'CANCELLED', message: error.message }
+      : toProtocolError(error, '发送 prompt 失败'))
   } finally {
-    acpState.activePromptSessionId = prevActiveSessionId
+    if (sent && acpState.connectGeneration === generation) acpState.activePromptSessionId = prevActiveSessionId
   }
 }
 
 export function cancelAcp(payload: { sessionId: string }): Result<void, AppError> {
+  cancelMcpRecovery(payload.sessionId)
   const a = requireAgent()
   if (!a.ok) return a
   try {

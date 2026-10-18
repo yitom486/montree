@@ -34,6 +34,7 @@ import { startWindowMcpServer } from './mcp/stdio-server'
 import { windowMcpEntry } from './mcp/session-config'
 import { logAcpDiagnostic } from './mcp/diagnostics'
 import { restoreOrCreateAcpSession, isAuthenticationRequired } from './session-open'
+import { bindSessionMcp, cancelMcpRecovery } from './mcp-session-recovery'
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
 import { ensureBunForCommand } from '../bun-runtime'
@@ -200,6 +201,7 @@ async function openSessionAfterAuth(
 
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
     claimAcpSession(opened.sessionId)
+    bindSessionMcp(opened.sessionId, acpState.montreeMcp, cwd, opened.nativeSessionAccepted ? acpState.connectionBinding?.sessionMeta : undefined)
     acpState.sessionId = opened.sessionId
     acpState.workspaceRoot = cwd
     acpState.pendingResumeSessionId = null
@@ -296,6 +298,7 @@ export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectRe
   const pending = pendingConnections.get(context)
   if (pending?.key === key) return pending.promise
   const gen = ++acpState.connectGeneration
+  cancelMcpRecovery()
   const promise = enqueueConnection(() => connectAcpAttempt(payload, gen))
   pendingConnections.set(context, { key, promise })
   void promise.finally(() => { if (pendingConnections.get(context)?.promise === promise) pendingConnections.delete(context) }).catch(() => undefined)
@@ -802,6 +805,7 @@ export function disconnectAcp(
 ): Promise<Result<void, AppError>> {
   // 立即取消在途连接；实际清理排在它之后，避免拆掉下一条新连接。
   ++acpState.connectGeneration
+  cancelMcpRecovery()
   pendingConnections.delete(currentAcpContext())
   if (!acpState.closeSessionSupported || acpState.status === 'connecting') {
     try { acpState.sdkConn?.close() } catch { /* 取消握手；已连接且支持 close 时交给队列先清理会话 */ }
