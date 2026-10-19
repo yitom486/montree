@@ -61,5 +61,6 @@ export function useTypstSession(filePath: string, content: string, rootPath: str
     updateContent: (value: string) => controllerRef.current?.updateContent(value),
     request: (method: TypstRequestMethod, params: unknown) => controllerRef.current?.request(method, params) ?? Promise.resolve(null),
     exportPdf: () => controllerRef.current?.exportPdf() ?? Promise.resolve(null),
+    exportHtml: () => controllerRef.current?.exportHtml() ?? Promise.resolve(null),
   }
 }

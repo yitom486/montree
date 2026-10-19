@@ -5,7 +5,7 @@ import { IPC } from '@yitom/contracts'
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<unknown>>(),
   windows: new Map<number, unknown>(), descriptor: vi.fn(),
-  status: vi.fn(async () => ({ available: true })), request: vi.fn(), pdf: vi.fn(), close: vi.fn(),
+  status: vi.fn(async () => ({ available: true })), request: vi.fn(), pdf: vi.fn(), html: vi.fn(), close: vi.fn(),
   disposeOwner: vi.fn(), disposeAll: vi.fn(), savePath: vi.fn(),
   write: vi.fn(), rename: vi.fn(), rm: vi.fn(),
 }))
@@ -21,11 +21,12 @@ vi.mock('../services/typst/typst-service', () => ({ TypstService: class {
   status = mocks.status
   request = mocks.request
   pdf = mocks.pdf
+  html = mocks.html
   close = mocks.close
   disposeOwner = mocks.disposeOwner
   disposeAll = mocks.disposeAll
 } }))
-import { registerTypstHandlers } from './typst-handlers'
+import { registerTypstHandlers, TYPST_EXPORT_HTML_CHANNEL } from './typst-handlers'
 
 let nextId = 9000
 class Sender extends EventEmitter {
@@ -47,7 +48,7 @@ afterEach(() => {
   for (const value of mocks.windows.values()) (value as { webContents: Sender }).webContents.emit('destroyed')
   mocks.windows.clear()
   mocks.descriptor.mockReset()
-  mocks.request.mockReset(); mocks.pdf.mockReset(); mocks.savePath.mockReset()
+  mocks.request.mockReset(); mocks.pdf.mockReset(); mocks.html.mockReset(); mocks.savePath.mockReset()
   mocks.close.mockReset()
   mocks.write.mockReset(); mocks.rename.mockReset(); mocks.rm.mockReset()
   mocks.disposeOwner.mockClear(); mocks.status.mockClear()
@@ -109,5 +110,29 @@ describe('Typst IPC owner and frame boundaries', () => {
     expect(await invoke(window(), IPC.TYPST_EXPORT_PDF, { sessionId: 'owned', version: 1 })).toMatchObject({ ok: false, error: { code: 'REVISION_CONFLICT' } })
     expect(mocks.write).not.toHaveBeenCalled()
     expect(mocks.rename).not.toHaveBeenCalled()
+  })
+  it('exports HTML through the dedicated channel and writes the file atomically', async () => {
+    mocks.savePath.mockResolvedValue({ canceled: false, filePath: 'document.html' })
+    mocks.html.mockResolvedValue(Buffer.from('<!DOCTYPE html><html></html>'))
+    mocks.rm.mockResolvedValue(undefined)
+    const result = await invoke(window(), TYPST_EXPORT_HTML_CHANNEL, { sessionId: 'owned', version: 1 })
+    expect(result).toMatchObject({ ok: true, value: { filePath: 'document.html', version: 1 } })
+    expect(mocks.html).toHaveBeenCalledOnce()
+    expect(mocks.pdf).not.toHaveBeenCalled()
+    expect(mocks.write).toHaveBeenCalledOnce()
+    expect(mocks.rename).toHaveBeenCalledOnce()
+    expect(mocks.rm).toHaveBeenCalled()
+  })
+  it('rejects non-HTML export targets without compilation', async () => {
+    mocks.savePath.mockResolvedValue({ canceled: false, filePath: 'document.pdf' })
+    expect(await invoke(window(), TYPST_EXPORT_HTML_CHANNEL, { sessionId: 'owned', version: 1 })).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
+    expect(mocks.html).not.toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
+  })
+  it('returns CANCELLED without compilation when HTML export is cancelled', async () => {
+    mocks.savePath.mockResolvedValue({ canceled: true })
+    expect(await invoke(window(), TYPST_EXPORT_HTML_CHANNEL, { sessionId: 'owned', version: 1 })).toMatchObject({ ok: false, error: { code: 'CANCELLED' } })
+    expect(mocks.html).not.toHaveBeenCalled()
+    expect(mocks.write).not.toHaveBeenCalled()
   })
 })

@@ -9,6 +9,11 @@ import { resolveExportSavePath } from '../services/export-save-path'
 
 let service: TypstService | null = null
 const owners = new Set<number>()
+/**
+ * 上游 `@yitom/contracts` 暂无 `TYPST_EXPORT_HTML`，通道名字面量与 PDF 侧对齐
+ *（`typst:export-html`）；contracts 补上后切回 `IPC.TYPST_EXPORT_HTML`。
+ */
+export const TYPST_EXPORT_HTML_CHANNEL = 'typst:export-html'
 function runtime(): TypstService {
   service ??= new TypstService({
     userData: app.getPath('userData'),
@@ -37,8 +42,28 @@ async function scoped<T>(event: IpcMainInvokeEvent, action: (service: TypstServi
     return err({ code: known.has(code ?? '') ? code as AppError['code'] : 'UNKNOWN', message: error instanceof Error ? error.message : 'Typst 操作失败' })
   }
 }
-export function registerTypstHandlers(): void {
-  ipcMain.handle(IPC.TYPST_GET_CONFIG, (event, filePath?: string) => scoped(event, service => service.getConfig(filePath)))
+async function exportTypstFile(options: {
+  title: string
+  defaultPath: string
+  extensions: string[]
+  expectedExt?: string
+  expectedExts?: string[]
+  produce: () => Promise<Buffer>
+  version: number
+}): Promise<{ filePath: string; version: number }> {
+  const name = options.extensions[0]!.toUpperCase()
+  const target = await resolveExportSavePath({ title: options.title, defaultPath: options.defaultPath, filters: [{ name, extensions: options.extensions }] })
+  if (target.canceled || !target.filePath) throw Object.assign(new Error('已取消导出'), { code: 'CANCELLED' })
+  const actual = path.extname(target.filePath).toLowerCase()
+  const accepted = options.expectedExts ?? (options.expectedExt ? [options.expectedExt] : [])
+  if (!accepted.includes(actual)) throw Object.assign(new Error(`导出目标必须为 ${accepted.join('/')} 文件`), { code: 'INVALID_ARGUMENT' })
+  const bytes = await options.produce()
+  const temporary = path.join(path.dirname(target.filePath), `.${path.basename(target.filePath)}.${randomUUID()}.tmp`)
+  try { await writeFile(temporary, bytes, { flag: 'wx' }); await rename(temporary, target.filePath) }
+  finally { await rm(temporary, { force: true }).catch(() => {}) }
+  return { filePath: target.filePath, version: options.version }
+}
+export function registerTypstHandlers(): void {  ipcMain.handle(IPC.TYPST_GET_CONFIG, (event, filePath?: string) => scoped(event, service => service.getConfig(filePath)))
   ipcMain.handle(IPC.TYPST_SAVE_CONFIG, (event, config: TypstConfig, filePath?: string) => scoped(event, service => service.saveConfig(config, filePath)))
   ipcMain.handle(IPC.TYPST_STATUS, event => scoped(event, service => service.status()))
   ipcMain.handle(IPC.TYPST_OPEN, (event, payload: TypstOpenPayload) => scoped(event, (service, owner) => service.open(owner, payload)))
@@ -47,14 +72,18 @@ export function registerTypstHandlers(): void {
   // Workspace switches must still release an old local session; service.close enforces its owner.
   ipcMain.handle(IPC.TYPST_CLOSE, (event, sessionId: string) => scoped(event, (service, owner) => service.close(owner, sessionId), true))
   ipcMain.handle(IPC.TYPST_EXPORT_PDF, (event, payload: TypstExportPayload) => scoped(event, async (service, owner) => {
-    const target = await resolveExportSavePath({ title: '导出 Typst PDF', defaultPath: 'document.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] })
-    if (target.canceled || !target.filePath) throw Object.assign(new Error('已取消导出'), { code: 'CANCELLED' })
-    if (path.extname(target.filePath).toLowerCase() !== '.pdf') throw Object.assign(new Error('导出目标必须为 PDF 文件'), { code: 'INVALID_ARGUMENT' })
-    const bytes = await service.pdf(owner, payload.sessionId, payload.version)
-    const temporary = path.join(path.dirname(target.filePath), `.${path.basename(target.filePath)}.${randomUUID()}.tmp`)
-    try { await writeFile(temporary, bytes, { flag: 'wx' }); await rename(temporary, target.filePath) }
-    finally { await rm(temporary, { force: true }).catch(() => {}) }
-    return { filePath: target.filePath, version: payload.version }
+    return exportTypstFile({
+      title: '导出 Typst PDF', defaultPath: 'document.pdf', extensions: ['pdf'], expectedExt: '.pdf',
+      produce: () => service.pdf(owner, payload.sessionId, payload.version),
+      version: payload.version,
+    })
+  }))
+  ipcMain.handle(TYPST_EXPORT_HTML_CHANNEL, (event, payload: TypstExportPayload) => scoped(event, async (service, owner) => {
+    return exportTypstFile({
+      title: '导出 Typst HTML', defaultPath: 'document.html', extensions: ['html', 'htm'], expectedExts: ['.html', '.htm'],
+      produce: () => service.html(owner, payload.sessionId, payload.version),
+      version: payload.version,
+    })
   }))
 }
 export function disposeAllTypst(): void { service?.disposeAll() }

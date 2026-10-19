@@ -103,6 +103,14 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
     } catch (error) { setActionError(error instanceof Error ? error.message : String(error)) }
     finally { setExporting(false) }
   }
+  const exportHtml = async () => {
+    setExporting(true); setActionError(null)
+    try {
+      const result = await session.exportHtml()
+      if (result) toast.success(`HTML 已导出：${result.filePath}`)
+    } catch (error) { setActionError(error instanceof Error ? error.message : String(error)) }
+    finally { setExporting(false) }
+  }
 
   return <section className="flex h-full min-h-0 min-w-0 flex-col" aria-label="Typst 工作区" data-testid="typst-workspace">
     <div className="flex min-h-10 flex-wrap items-center gap-1 border-b bg-background px-2 py-1">
@@ -113,6 +121,7 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
       <Button size="sm" variant="ghost" disabled={remote} onClick={() => { setActionError(null); session.restart(); void configQuery.refetch() }}><RefreshCw aria-hidden="true" />重启服务</Button>
       <Button size="sm" variant="ghost" disabled={remote} onClick={() => setSettingsOpen(true)}><Settings2 aria-hidden="true" />Typst 配置</Button>
       <Button size="sm" variant="outline" disabled={!session.session || remote || exporting || session.phase === 'error'} onClick={() => void exportPdf()}><Download aria-hidden="true" />{exporting ? '正在导出…' : '导出 PDF'}</Button>
+      <Button size="sm" variant="outline" disabled={!session.session || remote || exporting || session.phase === 'error'} onClick={() => void exportHtml()}><Download aria-hidden="true" />{exporting ? '正在导出…' : '导出 HTML'}</Button>
     </div>
     {error && <div className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive" role="alert">{error}</div>}
     <ResizablePanelGroup groupRef={groupRef} orientation="horizontal" className="min-h-0 flex-1" disabled={viewMode !== 'split'}>

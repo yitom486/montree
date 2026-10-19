@@ -14,5 +14,6 @@ export const typstApi = {
   request: (payload: TypstRequestPayload) => api().typstRequest(payload),
   close: (sessionId: string) => api().typstClose(sessionId),
   exportPdf: (payload: TypstExportPayload) => api().typstExportPdf(payload),
+  exportHtml: (payload: TypstExportPayload) => api().typstExportHtml(payload),
   onEvent: (callback: (event: TypstEvent) => void) => api().onTypstEvent(callback),
 }

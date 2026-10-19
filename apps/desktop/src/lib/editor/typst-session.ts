@@ -7,6 +7,7 @@ export interface TypstSessionPort {
   request(payload: TypstRequestPayload): Promise<Result<unknown, AppError>>
   close(sessionId: string): Promise<Result<void, AppError>>
   exportPdf(payload: TypstExportPayload): Promise<Result<TypstExportResult, AppError>>
+  exportHtml(payload: TypstExportPayload): Promise<Result<TypstExportResult, AppError>>
   onEvent(callback: (event: TypstEvent) => void): () => void
 }
 export interface TypstSessionState {
@@ -121,11 +122,19 @@ export class TypstSessionController {
     return result.value
   }
   async exportPdf(): Promise<TypstExportResult | null> {
+    return this.exportDocument('pdf')
+  }
+  async exportHtml(): Promise<TypstExportResult | null> {
+    return this.exportDocument('html')
+  }
+  private async exportDocument(kind: 'pdf' | 'html'): Promise<TypstExportResult | null> {
     const version = this.version
     await this.flush()
     if (this.failed) throw new Error(this.message ?? 'Typst 服务已退出，请重启服务')
     if (this.disposed || !this.session || version !== this.version) throw new Error('文档已更新，请重新导出')
-    const result = await this.port.exportPdf({ sessionId: this.session.sessionId, version })
+    const result = kind === 'pdf'
+      ? await this.port.exportPdf({ sessionId: this.session.sessionId, version })
+      : await this.port.exportHtml({ sessionId: this.session.sessionId, version })
     if (this.disposed || this.failed) return null
     if (!result.ok) {
       if (result.error.code === 'CANCELLED') return null

@@ -8,6 +8,7 @@ import type { ExportDocumentPayload, ExportMarkdownPayload, OpenDialogOptions, S
 import type { RendererErrorPayload } from '@yitom/contracts'
 import type { WindowInit } from '@yitom/contracts'
 import type { ElectronAPI } from '@yitom/contracts'
+import type { TypstExportPayload } from '@yitom/contracts'
 import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@yitom/contracts'
 import type { DetectPdfTocPagesPayload, GetPdfOcrTocPayload, GetPdfOcrPagePayload, ListPdfOcrPagesPayload, RecognizePdfPagePayload, RecognizePdfTocPayload, SavePdfOcrTocPayload } from '@yitom/contracts'
 import type { ClassifyPdfDocumentPayload, ExtractPdfBookMarkdownPayload } from '@yitom/contracts'
@@ -408,7 +409,11 @@ const electronAPI: ElectronAPI = {
   remoteServerStatus: (connectionId) => ipcRenderer.invoke(IPC.REMOTE_SERVER_STATUS, connectionId),
 }
 
-contextBridge.exposeInMainWorld('electronAPI', electronAPI)
+contextBridge.exposeInMainWorld('electronAPI', {
+  ...electronAPI,
+  // 上游 contracts 补 `TYPST_EXPORT_HTML` 前经本仓字面通道透出，见 ipc/typst-handlers。
+  typstExportHtml: (payload: TypstExportPayload) => ipcRenderer.invoke('typst:export-html', payload),
+})
 const terminalAPI: TerminalAPI = {
   profiles: () => ipcRenderer.invoke(TERMINAL_IPC.profiles),
   list: () => ipcRenderer.invoke(TERMINAL_IPC.list),

@@ -2,7 +2,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `TypstWorkspace.tsx` | `.typ` 的编辑/预览分栏、状态与错误、字体/固定入口配置、显式 PDF 导出；远程工作区仅编辑，不回落本机编译 |
+| `TypstWorkspace.tsx` | `.typ` 的编辑/预览分栏、状态与错误、字体/固定入口配置、显式 PDF/HTML 导出；远程工作区仅编辑，不回落本机编译 |
 | `TypstEditor.tsx` | CodeMirror 6 的 WASM-free Lezer 语法、共享 TextDocument 历史、Tinymist LSP 补全/参数/悬浮/定义跳转/格式化/诊断；异步响应校验原文并丢弃过期结果 |
 | `TypstEditor.test.ts` | 实际 CodeMirror 组件回归：补全范围与 snippet、导入补全单步撤销、诊断、异步格式化、会话重启隔离、跨视图历史与外部正文同步 |
 

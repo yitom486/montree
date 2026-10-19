@@ -17,6 +17,7 @@ function setup() {
     request: vi.fn<TypstSessionPort['request']>(async () => ok({ contents: 'help' })),
     close: vi.fn<TypstSessionPort['close']>(async () => ok(undefined)),
     exportPdf: vi.fn<TypstSessionPort['exportPdf']>(async () => ok({ filePath: '/project/output.pdf', version: 1 })),
+    exportHtml: vi.fn<TypstSessionPort['exportHtml']>(async () => ok({ filePath: '/project/output.html', version: 1 })),
     onEvent: vi.fn<TypstSessionPort['onEvent']>((listener) => { eventListener = listener; return unsubscribe }),
   }
   const states: TypstSessionState[] = []
@@ -141,6 +142,14 @@ describe('Typst session lifetime and unsaved buffer', () => {
     expect(await controller.exportPdf()).toBeNull()
     expect(port.exportPdf).toHaveBeenCalledWith({ sessionId: session.sessionId, version: 2 })
     expect(port.exportPdf.mock.invocationCallOrder[0]).toBeGreaterThan(port.sync.mock.invocationCallOrder[0])
+    controller.dispose()
+  })
+  it('routes HTML export through the same flush-then-export path as PDF', async () => {
+    const { controller, port } = setup()
+    await controller.start(); controller.updateContent('= draft')
+    expect(await controller.exportHtml()).toEqual({ filePath: '/project/output.html', version: 1 })
+    expect(port.exportHtml).toHaveBeenCalledWith({ sessionId: session.sessionId, version: 2 })
+    expect(port.exportHtml.mock.invocationCallOrder[0]).toBeGreaterThan(port.sync.mock.invocationCallOrder[0])
     controller.dispose()
   })
   it('stops issuing language requests after the runtime exits', async () => {

@@ -216,18 +216,27 @@ export class TypstService {
     return response
   }
   async pdf(owner: number, sessionId: string, version: number): Promise<Buffer> {
+    const bytes = await this.exportViaLsp(owner, sessionId, version, 'tinymist.exportPdf')
+    if (bytes.subarray(0, 5).toString() === '%PDF-') return bytes
+    invalid('Tinymist 未返回有效 PDF，文档可能包含编译错误', 'PROTOCOL_ERROR')
+  }
+  async html(owner: number, sessionId: string, version: number): Promise<Buffer> {
+    const bytes = await this.exportViaLsp(owner, sessionId, version, 'tinymist.exportHtml')
+    if (bytes.subarray(0, 15).toString().toLowerCase().startsWith('<!doctype html')) return bytes
+    invalid('Tinymist 未返回有效 HTML，文档可能包含编译错误', 'PROTOCOL_ERROR')
+  }
+  private async exportViaLsp(owner: number, sessionId: string, version: number, command: string): Promise<Buffer> {
     const doc = this.owned(owner, sessionId)
     if (doc.version !== version) invalid('文档已变化，请重新导出', 'REVISION_CONFLICT')
     const revisions = new Map([...doc.project.documents].map(([id, state]) => [id, state.version]))
     const entry = (await this.getConfig(doc.public.filePath)).entryPath || doc.public.filePath
-    const response = await doc.project.process.request('workspace/executeCommand', { command: 'tinymist.exportPdf', arguments: [entry, {}, { write: false, open: false }] })
+    const response = await doc.project.process.request('workspace/executeCommand', { command, arguments: [entry, {}, { write: false, open: false }] })
     if (doc.project.dead || revisions.size !== doc.project.documents.size || [...revisions].some(([id, revision]) => doc.project.documents.get(id)?.version !== revision)) invalid('导出期间项目文档已变化，请重新导出', 'REVISION_CONFLICT')
     // Tinymist 0.15.8 returns base64 data when write=false.
     if (response && typeof response === 'object' && typeof (response as { data?: unknown }).data === 'string') {
-      const bytes = Buffer.from((response as { data: string }).data, 'base64')
-      if (bytes.subarray(0, 5).toString() === '%PDF-') return bytes
+      return Buffer.from((response as { data: string }).data, 'base64')
     }
-    invalid('Tinymist 未返回有效 PDF，文档可能包含编译错误', 'PROTOCOL_ERROR')
+    invalid(`Tinymist 未返回有效导出数据（${command}），文档可能包含编译错误`, 'PROTOCOL_ERROR')
   }
   async close(owner: number, sessionId: string): Promise<void> {
     const doc = this.documents.get(sessionId)
