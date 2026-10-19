@@ -305,6 +305,10 @@ describe('acp-ui-store history + plan', () => {
     const messages = msgs()
     expect(messages.map((m) => m.text).join('')).toContain('首段尾段')
     expect(messages.every((m) => !m.streaming)).toBe(true)
+    // 回归：迟到尾包不得另起气泡（如“开启它。”自立一卡），必须合入同一 agent 气泡
+    const agents = messages.filter((m) => m.role === 'agent')
+    expect(agents).toHaveLength(1)
+    expect(agents[0]?.text).toBe('首段尾段')
   })
 
   it('回放重建不受冻结标记影响：无 begin 即 streaming，收尾统一冻结', () => {

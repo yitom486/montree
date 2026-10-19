@@ -684,6 +684,24 @@ export const createChatSlice: StateCreator<
         set((s) => ({
           ...(role === 'user' ? { pendingReplayUserText: null } : {}),
           ...patchActiveThread(s, (t) => {
+            // 迟到 chunk 合并：仅当回合已收尾（turnSettled=true，即 finishStreaming
+            // 之后）到达的同 role 文本（如 agy 尾包“开启它。”）才拼入最后一个
+            // 同 role 气泡，不另起新气泡。包归约器只在 last.streaming 时追加，
+            // 冻结后会另起一条；此处先拦截，保证单气泡 + 不点亮流式。
+            // 恢复定居（freezeSettledStreaming，不碰 turnSettled）不在此列：
+            // 后续合法消息仍走包路径继续流式（见 stream-host 回归测试）。
+            if ((role === 'agent' || role === 'thought') && effectiveText && s.turnSettled) {
+              const last = t.messages[t.messages.length - 1]
+              if (last && last.role === role && !last.streaming) {
+                const messages = [...t.messages]
+                messages[messages.length - 1] = {
+                  ...last,
+                  text: last.text + effectiveText,
+                  updatedAt: Date.now(),
+                }
+                return { ...t, messages, updatedAt: Date.now() }
+              }
+            }
             const feed = dispatchOwnedChatEvent(t, { type: 'text-chunk', role, text: effectiveText })
             return { ...t, messages: feed.messages, updatedAt: Date.now() }
           }),
