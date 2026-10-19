@@ -6,6 +6,10 @@ ACP Agent 主进程侧 wiring：拉起 `codex-acp`、连接生命周期、权限
 ACP 协议与客户端底层纯逻辑已独立至外部包 `@yitom/acp-client`；渲染端零直接引用（`tsconfig.web` include 已剔除 acp）。
 `montree_diagram_guide` 返回 `node_modules/@yitom/contracts/dist/agent/diagram-design.js` 的按需图解规范；`montree_present(kind=preset,preset=diagram)` 沿用 present 快照链路生成参数化 SVG，不启动额外 Agent 或执行 skill 脚本。
 连接与断连按窗口串行，相同在途连接请求合并；断连立即取消在途 SDK 请求。温进程 initialize 失败时同一次连接仅冷启动回退一次，沿用原会话恢复参数，最终失败才报错。`acp-connection.test.ts` 覆盖自动回退、快速断连重连与重试上限。
+OpenCode 主会话的 MCP 在 resume/load 后仍未重新发现时，`mcp-session-recovery.ts` 委托 `acp-connection.ts` 冷启动一次；该路径禁止 session/new，严格核对原会话 ID 与 Code mode，等待新 tools/list 后才在新 SDK 连接发送本轮消息。其他会话忙碌、取消或连接切换时不继续重启；失败关闭新进程并报错。进程生命周期属于宿主，依赖仍使用正式 registry 包。
+Agent 工作区文件、Shell 和 Git 使用运行时的原生工具，Montree MCP 负责文档和编辑器状态。Code mode 的局部目录不代表 Agent 顶层工具全集；ACP 的客户端 `fs` / `terminal` 声明保留作兼容，不据此推断原生工具是否可用。
+
+可选实测：`node scripts/probe-opencode-native-tools.mjs <opencode可执行文件路径>`，适用于 OpenCode 2.0.22；启动真实 ACP 进程与本地模拟模型，在临时配置/工作区中验证原生建文件、读取和 Git，客户端文件/终端委托会被拒绝。无需模型密钥，不调用付费模型接口；请求阶段总超时 45 秒，结束后清理临时进程和目录。
 通用流桥接、客户端身份、请求超时/取消、会话恢复/新建、原生扩展回退与有界工具输出恢复统一由 `@yitom/acp-client` 实现。`sdk-client.ts` 仅补运行时参数转发与失败诊断，`session-open.ts` 仅补诊断及阅读会话保留 MCP 的重试策略；窗口上下文、进程归属和文档操作留宿主。安装与更新参见根 README 的「聊天与 ACP 包依赖」。
 
 会话级 Code mode（PTC）：仅当 `initialize` 的 `agentCapabilities._meta.toolsMode.values` 显式包含 `ptc` 时，`openSessionAfterAuth` 才在 `sessionMeta` 合并 `{ toolsMode: 'ptc' }`，随 `session/new|load|resume` 下发；能力解析在 `code-mode-support.ts`（纯函数 + 单测），不从运行时 id 推断。渲染端按线程保存请求，只对下一次新建/恢复生效；`AgentHeaderOverflowMenu` 仅在声明支持时显示开关，连接结果回带 `codeModeSupported`。

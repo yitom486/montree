@@ -1,3 +1,5 @@
+export class McpDiscoveryTimeoutError extends Error {}
+
 /** Broker observations only: a discovered catalog is not proof of model-side availability. */
 export class McpConnectionHealth {
   private clients = new Set<object>()
@@ -33,7 +35,7 @@ export class McpConnectionHealth {
       }
       const timer = setTimeout(() => {
         cleanup()
-        reject(new Error('未收到 Agent 重新发现 Montree 工具的请求，请重新连接 Agent'))
+        reject(new McpDiscoveryTimeoutError('未收到 Agent 重新发现 Montree 工具的请求，请重新连接 Agent'))
       }, timeoutMs)
       this.listeners.add(check)
       signal.addEventListener('abort', abort, { once: true })

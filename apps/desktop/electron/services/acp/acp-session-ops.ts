@@ -26,7 +26,7 @@ import {
   requireAgent,
   toProtocolError,
 } from './acp-bridges'
-import { detachSdkStreamNow, disconnectAcp } from './acp-connection'
+import { detachSdkStreamNow, disconnectAcp, restartAcpForMcp } from './acp-connection'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
 function sessionPromptMode(nativeSessionAccepted:boolean, restored:boolean) {
@@ -202,10 +202,19 @@ export async function promptAcp(payload: {
   }
 
   const prevActiveSessionId = acpState.activePromptSessionId
-  const generation = acpState.connectGeneration
+  let generation = acpState.connectGeneration
+  let agent = a.value
   let sent = false
   try {
-    await ensureSessionMcp(payload.sessionId, (method, params) => sdkRequest<unknown, unknown>(a.value, method, params))
+    await ensureSessionMcp(payload.sessionId, (method, params) => sdkRequest<unknown, unknown>(agent, method, params),
+      async (input) => {
+        await restartAcpForMcp(input)
+        // 重启有意切换代际；后续 prompt 必须使用新连接，不能继续引用旧 agent。
+        generation = acpState.connectGeneration
+        const current = requireAgent()
+        if (!current.ok) throw new Error(current.error.message)
+        agent = current.value
+      })
     if (currentAcpContext().closed || acpState.connectGeneration !== generation) {
       throw new McpRecoveryCancelledError('Agent 连接已变更，已取消发送消息')
     }
@@ -215,7 +224,7 @@ export async function promptAcp(payload: {
     disarmSuppressSettle()
     sent = true
     const result = await sdkRequest<typeof methods.agent.session.prompt>(
-      a.value,
+      agent,
       methods.agent.session.prompt,
       {
         sessionId: payload.sessionId,
@@ -229,7 +238,7 @@ export async function promptAcp(payload: {
   } catch (error) {
     logAcpDiagnostic('acp.prompt.failed', { sessionId: payload.sessionId })
     try {
-      if (sent) void a.value.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
+      if (sent) void agent.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
     } catch {
       // 忽略竞态
     }

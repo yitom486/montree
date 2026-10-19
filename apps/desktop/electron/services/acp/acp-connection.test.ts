@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SpawnedAcpProcess } from './process-manager'
 import { getAcpContext, runInAcpContext, forgetAcpContext } from './acp-context'
 import { getAcpState } from './acp-state'
+import { McpConnectionHealth } from './mcp/connection-health'
+import { restoreOrCreateAcpSession as restoreSession } from '@yitom/acp-client'
+import type { McpProcessRestartInput } from './mcp-session-recovery'
 
 const mocks = vi.hoisted(() => ({
   live: null as SpawnedAcpProcess | null,
@@ -46,7 +49,7 @@ vi.mock('./sdk-client', () => ({
   },
 }))
 
-import { connectAcp, disconnectAcp } from './acp-connection'
+import { connectAcp, disconnectAcp, restartAcpForMcp } from './acp-connection'
 import { createAcpSession, loadAcpSession } from './acp-session-ops'
 
 function processHandle(label: string): SpawnedAcpProcess {
@@ -80,6 +83,102 @@ afterEach(async () => {
 const payload = { runtimeId: 'codex-acp', resumeSessionId: 'old-session', hasLocalHistory: true }
 
 describe('ACP reconnect', () => {
+  function recoveryInput(): McpProcessRestartInput {
+    const state = getAcpState(scope)
+    const health = new McpConnectionHealth()
+    const handle = { url: 'test-pipe', authToken: 'test-token', health, close: async () => undefined }
+    state.runtimeId = 'opencode'; state.sessionId = 'old-session'; state.montreeMcp = handle
+    state.processHandle = mocks.live
+    mocks.initialize.mockResolvedValue(initialized)
+    mocks.restore.mockImplementation(restoreSession)
+    return { sessionId: 'old-session', cwd: 'D:\\books', handle, signal: new AbortController().signal,
+      generation: state.connectGeneration, advanceGeneration: vi.fn() }
+  }
+
+  it('MCP 超时后强制杀旧进程并冷启动，恢复同一会话且等待新 tools/list', async () => {
+    const input = recoveryInput()
+    const old = mocks.live!
+    mocks.sessionRequest.mockImplementation(async (method: string, params) => {
+      expect(method).toBe('session/resume')
+      expect(params).toMatchObject({ sessionId: 'old-session', mcpServers: [{ name: 'montree' }] })
+      input.handle.health!.discovered({})
+      return { sessionId: 'old-session', configOptions: [] }
+    })
+    await runInAcpContext(scope, () => restartAcpForMcp(input))
+    expect(old.kill).toHaveBeenCalledOnce()
+    expect(mocks.spawn).toHaveBeenCalledOnce()
+    expect(mocks.initialize).toHaveBeenCalledTimes(1)
+    expect(mocks.sessionRequest).toHaveBeenCalledOnce()
+    expect(getAcpState(scope).sessionId).toBe('old-session')
+    expect(input.advanceGeneration).toHaveBeenCalledWith(input.generation + 1)
+  })
+
+  it('冷恢复的 resume/load 均失败时禁止调用 session/new，且关闭失败进程', async () => {
+    const input = recoveryInput()
+    mocks.sessionRequest.mockRejectedValue(new Error('session not found'))
+    await expect(runInAcpContext(scope, () => restartAcpForMcp(input))).rejects.toThrow()
+    expect(mocks.sessionRequest.mock.calls.map(([method]) => method)).toEqual(['session/resume', 'session/load'])
+    expect(mocks.spawn).toHaveBeenCalledOnce()
+    expect(getAcpState(scope).sdkConn).toBeNull()
+  })
+
+  it('冷恢复不得接收其他会话 ID，也不会发送 prompt', async () => {
+    const input = recoveryInput()
+    mocks.sessionRequest.mockResolvedValue({ sessionId: 'wrong-session' })
+    await expect(runInAcpContext(scope, () => restartAcpForMcp(input))).rejects.toThrow()
+    expect(mocks.sessionRequest.mock.calls.every(([method]) => ['session/resume', 'session/load'].includes(method))).toBe(true)
+    expect(getAcpState(scope).sessionId).toBeNull()
+  })
+
+  it('存在其他活动 prompt 或请求已经取消时不重启进程', async () => {
+    const input = recoveryInput()
+    getAcpState(scope).activePromptSessionId = 'busy'
+    await expect(runInAcpContext(scope, () => restartAcpForMcp(input))).rejects.toThrow('状态已变化')
+    getAcpState(scope).activePromptSessionId = null
+    const controller = new AbortController(); controller.abort()
+    await expect(runInAcpContext(scope, () => restartAcpForMcp({ ...input, signal: controller.signal }))).rejects.toThrow('已取消')
+    expect(mocks.spawn).not.toHaveBeenCalled()
+  })
+
+  it('冷启动 RPC 成功但没有新的工具发现时仍失败，不把旧目录当作恢复', async () => {
+    const input = recoveryInput()
+    input.handle.health!.discovered({})
+    const health = input.handle.health!
+    health.waitForDiscovery = (after, signal) => McpConnectionHealth.prototype.waitForDiscovery.call(health, after, signal, 10)
+    mocks.sessionRequest.mockResolvedValue({ sessionId: 'old-session' })
+    const failure = await runInAcpContext(scope, () => restartAcpForMcp(input)).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toContain('重新发现')
+    expect(mocks.spawn).toHaveBeenCalledOnce()
+    expect(getAcpState(scope).sdkConn).toBeNull()
+  })
+
+  it('冷启动期间取消会清理进程，不继续恢复或发送消息', async () => {
+    const input = recoveryInput()
+    const controller = new AbortController()
+    let started!: () => void
+    let release!: () => void
+    const entered = new Promise<void>(resolve => { started = resolve })
+    const handshake = new Promise<void>(resolve => { release = resolve })
+    mocks.initialize.mockImplementation(async () => { started(); await handshake; return initialized })
+    const pending = runInAcpContext(scope, () => restartAcpForMcp({ ...input, signal: controller.signal }))
+      .catch((error: unknown) => error)
+    await entered
+    runInAcpContext(scope, () => controller.abort())
+    release()
+    expect(await pending).toBeInstanceOf(Error)
+    await runInAcpContext(scope, () => disconnectAcp(undefined, { killProcess: true }))
+    expect(mocks.sessionRequest).not.toHaveBeenCalled()
+    expect(getAcpState(scope).sdkConn).toBeNull()
+  })
+
+  it('冷启动后 Code mode 能力丢失时不降级发送', async () => {
+    const input = recoveryInput()
+    input.meta = { toolsMode: 'ptc' }
+    await expect(runInAcpContext(scope, () => restartAcpForMcp(input))).rejects.toThrow('Code mode')
+    expect(mocks.sessionRequest).not.toHaveBeenCalled()
+  })
+
   it('规则标签变化时不取消仍在回答的旧会话', async () => {
     const old = mocks.live!
     old.profileTag = 'old-native-binding'

@@ -8,6 +8,8 @@ import { RemoteConnectModal } from './RemoteConnectModal'
 import { cn } from '@/lib/utils'
 
 export interface StatusBarProps {
+  terminalVisible?: boolean
+  onToggleTerminal?: () => void
   workspaceRoot?: string
   activeFilePath?: string
   onOpenWorkspacePath?: (path: string) => void
@@ -19,6 +21,8 @@ export interface StatusBarProps {
  * 底部状态栏：展示工作区环境（VS Code 风格 WSL/SSH 远程直连胶囊）、Git 分支与变更状态、一键远程推送、当前文档编码与格式。
  */
 export function StatusBar({
+  terminalVisible,
+  onToggleTerminal,
   workspaceRoot,
   activeFilePath,
   onOpenWorkspacePath,
@@ -183,6 +187,7 @@ export function StatusBar({
 
         {/* 右侧：文档格式与编码 */}
         <div className="flex items-center gap-3">
+          <button type="button" aria-label="切换终端" aria-pressed={terminalVisible} title="终端 (Ctrl+`)" onClick={onToggleTerminal} className="flex items-center gap-1 hover:text-foreground"><Terminal className="size-3" /><span>终端</span></button>
           {documentKind && (
             <span className="uppercase tracking-wider text-[10px] font-mono text-muted-foreground/80">
               {documentKind}

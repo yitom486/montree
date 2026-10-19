@@ -9,6 +9,7 @@ import { createWindow } from './window/create-window'
 import { extractExternalFilePaths, pendingExternalFiles } from './window/external-file'
 import { installAppMenu } from './window/app-menu'
 import { registerIpcHandlers } from './ipc/register-handlers'
+import { workspaceTerminals } from './services/terminal-runtime'
 import { initAppUpdater } from './services/app-updater'
 import { disposeAllAcp } from './services/acp/acp-client'
 import { configureAcpDiagnostics } from './services/acp/mcp/diagnostics'
@@ -112,12 +113,14 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  workspaceTerminals.dispose()
   closeAllBookDbs()
   disposeAllAcp()
   disposeAllTypst()
 })
 
 app.on('window-all-closed', () => {
+  workspaceTerminals.dispose()
   disposeAllWorkspaceWatches()
   disposeAllAcp()
   disposeAllTypst()

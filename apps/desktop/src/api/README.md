@@ -8,6 +8,7 @@
 |------|------|
 | `file-api.ts` | 打开/保存/读写文件、工作区、导出、粘贴图等 |
 | `app-api.ts` | 应用级：窗口/标题/关闭确认、更新、外部文件与链接、日志、E2E 门控、工作区监听等 |
+| `terminal-api.ts` | 交互终端 IPC：Shell 列表、会话创建/读写/尺寸/关闭及输出事件；独立沙盒 preload 桥接 |
 | `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@montree/contracts`，传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`，主进程留守见 `apps/desktop/electron/services/acp/`） |
 | `reading-marks-api.ts` | 书签 / 高亮 / 批注 CRUD + 本书全文搜 + 按章查询 |
 | `flashcards-api.ts` | 记忆卡片：待复习列表、复习评分落盘 |

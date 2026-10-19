@@ -7,6 +7,8 @@
 | 文件 | 功能 |
 |------|------|
 | `file-service.ts` | 打开/保存对话框、读文本/二进制/图片、粘贴图、导出入口 |
+| `terminal-service.ts` / `.test.ts` | 用户交互式 node-pty 会话管理、原生 Shell / WSL、输入/resize/输出游标、窗口隔离与进程清理；独立于 Agent 原生工具 |
+| `terminal-runtime.ts` | 终端服务实例，将输出事件送往所属窗口；退出应用统一释放 |
 | `workspace.ts` | 扫描工作区树（深度限制、忽略目录、无权限/受限目录容错、去掉空文件夹） |
 | `workspace-fs.ts` | 工作区内新建/重命名/移动/复制/删除 |
 | `workspace-md-search.ts` | 工作区 Markdown 字面检索（只读：根内断言 + symlink 跳过，仅 .md，200 文件/256KB/100 命中上限，仅 inspect 链调用；B3 分页 offset/limit/nextOffset） |

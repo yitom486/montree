@@ -6,6 +6,17 @@ import { requestSessionWithResources } from './session-open'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
 import { windowMcpEntry } from './mcp/session-config'
 import { logAcpDiagnostic } from './mcp/diagnostics'
+import { McpDiscoveryTimeoutError } from './mcp/connection-health'
+
+export interface McpProcessRestartInput {
+  sessionId: string
+  cwd: string
+  meta?: Record<string, unknown>
+  handle: MontreeMcpServerHandle
+  signal: AbortSignal
+  generation: number
+  advanceGeneration: (generation: number) => void
+}
 
 interface Binding {
   handle: MontreeMcpServerHandle
@@ -39,7 +50,8 @@ export function cancelMcpRecovery(sessionId?: string): void {
 }
 
 /** Restore the same session before sending user input; never fall back to session/new. */
-export async function ensureSessionMcp(sessionId: string, request: AcpRpcRequest): Promise<void> {
+export async function ensureSessionMcp(sessionId: string, request: AcpRpcRequest,
+  restart?: (input: McpProcessRestartInput) => Promise<void>): Promise<void> {
   const owner = currentAcpContext()
   const binding = bindings.get(owner)?.get(sessionId)
   if (!binding) return
@@ -97,6 +109,27 @@ export async function ensureSessionMcp(sessionId: string, request: AcpRpcRequest
           logAcpDiagnostic('mcp.recovery.failed', { sessionId, method })
           if (error instanceof RecoveryInvariantError) throw error
           if (method === methods.at(-1)) {
+            if (error instanceof McpDiscoveryTimeoutError && restart && acpState.runtimeId === 'opencode'
+              && acpState.sessionId === sessionId && binding.name === 'montree') {
+              logAcpDiagnostic('mcp.recovery.cold-start', { sessionId })
+              await restart({ sessionId, cwd: binding.cwd, meta: binding.meta, handle: binding.handle,
+                signal: controller.signal, generation: binding.generation,
+                advanceGeneration: (generation) => {
+                  valid()
+                  const previous = binding.generation
+                  for (const entry of bindings.get(owner)!.values()) {
+                    if (entry.generation === previous) entry.generation = generation
+                  }
+                  binding.generation = generation
+                } }).catch((restartError: unknown) => {
+                  valid()
+                  throw restartError
+                })
+              valid()
+              binding.disconnects = health.disconnects
+              logAcpDiagnostic('mcp.recovery.discovered', { sessionId, method: 'cold-start' })
+              return
+            }
             throw new Error(`Montree 工具恢复失败，请重新连接 Agent：${error instanceof Error ? error.message : '未知错误'}`)
           }
         }

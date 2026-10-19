@@ -1,4 +1,5 @@
 import { registerTypstHandlers } from './typst-handlers'
+import { registerTerminalHandlers } from './terminal-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
@@ -533,6 +534,7 @@ export function registerIpcHandlers(): void {
   setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()
   registerTypstHandlers()
+  registerTerminalHandlers()
   if (process.env.E2E_READER_VISUAL === '1') {
     Object.assign(globalThis, {
       __montreeE2eVisualTools: (name: string, args?: Record<string, unknown>) =>

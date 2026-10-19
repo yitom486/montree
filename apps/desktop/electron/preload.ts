@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { IPC } from '@yitom/contracts'
 import type { AppError } from '@yitom/contracts'
@@ -408,3 +409,18 @@ const electronAPI: ElectronAPI = {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
+const terminalAPI: TerminalAPI = {
+  profiles: () => ipcRenderer.invoke(TERMINAL_IPC.profiles),
+  list: () => ipcRenderer.invoke(TERMINAL_IPC.list),
+  create: payload => ipcRenderer.invoke(TERMINAL_IPC.create, payload),
+  write: (id, data) => ipcRenderer.invoke(TERMINAL_IPC.write, id, data),
+  resize: (id, cols, rows) => ipcRenderer.invoke(TERMINAL_IPC.resize, id, cols, rows),
+  read: (id, cursor) => ipcRenderer.invoke(TERMINAL_IPC.read, id, cursor),
+  close: id => ipcRenderer.invoke(TERMINAL_IPC.close, id),
+  onEvent: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, event: TerminalEvent) => callback(event)
+    ipcRenderer.on(TERMINAL_IPC.event, listener)
+    return () => ipcRenderer.removeListener(TERMINAL_IPC.event, listener)
+  },
+}
+contextBridge.exposeInMainWorld('montreeTerminal', terminalAPI)

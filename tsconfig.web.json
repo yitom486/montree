@@ -11,5 +11,5 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["apps/desktop/src/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/web-doc/src/**/*"]
+  "include": ["apps/desktop/src/**/*", "apps/desktop/contracts/**/*", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/web-doc/src/**/*"]
 }

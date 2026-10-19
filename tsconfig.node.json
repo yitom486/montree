@@ -10,5 +10,5 @@
     },
     "types": ["electron-vite/node"]
   },
-  "include": ["apps/desktop/electron/**/*", "apps/desktop/electron.vite.config.ts", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/web-doc/src/**/*", "packages/workspace-core/src/**/*", "packages/remote-server/src/**/*"]
+  "include": ["apps/desktop/electron/**/*", "apps/desktop/contracts/**/*", "apps/desktop/electron.vite.config.ts", "packages/pdf/src/**/*", "packages/ocr-core/src/**/*", "packages/web-doc/src/**/*", "packages/workspace-core/src/**/*", "packages/remote-server/src/**/*"]
 }

@@ -5,9 +5,9 @@ import { bindSessionMcp, cancelMcpRecovery, ensureSessionMcp } from './mcp-sessi
 import { McpConnectionHealth } from './mcp/connection-health'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
 
-const mocks = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn() }))
-vi.mock('./sdk-client', () => ({ sdkRequest: (_agent: unknown, ...args: unknown[]) => mocks.request(...args) }))
-vi.mock('./acp-connection', () => ({ detachSdkStreamNow: vi.fn(), disconnectAcp: vi.fn() }))
+const mocks = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn(), restart: vi.fn(), agent: vi.fn() }))
+vi.mock('./sdk-client', () => ({ sdkRequest: (agent: unknown, ...args: unknown[]) => { mocks.agent(agent); return mocks.request(...args) } }))
+vi.mock('./acp-connection', () => ({ detachSdkStreamNow: vi.fn(), disconnectAcp: vi.fn(), restartAcpForMcp: (...args: unknown[]) => mocks.restart(...args) }))
 vi.mock('electron', () => ({ app: { getPath: () => process.cwd() } }))
 import { promptAcp, cancelAcp } from './acp-session-ops'
 
@@ -42,6 +42,54 @@ afterEach(() => {
 })
 
 describe('MCP recovery before prompt', () => {
+  it('after idle discovery timeouts, restarts once and sends only on the new connection', async () => {
+    const state = getAcpState(owner)
+    state.runtimeId = 'opencode'
+    const oldAgent = state.sdkConn!.agent
+    const newAgent = { notify: vi.fn() }
+    health.closed(oldClient)
+    mocks.restart.mockImplementation(async (input) => {
+      expect(input.sessionId).toBe(sessionId)
+      expect(input.meta).toEqual({ toolsMode: 'ptc', app: 'resources' })
+      input.advanceGeneration(1)
+      state.connectGeneration = 1
+      state.sdkConn = { agent: newAgent } as unknown as typeof state.sdkConn
+      health.discovered({})
+    })
+    const pending = inWindow(() => promptAcp({ sessionId, prompt: [{ type: 'text', text: 'once' }] }))
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect((await pending).ok).toBe(true)
+    expect(mocks.restart).toHaveBeenCalledOnce()
+    expect(mocks.request.mock.calls.map(([method]) => method)).toEqual(['session/resume', 'session/load', 'session/prompt'])
+    expect(oldAgent).not.toBe(newAgent)
+    expect(mocks.agent.mock.lastCall?.[0]).toBe(newAgent)
+    expect(state.suppressSessionUpdates).toBe(false)
+  })
+
+  it('does not cold restart when a different session or rejected Code mode is returned', async () => {
+    getAcpState(owner).runtimeId = 'opencode'
+    health.closed(oldClient)
+    mocks.request.mockResolvedValue({ sessionId: 'different' })
+    const result = await inWindow(() => promptAcp({ sessionId, prompt: [{ type: 'text', text: 'hello' }] }))
+    expect(result.ok).toBe(false)
+    expect(mocks.restart).not.toHaveBeenCalled()
+  })
+
+  it('cancels a cold restart and never sends the pending user message', async () => {
+    getAcpState(owner).runtimeId = 'opencode'
+    health.closed(oldClient)
+    mocks.restart.mockImplementation((input) => new Promise<void>((_resolve, reject) => {
+      input.signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
+    }))
+    const pending = inWindow(() => promptAcp({ sessionId, prompt: [{ type: 'text', text: 'hello' }] }))
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(mocks.restart).toHaveBeenCalledOnce()
+    inWindow(() => cancelAcp({ sessionId }))
+    const result = await pending
+    expect(!result.ok && result.error.code).toBe('CANCELLED')
+    expect(mocks.request.mock.calls.some(([method]) => method === 'session/prompt')).toBe(false)
+  })
+
   it('keeps healthy and lazily started sessions on the normal prompt path', async () => {
     await inWindow(() => promptAcp({ sessionId, prompt: [{ type: 'text', text: 'hello' }] }))
     expect(mocks.request.mock.calls.map(([method]) => method)).toEqual(['session/prompt'])

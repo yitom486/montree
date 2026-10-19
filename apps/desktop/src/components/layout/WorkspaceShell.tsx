@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
@@ -28,6 +28,7 @@ import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
 import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 
 import type { AppTheme } from '@/stores/editor-ui-store'
+const TerminalPanel = lazy(() => import('./TerminalPanel'))
 
 export interface WorkspaceShellProps {
   workspaceRoot?: string
@@ -111,6 +112,9 @@ export function WorkspaceShell({
   isDirty = false,
 }: WorkspaceShellProps) {
   const [internalRemoteModalOpen, setInternalRemoteModalOpen] = useState(false)
+  const [terminalVisible, setTerminalVisible] = useState(false)
+  const [terminalMounted, setTerminalMounted] = useState(false)
+  const toggleTerminal = () => { setTerminalMounted(true); setTerminalVisible(value => !value) }
   const handleOpenRemoteModal = onOpenRemote || (() => setInternalRemoteModalOpen(true))
 
   const theme = useEditorUiStore((state) => state.theme)
@@ -168,6 +172,9 @@ export function WorkspaceShell({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.code === 'Backquote') {
+        event.preventDefault(); toggleTerminal(); return
+      }
       if (event.key === 'Escape' && zenMode) {
         preserveScrollAnchor(() => setZenMode(false))
         return
@@ -274,7 +281,13 @@ export function WorkspaceShell({
           {isSidebarVisible ? <ResizableHandle withHandle /> : null}
 
           <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
-            {children}
+            <ResizablePanelGroup orientation="vertical">
+              <ResizablePanel id="document" defaultSize="70%" minSize="20%">{children}</ResizablePanel>
+              {terminalVisible && <ResizableHandle withHandle />}
+              {terminalMounted && <ResizablePanel id="terminal" defaultSize="30%" minSize={terminalVisible ? '15%' : 0} maxSize={terminalVisible ? '75%' : 0} style={{ display: terminalVisible ? undefined : 'none' }}>
+                <Suspense fallback={<div className="p-2 text-xs">正在加载终端…</div>}><TerminalPanel visible={terminalVisible} workspaceRoot={workspaceRoot} onClose={() => setTerminalVisible(false)} /></Suspense>
+              </ResizablePanel>}
+            </ResizablePanelGroup>
           </ResizablePanel>
 
           {isDockedPanelVisible ? <ResizableHandle withHandle /> : null}
@@ -296,6 +309,8 @@ export function WorkspaceShell({
 
       {!zenMode && (
         <StatusBar
+          terminalVisible={terminalVisible}
+          onToggleTerminal={toggleTerminal}
           workspaceRoot={workspaceRoot}
           activeFilePath={activeFilePath}
           onOpenWorkspacePath={onOpenWorkspacePath}

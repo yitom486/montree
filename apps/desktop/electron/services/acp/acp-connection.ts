@@ -36,7 +36,7 @@ import { logAcpDiagnostic } from './mcp/diagnostics'
 import { restoreOrCreateAcpSession, isAuthenticationRequired } from './session-open'
 import { supportsCodeModeCaps } from './code-mode-support'
 import { flattenGroupedConfigOptions } from './config-options'
-import { bindSessionMcp, cancelMcpRecovery } from './mcp-session-recovery'
+import { bindSessionMcp, cancelMcpRecovery, McpRecoveryCancelledError, type McpProcessRestartInput } from './mcp-session-recovery'
 import { connectSdkClient, sdkRequest } from './sdk-client'
 import { getLiveAcpProcess, getAcpEarlyExitStderrDetail, isSpawnedAcpProcessAlive, spawnAcpProcess, withAcpEarlyExitDetail, type SpawnedAcpProcess } from './process-manager'
 import { ensureBunForCommand } from '../bun-runtime'
@@ -173,7 +173,7 @@ function watchProcessExit(handle: SpawnedAcpProcess, gen: number): void {
 
 async function openSessionAfterAuth(
   cwd: string,
-  options?: { keepAliveOnFailure?: boolean },
+  options?: { keepAliveOnFailure?: boolean; recovery?: McpProcessRestartInput },
 ): Promise<Result<AcpConnectReadyResultWithCodeMode, AppError>> {
   const a = requireAgent(true)
   if (!a.ok) return err(a.error)
@@ -182,8 +182,20 @@ async function openSessionAfterAuth(
   }
 
   const resumeId = acpState.pendingResumeSessionId?.trim() || null
+  const recovery = options?.recovery
+  const generation = acpState.connectGeneration
+  let recoveryInvariantFailure: Error | undefined
+  const checkRecovery = () => {
+    if (recovery && (recovery.signal.aborted || currentAcpContext().closed || acpState.connectGeneration !== generation)) {
+      throw new McpRecoveryCancelledError('MCP 恢复已取消，Agent 连接已变更')
+    }
+  }
 
   try {
+    checkRecovery()
+    if (recovery?.meta?.toolsMode === 'ptc' && !acpState.codeModeSupported) {
+      throw new Error('重启后的 Agent 不再支持 Code mode，已停止自动恢复')
+    }
     const sessionCwd = isWslPath(cwd) ? windowsToLinuxPath(cwd) : cwd
     const baseSessionMeta = acpState.pendingRecoverToolCallIds.length ? {
       ...acpState.connectionBinding?.sessionMeta,
@@ -193,24 +205,42 @@ async function openSessionAfterAuth(
       ? { ...(baseSessionMeta ?? {}), toolsMode: 'ptc' }
       : baseSessionMeta
     const opened = await restoreOrCreateAcpSession({
-      request: (method, params) => sdkRequest<unknown, unknown>(a.value, method, params),
+      request: async (method, params) => {
+        checkRecovery()
+        if (recoveryInvariantFailure) throw recoveryInvariantFailure
+        // 自动恢复绝不能触发 helper 的 session/new 回退或接受另一条会话。
+        if (recovery && method === methods.agent.session.new) throw new Error('原会话恢复失败，已禁止新建会话')
+        const result = await sdkRequest<unknown, unknown>(a.value, method, params)
+        checkRecovery()
+        const id = (result as { sessionId?: unknown } | null)?.sessionId
+        if (recovery && typeof id === 'string' && id !== recovery.sessionId) {
+          recoveryInvariantFailure = new Error('Agent 恢复返回了其他会话，已停止自动恢复')
+          throw recoveryInvariantFailure
+        }
+        return result
+      },
       cwd: sessionCwd,
-      sessionMeta,
+      sessionMeta: recovery ? recovery.meta : sessionMeta,
       resumeSessionId: resumeId,
       resumeSupported: acpState.resumeSessionSupported,
       loadSupported: acpState.loadSessionSupported,
       mcpServers: acpState.montreeMcp ? windowMcpEntry(acpState.montreeMcp, 'montree', cwd) : [],
       onSuppressUpdates: (suppress) => {
-        acpState.suppressSessionUpdates = suppress
+        acpState.suppressSessionUpdates = recovery ? true : suppress
       },
     })
+    checkRecovery()
+    if (recovery && (!opened.sessionRestored || opened.sessionId !== recovery.sessionId
+      || (recovery.meta?.toolsMode === 'ptc' && !opened.nativeSessionAccepted))) {
+      throw new Error('Agent 未恢复原会话及工具模式，已停止自动恢复')
+    }
 
     if (acpState.pendingCodeMode && acpState.codeModeSupported && !opened.nativeSessionAccepted) {
       throw new Error('Agent 拒绝了 code mode 元数据，已回退 native；请关闭 Code mode 后重试')
     }
     if (currentAcpContext().closed) throw new Error('Agent 所属窗口已关闭')
     claimAcpSession(opened.sessionId)
-    bindSessionMcp(opened.sessionId, acpState.montreeMcp, cwd, opened.nativeSessionAccepted
+    if (!recovery) bindSessionMcp(opened.sessionId, acpState.montreeMcp, cwd, opened.nativeSessionAccepted
       ? { ...acpState.connectionBinding?.sessionMeta, ...(acpState.pendingCodeMode && acpState.codeModeSupported ? { toolsMode: 'ptc' } : {}) }
       : undefined)
     acpState.sessionId = opened.sessionId
@@ -325,7 +355,56 @@ export function connectAcp(payload: ConnectPayload): Promise<Result<AcpConnectRe
   return promise
 }
 
-async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm = true): Promise<Result<AcpConnectResultWithCodeMode, AppError>> {
+/** A single cold reconnect for OpenCode's evicted MCP services, before any prompt is sent. */
+export function restartAcpForMcp(input: McpProcessRestartInput): Promise<void> {
+  const context = currentAcpContext()
+  const valid = (generation: number) => {
+    if (input.signal.aborted || context.closed || acpState.connectGeneration !== generation) {
+      throw new McpRecoveryCancelledError('MCP 恢复已取消，Agent 连接已变更')
+    }
+  }
+  return enqueueConnection(async () => {
+    valid(input.generation)
+    if (acpState.runtimeId !== 'opencode' || acpState.sessionId !== input.sessionId
+      || acpState.montreeMcp !== input.handle || acpState.activePromptSessionId || pendingConnections.has(context)) {
+      throw new Error('Agent 状态已变化，已停止自动重启，请重新连接原会话')
+    }
+    const generation = input.generation + 1
+    input.advanceGeneration(generation)
+    acpState.connectGeneration = generation
+    const after = input.handle.health!.discoveries
+    const abort = () => {
+      if (acpState.connectGeneration === generation) {
+        void disconnectAcp(undefined, { killProcess: true }).catch(() => undefined)
+      }
+    }
+    input.signal.addEventListener('abort', abort, { once: true })
+    try {
+      const connected = await connectAcpAttempt({ runtimeId: 'opencode', cwd: input.cwd,
+        resumeSessionId: input.sessionId, hasLocalHistory: true, codeMode: input.meta?.toolsMode === 'ptc' },
+      generation, false, input)
+      valid(generation)
+      if (!connected.ok) throw new Error(connected.error.message)
+      if (connected.value.phase !== 'ready' || connected.value.sessionId !== input.sessionId) {
+        throw new Error('重启后未能恢复原会话，请重新连接 Agent')
+      }
+      await input.handle.health!.waitForDiscovery(after, input.signal)
+      valid(generation)
+      if (!input.handle.health!.hasDiscoveredClient) throw new Error('重启后的 MCP 连接再次断开，请重新连接 Agent')
+    } catch (error) {
+      if (acpState.connectGeneration === generation && !context.closed) {
+        await disconnectAcpNow(undefined, { killProcess: true })
+        setStatus('error', error instanceof Error ? error.message : 'MCP 自动重启失败')
+      }
+      throw error
+    } finally {
+      input.signal.removeEventListener('abort', abort)
+    }
+  })
+}
+
+async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm = true,
+  recovery?: McpProcessRestartInput): Promise<Result<AcpConnectResultWithCodeMode, AppError>> {
   if (currentAcpContext().closed) return err({ code: 'ACP_NOT_CONNECTED', message: 'Agent 所属窗口已关闭' })
   if (gen !== acpState.connectGeneration) return err({ code: 'ACP_PROTOCOL_ERROR', message: '连接已被更新的请求取代' })
   acpState.pendingCodeMode = payload.codeMode === true
@@ -718,7 +797,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
         })
       },
       tryOpenSessionWithoutAuth: async () => {
-        const direct = await openSessionAfterAuth(cwd, { keepAliveOnFailure: true })
+        const direct = await openSessionAfterAuth(cwd, { keepAliveOnFailure: true, recovery })
         if (direct.ok) {
           openedWithoutAuth = direct.value
           return true
@@ -756,7 +835,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
       return ok(openedWithoutAuth)
     }
 
-    return await openSessionAfterAuth(cwd)
+    return await openSessionAfterAuth(cwd, { recovery })
   } catch (error) {
     if (gen !== acpState.connectGeneration) {
       return err({ code: 'ACP_PROTOCOL_ERROR', message: '连接已被更新的请求取代' })

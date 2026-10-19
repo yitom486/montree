@@ -24,6 +24,7 @@ files:
   - node_modules/lodash.isequal/**/*
   - node_modules/semver/**/*
   - node_modules/tiny-typed-emitter/**/*
+  - node_modules/node-pty/**/*
   - node_modules/graceful-fs/**/*
   - node_modules/jsonfile/**/*
   - node_modules/universalify/**/*
@@ -49,6 +50,8 @@ files:
 electronLanguages:
   - zh-CN
   - en-US
+asarUnpack:
+  - node_modules/node-pty/**/*
 # 远端工作区 Node 服务：自包含 bundle + manifest（`bun run build:remote-server` 产物），
 # main 在 resourcesPath/remote-server（开发期为本目录）定位并校验后启动
 beforePack: ./scripts/verify-typst-before-pack.cjs

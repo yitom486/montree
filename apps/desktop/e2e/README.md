@@ -2,6 +2,8 @@
 
 Playwright 驱动**已构建**的 Electron 应用（`out/main/main.js`）。运行前需先 `bun run build`。
 
+`terminal.spec.ts`：用户终端面板的真实 PTY 输入、Git 命令、新文件落盘、标签切换、隐藏保留和关闭释放，使用独立临时工作区。Agent 原生工具实测另见 `scripts/probe-opencode-native-tools.mjs`（可选，需安装 OpenCode 2.0.22）。
+
 ```bash
 bun run build
 bun run test:e2e          # 全部 E2E
