@@ -6,9 +6,9 @@ import { logAcpDiagnostic } from './mcp/diagnostics'
 export { ACP_SDK_REQUEST_TIMEOUT_MS, createSdkStreamHandle } from '@yitom/acp-client'
 export type { SdkStreamHandle } from '@yitom/acp-client'
 
-/** Application identity only; transport ownership and teardown live in the headless SDK. */
+/** Transport ownership, client identity and teardown live in the headless SDK. */
 export function connectSdkClient(child: ChildProcessWithoutNullStreams, configure: (app: ClientApp) => void, runtimeId?: string) {
-  return connect(child, configure, runtimeId, { name: 'montree' })
+  return connect(child, configure, runtimeId)
 }
 
 export function sdkRequest<Method extends AgentRequestMethod>(agent: ClientContext, method: Method, params: AgentRequestParamsByMethod[Method], timeoutMs?: number): Promise<AgentRequestResponsesByMethod[Method]>
