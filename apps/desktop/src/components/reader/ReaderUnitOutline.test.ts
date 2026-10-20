@@ -44,6 +44,42 @@ describe('ReaderUnitOutline', () => {
     expect(container.textContent).not.toContain('当前板块')
   })
 
+  it('分组节点点击标题只折叠，不跳转到首个子项', async () => {
+    const onSelectUnit = vi.fn()
+    const groupedUnits = [
+      { label: 'Static methods', href: 'parseHTML.html', level: 0 },
+      { label: 'parseHTML()', href: 'parseHTML.html', level: 1 },
+      { label: 'parseHTMLUnsafe()', href: 'parseHTMLUnsafe.html', level: 1 },
+    ]
+
+    await act(async () => {
+      root.render(
+        createElement(ReaderUnitOutline, {
+          units: groupedUnits,
+          onToggle: vi.fn(),
+          onSelectUnit,
+        }),
+      )
+    })
+
+    expect(container.textContent).toContain('parseHTML()')
+    const groupButton = container.querySelector('button[title="Static methods"]') as HTMLButtonElement
+    expect(groupButton.getAttribute('aria-expanded')).toBe('true')
+
+    act(() => {
+      groupButton.click()
+    })
+    expect(onSelectUnit).not.toHaveBeenCalled()
+    expect(groupButton.getAttribute('aria-expanded')).toBe('false')
+    expect(container.textContent).not.toContain('parseHTML()')
+
+    act(() => {
+      groupButton.click()
+    })
+    expect(onSelectUnit).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('parseHTML()')
+  })
+
   it('双轨模式下渲染切换胶囊按钮，点击可触发 onSelectTocView', async () => {
     const onSelectTocView = vi.fn()
     const tocViews = [

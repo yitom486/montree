@@ -44,7 +44,10 @@ function OutlineTreeNode({
 }) {
   const hasChildren = node.children.length > 0
   const [expanded, setExpanded] = useState(() => shouldExpandReaderUnitNode(depth))
-  const isActive = currentUnitId === node.unit.href
+  // Web 文档的分组节点沿用“组 href = 首个子项 href”的约定：
+  // 这类节点点击标题只折叠，不重复跳到首个子项。
+  const isGroup = hasChildren && node.children[0]?.unit.href === node.unit.href
+  const isActive = !isGroup && currentUnitId === node.unit.href
 
   return (
     <li>
@@ -69,9 +72,17 @@ function OutlineTreeNode({
           className={cn(
             'min-w-0 flex-1 truncate rounded-md px-1 py-1 text-left text-xs transition-colors hover:bg-accent/50 hover:text-foreground',
             isActive ? 'bg-primary/15 text-primary' : 'text-muted-foreground',
+            isGroup && 'font-medium text-foreground',
           )}
           title={node.unit.label}
-          onClick={() => onSelectUnit(node.unit)}
+          aria-expanded={isGroup ? expanded : undefined}
+          onClick={() => {
+            if (isGroup) {
+              setExpanded((value) => !value)
+              return
+            }
+            onSelectUnit(node.unit)
+          }}
         >
           {node.unit.label}
         </button>

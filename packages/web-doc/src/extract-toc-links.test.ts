@@ -118,6 +118,73 @@ describe('extractStructuredNavToc', () => {
     expect(entries.some((e) => e.label === 'Other page buried in content')).toBe(false)
   })
 
+  it('MDN <ol> + <details><summary> 分组保留层级', () => {
+    const html = `<!DOCTYPE html><html><body>
+      <nav id="sidebar" aria-label="Documentation">
+        <div class="left-sidebar__content">
+          <ol>
+            <li class="section"><a href="/en-US/docs/Web/API/View_Transition_API">View Transition API</a></li>
+            <li class="section"><a href="/en-US/docs/Web/API/Document">Document</a></li>
+            <li><details open=""><summary><span>Static methods</span></summary><ol>
+              <li><a href="/en-US/docs/Web/API/Document/parseHTML_static">parseHTML()</a></li>
+              <li><a href="/en-US/docs/Web/API/Document/parseHTMLUnsafe_static">parseHTMLUnsafe()</a></li>
+            </ol></details></li>
+            <li><details open=""><summary><span>Instance methods</span></summary><ol>
+              <li><a href="/en-US/docs/Web/API/Document/startViewTransition">startViewTransition()</a></li>
+              <li><a href="/en-US/docs/Web/API/Document/append">append()</a></li>
+            </ol></details></li>
+            <li><details open=""><summary><span>Events</span></summary><ol>
+              <li><a href="/en-US/docs/Web/API/Document/scroll_event">scroll</a></li>
+              <li><a href="/en-US/docs/Web/API/Document/visibilitychange_event">visibilitychange</a></li>
+            </ol></details></li>
+          </ol>
+        </div>
+      </nav>
+    </body></html>`
+
+    const entries = extractStructuredNavToc(
+      html,
+      'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition',
+    )
+    expect(entries.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:View Transition API',
+      '0:Document',
+      '0:Static methods',
+      '1:parseHTML()',
+      '1:parseHTMLUnsafe()',
+      '0:Instance methods',
+      '1:startViewTransition()',
+      '1:append()',
+      '0:Events',
+      '1:scroll',
+      '1:visibilitychange',
+    ])
+    expect(entries.find((e) => e.label === 'Static methods')?.href).toBe(
+      'https://developer.mozilla.org/en-US/docs/Web/API/Document/parseHTML_static',
+    )
+    expect(entries.find((e) => e.label === 'Instance methods')?.href).toBe(
+      'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition',
+    )
+  })
+
+  it('summary 分组没有链接时不生成空分组', () => {
+    const html = `<!DOCTYPE html><html><body>
+      <nav id="sidebar" aria-label="Documentation"><ol>
+        <li><details><summary>Empty group</summary></details></li>
+        <li><a href="/a">Alpha</a></li>
+        <li><a href="/b">Beta</a></li>
+        <li><a href="/c">Gamma</a></li>
+      </ol></nav>
+    </body></html>`
+
+    const entries = extractStructuredNavToc(html, 'https://docs.example.com/')
+    expect(entries.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:Alpha',
+      '0:Beta',
+      '0:Gamma',
+    ])
+  })
+
   it('MkDocs 主侧栏：解码实体并保留章 → 节层级', () => {
     const nav = pickDocsNavHtml(MKDOCS_NAV_FIXTURE)
     expect(nav).toContain('md-nav--primary')

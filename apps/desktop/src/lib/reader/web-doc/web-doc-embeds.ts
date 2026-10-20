@@ -160,6 +160,63 @@ export function normalizeWebDocEmbedPlaceholders(root: HTMLElement, pageUrl: str
   })
 }
 
+const CLIENT_RENDERED_TABLE_SELECTOR =
+  'mdn-compat-table-lazy, mdn-compat-table, [data-bcd-query], [data-compat-query]'
+
+/**
+ * MDN 的 Browser compatibility 表格不是静态 HTML：页面只输出
+ * `<mdn-compat-table-lazy query="...">`，真实数据由客户端脚本从 BCD 拉取后
+ * 渲染进 Shadow DOM。阅读器不执行站点脚本，因此这里降级为说明卡 + 原文链接，
+ * 避免标题下出现空白。query 保留在 data 属性上，后续可接 BCD 数据源。
+ */
+export function normalizeWebDocClientRenderedTables(root: HTMLElement, pageUrl: string): void {
+  const doc = root.ownerDocument
+  root.querySelectorAll<HTMLElement>(CLIENT_RENDERED_TABLE_SELECTOR).forEach((table) => {
+    if (
+      table.classList.contains('web-doc-embed-placeholder') ||
+      table.classList.contains('web-doc-bcd') ||
+      table.querySelector('.web-doc-bcd-table')
+    ) {
+      return
+    }
+
+    const query =
+      table.getAttribute('query') ??
+      table.getAttribute('data-bcd-query') ??
+      table.getAttribute('data-compat-query') ??
+      ''
+
+    const placeholder = doc.createElement('section')
+    placeholder.className = 'web-doc-embed-placeholder web-doc-compat-placeholder'
+    placeholder.setAttribute('role', 'note')
+    if (query) placeholder.setAttribute('data-bcd-query', query)
+
+    const heading = doc.createElement('div')
+    heading.className = 'web-doc-embed-placeholder-title'
+    heading.textContent = '浏览器兼容性表格'
+
+    const note = doc.createElement('small')
+    note.className = 'web-doc-embed-placeholder-note'
+    note.textContent = '该表格由 MDN 在浏览器端动态加载，阅读器未执行站点脚本。'
+
+    placeholder.append(heading, note)
+    try {
+      const url = new URL(pageUrl)
+      url.hash = 'browser_compatibility'
+      const link = doc.createElement('a')
+      link.className = 'web-doc-embed-placeholder-link'
+      link.href = url.toString()
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      link.textContent = '在原文中查看完整兼容性表格'
+      placeholder.appendChild(link)
+    } catch {
+      // 非法 URL 时保留说明卡，不生成链接
+    }
+    table.replaceWith(placeholder)
+  })
+}
+
 export function buildWebDocEmbedCss(theme: EpubThemeMode): string {
   const palette = READER_PALETTE[theme]
   return `

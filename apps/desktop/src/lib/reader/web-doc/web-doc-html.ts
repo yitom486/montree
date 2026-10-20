@@ -17,6 +17,7 @@ import {
 import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@yitom/reader-core'
 import { DEFAULT_READER_TYPOGRAPHY, type ReaderTypography } from '@yitom/reader-core'
 import { buildWebDocCodeBlockCss, buildWebDocTabsRuntimeScript, enhanceWebDocCodeBlocks } from '@/lib/reader/web-doc/web-doc-code-blocks'
+import { buildWebDocCompatTableCss } from '@/lib/reader/web-doc/web-doc-compat'
 import {
   buildWebDocEmbedCss,
   normalizeAllowedWebDocEmbeds,
@@ -666,6 +667,90 @@ export function buildWebDocBaselineCss(theme: EpubThemeMode): string {
   `
 }
 
+/** 文档底部元信息卡（`normalizeWebDocArticleFooters`）：更新时间、贡献与原文反馈入口。 */
+export function buildWebDocDocMetaCss(theme: EpubThemeMode): string {
+  const isDark = theme === 'dark'
+  const isSepia = theme === 'sepia'
+  const palette = READER_PALETTE[theme]
+  const muted = isDark ? '#a1a1aa' : isSepia ? '#6b5d4c' : '#71717a'
+  const border = isDark ? 'rgba(255, 255, 255, 0.1)' : isSepia ? 'rgba(120, 100, 70, 0.16)' : 'rgba(24, 24, 27, 0.1)'
+  const surface = isDark ? 'rgba(255, 255, 255, 0.03)' : isSepia ? 'rgba(255, 255, 255, 0.3)' : '#f8fafc'
+  const hover = isDark ? 'rgba(255, 255, 255, 0.05)' : isSepia ? 'rgba(120, 100, 70, 0.06)' : 'rgba(24, 24, 27, 0.04)'
+
+  return `
+    body .web-doc-doc-meta {
+      margin: 1.5rem 0 0.5rem !important;
+      padding: 1rem 1.1rem !important;
+      border: 1px solid ${border} !important;
+      border-radius: 0.75rem !important;
+      background: ${surface} !important;
+      color: ${palette.text} !important;
+      font-size: 0.9rem !important;
+      line-height: 1.55 !important;
+    }
+    body .web-doc-doc-meta-header {
+      display: flex !important;
+      align-items: flex-start !important;
+      justify-content: space-between !important;
+      flex-wrap: wrap !important;
+      gap: 0.6rem 1rem !important;
+    }
+    body .web-doc-doc-meta-title {
+      color: ${palette.text} !important;
+      font-size: 1rem !important;
+      font-weight: 600 !important;
+      line-height: 1.4 !important;
+    }
+    body .web-doc-doc-meta-feedback {
+      display: inline-flex !important;
+      flex: 0 0 auto !important;
+      align-items: center !important;
+      padding: 0.3rem 0.7rem !important;
+      border: 1px solid ${border} !important;
+      border-radius: 999px !important;
+      color: ${palette.link} !important;
+      font-size: 0.78rem !important;
+      font-weight: 500 !important;
+      line-height: 1.4 !important;
+      text-decoration: none !important;
+    }
+    body .web-doc-doc-meta-feedback:hover {
+      background: ${hover} !important;
+      border-color: ${palette.link} !important;
+      color: ${palette.linkHover} !important;
+    }
+    body .web-doc-doc-meta-modified {
+      margin: 0.7rem 0 0 !important;
+      color: ${muted} !important;
+      font-size: 0.8rem !important;
+      line-height: 1.5 !important;
+    }
+    body .web-doc-doc-meta-modified a {
+      color: ${palette.link} !important;
+    }
+    body .web-doc-doc-meta-links {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 0.45rem 0.95rem !important;
+      margin-top: 0.75rem !important;
+      padding-top: 0.75rem !important;
+      border-top: 1px solid ${border} !important;
+    }
+    body .web-doc-doc-meta-links a {
+      color: ${palette.link} !important;
+      font-size: 0.82rem !important;
+      font-weight: 500 !important;
+      line-height: 1.4 !important;
+      text-decoration: none !important;
+      border-bottom: 1px solid transparent !important;
+    }
+    body .web-doc-doc-meta-links a:hover {
+      color: ${palette.linkHover} !important;
+      border-bottom-color: currentColor !important;
+    }
+  `
+}
+
 /** 选择器赢家小于此字符数、且 body 远大于此 → 视为被导航碎片截胡，进密度兜底 */
 const TINY_WINNER_TEXT = 500
 const DENSE_BODY_TEXT = 2000
@@ -1234,6 +1319,8 @@ export function buildWebDocReaderDocument(
   const inlineCodeCss = buildWebDocInlineCodeCss(theme)
   const calloutCss = buildWebDocCalloutCss(theme)
   const baselineCss = buildWebDocBaselineCss(theme)
+  const compatTableCss = buildWebDocCompatTableCss(theme)
+  const docMetaCss = buildWebDocDocMetaCss(theme)
   const cardGridCss = buildWebDocCardGridCss(theme)
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss(theme)
@@ -1285,6 +1372,8 @@ export function buildWebDocReaderDocument(
   <style>${inlineCodeCss}</style>
   <style>${calloutCss}</style>
   <style>${baselineCss}</style>
+  <style>${compatTableCss}</style>
+  <style>${docMetaCss}</style>
   <style>${cardGridCss}</style>
   <style>${mathCss}</style>
   <style>${embedCss}</style>

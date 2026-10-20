@@ -136,6 +136,78 @@ describe('web-doc-html', () => {
     expect(readerDocument).toContain('.web-doc-embed-placeholder')
   })
 
+  it('MDN 客户端渲染的浏览器兼容性表格降级为原文占位卡', () => {
+    const pageUrl = 'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition'
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Document: startViewTransition() method</h1>
+      <section aria-labelledby="browser_compatibility">
+        <h2 id="browser_compatibility">Browser compatibility</h2>
+        <mdn-compat-table-lazy locale="en-US" query="api.Document.startViewTransition">
+          <template shadowroot="open" shadowrootmode="open">
+            <p><noscript>Enable JavaScript to view this browser compatibility table.</noscript></p>
+          </template>
+        </mdn-compat-table-lazy>
+      </section>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(html, pageUrl)
+    expect(result.bodyHtml).toContain('web-doc-compat-placeholder')
+    expect(result.bodyHtml).toContain('浏览器兼容性表格')
+    expect(result.bodyHtml).toContain('动态加载')
+    expect(result.bodyHtml).toContain(`href="${pageUrl}#browser_compatibility"`)
+    expect(result.bodyHtml).toContain('data-bcd-query="api.Document.startViewTransition"')
+    expect(result.bodyHtml).not.toContain('mdn-compat-table')
+    expect(result.bodyHtml).not.toContain('Enable JavaScript')
+  })
+
+  it('MDN article footer 归一化为文档信息卡，不保留 Shadow DOM 反馈组件', () => {
+    const pageUrl = 'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition'
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Document: startViewTransition() method</h1>
+      <section class="content-section article-footer" aria-labelledby="feedback">
+        <div class="article-footer__inner">
+          <div class="article-footer__svg-container"><svg width="162" height="162"><path d="M1" /></svg></div>
+          <h2 id="feedback">Help improve MDN</h2>
+          <mdn-content-feedback locale="en-US">
+            <template shadowroot="open" shadowrootmode="open">
+              <p>Was this page helpful to you?</p>
+              <button>Yes</button><button>No</button>
+            </template>
+          </mdn-content-feedback>
+          <a class="article-footer__contribute" href="/en-US/docs/MDN/Community/Getting_started">Learn how to contribute</a>
+          <p class="article-footer__last-modified">
+            This page was last modified on <time datetime="2026-06-19T17:02:58.000Z">Jun 19, 2026</time>
+            by <a href="/en-US/docs/Web/API/Document/startViewTransition/contributors.txt">MDN contributors</a>.
+          </p>
+          <div class="article-footer__links">
+            <a href="https://github.com/mdn/content/blob/main/files/en-us/web/api/document/startviewtransition/index.md">View this page on GitHub</a>
+            <a href="https://github.com/mdn/content/issues/new?template=page-report.yml">Report a problem with this content</a>
+          </div>
+        </div>
+      </section>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(html, pageUrl)
+    expect(result.bodyHtml).toContain('web-doc-doc-meta')
+    expect(result.bodyHtml).toContain('Help improve MDN')
+    expect(result.bodyHtml).toContain('Learn how to contribute')
+    expect(result.bodyHtml).toContain('This page was last modified')
+    expect(result.bodyHtml).toContain('View this page on GitHub')
+    expect(result.bodyHtml).toContain('Report a problem with this content')
+    expect(result.bodyHtml).toContain(`href="${pageUrl}#feedback"`)
+    expect(result.bodyHtml).not.toContain('article-footer__svg-container')
+    expect(result.bodyHtml).not.toContain('mdn-content-feedback')
+    expect(result.bodyHtml).not.toContain('<template')
+    expect(result.bodyHtml).not.toContain('Was this page helpful')
+
+    const readerDocument = buildWebDocReaderDocument(
+      { title: 'Document', bodyHtml: result.bodyHtml, baseUrl: pageUrl },
+      'dark',
+    )
+    expect(readerDocument).toContain('.web-doc-doc-meta')
+    expect(readerDocument).toContain('web-doc-doc-meta-feedback')
+  })
+
   it('rewriteRelativeUrls 保留 hash 链接', () => {
     const root = document.createElement('div')
     root.innerHTML = '<a href="#intro">intro</a>'

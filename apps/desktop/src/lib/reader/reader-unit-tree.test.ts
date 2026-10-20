@@ -67,6 +67,30 @@ describe('reader-unit-tree', () => {
     expect(tree[0]!.children.map((node) => node.unit.label)).toEqual(['5.6指令流水线', '5.1功能结构'])
   })
 
+  it('MDN 分组目录还原为可折叠树', () => {
+    const tree = buildReaderUnitTree([
+      { label: 'View Transition API', href: 'https://mdn/View_Transition_API', level: 0 },
+      { label: 'Document', href: 'https://mdn/Document', level: 0 },
+      { label: 'Static methods', href: 'https://mdn/parseHTML_static', level: 0 },
+      { label: 'parseHTML()', href: 'https://mdn/parseHTML_static', level: 1 },
+      { label: 'parseHTMLUnsafe()', href: 'https://mdn/parseHTMLUnsafe_static', level: 1 },
+      { label: 'Instance methods', href: 'https://mdn/startViewTransition', level: 0 },
+      { label: 'startViewTransition()', href: 'https://mdn/startViewTransition', level: 1 },
+    ])
+
+    expect(tree.map((node) => node.unit.label)).toEqual([
+      'View Transition API',
+      'Document',
+      'Static methods',
+      'Instance methods',
+    ])
+    expect(tree[2]!.children.map((node) => node.unit.label)).toEqual([
+      'parseHTML()',
+      'parseHTMLUnsafe()',
+    ])
+    expect(tree[3]!.children.map((node) => node.unit.label)).toEqual(['startViewTransition()'])
+  })
+
   it('将目录树转换为 Markmap 兼容 Markdown', () => {
     const md = readerUnitsToMarkmap(units, '书籍全景')
     expect(md).toContain('# 书籍全景')

@@ -1,5 +1,6 @@
 import type { WebDocSiteId } from '@yitom/contracts'
 import {
+  normalizeWebDocClientRenderedTables,
   normalizeWebDocEmbedPlaceholders,
   stripDisallowedWebDocEmbeds,
 } from '@/lib/reader/web-doc/web-doc-embeds'
@@ -249,6 +250,82 @@ function stripDocsEditChrome(root: HTMLElement): void {
       anchor.remove()
     }
   })
+}
+
+/**
+ * MDN 等文档站的 article footer 同时混有：帮助改进标题、客户端反馈组件、
+ * 更新时间、GitHub 编辑/报错入口。这里只保留可静态阅读的元信息，重建为
+ * 阅读器卡片；客户端投票和装饰性大 SVG 不进入正文。
+ */
+export function normalizeWebDocArticleFooters(root: HTMLElement, pageUrl: string): void {
+  const doc = root.ownerDocument
+  const footers = [...root.querySelectorAll<HTMLElement>(
+    'section.article-footer, section[aria-labelledby="feedback"], [data-component-part="article-footer"]',
+  )].filter((footer, index, all) => !all.some((other) => other !== footer && other.contains(footer)))
+
+  for (const footer of footers) {
+    const heading = footer.querySelector<HTMLElement>('h2, h3')
+    const titleText = (heading?.textContent ?? '').replace(/\s+/g, ' ').trim()
+    const lastModified =
+      footer.querySelector<HTMLElement>('.article-footer__last-modified, [class*="last-modified"]') ??
+      footer.querySelector<HTMLElement>('time')?.closest<HTMLElement>('p, div')
+    const contribute = footer.querySelector<HTMLAnchorElement>('.article-footer__contribute')
+    const linksContainer = footer.querySelector<HTMLElement>('.article-footer__links, [class*="footer__links"]')
+    const extraLinks = [...(linksContainer?.querySelectorAll<HTMLAnchorElement>('a[href]') ?? [])]
+    const links = [contribute, ...extraLinks].filter((link): link is HTMLAnchorElement => Boolean(link))
+
+    if (!titleText && !lastModified && links.length === 0) {
+      footer.remove()
+      continue
+    }
+
+    const card = doc.createElement('section')
+    card.className = 'web-doc-doc-meta'
+    card.setAttribute('aria-label', '文档信息')
+
+    const header = doc.createElement('div')
+    header.className = 'web-doc-doc-meta-header'
+
+    const title = doc.createElement('small')
+    title.className = 'web-doc-doc-meta-title'
+    title.textContent = titleText || '文档信息'
+    header.appendChild(title)
+
+    try {
+      const feedbackUrl = new URL(pageUrl)
+      feedbackUrl.hash = 'feedback'
+      const feedback = doc.createElement('a')
+      feedback.className = 'web-doc-doc-meta-feedback'
+      feedback.href = feedbackUrl.toString()
+      feedback.target = '_blank'
+      feedback.rel = 'noopener noreferrer'
+      feedback.textContent = '在原文中反馈'
+      header.appendChild(feedback)
+    } catch {
+      // 非法 URL 时只保留元信息
+    }
+    card.appendChild(header)
+
+    if (lastModified) {
+      lastModified.classList.add('web-doc-doc-meta-modified')
+      card.appendChild(lastModified)
+    }
+
+    if (links.length > 0) {
+      const linkRow = doc.createElement('div')
+      linkRow.className = 'web-doc-doc-meta-links'
+      const seen = new Set<string>()
+      for (const link of links) {
+        const key = link.getAttribute('href') ?? ''
+        if (key && seen.has(key)) continue
+        if (key) seen.add(key)
+        linkRow.appendChild(link)
+      }
+      if (linkRow.childElementCount > 0) card.appendChild(linkRow)
+    }
+
+    footer.replaceWith(card)
+  }
 }
 
 /**
@@ -1033,8 +1110,12 @@ export function stripCodeBlockLineNumbers(root: ParentNode): void {
 
 function stripGenericChrome(root: HTMLElement, pageUrl: string): void {
   root.querySelectorAll('form, [role="navigation"], nav').forEach((node) => node.remove())
+  // Shadow DOM 模板是惰性内容；正文抽取不执行脚本，留在大纲里只会膨胀 DOM。
+  root.querySelectorAll('template').forEach((node) => node.remove())
   normalizeWebDocEmbedPlaceholders(root, pageUrl)
+  normalizeWebDocClientRenderedTables(root, pageUrl)
   stripDisallowedWebDocEmbeds(root)
+  normalizeWebDocArticleFooters(root, pageUrl)
 
   stripDocsEditChrome(root)
   stripDocsFooterAndFeedbackChrome(root)

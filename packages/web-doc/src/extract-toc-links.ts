@@ -235,7 +235,7 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
     pos = gt >= 0 ? gt + 1 : 0
   }
 
-  let pendingGroup: { label: string; level: number } | null = null
+  let pendingGroup: { label: string; level: number; depth: number } | null = null
   let activeGroupLevel: number | null = null
   let groupBaseDepth = 0
 
@@ -259,8 +259,17 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
   }
 
   while (pos < navHtml.length) {
+    // 分组（<summary>/<h*）之后若已退出对应列表，取消未落地的分组，
+    // 避免把后续无关链接误挂到上一个分组。
+    if (pendingGroup && depth < pendingGroup.depth) pendingGroup = null
+
     const ulOpen = navHtml.indexOf('<ul', pos)
     const ulClose = navHtml.indexOf('</ul>', pos)
+    // MDN 等站点使用 <ol> + <details><summary>分组，不能只跟踪 <ul>。
+    const olOpen = navHtml.indexOf('<ol', pos)
+    const olClose = navHtml.indexOf('</ol>', pos)
+    const detailsClose = navHtml.indexOf('</details>', pos)
+    const summaryOpen = navHtml.indexOf('<summary', pos)
     const aMatches = ['<a ', '<a\n', '<a\t', '<a>'].map((token) => navHtml.indexOf(token, pos))
     const nextA = aMatches.filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), Infinity)
     const headingMatches = ['<h2', '<h3', '<h4'].map((token) => navHtml.indexOf(token, pos))
@@ -269,6 +278,10 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
     const candidates = [
       ulOpen,
       ulClose,
+      olOpen,
+      olClose,
+      detailsClose,
+      summaryOpen,
       nextA === Infinity ? -1 : nextA,
       nextH === Infinity ? -1 : nextH,
     ].filter((index) => index >= 0)
@@ -284,6 +297,38 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
       pos = bumpDepth(-1, ulClose, 5)
       continue
     }
+    if (next === olOpen) {
+      pos = bumpDepth(1, olOpen, 3)
+      continue
+    }
+    if (next === olClose) {
+      pos = bumpDepth(-1, olClose, 5)
+      continue
+    }
+    if (next === detailsClose) {
+      // 空分组（summary 后没有链接）不落地。
+      pendingGroup = null
+      pos = detailsClose + '</details>'.length
+      continue
+    }
+
+    if (next === summaryOpen) {
+      const closeTag = navHtml.indexOf('>', summaryOpen)
+      const endSummary = navHtml.indexOf('</summary>', closeTag)
+      if (closeTag < 0 || endSummary < 0) break
+      const label = stripTags(navHtml.slice(closeTag + 1, endSummary))
+      pos = endSummary + '</summary>'.length
+      if (label && label.length >= 2 && label.length <= 80) {
+        pendingGroup = {
+          label,
+          level: Math.max(0, depth > 0 ? depth - 1 : 0),
+          depth,
+        }
+        activeGroupLevel = null
+        groupBaseDepth = 0
+      }
+      continue
+    }
 
     if (next === nextH) {
       const closeTag = navHtml.indexOf('>', nextH)
@@ -292,7 +337,11 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
       const label = stripTags(navHtml.slice(closeTag + 1, endHeading))
       pos = endHeading + 5
       if (label && label.length >= 2 && label.length <= 80) {
-        pendingGroup = { label, level: Math.max(0, depth > 0 ? depth - 1 : 0) }
+        pendingGroup = {
+          label,
+          level: Math.max(0, depth > 0 ? depth - 1 : 0),
+          depth,
+        }
         activeGroupLevel = null
         groupBaseDepth = 0
       }
