@@ -131,7 +131,7 @@ describe('extractStructuredNavToc', () => {
             </ol></details></li>
             <li><details open=""><summary><span>Instance methods</span></summary><ol>
               <li><a href="/en-US/docs/Web/API/Document/startViewTransition">startViewTransition()</a></li>
-              <li><a href="/en-US/docs/Web/API/Document/append">append()</a></li>
+              <li><a href="/en-US/docs/Web/API/Document/append">append()<span role="img" class="icon icon-baseline discouraged" title="Deprecated. Not for use in new websites." aria-label="Deprecated"></span></a></li>
             </ol></details></li>
             <li><details open=""><summary><span>Events</span></summary><ol>
               <li><a href="/en-US/docs/Web/API/Document/scroll_event">scroll</a></li>
@@ -165,6 +165,7 @@ describe('extractStructuredNavToc', () => {
     expect(entries.find((e) => e.label === 'Instance methods')?.href).toBe(
       'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition',
     )
+    expect(entries.some((e) => /Deprecated|Non-standard/.test(e.label))).toBe(false)
   })
 
   it('summary 分组没有链接时不生成空分组', () => {

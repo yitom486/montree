@@ -40,16 +40,24 @@ function extractAnchorLabel(anchorHtml: string): string {
     if (label) return label
   }
 
-  const title = anchorHtml.match(/\btitle=["']([^"']+)["']/i)?.[1]
+  // MDN 的锚点里带状态图标 span，其 title 是 “Deprecated…” 等说明；
+  // 必须只看可见文本，不能把整段 anchor 的第一个 title 当标签。
+  const srOnly = anchorHtml.match(/<span[^>]*\bsr-only\b[^>]*>([\s\S]*?)<\/span>/i)?.[1]
+  const withoutSrOnly = anchorHtml.replace(/<span[^>]*\bsr-only\b[^>]*>[\s\S]*?<\/span>/gi, '')
+  const visibleText = stripTags(withoutSrOnly.replace(/<wbr\b[^>]*>/gi, ''))
+  if (visibleText) return visibleText
+
+  const srOnlyText = stripTags(srOnly ?? '')
+  if (srOnlyText) return srOnlyText
+
+  const openingTag = anchorHtml.match(/^<a\b[^>]*>/i)?.[0] ?? ''
+  const title = openingTag.match(/\btitle=["']([^"']+)["']/i)?.[1]
   if (title?.trim()) return decodeHtmlEntities(title)
 
-  const srOnly = anchorHtml.match(/<span[^>]*\bsr-only\b[^>]*>([\s\S]*?)<\/span>/i)?.[1]
-  if (srOnly) {
-    const label = stripTags(srOnly)
-    if (label) return label
-  }
+  const ariaLabel = openingTag.match(/\baria-label=["']([^"']+)["']/i)?.[1]
+  if (ariaLabel?.trim()) return decodeHtmlEntities(ariaLabel)
 
-  return stripTags(anchorHtml)
+  return ''
 }
 
 function stripScriptsAndStyles(html: string): string {
