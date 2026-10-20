@@ -2,13 +2,64 @@
 import { describe, expect, it } from 'vitest'
 import { getCodeBlockTextFromCopyButton } from '@/lib/preview/code-block-copy'
 import { activateWebDocCodeTab, enhanceWebDocCodeBlocks } from './web-doc-code-blocks'
-import { buildWebDocReaderDocument } from './web-doc-html'
+import { buildWebDocReaderDocument, extractWebDocArticle } from './web-doc-html'
 
 describe('enhanceWebDocCodeBlocks', () => {
   it('react.dev Sandpack pre 识别 javascript', () => {
     const html = `<pre class="sp-cm sp-pristine sp-javascript"><code>function MyButton() {}</code></pre>`
     const enhanced = enhanceWebDocCodeBlocks(html)
     expect(enhanced).toContain('class="code-block-lang">javascript')
+  })
+
+  it('识别 MDN brush 语言并清理 example-header 中的重复语言标签', () => {
+    const source = 'startViewTransition()\nstartViewTransition(updateCallback)\nstartViewTransition(options)\n'
+    const html = `<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>${source}</code></pre></div>`
+
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    const doc = new DOMParser().parseFromString(enhanced, 'text/html')
+
+    expect(doc.querySelector('.example-header')).toBeNull()
+    expect(doc.querySelector('.code-block-lang')?.textContent).toBe('javascript')
+    expect(doc.querySelector('pre')?.getAttribute('data-language')).toBe('javascript')
+    expect(doc.querySelector('code')?.textContent).toBe(source)
+  })
+
+  it('pre 无显式语言类时从 example-header 语言名回退（且不被内容猜测覆盖）', () => {
+    const html = `<div class="code-example"><div class="example-header"><span class="language-name">TypeScript</span></div><pre><code>const answer: number = 42</code></pre></div>`
+
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    const doc = new DOMParser().parseFromString(enhanced, 'text/html')
+
+    expect(doc.querySelector('.example-header')).toBeNull()
+    expect(doc.querySelector('.code-block-lang')?.textContent).toBe('typescript')
+    expect(doc.querySelector('pre')?.getAttribute('data-language')).toBe('typescript')
+  })
+
+  it('保留带标题的 code-example 头部，只移除语言/复制等重复装饰', () => {
+    const html = `<div class="code-example"><div class="example-header">Basic usage</div><pre class="brush: js"><code>const x = 1</code></pre></div>`
+
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    const doc = new DOMParser().parseFromString(enhanced, 'text/html')
+
+    expect(doc.querySelector('.example-header')?.textContent).toBe('Basic usage')
+    expect(doc.querySelector('.code-block-lang')?.textContent).toBe('javascript')
+  })
+
+  it('识别 brush、highlight-source-*、lang 属性与 data-code-language', () => {
+    const cases: Array<[string, string]> = [
+      ['<pre class="brush: python notranslate"><code>print(1)</code></pre>', 'python'],
+      ['<div class="highlight highlight-source-js"><pre><code>const x = 1</code></pre></div>', 'javascript'],
+      ['<div class="highlight-python notranslate"><div class="highlight"><pre><code>print(2)</code></pre></div></div>', 'python'],
+      ['<div class="highlight-python notranslate"><pre><code>print(3)</code></pre></div>', 'python'],
+      ['<pre lang="yaml"><code>key: value</code></pre>', 'yaml'],
+      ['<pre data-code-language="go"><code>package main</code></pre>', 'go'],
+    ]
+
+    for (const [html, lang] of cases) {
+      const doc = new DOMParser().parseFromString(enhanceWebDocCodeBlocks(html), 'text/html')
+      expect(doc.querySelector('.code-block-lang')?.textContent).toBe(lang)
+      expect(doc.querySelector('pre')?.getAttribute('data-language')).toBe(lang)
+    }
   })
 
   it('为 VuePress 风格 div.language-* > pre > code 注入复制工具栏', () => {
@@ -164,6 +215,22 @@ describe('buildWebDocReaderDocument', () => {
     expect(doc).toContain('.code-block-toolbar')
     expect(new DOMParser().parseFromString(doc, 'text/html').querySelector('pre code')?.textContent).toBe('echo hi')
     expect(doc).toContain('web-doc-tabs-tab')
+  })
+
+  it('MDN startViewTransition 文章抽取后保留 JS 高亮且不再输出独立的 js 文本', () => {
+    const pageUrl = 'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition'
+    const source = 'startViewTransition()\nstartViewTransition(updateCallback)\nstartViewTransition(options)\n'
+    const html = `<!doctype html><html><head><title>Document: startViewTransition() method</title></head><body><main><article><h1>Document: startViewTransition() method</h1><section><h2>Syntax</h2><div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>${source}</code></pre></div></section></article></main></body></html>`
+
+    const { bodyHtml } = extractWebDocArticle(html, pageUrl)
+    const doc = new DOMParser().parseFromString(
+      buildWebDocReaderDocument({ title: 'startViewTransition()', bodyHtml, baseUrl: pageUrl }, 'dark'),
+      'text/html',
+    )
+    expect(doc.querySelector('.example-header')).toBeNull()
+    expect(doc.querySelector('.code-block-lang')?.textContent).toBe('javascript')
+    expect(doc.querySelector('pre')?.getAttribute('data-language')).toBe('javascript')
+    expect(doc.querySelector('code.hljs.language-javascript')?.textContent).toBe(source)
   })
 
   it('Tab 运行时脚本哈希与 CSP 放行值一致（改脚本须同步更新）', async () => {

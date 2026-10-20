@@ -453,6 +453,155 @@ describe('web-doc-html', () => {
     expect(result.bodyHtml).toContain('Second warning paragraph.')
   })
 
+  it('MDN Baseline 指示器归一化为可展开状态卡片', () => {
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Document: startViewTransition() method</h1>
+      <details class="baseline-indicator low" data-glean-toggle-open="baseline_toggle_open">
+        <summary>
+          <span class="indicator" role="img" aria-label="Baseline Check"></span>
+          <div class="status-title">Baseline 2025<?></div>
+          <div class="pill">Newly available</div>
+          <div class="browsers">
+            <span class="engine" title="Supported in Chrome and Edge">
+              <span class="browser chrome supported" role="img" aria-label="Chrome check"></span>
+              <span class="browser edge supported" role="img" aria-label="Edge check"></span>
+            </span>
+            <span class="engine" title="Supported in Firefox">
+              <span class="browser firefox supported" role="img" aria-label="Firefox check"></span>
+            </span>
+            <span class="engine" title="Supported in Safari">
+              <span class="browser safari supported" role="img" aria-label="Safari check"></span>
+            </span>
+          </div>
+          <span class="icon icon-chevron"></span>
+        </summary>
+        <div class="extra">
+          <p>Since October 2025, this feature works across the latest devices and browser versions.</p>
+          <ul>
+            <li><a href="#browser_compatibility">See full compatibility</a></li>
+            <li><a href="/en-US/docs/Glossary/Baseline/Compatibility">Learn more</a></li>
+          </ul>
+        </div>
+      </details>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(
+      html,
+      'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition',
+    )
+    expect(result.bodyHtml).toContain('web-doc-baseline')
+    expect(result.bodyHtml).toContain('web-doc-baseline-low')
+    expect(result.bodyHtml).not.toContain('<?>')
+    expect(result.bodyHtml).not.toContain('baseline_toggle_open')
+
+    const root = new DOMParser().parseFromString(result.bodyHtml, 'text/html')
+    const card = root.querySelector<HTMLDetailsElement>('details.web-doc-baseline')!
+    expect(card).not.toBeNull()
+    expect(card.classList.contains('web-doc-baseline-low')).toBe(true)
+    expect(card.querySelector('.web-doc-baseline-title')?.textContent).toBe('Baseline 2025')
+    expect(card.querySelector('.web-doc-baseline-pill')?.textContent).toBe('Newly available')
+    expect(card.querySelector('.web-doc-baseline-icon')?.textContent).toBe('✓')
+    expect(card.querySelector('.web-doc-baseline-chevron')).not.toBeNull()
+    expect(card.querySelectorAll('.web-doc-baseline-browser')).toHaveLength(4)
+    expect(card.querySelectorAll('.web-doc-baseline-browser-supported')).toHaveLength(4)
+    expect(
+      [...card.querySelectorAll('.web-doc-baseline-browser-name')].map((node) => node.textContent),
+    ).toEqual(['Chrome', 'Edge', 'Firefox', 'Safari'])
+    expect(card.querySelector('.web-doc-baseline-extra')?.textContent).toContain('See full compatibility')
+    expect(card.querySelector('.web-doc-baseline-extra a')?.getAttribute('href')).toBe('#browser_compatibility')
+
+    const readerDocument = buildWebDocReaderDocument(
+      {
+        title: 'Document: startViewTransition() method',
+        bodyHtml: result.bodyHtml,
+        baseUrl: 'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition',
+      },
+      'dark',
+    )
+    expect(readerDocument).toContain('.web-doc-baseline')
+    expect(readerDocument).toContain('.web-doc-baseline.web-doc-baseline-low')
+    expect(readerDocument).toContain('--web-doc-baseline-accent: #60a5fa')
+    expect(readerDocument).toContain('.web-doc-baseline-browser-state')
+
+    // buildWebDocReaderDocument 会再归一化一次（兼容缓存旧片段），不能清空已生成的浏览器标签。
+    const readerRoot = new DOMParser().parseFromString(readerDocument, 'text/html')
+    expect(readerRoot.querySelectorAll('.web-doc-baseline-browser')).toHaveLength(4)
+    expect(readerRoot.querySelector('.web-doc-baseline-title')?.textContent).toBe('Baseline 2025')
+  })
+
+  it('Baseline 状态、图标与不支持浏览器映射到卡片修饰类', () => {
+    const html = `<!DOCTYPE html><html><body><article>
+      <h1>Baseline statuses</h1>
+      <details class="baseline-indicator high">
+        <summary>
+          <span class="indicator"></span>
+          <div class="status-title">Baseline</div>
+          <div class="pill">Widely available</div>
+          <div class="browsers">
+            <span class="browser chrome supported"></span>
+            <span class="browser firefox"></span>
+          </div>
+        </summary>
+        <div class="extra"><p>High status.</p></div>
+      </details>
+      <details class="baseline-indicator">
+        <summary>
+          <span class="indicator"></span>
+          <div class="status-title">Baseline</div>
+          <div class="browsers"><span class="browser safari supported"></span></div>
+        </summary>
+        <div class="extra"><p>Limited status.</p></div>
+      </details>
+      <details class="baseline-indicator removing">
+        <summary>
+          <span class="indicator"></span>
+          <div class="status-title">Baseline</div>
+        </summary>
+        <div class="extra"><p>Removing status.</p></div>
+      </details>
+      <details class="baseline-indicator discouraged">
+        <summary>
+          <span class="indicator"></span>
+          <div class="status-title">Baseline</div>
+        </summary>
+        <div class="extra"><p>Discouraged status.</p></div>
+      </details>
+    </article></body></html>`
+
+    const result = extractWebDocArticle(html, 'https://developer.mozilla.org/en-US/docs/Web/API/')
+    const root = new DOMParser().parseFromString(result.bodyHtml, 'text/html')
+    const cards = [...root.querySelectorAll<HTMLDetailsElement>('details.web-doc-baseline')]
+
+    expect(cards.map((card) => card.className.match(/web-doc-baseline-(\w+)/)?.[1])).toEqual([
+      'high',
+      'limited',
+      'removing',
+      'discouraged',
+    ])
+    expect(cards.map((card) => card.querySelector('.web-doc-baseline-icon')?.textContent)).toEqual([
+      '✓',
+      '!',
+      '×',
+      '×',
+    ])
+    expect(cards.map((card) => card.querySelector('.web-doc-baseline-pill')?.textContent)).toEqual([
+      'Widely available',
+      'Limited availability',
+      'Pending removal',
+      'Discouraged',
+    ])
+
+    const highBrowsers = [...cards[0].querySelectorAll('.web-doc-baseline-browser')]
+    expect(highBrowsers.map((browser) => browser.className)).toEqual([
+      'web-doc-baseline-browser web-doc-baseline-browser-supported',
+      'web-doc-baseline-browser web-doc-baseline-browser-unsupported',
+    ])
+    expect(highBrowsers.map((browser) => browser.querySelector('.web-doc-baseline-browser-state')?.textContent)).toEqual([
+      '✓',
+      '×',
+    ])
+  })
+
   it('react.dev 的 Next.js 响应式图片 srcset 与 source 改写为完整绝对路径', () => {
     const html = `<!DOCTYPE html><html><body><article>
       <h1>Sharing data</h1>

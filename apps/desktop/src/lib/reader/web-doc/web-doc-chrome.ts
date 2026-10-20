@@ -396,6 +396,149 @@ export function normalizeWebDocCallouts(root: HTMLElement): void {
   })
 }
 
+const BASELINE_SELECTOR = 'details.baseline-indicator, .baseline-indicator'
+const BASELINE_BROWSER_LABELS: Record<string, string> = {
+  chrome: 'Chrome',
+  edge: 'Edge',
+  firefox: 'Firefox',
+  safari: 'Safari',
+}
+
+type WebDocBaselineStatus = 'high' | 'low' | 'limited' | 'discouraged' | 'removing'
+
+const BASELINE_PILL_FALLBACK: Record<WebDocBaselineStatus, string> = {
+  high: 'Widely available',
+  low: 'Newly available',
+  limited: 'Limited availability',
+  discouraged: 'Discouraged',
+  removing: 'Pending removal',
+}
+
+function resolveBaselineStatus(element: HTMLElement): WebDocBaselineStatus {
+  if (element.classList.contains('high')) return 'high'
+  if (element.classList.contains('low')) return 'low'
+  if (element.classList.contains('removing')) return 'removing'
+  if (element.classList.contains('discouraged')) return 'discouraged'
+  return 'limited'
+}
+
+function baselineBrowserLabel(browser: Element): string {
+  for (const [key, label] of Object.entries(BASELINE_BROWSER_LABELS)) {
+    if (browser.classList.contains(key)) return label
+  }
+  return browser.getAttribute('aria-label')?.replace(/\s+(?:check|supported).*$/i, '').trim() || 'Browser'
+}
+
+function cleanBaselineLabel(element: Element | null): string {
+  return (element?.textContent ?? '')
+    .replace(/<\?[^>]*\?>/g, '')
+    .replace(/<\?>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * MDN Baseline 指示器：原站依赖自身 CSS 绘制状态图标、浏览器图标和折叠箭头，
+ * 正文抽取后这些空 span 会退化成无意义文本。这里重建为阅读器自己的语义卡片，
+ * 保留原生 details 折叠能力与兼容性链接，并去掉 `<?>` 模板残留。
+ */
+export function normalizeWebDocBaselineIndicators(root: HTMLElement): void {
+  const doc = root.ownerDocument
+  root.querySelectorAll<HTMLElement>(BASELINE_SELECTOR).forEach((indicator) => {
+    const status = resolveBaselineStatus(indicator)
+    indicator.classList.add('web-doc-baseline', `web-doc-baseline-${status}`)
+    indicator.removeAttribute('data-glean-toggle-open')
+
+    const summary = indicator.querySelector<HTMLElement>('summary')
+    summary?.classList.add('web-doc-baseline-summary')
+
+    const title = indicator.querySelector<HTMLElement>('.status-title')
+    let pill = indicator.querySelector<HTMLElement>('.pill')
+    if (title && pill && title.contains(pill)) title.after(pill)
+
+    if (title) {
+      title.classList.add('web-doc-baseline-title')
+      title.textContent = cleanBaselineLabel(title) || 'Baseline'
+    }
+
+    if (!pill && title) {
+      pill = doc.createElement('small')
+      pill.className = 'pill'
+      title.after(pill)
+    }
+
+    if (pill) {
+      pill.classList.add('web-doc-baseline-pill')
+      pill.textContent = cleanBaselineLabel(pill) || BASELINE_PILL_FALLBACK[status]
+      if (pill.tagName !== 'SMALL') {
+        // 阅读器布局会强制 div/span 继承字号与颜色；small 不在覆盖名单内。
+        const small = doc.createElement('small')
+        small.className = pill.className
+        small.textContent = pill.textContent
+        pill.replaceWith(small)
+      }
+    }
+
+    const indicatorIcon = indicator.querySelector<HTMLElement>('.indicator')
+    if (indicatorIcon) {
+      const icon = doc.createElement('small')
+      icon.className = 'web-doc-baseline-icon'
+      icon.setAttribute('aria-hidden', 'true')
+      icon.textContent =
+        status === 'removing' || status === 'discouraged' ? '×' : status === 'limited' ? '!' : '✓'
+      indicatorIcon.replaceWith(icon)
+    }
+
+    const browsers = indicator.querySelector<HTMLElement>('.browsers')
+    if (browsers) {
+      const sourceBrowsers = Array.from(browsers.querySelectorAll<HTMLElement>('.browser'))
+      const chips = sourceBrowsers.map((browser) => {
+        const label = baselineBrowserLabel(browser)
+        const supported = browser.classList.contains('supported')
+        const chip = doc.createElement('small')
+        chip.className = `web-doc-baseline-browser web-doc-baseline-browser-${supported ? 'supported' : 'unsupported'}`
+        chip.setAttribute('role', 'img')
+        chip.setAttribute('aria-label', `${label}: ${supported ? 'supported' : 'not supported'}`)
+        chip.setAttribute('title', browser.getAttribute('aria-label') ?? `${label} ${supported ? 'supported' : 'not supported'}`)
+
+        const name = doc.createElement('span')
+        name.className = 'web-doc-baseline-browser-name'
+        name.textContent = label
+        const state = doc.createElement('small')
+        state.className = 'web-doc-baseline-browser-state'
+        state.setAttribute('aria-hidden', 'true')
+        state.textContent = supported ? '✓' : '×'
+        chip.append(name, state)
+        return chip
+      })
+      browsers.classList.add('web-doc-baseline-browsers')
+      if (chips.length > 0) browsers.replaceChildren(...chips)
+    }
+
+    const chevron = indicator.querySelector<HTMLElement>('.icon-chevron')
+    if (chevron) {
+      const marker = doc.createElement('small')
+      marker.className = 'web-doc-baseline-chevron'
+      marker.setAttribute('aria-hidden', 'true')
+      chevron.replaceWith(marker)
+    }
+
+    const extra = indicator.querySelector<HTMLElement>(':scope > .extra')
+    if (extra) {
+      if (extra.tagName === 'SECTION') {
+        extra.classList.add('web-doc-baseline-extra')
+      } else {
+        // extra 内含 p/ul，改用 section 以继承阅读器为卡片设置的字号与颜色。
+        const section = doc.createElement('section')
+        section.className = extra.className
+        section.classList.add('web-doc-baseline-extra')
+        while (extra.firstChild) section.appendChild(extra.firstChild)
+        extra.replaceWith(section)
+      }
+    }
+  })
+}
+
 /**
  * 独立插图归一化：现代文档站（Mintlify 的 span.contents/picture.contents 链、
  * MDX 裸图）常把单图放在透明内联包装里，原站靠 `display:contents` + prose
@@ -907,6 +1050,7 @@ function stripGenericChrome(root: HTMLElement): void {
   normalizeWebDocPermalinks(root)
   normalizeWebDocCards(root)
   normalizeWebDocCallouts(root)
+  normalizeWebDocBaselineIndicators(root)
   normalizeWebDocFigureRows(root)
   normalizeWebDocCardGrids(root)
   normalizeWebDocStandaloneFigures(root)

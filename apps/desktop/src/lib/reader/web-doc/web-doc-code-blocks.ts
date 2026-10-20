@@ -10,6 +10,79 @@ const LANGUAGE_CLASS = /\blanguage-([\w-]+)\b/i
 const LANG_CLASS = /\blang-([\w-]+)\b/i
 const SP_LANG_CLASS = /\bsp-(javascript|typescript|jsx|tsx|json|css|html|bash|shell|python|java|go|rust|yaml|markdown|md)\b/i
 const HLJS_LANG_CLASS = /\bhljs-([\w-]+)\b/i
+/** MDN / 旧版 wiki 语法：`<pre class="brush: js notranslate">` */
+const BRUSH_LANG_CLASS = /\bbrush:\s*([\w.+#-]+)/i
+/** GitHub 代码块：`highlight highlight-source-js` */
+const HIGHLIGHT_SOURCE_CLASS = /\bhighlight-source-([\w.+#-]+)\b/i
+/** Sphinx / Pygments：`highlight-python` */
+const HIGHLIGHT_LANG_CLASS = /\bhighlight-(?!source-)([\w.+#-]+)\b/i
+const DIRECT_CODE_EXAMPLE_HEADER_SELECTOR = ':scope > .example-header, :scope > .code-example-header, :scope > [class*="example-header"], :scope > [class*="code-example-header"]'
+
+const LANGUAGE_ALIASES: Record<string, string> = {
+  js: 'javascript',
+  javascript: 'javascript',
+  ts: 'typescript',
+  typescript: 'typescript',
+  py: 'python',
+  python: 'python',
+  rb: 'ruby',
+  ruby: 'ruby',
+  rs: 'rust',
+  rust: 'rust',
+  golang: 'go',
+  go: 'go',
+  kt: 'kotlin',
+  kotlin: 'kotlin',
+  cs: 'csharp',
+  'c#': 'csharp',
+  csharp: 'csharp',
+  'c++': 'cpp',
+  cpp: 'cpp',
+  sh: 'bash',
+  shell: 'bash',
+  zsh: 'bash',
+  console: 'bash',
+  bash: 'bash',
+  yml: 'yaml',
+  yaml: 'yaml',
+  md: 'markdown',
+  markdown: 'markdown',
+  htm: 'html',
+  html: 'html',
+  xml: 'xml',
+  svg: 'xml',
+  plain: 'text',
+  plaintext: 'text',
+  'plain-text': 'text',
+  txt: 'text',
+  text: 'text',
+}
+
+function canonicalizeLanguage(raw: string): string {
+  const token = raw.trim().toLowerCase().replace(/[;,]+$/, '')
+  if (!token) return 'text'
+  const compact = token.replace(/\s+/g, '-')
+  return LANGUAGE_ALIASES[token] ?? LANGUAGE_ALIASES[compact] ?? compact
+}
+
+function languageFromCodeExampleHeader(node: Element): string | null {
+  const parent = node.parentElement
+  if (!parent) return null
+  const header = parent.querySelector(DIRECT_CODE_EXAMPLE_HEADER_SELECTOR)
+  if (!header) return null
+  const label = header.matches('[data-language], [data-language-name]')
+    ? header
+    : header.querySelector('.language-name, [data-language-name], [data-language]')
+  if (!label) return null
+  const raw =
+    label.getAttribute('data-language') ??
+    label.getAttribute('data-language-name') ??
+    label.textContent ??
+    ''
+  if (!raw.trim()) return null
+  const language = canonicalizeLanguage(raw)
+  return language === 'text' ? null : language
+}
 
 /** MkDocs / pymdownx 多语言 Tab 标签 → 工具栏语言名 */
 const TABBED_LABEL_LANG: Record<string, string> = {
@@ -62,32 +135,77 @@ function detectCodeLanguage(node: Element): string {
 
   for (const source of sources) {
     const language = source.match(LANGUAGE_CLASS)?.[1] ?? source.match(LANG_CLASS)?.[1]
-    if (language) return language.toLowerCase()
+    if (language) return canonicalizeLanguage(language)
 
     const sp = source.match(SP_LANG_CLASS)?.[1]
-    if (sp) return sp.toLowerCase()
+    if (sp) return canonicalizeLanguage(sp)
 
     const hljs = source.match(HLJS_LANG_CLASS)?.[1]
-    if (hljs) return hljs.toLowerCase()
+    if (hljs) return canonicalizeLanguage(hljs)
+
+    const brush = source.match(BRUSH_LANG_CLASS)?.[1]
+    if (brush) return canonicalizeLanguage(brush)
+
+    const highlightSource = source.match(HIGHLIGHT_SOURCE_CLASS)?.[1]
+    if (highlightSource) return canonicalizeLanguage(highlightSource)
+
+    const highlight = source.match(HIGHLIGHT_LANG_CLASS)?.[1]
+    if (highlight) return canonicalizeLanguage(highlight)
   }
 
+  const code = node.querySelector('code')
   const dataLang =
     node.getAttribute('data-language') ??
+    node.getAttribute('data-code-language') ??
     node.getAttribute('data-lang') ??
-    node.querySelector('code')?.getAttribute('data-language') ??
+    code?.getAttribute('data-language') ??
+    code?.getAttribute('data-code-language') ??
+    code?.getAttribute('data-lang') ??
+    node.closest('[data-code-language]')?.getAttribute('data-code-language') ??
     node.closest('[data-language]')?.getAttribute('data-language')
-  if (dataLang?.trim()) return dataLang.trim().toLowerCase()
+  if (dataLang?.trim()) return canonicalizeLanguage(dataLang)
+
+  const langAttr =
+    node.getAttribute('lang') ?? code?.getAttribute('lang') ?? node.querySelector('pre')?.getAttribute('lang')
+  if (langAttr?.trim()) return canonicalizeLanguage(langAttr)
+
+  // MDN 的 `<span class="language-name">js</span>` 位于 pre 的兄弟头部；
+  // 部分站点只给出这个标签，pre 自身没有 language/brush class。
+  const headerLanguage = languageFromCodeExampleHeader(node)
+  if (headerLanguage) return headerLanguage
 
   const pre = node.tagName === 'PRE' ? node : node.querySelector('pre')
   const inferred = inferLanguageFromContent(pre?.textContent ?? node.textContent ?? '')
-  if (inferred) return inferred
+  if (inferred) return canonicalizeLanguage(inferred)
 
   return 'text'
 }
 
+/**
+ * MDN 的代码语言与复制按钮在 `.example-header` 中，阅读器工具栏已经承担同样职责；
+ * 保留头部会让语言名（如独立的 “js”）作为正文段落重复出现。
+ */
+function removeRedundantCodeExampleHeader(pre: Element): void {
+  const container = pre.closest('.code-example, .code-example-container')
+  const header = container?.querySelector(DIRECT_CODE_EXAMPLE_HEADER_SELECTOR)
+  if (!header) return
+  // 头部若带文件名则保留，避免只清理语言标签时丢掉文件信息。
+  if (header.querySelector('a[href], .filename, [class*="filename"], [class*="file-name"]')) return
+  // 只有语言标签 / 复制按钮 / 空白的头部才是重复信息；带标题的头部必须保留。
+  const residual = header.cloneNode(true) as Element
+  residual.querySelectorAll('.language-name, [data-language-name], [data-language], button').forEach((node) => node.remove())
+  if (residual.textContent?.trim()) return
+  header.remove()
+}
+
 function isLanguageWrapper(div: HTMLElement): boolean {
   if (div.classList.contains('code-block')) return false
-  if (LANGUAGE_CLASS.test(div.className) || LANG_CLASS.test(div.className) || div.classList.contains('highlight')) {
+  if (
+    LANGUAGE_CLASS.test(div.className) ||
+    LANG_CLASS.test(div.className) ||
+    HIGHLIGHT_LANG_CLASS.test(div.className) ||
+    div.classList.contains('highlight')
+  ) {
     return true
   }
   return false
@@ -150,6 +268,7 @@ function wrapCodeBlockHost(host: HTMLElement): void {
   if (host !== pre) {
     host.remove()
   }
+  removeRedundantCodeExampleHeader(pre)
 }
 
 /**

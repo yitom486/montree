@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import { Readability } from '@mozilla/readability'
 import type { WebDocPageContent, WebDocSiteId } from '@yitom/contracts'
 import {
+  normalizeWebDocBaselineIndicators,
   normalizeWebDocCallouts,
   normalizeWebDocCardGrids,
   normalizeWebDocCards,
@@ -415,6 +416,253 @@ export function buildWebDocCalloutCss(theme: EpubThemeMode): string {
       margin-top: 0.5rem !important;
     }
     ${typeRules}
+  `
+}
+
+/**
+ * MDN Baseline 指示器卡片（`normalizeWebDocBaselineIndicators`）：
+ * 原站靠 CSS 背景图绘制图标，抽取后重建成阅读器自己的状态卡片。
+ * 颜色按状态取蓝/绿/琥珀/灰/红，使用主题 palette 保持深浅色一致。
+ */
+export function buildWebDocBaselineCss(theme: EpubThemeMode): string {
+  const isDark = theme === 'dark'
+  const isSepia = theme === 'sepia'
+  const palette = READER_PALETTE[theme]
+  const muted = isDark ? '#a1a1aa' : isSepia ? '#6b5d4c' : '#71717a'
+  const chipBg = isDark ? 'rgba(255, 255, 255, 0.04)' : isSepia ? 'rgba(120, 100, 70, 0.06)' : 'rgba(24, 24, 27, 0.04)'
+  const chipBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : isSepia ? 'rgba(120, 100, 70, 0.16)' : 'rgba(24, 24, 27, 0.1)'
+  const extraBorder = isDark ? 'rgba(255, 255, 255, 0.08)' : isSepia ? 'rgba(120, 100, 70, 0.14)' : 'rgba(24, 24, 27, 0.08)'
+  const extraBg = isDark ? 'rgba(0, 0, 0, 0.12)' : isSepia ? 'rgba(255, 255, 255, 0.24)' : 'rgba(255, 255, 255, 0.5)'
+  const hoverBg = isDark ? 'rgba(255, 255, 255, 0.04)' : isSepia ? 'rgba(120, 100, 70, 0.05)' : 'rgba(24, 24, 27, 0.03)'
+  const unsupportedColor = isDark ? '#f87171' : isSepia ? '#b91c1c' : '#dc2626'
+
+  const statusThemes = {
+    high: {
+      accent: isDark ? '#4ade80' : isSepia ? '#15803d' : '#16a34a',
+      border: isDark ? 'rgba(74, 222, 128, 0.28)' : 'rgba(22, 163, 74, 0.22)',
+      bg: isDark ? 'rgba(34, 197, 94, 0.1)' : isSepia ? 'rgba(220, 252, 231, 0.55)' : '#f0fdf4',
+      iconBg: isDark ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.1)',
+      pillBg: isDark ? '#166534' : '#15803d',
+    },
+    low: {
+      accent: isDark ? '#60a5fa' : isSepia ? '#1d4ed8' : '#2563eb',
+      border: isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(37, 99, 235, 0.2)',
+      bg: isDark ? 'rgba(37, 99, 235, 0.12)' : isSepia ? 'rgba(219, 234, 254, 0.55)' : '#f0f7ff',
+      iconBg: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.08)',
+      pillBg: isDark ? '#1d4ed8' : '#1b6ef3',
+    },
+    limited: {
+      accent: isDark ? '#fbbf24' : isSepia ? '#b45309' : '#d97706',
+      border: isDark ? 'rgba(251, 191, 36, 0.28)' : 'rgba(217, 119, 6, 0.22)',
+      bg: isDark ? 'rgba(217, 119, 6, 0.1)' : isSepia ? 'rgba(254, 243, 199, 0.55)' : '#fffbeb',
+      iconBg: isDark ? 'rgba(217, 119, 6, 0.18)' : 'rgba(217, 119, 6, 0.1)',
+      pillBg: isDark ? '#b45309' : '#b45309',
+    },
+    discouraged: {
+      accent: isDark ? '#a1a1aa' : '#71717a',
+      border: isDark ? 'rgba(161, 161, 170, 0.28)' : 'rgba(113, 113, 122, 0.2)',
+      bg: isDark ? 'rgba(113, 113, 122, 0.1)' : isSepia ? 'rgba(231, 229, 228, 0.5)' : '#f4f4f5',
+      iconBg: isDark ? 'rgba(113, 113, 122, 0.18)' : 'rgba(113, 113, 122, 0.1)',
+      pillBg: isDark ? '#52525b' : '#71717a',
+    },
+    removing: {
+      accent: isDark ? '#f87171' : isSepia ? '#b91c1c' : '#dc2626',
+      border: isDark ? 'rgba(248, 113, 113, 0.3)' : 'rgba(220, 38, 38, 0.22)',
+      bg: isDark ? 'rgba(220, 38, 38, 0.1)' : isSepia ? 'rgba(254, 226, 226, 0.55)' : '#fef2f2',
+      iconBg: isDark ? 'rgba(220, 38, 38, 0.18)' : 'rgba(220, 38, 38, 0.1)',
+      pillBg: isDark ? '#b91c1c' : '#b91c1c',
+    },
+  }
+
+  const statusRules = Object.entries(statusThemes)
+    .map(([status, cfg]) => `
+    body .web-doc-baseline.web-doc-baseline-${status} {
+      --web-doc-baseline-accent: ${cfg.accent};
+      --web-doc-baseline-border: ${cfg.border};
+      --web-doc-baseline-bg: ${cfg.bg};
+      --web-doc-baseline-icon-bg: ${cfg.iconBg};
+      --web-doc-baseline-pill-bg: ${cfg.pillBg};
+    }
+    `)
+    .join('\n')
+
+  return `
+    body .web-doc-baseline {
+      position: relative !important;
+      display: block !important;
+      box-sizing: border-box !important;
+      margin: 0.75rem 0 1.25rem !important;
+      overflow: hidden !important;
+      border: 1px solid var(--web-doc-baseline-border, ${chipBorder}) !important;
+      border-radius: 0.75rem !important;
+      background: var(--web-doc-baseline-bg, ${chipBg}) !important;
+      color: ${palette.text} !important;
+      font-family: inherit !important;
+      font-size: 0.9rem !important;
+      line-height: 1.6 !important;
+    }
+    body .web-doc-baseline > summary {
+      position: relative !important;
+      display: flex !important;
+      align-items: center !important;
+      flex-wrap: wrap !important;
+      gap: 0.5rem 0.65rem !important;
+      min-height: 3rem !important;
+      padding: 0.8rem 2.75rem 0.8rem 1rem !important;
+      list-style: none !important;
+      cursor: pointer !important;
+      user-select: none !important;
+      font-size: 0.95rem !important;
+      line-height: 1.45 !important;
+    }
+    body .web-doc-baseline > summary::-webkit-details-marker {
+      display: none !important;
+    }
+    body .web-doc-baseline > summary::marker {
+      content: "" !important;
+    }
+    body .web-doc-baseline > summary:hover {
+      background: ${hoverBg} !important;
+    }
+    body .web-doc-baseline > summary:focus-visible {
+      outline: 2px solid var(--web-doc-baseline-accent, ${muted}) !important;
+      outline-offset: -2px !important;
+    }
+    body .web-doc-baseline-icon {
+      display: inline-flex !important;
+      flex: 0 0 auto !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 1.75rem !important;
+      height: 1.75rem !important;
+      border-radius: 999px !important;
+      background: var(--web-doc-baseline-icon-bg, ${chipBg}) !important;
+      color: var(--web-doc-baseline-accent, ${muted}) !important;
+      font-size: 0.95rem !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+    }
+    body .web-doc-baseline-title {
+      margin: 0 !important;
+      color: ${palette.text} !important;
+      font-weight: 600 !important;
+    }
+    body .web-doc-baseline-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      padding: 0.14rem 0.45rem !important;
+      border-radius: 999px !important;
+      background: var(--web-doc-baseline-pill-bg, ${muted}) !important;
+      color: #ffffff !important;
+      font-size: 0.64rem !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.045em !important;
+      line-height: 1.4 !important;
+      text-transform: uppercase !important;
+      white-space: nowrap !important;
+    }
+    body .web-doc-baseline-browsers {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: 0.35rem !important;
+      margin-left: auto !important;
+    }
+    body .web-doc-baseline-browser {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 0.28rem !important;
+      padding: 0.18rem 0.48rem !important;
+      border: 1px solid ${chipBorder} !important;
+      border-radius: 999px !important;
+      background: ${chipBg} !important;
+      color: ${muted} !important;
+      font-size: 0.72rem !important;
+      line-height: 1.35 !important;
+      white-space: nowrap !important;
+    }
+    body .web-doc-baseline-browser-name {
+      font-weight: 500 !important;
+    }
+    body .web-doc-baseline-browser-state {
+      color: var(--web-doc-baseline-accent, ${muted}) !important;
+      font-size: 0.78rem !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+    }
+    body .web-doc-baseline-browser-unsupported {
+      opacity: 0.72 !important;
+    }
+    body .web-doc-baseline-browser-unsupported .web-doc-baseline-browser-state {
+      color: ${unsupportedColor} !important;
+    }
+    body .web-doc-baseline-chevron {
+      position: absolute !important;
+      top: 50% !important;
+      right: 1rem !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 1rem !important;
+      height: 1rem !important;
+      color: ${muted} !important;
+      pointer-events: none !important;
+      transform: translateY(-50%) !important;
+    }
+    body .web-doc-baseline-chevron::before {
+      content: "" !important;
+      display: block !important;
+      width: 0.42rem !important;
+      height: 0.42rem !important;
+      border-right: 2px solid currentColor !important;
+      border-bottom: 2px solid currentColor !important;
+      transform: rotate(45deg) !important;
+      transition: transform 0.18s ease !important;
+    }
+    body .web-doc-baseline[open] .web-doc-baseline-chevron::before {
+      transform: rotate(225deg) !important;
+    }
+    body .web-doc-baseline-extra {
+      padding: 0.8rem 1rem 0.95rem !important;
+      border-top: 1px solid ${extraBorder} !important;
+      background: ${extraBg} !important;
+      color: ${muted} !important;
+      font-size: 0.9rem !important;
+      line-height: 1.6 !important;
+    }
+    body .web-doc-baseline-extra p {
+      margin: 0 !important;
+    }
+    body .web-doc-baseline-extra > p + p {
+      margin-top: 0.5rem !important;
+    }
+    body .web-doc-baseline-extra ul {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 0.5rem 1.1rem !important;
+      margin: 0.7rem 0 0 !important;
+      padding: 0 !important;
+      list-style: none !important;
+    }
+    body .web-doc-baseline-extra li {
+      margin: 0 !important;
+    }
+    body .web-doc-baseline-extra a {
+      color: ${palette.link} !important;
+      font-weight: 500 !important;
+      text-decoration: none !important;
+      border-bottom: 1px solid transparent !important;
+    }
+    body .web-doc-baseline-extra a:hover {
+      color: ${palette.linkHover} !important;
+      border-bottom-color: currentColor !important;
+    }
+    @media (max-width: 560px) {
+      body .web-doc-baseline-browsers {
+        margin-left: 0 !important;
+      }
+    }
+    ${statusRules}
   `
 }
 
@@ -985,6 +1233,7 @@ export function buildWebDocReaderDocument(
   const codeBlockCss = buildWebDocCodeBlockCss(theme)
   const inlineCodeCss = buildWebDocInlineCodeCss(theme)
   const calloutCss = buildWebDocCalloutCss(theme)
+  const baselineCss = buildWebDocBaselineCss(theme)
   const cardGridCss = buildWebDocCardGridCss(theme)
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss()
@@ -1001,6 +1250,7 @@ export function buildWebDocReaderDocument(
     if (!root) return content.bodyHtml
     normalizeWebDocCards(root)
     normalizeWebDocCallouts(root)
+    normalizeWebDocBaselineIndicators(root)
     normalizeWebDocFigureRows(root)
     normalizeWebDocCardGrids(root)
     normalizeWebDocStandaloneFigures(root)
@@ -1034,6 +1284,7 @@ export function buildWebDocReaderDocument(
   <style>${codeBlockCss}</style>
   <style>${inlineCodeCss}</style>
   <style>${calloutCss}</style>
+  <style>${baselineCss}</style>
   <style>${cardGridCss}</style>
   <style>${mathCss}</style>
   <style>${embedCss}</style>
