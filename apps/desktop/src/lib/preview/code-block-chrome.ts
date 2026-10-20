@@ -14,11 +14,15 @@ export function buildCodeBlockCopyButtonHtml(): string {
   return `<button type="button" class="code-block-copy" aria-label="复制代码" title="复制代码">${CODE_BLOCK_COPY_ICON_SVG}</button>`
 }
 
-export function buildCodeBlockToolbarHtml(lang: string): string {
+export function buildCodeBlockToolbarHtml(lang: string, filename?: string): string {
   const label = escapeCodeBlockLangLabel(lang || 'text')
+  const file = filename?.trim()
+  const filenameHtml = file
+    ? `<span class="code-block-filename" title="${escapeCodeBlockLangLabel(file)}">${escapeCodeBlockLangLabel(file)}</span>`
+    : ''
   return [
     '<div class="code-block-toolbar">',
-    `<span class="code-block-lang">${label}</span>`,
+    `<span class="code-block-labels">${filenameHtml}<span class="code-block-lang">${label}</span></span>`,
     buildCodeBlockCopyButtonHtml(),
     '</div>',
   ].join('')

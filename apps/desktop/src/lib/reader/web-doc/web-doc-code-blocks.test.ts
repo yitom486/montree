@@ -62,6 +62,47 @@ describe('enhanceWebDocCodeBlocks', () => {
     }
   })
 
+  it('将 Pygments / Docusaurus / data-filename 的文件名提升到工具栏', () => {
+    const pygments = enhanceWebDocCodeBlocks(
+      `<div class="highlight"><span class="filename">example.py</span><pre><code class="language-python">print("hi")</code></pre></div>`,
+    )
+    const pygmentsDoc = new DOMParser().parseFromString(pygments, 'text/html')
+    expect(pygmentsDoc.querySelector('.code-block-filename')?.textContent).toBe('example.py')
+    expect(pygmentsDoc.querySelector('.filename')).toBeNull()
+    expect(pygmentsDoc.querySelector('.code-block-lang')?.textContent).toBe('python')
+
+    const docusaurus = enhanceWebDocCodeBlocks(
+      `<div class="codeBlockContainer"><div class="codeBlockTitle_x1">src/App.tsx</div><div class="codeBlockContent"><pre><code class="language-tsx">const App = () => null</code></pre></div></div>`,
+    )
+    const docusaurusDoc = new DOMParser().parseFromString(docusaurus, 'text/html')
+    expect(docusaurusDoc.querySelector('.code-block-filename')?.textContent).toBe('src/App.tsx')
+    expect(docusaurusDoc.querySelector('[class*="codeBlockTitle"]')).toBeNull()
+    expect(docusaurusDoc.querySelector('.code-block-lang')?.textContent).toBe('tsx')
+
+    const dataFilename = enhanceWebDocCodeBlocks(
+      `<pre data-filename="Dockerfile"><code>FROM node:20</code></pre>`,
+    )
+    const dataFilenameDoc = new DOMParser().parseFromString(dataFilename, 'text/html')
+    expect(dataFilenameDoc.querySelector('.code-block-filename')?.textContent).toBe('Dockerfile')
+    expect(dataFilenameDoc.querySelector('pre')?.textContent).toBe('FROM node:20')
+  })
+
+  it('普通标题或交互式文件名不会搬进工具栏', () => {
+    const title = enhanceWebDocCodeBlocks(
+      `<div class="highlight"><span class="filename">Basic usage</span><pre><code>echo hi</code></pre></div>`,
+    )
+    const titleDoc = new DOMParser().parseFromString(title, 'text/html')
+    expect(titleDoc.querySelector('.code-block-filename')).toBeNull()
+    expect(titleDoc.querySelector('.filename')?.textContent).toBe('Basic usage')
+
+    const link = enhanceWebDocCodeBlocks(
+      `<div class="highlight"><a class="filename" href="/src/app.ts">src/app.ts</a><pre><code class="language-ts">const x = 1</code></pre></div>`,
+    )
+    const linkDoc = new DOMParser().parseFromString(link, 'text/html')
+    expect(linkDoc.querySelector('.code-block-filename')).toBeNull()
+    expect(linkDoc.querySelector('a.filename')?.getAttribute('href')).toBe('/src/app.ts')
+  })
+
   it('为 VuePress 风格 div.language-* > pre > code 注入复制工具栏', () => {
     const html = `<div class="language-bash extra-class"><pre class="language-bash"><code>$ curl -Lo minikube</code></pre></div>`
 

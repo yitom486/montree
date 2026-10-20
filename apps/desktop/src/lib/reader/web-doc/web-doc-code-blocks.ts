@@ -17,6 +17,17 @@ const HIGHLIGHT_SOURCE_CLASS = /\bhighlight-source-([\w.+#-]+)\b/i
 /** Sphinx / Pygments：`highlight-python` */
 const HIGHLIGHT_LANG_CLASS = /\bhighlight-(?!source-)([\w.+#-]+)\b/i
 const DIRECT_CODE_EXAMPLE_HEADER_SELECTOR = ':scope > .example-header, :scope > .code-example-header, :scope > [class*="example-header"], :scope > [class*="code-example-header"]'
+const CODE_FILENAME_SELECTOR = [
+  '[data-filename]',
+  '.filename',
+  '[class*="filename"]',
+  '[class*="file-name"]',
+  '[class*="codeBlockTitle"]',
+  '[class*="code-block-title"]',
+  '[class*="code-title"]',
+].join(', ')
+const KNOWN_CODE_FILENAMES =
+  /^(?:Dockerfile|Makefile|Gemfile|Rakefile|Procfile|Vagrantfile|CMakeLists\.txt|Justfile|Brewfile|Earthfile)$/i
 
 const LANGUAGE_ALIASES: Record<string, string> = {
   js: 'javascript',
@@ -245,16 +256,63 @@ function collectCodeBlockHosts(root: ParentNode): HTMLElement[] {
   return hosts
 }
 
+function looksLikeCodeFilename(value: string): boolean {
+  if (!value || value.length > 120 || /\s/.test(value)) return false
+  return /[\\/]/.test(value) || /\.[a-z0-9]{1,12}$/i.test(value) || KNOWN_CODE_FILENAMES.test(value)
+}
+
+interface CodeBlockFilename {
+  filename: string
+  source: HTMLElement | null
+}
+
+/**
+ * 通用文件名提升：Pygments/MkDocs 的 `.filename`、Docusaurus 的 `codeBlockTitle`、
+ * 以及 `data-filename`。只接受短且像文件名的文本，普通标题保持原位。
+ */
+function detectCodeBlockFilename(host: HTMLElement): CodeBlockFilename | null {
+  const pre = host.tagName === 'PRE' ? host : host.querySelector('pre')
+  const code = pre?.querySelector('code') ?? host.querySelector('code')
+  const explicit =
+    host.getAttribute('data-filename') ??
+    pre?.getAttribute('data-filename') ??
+    code?.getAttribute('data-filename')
+  if (explicit?.trim()) return { filename: explicit.trim(), source: null }
+
+  const scope =
+    host.closest('.highlight, [class*="codeBlockContainer"], [class*="code-block-container"], figure') ??
+    host.parentElement
+  if (!scope) return null
+
+  for (const candidate of scope.querySelectorAll<HTMLElement>(CODE_FILENAME_SELECTOR)) {
+    if (candidate === host || candidate.contains(host)) continue
+    if (candidate.closest('pre, code')) continue
+    // 交互元素保留原链接/按钮，不搬进工具栏。
+    if (candidate.closest('a, button')) continue
+    // 文件名通常位于代码块之前；避免把后一个代码块的标题挂到当前块。
+    if (!(candidate.compareDocumentPosition(host) & Node.DOCUMENT_POSITION_FOLLOWING)) continue
+
+    const text = (candidate.getAttribute('data-filename') ?? candidate.textContent ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!text) continue
+    if (!candidate.hasAttribute('data-filename') && !looksLikeCodeFilename(text)) continue
+    return { filename: text, source: candidate }
+  }
+  return null
+}
+
 function wrapCodeBlockHost(host: HTMLElement): void {
   const pre = host.tagName === 'PRE' ? host : host.querySelector('pre')
   if (!pre) return
 
   const lang = detectCodeLanguage(host)
+  const filename = detectCodeBlockFilename(host)
   pre.setAttribute('data-language', lang)
   const doc = host.ownerDocument
   const wrapper = doc.createElement('div')
   wrapper.className = 'code-block'
-  wrapper.innerHTML = buildCodeBlockToolbarHtml(lang)
+  wrapper.innerHTML = buildCodeBlockToolbarHtml(lang, filename?.filename)
 
   const body = doc.createElement('div')
   body.className = 'code-block-body'
@@ -268,6 +326,7 @@ function wrapCodeBlockHost(host: HTMLElement): void {
   if (host !== pre) {
     host.remove()
   }
+  filename?.source?.remove()
   removeRedundantCodeExampleHeader(pre)
 }
 
@@ -573,7 +632,23 @@ export function buildWebDocCodeBlockCss(mode: EpubThemeMode): string {
       background: ${toolbar} !important;
       padding: 0.375rem 0.625rem !important;
     }
+    .code-block-labels {
+      display: flex !important;
+      align-items: center !important;
+      gap: 0.5rem !important;
+      min-width: 0 !important;
+    }
+    .code-block-filename {
+      overflow: hidden !important;
+      color: ${primary} !important;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+      font-size: 0.75rem !important;
+      font-weight: 600 !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+    }
     .code-block-lang {
+      flex: 0 0 auto !important;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
       font-size: 0.75rem !important;
       font-weight: 500 !important;
