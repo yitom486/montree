@@ -100,6 +100,42 @@ describe('web-doc-html', () => {
     expect(sanitized).toContain('正文')
   })
 
+  it('被安全策略移除的交互式嵌入降级为原文占位卡', () => {
+    const pageUrl = 'https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition'
+    const html = `<!DOCTYPE html><html><body><main>
+      <h1>Demo</h1>
+      <div class="code-example">
+        <div class="example-header"></div>
+        <iframe class="sample-code-frame" title="color change sample" src="about:blank" data-live-id="color_change"></iframe>
+      </div>
+      <iframe title="CodePen demo" src="https://codepen.io/team/pen/embed/abc"></iframe>
+      <iframe title="YouTube video player" src="https://www.youtube.com/embed/abc"></iframe>
+      <iframe title="Advertisement" src="https://ads.example.com/ad"></iframe>
+      <iframe title="Python Tutor" src="https://pythontutor.com/iframe-embed.html"></iframe>
+    </main></body></html>`
+
+    const result = extractWebDocArticle(html, pageUrl)
+    expect(result.bodyHtml).toContain('web-doc-embed-placeholder')
+    expect(result.bodyHtml).toContain('color change sample')
+    expect(result.bodyHtml).toContain('CodePen demo')
+    expect(result.bodyHtml).toContain('YouTube video player')
+    expect(result.bodyHtml).toContain('在原文中打开')
+    expect(result.bodyHtml).toContain(`href="${pageUrl}"`)
+    expect(result.bodyHtml).not.toContain('ads.example.com')
+    // Python Tutor 是白名单 embed，必须保持原样。
+    expect(result.bodyHtml).toContain('pythontutor.com/iframe-embed.html')
+
+    const root = new DOMParser().parseFromString(result.bodyHtml, 'text/html')
+    expect(root.querySelectorAll('.web-doc-embed-placeholder')).toHaveLength(3)
+    expect(root.querySelectorAll('iframe')).toHaveLength(1)
+
+    const readerDocument = buildWebDocReaderDocument(
+      { title: 'Demo', bodyHtml: result.bodyHtml, baseUrl: pageUrl },
+      'dark',
+    )
+    expect(readerDocument).toContain('.web-doc-embed-placeholder')
+  })
+
   it('rewriteRelativeUrls 保留 hash 链接', () => {
     const root = document.createElement('div')
     root.innerHTML = '<a href="#intro">intro</a>'

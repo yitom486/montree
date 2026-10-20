@@ -1,5 +1,8 @@
 import type { WebDocSiteId } from '@yitom/contracts'
-import { stripDisallowedWebDocEmbeds } from '@/lib/reader/web-doc/web-doc-embeds'
+import {
+  normalizeWebDocEmbedPlaceholders,
+  stripDisallowedWebDocEmbeds,
+} from '@/lib/reader/web-doc/web-doc-embeds'
 import { stripHrttChrome } from '@/lib/reader/web-doc/hrtt-extract'
 import { MONTREE_SOURCE_HREF_ATTR } from '@/lib/reader/web-doc/web-doc-link'
 
@@ -1028,8 +1031,9 @@ export function stripCodeBlockLineNumbers(root: ParentNode): void {
   })
 }
 
-function stripGenericChrome(root: HTMLElement): void {
+function stripGenericChrome(root: HTMLElement, pageUrl: string): void {
   root.querySelectorAll('form, [role="navigation"], nav').forEach((node) => node.remove())
+  normalizeWebDocEmbedPlaceholders(root, pageUrl)
   stripDisallowedWebDocEmbeds(root)
 
   stripDocsEditChrome(root)
@@ -1063,8 +1067,8 @@ function stripPeopleDailyChrome(root: HTMLElement): void {
   root.querySelectorAll('h2:empty, h3:empty').forEach((node) => node.remove())
 }
 
-export function stripWebDocChrome(root: HTMLElement, siteId: WebDocSiteId): void {
-  stripGenericChrome(root)
+export function stripWebDocChrome(root: HTMLElement, siteId: WebDocSiteId, pageUrl: string): void {
+  stripGenericChrome(root, pageUrl)
 
   if (siteId === 'people-daily-paper') {
     stripPeopleDailyChrome(root)

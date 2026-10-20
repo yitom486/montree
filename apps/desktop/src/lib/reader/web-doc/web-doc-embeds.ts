@@ -1,6 +1,22 @@
+import type { EpubThemeMode } from '@yitom/reader-core'
+import { READER_PALETTE } from '@yitom/reader-core'
+
 /** 在线文档允许内嵌的第三方可视化（白名单，避免任意 iframe） */
 const EMBED_HOST_SUFFIXES = ['.pythontutor.com'] as const
 const EMBED_HOSTS = new Set(['pythontutor.com', 'www.pythontutor.com'])
+
+/** 常见交互式文档嵌入；被安全策略移除时降级为“在原文中打开”占位卡。 */
+const INTERACTIVE_EMBED_HOSTS = [
+  'codepen.io',
+  'codesandbox.io',
+  'stackblitz.com',
+  'jsfiddle.net',
+  'youtube.com',
+  'youtu.be',
+  'vimeo.com',
+  'observablehq.com',
+  'replit.com',
+] as const
 
 /** arXiv/LaTeXML 把插图放进 object；在插件清洗前降级为无脚本的图片。 */
 export function normalizeWebDocImageObjects(root: HTMLElement, baseUrl: string): void {
@@ -80,7 +96,72 @@ export function normalizeAllowedWebDocEmbeds(root: ParentNode): void {
   })
 }
 
-export function buildWebDocEmbedCss(): string {
+function isInteractiveEmbedHost(hostname: string): boolean {
+  return INTERACTIVE_EMBED_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`))
+}
+
+function isInteractiveEmbedIframe(iframe: HTMLIFrameElement, pageUrl: string): boolean {
+  if (isAllowedWebDocEmbedIframe(iframe)) return false
+  if (!iframe.getAttribute('title')?.trim() && !iframe.getAttribute('aria-label')?.trim()) return false
+
+  // MDN Live Sample：src 是 about:blank，靠站点脚本注入，只能看 data-live-*。
+  if (iframe.hasAttribute('data-live-id') || iframe.classList.contains('sample-code-frame')) return true
+
+  const src = iframe.getAttribute('src')?.trim()
+  if (!src) return false
+  try {
+    const url = new URL(src, pageUrl)
+    return isInteractiveEmbedHost(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 被安全策略移除的交互式嵌入（MDN Live Sample、CodePen、StackBlitz、YouTube 等）
+ * 不应留下空白；降级为说明卡并链接回原文，既保留信息又不执行站点脚本。
+ */
+export function normalizeWebDocEmbedPlaceholders(root: HTMLElement, pageUrl: string): void {
+  const doc = root.ownerDocument
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isInteractiveEmbedIframe(iframe, pageUrl)) return
+
+    const title =
+      iframe.getAttribute('title')?.trim() ||
+      iframe.getAttribute('aria-label')?.trim() ||
+      '交互示例'
+    const placeholder = doc.createElement('section')
+    placeholder.className = 'web-doc-embed-placeholder'
+    placeholder.setAttribute('role', 'note')
+
+    const heading = doc.createElement('div')
+    heading.className = 'web-doc-embed-placeholder-title'
+    heading.textContent = title
+
+    const note = doc.createElement('small')
+    note.className = 'web-doc-embed-placeholder-note'
+    note.textContent = '该交互内容依赖站点脚本，阅读器未直接运行。'
+
+    placeholder.append(heading, note)
+    if (pageUrl) {
+      try {
+        const link = doc.createElement('a')
+        link.className = 'web-doc-embed-placeholder-link'
+        link.href = pageUrl
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        link.textContent = '在原文中打开'
+        placeholder.appendChild(link)
+      } catch {
+        // 非法 base URL 时只保留说明，不生成链接
+      }
+    }
+    iframe.replaceWith(placeholder)
+  })
+}
+
+export function buildWebDocEmbedCss(theme: EpubThemeMode): string {
+  const palette = READER_PALETTE[theme]
   return `
     details.pythontutor,
     details.web-doc-embed {
@@ -110,6 +191,37 @@ export function buildWebDocEmbedCss(): string {
       border: 0;
       border-radius: 0.375rem;
       background: transparent;
+    }
+    .web-doc-embed-placeholder {
+      margin: 1em 0;
+      padding: 0.85rem 1rem;
+      border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+      border-radius: 0.5rem;
+      background: color-mix(in oklab, currentColor 4%, transparent);
+      color: inherit;
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+    .web-doc-embed-placeholder-title {
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .web-doc-embed-placeholder-note {
+      display: block;
+      margin-top: 0.3rem;
+      opacity: 0.72;
+      font-size: 0.88em;
+    }
+    .web-doc-embed-placeholder-link {
+      display: inline-block;
+      margin-top: 0.55rem;
+      color: ${palette.link};
+      font-weight: 500;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
+    .web-doc-embed-placeholder-link:hover {
+      color: ${palette.linkHover};
     }
   `
 }

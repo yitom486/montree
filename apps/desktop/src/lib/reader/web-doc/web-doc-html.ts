@@ -982,7 +982,7 @@ export function extractWebDocArticle(
   const root = pickArticleRoot(doc, siteId, pageUrl)
   const clone = root.cloneNode(true) as HTMLElement
   normalizeWebDocImageObjects(clone, pageUrl)
-  stripWebDocChrome(clone, siteId)
+  stripWebDocChrome(clone, siteId, pageUrl)
   // flight 回填必须在消毒（扔 script）之前从原始 HTML 提取，在归一化之后落到卡上
   backfillWebDocCardHrefs(clone, extractNextFlightCardHrefs(html))
   rewriteRelativeUrls(clone, pageUrl)
@@ -1236,7 +1236,7 @@ export function buildWebDocReaderDocument(
   const baselineCss = buildWebDocBaselineCss(theme)
   const cardGridCss = buildWebDocCardGridCss(theme)
   const mathCss = buildWebDocMathCss()
-  const embedCss = buildWebDocEmbedCss()
+  const embedCss = buildWebDocEmbedCss(theme)
   const playgroundCss = buildWebDocPlaygroundCss(theme)
   const safeTitle = DOMPurify.sanitize(content.title)
   // Query cache/HMR 可能让旧版 bodyHtml 在一次会话内继续存在；在最终生成
