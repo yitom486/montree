@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.18] - 2026-10-20
+
 - **工作区终端**：新增供用户操作的多标签 Shell 终端，支持输入、粘贴、Git、尺寸调整与 WSL 工作区，隐藏保留进程、关闭释放资源。
 - **Agent 原生工具指引**：工作区文件创建、Shell 和 Git 优先使用 Agent 原生工具；区分 Code mode 局部目录和顶层工具列表，避免误报缺少文件/终端能力。保留当前编辑器未保存内容的文档工具路径。
 - **OpenCode 闲置后的工具恢复**：原连接恢复仍无法重新发现工具时，自动冷启动一次并恢复同一会话；确认 MCP 工具重新连接后才发送消息，保留取消控制，禁止回退新会话或重复发送。
@@ -563,7 +567,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.17...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.18...HEAD
+[0.4.18]: https://github.com/yitom486/montree/compare/v0.4.17...v0.4.18
 [0.4.17]: https://github.com/yitom486/montree/compare/v0.4.16...v0.4.17
 [0.4.16]: https://github.com/yitom486/montree/compare/v0.4.15...v0.4.16
 [0.4.15]: https://github.com/yitom486/montree/compare/v0.4.14...v0.4.15
