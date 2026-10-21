@@ -75,6 +75,7 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await expect(content).toContainText('• 外链：')
     await expect(content).not.toContainText('[ref1]:')
     await expect(editor.getByRole('button', { name: '编辑引用定义' }).first()).toBeVisible()
+    await reveal(editor.locator('.cm-live-h2').first())
     expect(await editor.locator('.cm-live-h2').first().evaluate((node) => getComputedStyle(node).textDecorationLine)).toBe('none')
     await editor.getByRole('button', { name: '编辑引用定义' }).first().click()
     await expect(content).toContainText('[ref1]: https://example.com/report.pdf')
@@ -132,6 +133,8 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     expect(Math.abs(await editor.locator('.cm-scroller').evaluate((node) => node.scrollTop) - scrollBeforeTheme)).toBeLessThan(80)
     await page.screenshot({ path: testInfo.outputPath('live-preview-dark.png') })
     await reveal(editor.locator('.cm-live-h2').first())
+    // 链接与二级标题不一定同屏（CodeMirror 只渲染视口内行）：单独滚到链接
+    await reveal(editor.locator('.cm-live-link').first())
     const colors = await editor.locator('.cm-live-link').first().evaluate((node) => {
       const style = getComputedStyle(node)
       const rootStyle = getComputedStyle(document.documentElement)
@@ -147,6 +150,7 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
       return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
     }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
     expect((luminance(colors.link) + 0.05) / (luminance(colors.background) + 0.05)).toBeGreaterThan(4.5)
+    await reveal(editor.locator('.cm-live-h2').first())
     expect(await editor.locator('.cm-live-h2').first().evaluate((node) => getComputedStyle(node).textDecorationLine)).toBe('none')
     await page.screenshot({ path: testInfo.outputPath('live-preview-links-dark.png') })
     const note = editor.locator('.markdown-alert-note')

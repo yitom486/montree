@@ -167,7 +167,15 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
       await page.mouse.move(a.x + 1, a.y + a.height / 2)
       await page.mouse.down()
       await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2 + 2, { steps: 5 })
-      await page.mouse.move(b.x + b.width - 1, b.y + b.height / 2, { steps: 5 })
+      // 落点取末词最后一个字符的右缘（span 宽度延伸到下个词，不能直接用 span 右缘）
+      const endX = await to.evaluate((node) => {
+        const text = node.firstChild as Text
+        const word = (text.textContent ?? '').trimEnd()
+        const range = node.ownerDocument.createRange()
+        range.setStart(text, Math.max(0, word.length - 1)); range.setEnd(text, word.length)
+        return range.getBoundingClientRect().right
+      })
+      await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
       await page.mouse.up()
       // 回归：OCR 逐词 span 之间必须有空格，选区/摘录不能粘成一串
       expect(await page.evaluate(() => getSelection()?.toString().trim())).toMatch(new RegExp(`^${first} .* ${last}$`))

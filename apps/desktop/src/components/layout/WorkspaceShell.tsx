@@ -275,7 +275,7 @@ export function WorkspaceShell({
 
           {isSidebarVisible ? <ResizableHandle withHandle /> : null}
 
-          <ResizablePanel id="main" defaultSize="57%" minSize="30%" className="min-w-0">
+          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
             <ResizablePanelGroup orientation="vertical">
               <ResizablePanel id="document" defaultSize="70%" minSize="20%">
                 {/* 文档区隔离：内容（工具栏、滚动条、异步渲染）的尺寸变化不外溢到外壳布局 */}

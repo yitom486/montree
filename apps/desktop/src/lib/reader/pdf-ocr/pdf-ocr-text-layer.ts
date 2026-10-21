@@ -25,7 +25,7 @@ export function mountOcrTextLayer(
     span.style.position = 'absolute'
     span.style.left = `${word.bbox.x0 * viewport.width}px`
     span.style.top = `${word.bbox.y0 * viewport.height}px`
-    span.style.width = `${(item.width / cache.pageWidth) * viewport.width}px`
+    span.dataset.targetWidth = String((item.width / cache.pageWidth) * viewport.width)
     span.style.height = `${(word.bbox.y1 - word.bbox.y0) * viewport.height}px`
     span.style.fontSize = `${Math.max(8, (word.bbox.y1 - word.bbox.y0) * viewport.height * 0.85)}px`
     span.style.lineHeight = '1'
@@ -36,5 +36,15 @@ export function mountOcrTextLayer(
   })
 
   host.replaceChildren(layer)
+  // 与 pdf.js 文字层一致：按自然字宽横向缩放到 OCR 框宽，透明字形与原图逐词对齐，
+  // 划选能落到词尾字符上（固定 width 时字形会溢出或缩在框内，末字符选不中）。
+  const spans = Array.from(layer.children) as HTMLElement[]
+  const natural = spans.map((span) => span.getBoundingClientRect().width)
+  spans.forEach((span, index) => {
+    const target = Number(span.dataset.targetWidth)
+    const width = natural[index]
+    if (width > 0 && target > 0) span.style.transform = `scaleX(${target / width})`
+    delete span.dataset.targetWidth
+  })
   return registerPdfPageTextGeometry(pageRoot, viewport, textContent)
 }
