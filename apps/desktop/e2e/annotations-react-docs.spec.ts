@@ -79,6 +79,14 @@ async function agentProposeNote(page: Page, excerpt: string, note: string) {
   await expect(chat.getByRole('button', { name: '采用并保存', exact: true })).toHaveCount(0, { timeout: 15_000 })
   expect(await failure.allTextContents()).toEqual([])
 }
+/** 三击选段，直到选区工具栏出现（iframe 刚载入时选区监听可能尚未绑定，首次三击会丢） */
+async function tripleSelect(page: Page, target: Locator) {
+  const toolbar = page.getByRole('toolbar', { name: '选区操作' })
+  await expect(async () => {
+    await target.click({ clickCount: 3 })
+    await expect(toolbar).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+}
 async function smartCard(page: Page) {
   const toolbar = page.getByRole('toolbar', { name: '选区操作' })
   await expect(toolbar).toBeVisible()
@@ -104,13 +112,13 @@ test('React 在线文档：划重点 / 批注 / 智能制卡，重载后持久�
     const intro = frame.getByText(/React is a JavaScript library for rendering user interfaces/).first()
     await expect(intro).toBeVisible({ timeout: 20_000 })
 
-    await intro.click({ clickCount: 3 })
+    await tripleSelect(page, intro)
     await highlight(page, intro)
     const second = frame.getByText(/React applications are built from isolated pieces of UI/).first()
-    await second.click({ clickCount: 3 })
+    await tripleSelect(page, second)
     await annotate(page, 'React 组件即函数')
     const third = frame.getByText(/Each React component is a JavaScript function that may contain/).first()
-    await third.click({ clickCount: 3 })
+    await tripleSelect(page, third)
     await smartCard(page)
     await expect(frame.locator('[data-mark-id]').first()).toBeVisible()
     await agentProposeNote(page, 'You can declare many components in one file', 'AI 笔记：一个文件可声明多个组件')
