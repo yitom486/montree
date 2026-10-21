@@ -31,6 +31,7 @@ Agent 工作区文件、Shell 和 Git 使用运行时的原生工具，Montree M
 | Code mode | `code-mode-support.ts`（+ `.test.ts`） | 解析 `initialize.agentCapabilities._meta.toolsMode.values`，仅显式 `ptc` 才算支持；`openSessionAfterAuth` 按请求把 `toolsMode` 合并进 `sessionMeta`，`acp-state` 记录能力并由连接结果回带渲染；`acp-connection.test.ts` 覆盖声明/仅 native 两条路径 |
 | 原生规则 | `native-binding.ts`（+ `native-binding.test.ts`） | 用户 `~/.montree/AGENTS.md` 为运行入口；`agent-resources.ts`（+ `.test.ts`）在应用启动与连接时从随包模板补齐缺失规则/Skills，不覆盖用户文件；配置准备、原生 Skills 绑定与精确版本门全部委托 SDK。支持会话扩展的运行时优先按会话下发，新建/恢复/加载与批注副会话均回显自身送达结果；拒绝扩展只移除扩展并保留 MCP，未知版本继续兼容。目录副会话不携带完整宿主规则。温进程按资源与有效配置摘要匹配；自定义供应商 TOML 合并辅助保留，复杂结构不覆盖 |
 | 回调 | `client-handlers.ts` 留守（含 `registerAcpClientHandlers`，SDK `onRequest`/`onNotification` 原生签名） | Agent → 客户端：权限（无桥接直接 cancelled，禁静默 allow）、fs、终端等；错误抛 `RequestError` |
+| 终端审批 | `terminal-approval.ts` / `terminal-approval.test.ts` | `terminal/create` 先弹审批卡（允许一次/信任此工作区/拒绝）；信任文件每次重读；决定写 JSONL 审计日志 |
 | IO | `acp-fs.ts` / `acp-terminal.ts` 留守；终端输出缓冲已迁 `@yitom/acp-client` | 虚拟/真实读文件、终端（虚拟文件定义见 `@yitom/contracts`：`node_modules/@yitom/contracts/dist/agent/montree-virtual-fs.js`，快照类型同目录 `node_modules/@yitom/contracts/dist/agent/montree-snapshot.js`） |
 | MCP | `mcp/stdio-server.ts` + `mcp/session-config.ts` + `mcp/diagnostics.ts`（HTTP 留守诊断兼容）；工具表与 RPC 已迁 `@yitom/acp-client` | 主进程每窗口常驻命名管道/Unix socket；Agent 启动 stdio 子进程入口（源文件 `../../mcp-stdio.ts`），经 stdio 注册工具；断开 ACP 保留服务，关闭窗口/应用销毁；独立令牌与固定快照归属 |
 | 专篇 | `parameterized-model-picker.md` | cursor 参数化模型选择：两态、握手标记、Invalid params 根因与渲染三层设计 |

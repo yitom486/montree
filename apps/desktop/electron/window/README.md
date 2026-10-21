@@ -6,6 +6,7 @@
 |------|------|
 | `create-window.ts` | 创建 `BrowserWindow`、preload、图标、会话登记；`before-input` 全局快捷键 |
 | `artifact-navigation-guard.ts` / `artifact-navigation-guard.test.ts` | Artifact 预览子 frame 导航守卫：`frame-created` 登记不可变 `frameTreeNodeId`，`will-frame-navigate` 按身份阻止自导航（改名不解除）；阅读器帧不受影响 |
+| `navigation-policy.ts` / `navigation-policy.test.ts` | 主框架导航与 `window.open` 白名单：仅应用入口页、开发服务器、devtools 放行；http(s)/mailto 交系统浏览器；其余拦截并记日志 |
 | `window-shortcuts.ts` / `window-shortcuts.test.ts` | 原生快捷键映射：新建窗口、设置、打开/保存、搜索；网页 iframe 获得焦点时仍可用 |
 | `app-menu.ts` | Application Menu（`editMenu` 等），保证 Ctrl+C/V 在隐藏菜单栏时仍可用 |
 | `window-session.ts` | 按 `webContents` 登记窗口会话（dirty、允许关闭、稳定聊天存储分区等） |
