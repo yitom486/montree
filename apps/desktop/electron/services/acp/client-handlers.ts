@@ -8,11 +8,14 @@ import {
 import { methods, RequestError, type ClientApp, type RequestPermissionRequest, type SessionNotification } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from './acp-terminal'
+import type { TerminalApprovalPolicy } from './terminal-approval'
 import { bindAcpContext } from './acp-context'
 
 export interface AcpClientHandlerDeps {
   getWorkspaceRoot: () => string | null
   terminals: AcpTerminalManager
+  /** terminal/create 审批（未信任工作区先走审批卡；缺省时拒绝执行，绝不静默放行） */
+  terminalApproval?: TerminalApprovalPolicy
   /** 读取 Montree 虚拟文件：向渲染进程要内存快照，不碰磁盘 */
   readSnapshot: (resource: MontreeVirtualResource) => Promise<string>
   /**
@@ -143,6 +146,20 @@ export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandler
     const command = ctx.params.command
     if (!workspaceRoot || !sessionId || !command) {
       throw toInvalidParams('terminal/create 需要 sessionId、command 与已连接工作区')
+    }
+    if (!deps.terminalApproval) {
+      throw new RequestError(-32000, '终端审批不可用，已拒绝执行命令')
+    }
+    const args = ctx.params.args ?? undefined
+    const cwd = ctx.params.cwd ?? undefined
+    let approval: Awaited<ReturnType<TerminalApprovalPolicy['authorize']>>
+    try {
+      approval = await deps.terminalApproval.authorize({ sessionId, command, args, cwd, workspaceRoot })
+    } catch (error) {
+      throw toServerError(error, '终端审批失败')
+    }
+    if (!approval.allowed) {
+      throw new RequestError(-32000, approval.decision === 'cancelled' ? '用户未确认，命令未执行' : '用户拒绝执行该命令')
     }
     try {
       return deps.terminals.create({

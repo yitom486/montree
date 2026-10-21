@@ -32,11 +32,13 @@ function testDeps(
       params: Record<string, unknown>
     }) => Promise<AcpPermissionOutcome>
     onSessionUpdate: (params: Record<string, unknown>) => void
+    terminalApproval: any
   }> = {},
 ) {
   return {
     getWorkspaceRoot: () => overrides.workspaceRoot ?? null,
     terminals: new AcpTerminalManager(),
+    terminalApproval: overrides.terminalApproval,
     readSnapshot:
       overrides.readSnapshot ??
       (async () => {
@@ -291,7 +293,8 @@ describe('SDK terminal guard', () => {
   })
 
   it('terminal/create cwd 越界由 manager 拦截（映射 -32000，不断言静默放行）', async () => {
-    const { agentConn } = setupPeer(testDeps({ workspaceRoot: process.cwd() }))
+    const allow = { authorize: async () => ({ allowed: true, decision: 'trusted' }) }
+    const { agentConn } = setupPeer(testDeps({ workspaceRoot: process.cwd(), terminalApproval: allow }))
 
     const error = await agentConn.client
       .request(methods.client.terminal.create, {
@@ -307,6 +310,21 @@ describe('SDK terminal guard', () => {
     expect(error).toBeInstanceOf(RequestError)
     expect(error?.code).toBe(-32000)
     expect(String(error?.message)).toMatch(/工作区/)
+  })
+})
+
+describe('SDK terminal 审批', () => {
+  it('无审批策略或用户拒绝时不执行命令', async () => {
+    for (const terminalApproval of [undefined, { authorize: async () => ({ allowed: false, decision: 'rejected' }) }]) {
+      const deps = testDeps({ workspaceRoot: process.cwd(), terminalApproval })
+      const spy = vi.spyOn(deps.terminals, 'create')
+      const { agentConn } = setupPeer(deps)
+      const error = await agentConn.client
+        .request(methods.client.terminal.create, { sessionId: 's1', command: 'echo' })
+        .then(() => null, (failure) => failure as RequestError)
+      expect(error?.code).toBe(-32000)
+      expect(spy).not.toHaveBeenCalled()
+    }
   })
 })
 

@@ -1,6 +1,8 @@
 import { initializeAgentResources, montreeAgentResourceDir } from './agent-resources'
 import { closeAcpSessions } from '@yitom/acp-client'
 import { app } from 'electron'
+import { join as joinPath } from 'node:path'
+import { TerminalApprovalPolicy } from './terminal-approval'
 import { bindAcpContext, currentAcpContext, type AcpContext } from './acp-context'
 import {
   APP_TITLE,
@@ -645,6 +647,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
         registerAcpClientHandlers(sdk, {
           getWorkspaceRoot: () => acpState.workspaceRoot,
           terminals: acpState.terminalManager,
+          terminalApproval: getTerminalApprovalPolicy((permSessionId, params) => handlePermissionRequest(permSessionId, params)),
           readSnapshot: handleSnapshotRequest,
           onPermission: ({ sessionId: permSessionId, params }) =>
             handlePermissionRequest(permSessionId, params),
@@ -974,4 +977,16 @@ async function disconnectAcpNow(
   acpState.connectionBinding = null
   if (!opts?.preserveStatus) setStatus('disconnected', reason)
   return ok(undefined)
+}
+
+/** 每个连接一份（审批卡回到发起命令的窗口）；信任清单落盘共享 */
+function getTerminalApprovalPolicy(
+  requester: (sessionId: string | undefined, params: import('@agentclientprotocol/sdk').RequestPermissionRequest) => Promise<import('@yitom/contracts').AcpPermissionOutcome>,
+): TerminalApprovalPolicy {
+  const dir = app.getPath('userData')
+  return new TerminalApprovalPolicy({
+    trustFile: joinPath(dir, 'agent-terminal-trust.json'),
+    auditFile: joinPath(dir, 'logs', 'agent-terminal-audit.jsonl'),
+    requestPermission: requester,
+  })
 }

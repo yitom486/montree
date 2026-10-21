@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+- **聊天链接安全打开**：升级 `@yitom/*` 到 0.1.26（修复 `ChatMarkdown` 覆盖外层 `onLinkClick`）。Agent 聊天里的 http(s)/mailto 链接交系统浏览器打开，`file:`、自定义协议等一律拦截；主窗口 `will-navigate` 与 `window.open` 统一走白名单策略（仅应用入口页、开发服务器与 devtools），被拦截的目标记日志。新增 E2E。
+
+- **Agent 终端命令需审批**：Agent 请求 `terminal/create` 时先弹审批卡（允许一次 / 信任此工作区 / 拒绝），拒绝或未确认则不启动进程；信任的工作区记在 `agent-terminal-trust.json`，每次决定写入 `logs/agent-terminal-audit.jsonl`。新增单测与 E2E。
+
 - **Agent 批注提议：采用时保存卡片里的改稿**：升级 `@yitom/*` 到 0.1.25，聊天气泡内提议卡经 `onAdoptMarkProposal` 把用户编辑后的批注交给宿主写库；写库成功才标记已采用，失败保持待确认并提示原因。移除此前只能保存 AI 原稿的宿主侧兜底。E2E 增加“改稿后采用、重载后为改后文本”断言。
 
 - **E2E 稳定性**：React 在线文档标注用例三击选段改为重试至选区工具栏出现（iframe 刚载入时首次三击可能丢失）。
