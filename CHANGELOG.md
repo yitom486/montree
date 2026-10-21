@@ -6,10 +6,11 @@
 
 ## [未发布]
 
+- **聊天包升级 @yitom/* 0.1.23**：流式结束保留已显示正文块（脚注不再触发整篇重挂载）；上滑看历史时发送不抢滚动。恢复对应两条 E2E。
+
 - **Agent 退出不再卡死应用**：Agent 进程退出途中仍有写入时，stdin 的 `EPIPE` 曾成为主进程未捕获异常，弹出阻塞错误框并冻结整个应用；现统一监听 Agent stdio 错误，断开原因并入连接错误提示，面板回到可重连状态。
 
 - **CI 恢复与发版闸门**：修复 Agent 聊天 E2E 一直红的根因——测试仍往旧键 `montree-acp-ui` 播种，而聊天单权威迁移后应用读 `montree-acp-metadata/v2` + `montree-chat-session/v1`，种子被忽略、面板退回默认运行时；新增共享播种 helper。Release 工作流改为先完整复用 CI（含 E2E），CI 红则不打包、不发布。
-- **E2E 隔离**：`agent-streamdown` 中「完成态首段 DOM 保持」「上滑后新回合不抢滚动」两条暂标 `fixme`——它们暴露的是 `@yitom/chat-ui` 0.1.22 列表行为回归，待包内修复后恢复。
 - **Release 产物清理**：上传清单只收 `latest*.yml`，`builder-debug.yml` 不再进入 GitHub Release。
 
 ---

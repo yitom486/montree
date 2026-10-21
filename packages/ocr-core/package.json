@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@yitom/contracts": "0.1.22"
+    "@yitom/contracts": "0.1.23"
   },
   "exports": {
     ".": "./src/index.ts",

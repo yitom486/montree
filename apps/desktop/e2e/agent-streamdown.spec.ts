@@ -94,10 +94,7 @@ test.describe('Streamdown 正文 S1', () => {
     } finally { await app.close() }
   })
 
-  // 暂时隔离（2026-10-21）：播种修好后这条才真正跑到断言，暴露的是 @yitom/chat-ui 0.1.22
-  // ChatMessageList 的行为回归，需在 chat-ui 包里修复并发布后再恢复 test(...)。
-  // 回归点：完成态落定时首段 <p> 被重挂载（firstParagraph.isConnected === false）
-  test.fixme('流式中间态与完成态：表格/代码/公式/Mermaid/链接/复制', async ({}, info) => {
+  test('流式中间态与完成态：表格/代码/公式/Mermaid/链接/复制', async ({}, info) => {
     mkdirSync(info.outputDir, { recursive: true })
     const streamGate = info.outputPath('stream-continue')
     const app = await launchBuiltApp({
@@ -262,10 +259,7 @@ test.describe('Streamdown 正文 S1', () => {
     }
   })
 
-  // 暂时隔离（2026-10-21）：播种修好后这条才真正跑到断言，暴露的是 @yitom/chat-ui 0.1.22
-  // ChatMessageList 的行为回归，需在 chat-ui 包里修复并发布后再恢复 test(...)。
-  // 回归点：上滑离底后再次发送，列表仍被拉回底部（「回到底部」按钮消失）
-  test.fixme('新回合跟随：贴底跟随新流，上滑后不抢，按钮可回到底部', async ({}, info) => {
+  test('新回合跟随：贴底跟随新流，上滑后不抢，按钮可回到底部', async ({}, info) => {
     const app = await launchBuiltApp({
       E2E_ACP_WINDOW_TEST: '1',
       E2E_ACP_COMMAND: process.execPath,
