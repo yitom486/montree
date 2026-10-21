@@ -40,6 +40,18 @@ files:
   - node_modules/@yitom/acp-client/**/*
   - node_modules/@agentclientprotocol/sdk/**/*
   - node_modules/zod/**/*
+  # 行内补全：Vercel AI SDK（主进程 external）及其运行时依赖闭包
+  - node_modules/ai/**/*
+  - node_modules/@ai-sdk/gateway/**/*
+  - node_modules/@ai-sdk/provider/**/*
+  - node_modules/@ai-sdk/provider-utils/**/*
+  - node_modules/@ai-sdk/openai-compatible/**/*
+  - node_modules/json-schema/**/*
+  - node_modules/@standard-schema/spec/**/*
+  - node_modules/@workflow/serde/**/*
+  - node_modules/eventsource-parser/**/*
+  - node_modules/undici/**/*
+  - node_modules/@vercel/oidc/**/*
   # 聊天/阅读器 npm 包中主进程实际 import 的运行时依赖（renderer 侧由 vite 打进包，无需收录）
   - node_modules/@yitom/annotations/**/*
   - node_modules/@yitom/reader-core/**/*
