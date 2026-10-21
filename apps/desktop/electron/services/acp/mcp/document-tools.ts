@@ -60,8 +60,7 @@ export async function callDocumentTool(name: string, context: ReaderVisualToolCo
   const resources: Record<string, MontreeSnapshotResource> = { montree_table_read: 'table-read', montree_table_edit: 'table-edit', montree_ppt_read: 'slide-read', montree_ppt_edit: 'slide-edit', montree_ppt_edit_text: 'slide-edit', montree_ppt_delete: 'slide-edit', montree_ppt_chart_edit: 'slide-edit', montree_ppt_design_edit: 'slide-edit', montree_ppt_animation_edit: 'slide-edit', montree_document_save: 'document-save', montree_document_undo: 'document-undo' }
   resources.montree_text_read = 'text-read'
   resources.montree_text_edit = 'text-edit'
-  // 'text-propose' 尚未进入已发布的 @yitom/contracts 联合类型；IPC 按字符串透传。
-  resources.montree_text_propose = 'text-propose' as MontreeSnapshotResource
+  resources.montree_text_propose = 'text-propose'
   resources.montree_present = 'present'
   const resource = resources[name]
   if (!resource) throw new Error('未知文档工具')

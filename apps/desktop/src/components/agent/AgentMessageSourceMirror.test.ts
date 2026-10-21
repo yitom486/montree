@@ -3,7 +3,6 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { DockedAgentPane } from './DockedAgentPane'
 import { FloatingAIHud } from './FloatingAIHud'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
@@ -58,15 +57,6 @@ describe('挂载面统一读源接线', () => {
     })
     container.remove()
     queryClient.clear()
-  })
-
-  it('停靠面不再覆盖统一读源', async () => {
-    await act(async () => {
-      root.render(createElement(DockedAgentPane, { workspaceRoot: '/workspace' }))
-    })
-    const panel = container.querySelector('[data-testid="mock-agent-panel"]')
-    expect(panel).not.toBeNull()
-    expect(panel?.getAttribute('data-message-source')).toBe('unified')
   })
 
   it('悬浮面不再覆盖统一读源', async () => {

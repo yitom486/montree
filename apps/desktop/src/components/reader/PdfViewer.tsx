@@ -8,8 +8,6 @@ import { PdfPageView } from '@/components/reader/PdfPageView'
 import { ReaderContentShell } from '@/components/reader/ReaderContentShell'
 import { ReaderFooterNav } from '@/components/reader/ReaderFooterNav'
 import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
-import { useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
-import { DockedAgentPane } from '@/components/agent/DockedAgentPane'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
 import { DeepAnswerDialog } from '@/components/reader/DeepAnswerDialog'
@@ -53,7 +51,6 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
-  const dockedAgentVisible = useIsDockedAgentVisible()
   const containerRef = useRef<HTMLDivElement>(null)
   const pageAnchorRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
@@ -621,9 +618,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
             </PaneErrorBoundary>
           </div>
         </ReaderContentShell>
-        {dockedAgentVisible ? (
-          <DockedAgentPane workspaceRoot={workspaceRoot} />
-        ) : null}
       </div>
 
       <EpubMarkTooltip key={filePath} disabled={Boolean(inspector.active)} mark={hoveredMark} x={markTooltipPos?.x ?? 0} y={markTooltipPos?.y ?? 0} />

@@ -167,23 +167,39 @@ export function tableCellRange(block: PreviewBlock, row: number, column: number)
   return cell ? { from: block.from + cell.from, to: block.from + cell.to } : undefined
 }
 
+/**
+ * 已渲染块的高度缓存（按 kind + 源码）：重建 widget 时以 estimatedHeight 预留高度，
+ * 异步内容（Mermaid、图片、公式）出图前编辑器布局不塌陷、不跳动。
+ */
+const blockHeights = new Map<string, number>()
+const HEIGHT_CACHE_LIMIT = 256
+function heightKey(block: PreviewBlock): string { return `${block.kind}\u0000${block.source}` }
+
 class PreviewBlockWidget extends WidgetType {
   private root?: Root
   private observer?: ResizeObserver
   private alive = true
 
   constructor(readonly block: PreviewBlock, readonly filePath: string | undefined) { super() }
+  // 与位置无关：上方输入只平移块，不应销毁重建（重建会重新异步渲染 Mermaid 并跳高度）。
+  // 点击编辑时用 posAtDOM 取当前位置。
   eq(other: PreviewBlockWidget): boolean {
-    return this.block.from === other.block.from && this.block.to === other.block.to && this.block.source === other.block.source && this.block.referenceKey === other.block.referenceKey && this.block.renderedHtml === other.block.renderedHtml && this.filePath === other.filePath
+    return this.block.kind === other.block.kind && this.block.source === other.block.source && this.block.referenceKey === other.block.referenceKey && this.block.renderedHtml === other.block.renderedHtml && this.filePath === other.filePath
   }
+  get estimatedHeight(): number { return blockHeights.get(heightKey(this.block)) ?? -1 }
   toDOM(view: EditorView): HTMLElement {
     this.alive = true
     const dom = document.createElement('div')
     dom.className = 'cm-live-block markdown-preview'
     dom.dataset.previewKind = this.block.kind
     dom.contentEditable = 'false'
-    const edit = (range = { from: this.block.from, to: this.block.from }) => {
+    const reserved = blockHeights.get(heightKey(this.block))
+    if (reserved) dom.style.minHeight = `${reserved}px`
+    const currentFrom = () => { try { return view.posAtDOM(dom) } catch { return this.block.from } }
+    const edit = (relative?: { from: number; to: number }) => {
       if (!this.alive) return
+      const base = currentFrom()
+      const range = relative ? { from: base + relative.from - this.block.from, to: base + relative.to - this.block.from } : { from: base, to: base }
       view.dispatch({ selection: { anchor: range.from, head: range.to }, effects: EditorView.scrollIntoView(range.from, { y: 'nearest' }) })
       view.focus()
     }
@@ -200,7 +216,18 @@ class PreviewBlockWidget extends WidgetType {
       onEdit: () => edit(),
       onCell: (row, column) => edit(tableCellRange(this.block, row, column)),
     }))
-    this.observer = new ResizeObserver(() => { if (this.alive) view.requestMeasure() })
+    const key = heightKey(this.block)
+    this.observer = new ResizeObserver(() => {
+      if (!this.alive) return
+      const height = dom.getBoundingClientRect().height
+      // 内容出图后释放预留，记录真实高度供下次重建
+      if (height > 0 && dom.firstElementChild && !dom.querySelector('.animate-spin')) {
+        dom.style.minHeight = ''
+        blockHeights.delete(key); blockHeights.set(key, dom.getBoundingClientRect().height)
+        while (blockHeights.size > HEIGHT_CACHE_LIMIT) blockHeights.delete(blockHeights.keys().next().value as string)
+      }
+      view.requestMeasure()
+    })
     this.observer.observe(dom)
     return dom
   }

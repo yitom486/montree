@@ -184,9 +184,7 @@ export async function resolveMontreeSnapshot(
   resource: MontreeSnapshotResource,
   args?: MontreeSnapshotArgs,
 ): Promise<string> {
-  // 'text-propose' 为桌面端扩展资源，待 @yitom/contracts 下次发布时并入联合类型。
-  const key = resource as MontreeSnapshotResource | 'text-propose'
-  switch (key) {
+  switch (resource) {
     case 'document-save':
     case 'document-undo': {
       const provider = getDocumentTools()
@@ -318,7 +316,7 @@ export async function resolveMontreeSnapshot(
       return JSON.stringify(applyTocDraftWrite(args), null, 2)
     }
     default: {
-      const _exhaustive: never = key
+      const _exhaustive: never = resource
       throw new Error(`未知的快照资源: ${String(_exhaustive)}`)
     }
   }

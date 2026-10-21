@@ -11,7 +11,6 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 | 文件 | 功能 |
 |------|------|
 | `AgentPanel` | 右侧 Agent 主面板（壳 + 接线；配置项分类纯逻辑已出库 `lib/agent/acp-config-menu`，模型尾缀思考档只读徽标见 `lib/agent/acp-model-thinking`，fast 类 boolean 在输入栏给可见开关（`findFastToggle` 单列，不进 secondary），其余 boolean 仍在 secondary；运行时切换器全量读 `BUILTIN_ACP_RUNTIMES`，下游 8 项落地后零改动展示，非 codex 走中性认证提示；生成式 UI 提交经 `handleGenerativeSubmit` 做线程归属校验后沿 `sendPrompt` 回到同一会话；消息列表统一通过 `useAcpActiveMessages` 读取包权威 feed） |
-| `DockedAgentPane` | 阅读器内停靠态面板壳（左侧拉伸分隔线，宽持久化，三端 viewer 共用；与悬浮窗、WorkspaceShell 共用单一包权威消息读源） |
 | `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换）；仅当 Agent 在 initialize 声明 `_meta.toolsMode.values` 含 `ptc` 时显示「Code mode（PTC）」复选，按线程保存，只对下一次新建/恢复会话生效 |
 | `FloatingAIHud` | 悬浮 AI 伴读浮窗与微型药丸胶囊（支持 docked / floating / capsule 三态切换、四大 Tab 与自由拖拽） |
 | `CompactConfigMenu` | 输入栏旁的紧凑配置下拉（primary 配置项） |

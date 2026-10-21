@@ -1,3 +1,4 @@
+import { useRenderProbe } from '@/lib/perf/render-probe'
 import { subscribeAgentPrompts } from '@/lib/agent/agent-prompt-bus'
 import {
   ChevronDown,
@@ -86,6 +87,7 @@ export const AgentPanel = memo(function AgentPanel({
   onMinimizeToCapsule,
   className,
 }: AgentPanelProps) {
+  useRenderProbe(floating ? 'agent-panel-floating' : 'agent-panel')
   const view = useAcpChatShell()
   const setSelectedRuntimeId = useAcpUiStore((s) => s.setSelectedRuntimeId)
   const setPanelOpen = useAcpUiStore((s) => s.setPanelOpen)

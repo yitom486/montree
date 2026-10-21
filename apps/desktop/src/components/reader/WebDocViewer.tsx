@@ -14,8 +14,6 @@ import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
 import { ReaderContentShell } from '@/components/reader/ReaderContentShell'
 import { ReaderFooterNav } from '@/components/reader/ReaderFooterNav'
 import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
-import { useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
-import { DockedAgentPane } from '@/components/agent/DockedAgentPane'
 import { ReaderTypographyControls } from '@/components/reader/ReaderTypographyControls'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
@@ -55,7 +53,6 @@ interface WebDocViewerProps {
 
 export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
   function WebDocViewer({ pageUrl, theme, onOutlineChange, workspaceRoot }, ref) {
-    const dockedAgentVisible = useIsDockedAgentVisible()
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const queryClient = useQueryClient()
 
@@ -348,7 +345,6 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           >
             {readerHost}
           </ReaderContentShell>
-          {dockedAgentVisible ? <DockedAgentPane workspaceRoot={workspaceRoot} /> : null}
         </div>
 
         <EpubMarkTooltip key={pageUrl} disabled={Boolean(inspector.active)} mark={hoveredMark} x={markTooltipPos?.x ?? 0} y={markTooltipPos?.y ?? 0} />

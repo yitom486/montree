@@ -64,11 +64,6 @@ export interface WorkspaceShellProps {
   onNewWindow: () => void
   onQuit: () => void
   children: ReactNode
-  /**
-   * 阅读器模式由各 viewer 在内框行自行挂载 docked 侧栏（工具栏之下、底导航之上），
-   * 外壳此时不再于主区右侧挂载，避免底导航被顶穿。编辑器等模式保持外壳挂载。
-   */
-  suppressDockedAgent?: boolean
 }
 
 /**
@@ -108,7 +103,6 @@ export function WorkspaceShell({
   onNewWindow,
   onQuit,
   children,
-  suppressDockedAgent = false,
   isDirty = false,
 }: WorkspaceShellProps) {
   const [internalRemoteModalOpen, setInternalRemoteModalOpen] = useState(false)
@@ -130,7 +124,8 @@ export function WorkspaceShell({
   const setWebDocExpanded = useEditorUiStore((state) => state.setWebDocExpanded)
   const agentPanelOpen = useAcpUiStore((state) => state.panelOpen)
   const dockedAgentVisible = useIsDockedAgentVisible()
-  const isDockedPanelVisible = dockedAgentVisible && !suppressDockedAgent
+  // 聊天面板始终挂在外壳（与文档类型无关）：切换 Markdown/PDF/在线文档时不迁移、不重挂载、不改宽
+  const isDockedPanelVisible = dockedAgentVisible
   const toggleAgentPanel = useAcpUiStore((state) => state.togglePanel)
   const isNotesDrawerOpen = useReaderHudUiStore((state) => state.isNotesDrawerOpen)
   const setIsNotesDrawerOpen = useReaderHudUiStore((state) => state.setIsNotesDrawerOpen)
@@ -280,9 +275,12 @@ export function WorkspaceShell({
 
           {isSidebarVisible ? <ResizableHandle withHandle /> : null}
 
-          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
+          <ResizablePanel id="main" defaultSize="57%" minSize="30%" className="min-w-0">
             <ResizablePanelGroup orientation="vertical">
-              <ResizablePanel id="document" defaultSize="70%" minSize="20%">{children}</ResizablePanel>
+              <ResizablePanel id="document" defaultSize="70%" minSize="20%">
+                {/* 文档区隔离：内容（工具栏、滚动条、异步渲染）的尺寸变化不外溢到外壳布局 */}
+                <div className="h-full w-full overflow-hidden" style={{ contain: 'strict' }} data-testid="workspace-document-frame">{children}</div>
+              </ResizablePanel>
               {terminalVisible && <ResizableHandle withHandle />}
               {terminalMounted && <ResizablePanel id="terminal" defaultSize="30%" minSize={terminalVisible ? '15%' : 0} maxSize={terminalVisible ? '75%' : 0} style={{ display: terminalVisible ? undefined : 'none' }}>
                 <Suspense fallback={<div className="p-2 text-xs">正在加载终端…</div>}><TerminalPanel visible={terminalVisible} workspaceRoot={workspaceRoot} onClose={() => setTerminalVisible(false)} /></Suspense>
@@ -302,7 +300,7 @@ export function WorkspaceShell({
             maxSize="45%"
             className="min-w-0"
           >
-            <AgentPanel workspaceRoot={workspaceRoot} />
+            <div className="h-full w-full" style={{ contain: 'strict' }} data-testid="workspace-agent-frame"><AgentPanel workspaceRoot={workspaceRoot} /></div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

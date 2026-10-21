@@ -10,7 +10,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { renderMermaidSvg } from '@/lib/preview/mermaid-hydrate'
+import { getCachedMermaidSvg, renderMermaidSvg } from '@/lib/preview/mermaid-hydrate'
 import { repairMermaidSource } from '@/lib/preview/mermaid-repair'
 import { cn } from '@/lib/utils'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
@@ -41,17 +41,21 @@ export function MermaidBlock({
   const theme = useEditorUiStore((s) => s.theme)
   const reactId = useId().replace(/:/g, '')
 
-  const [svgHtml, setSvgHtml] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const repairedSource = useMemo(() => repairMermaidSource(source), [source])
+  // 缓存命中时首帧即出图；源码变化时保留上一张图直到新图就绪（不回到加载态，避免高度塌陷再撑开）
+  const [svgHtml, setSvgHtml] = useState<string | null>(() => getCachedMermaidSvg(source, theme) ?? null)
+  const [isLoading, setIsLoading] = useState<boolean>(() => getCachedMermaidSvg(source, theme) === undefined)
   const [renderError, setRenderError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'diagram' | 'code'>('diagram')
   const [copied, setCopied] = useState(false)
 
-  const repairedSource = useMemo(() => repairMermaidSource(source), [source])
-
   useEffect(() => {
     let alive = true
-    setIsLoading(true)
+    const cached = getCachedMermaidSvg(repairedSource, theme)
+    if (cached !== undefined) {
+      setSvgHtml(cached); setIsLoading(false); setRenderError(null)
+      return () => { alive = false }
+    }
     setRenderError(null)
 
     renderMermaidSvg(repairedSource, theme)
@@ -211,7 +215,7 @@ export function MermaidBlock({
             </div>
           ) : svgHtml ? (
             <div
-              className="w-full flex items-center justify-center p-3 overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto transition-all animate-in fade-in duration-300"
+              className="w-full flex items-center justify-center p-3 overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto"
               dangerouslySetInnerHTML={{ __html: svgHtml }}
               data-testid="mermaid-block"
               data-mermaid-source={repairedSource}

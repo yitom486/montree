@@ -95,20 +95,51 @@ function cleanupMermaidTempDom(renderId: string): void {
  * 直接渲染 Mermaid 源码为 SVG 矢量文本字符串。
  * 供 React 组件（如 MermaidBlock）声明式挂载，避免 DOM 命令式水合竞态。
  */
-export async function renderMermaidSvg(rawSource: string, theme: AppTheme): Promise<string> {
+const SVG_CACHE_LIMIT = 64
+const svgCache = new Map<string, string>()
+const inflight = new Map<string, Promise<string>>()
+let renderQueue: Promise<unknown> = Promise.resolve()
+
+function cacheKey(source: string, theme: AppTheme): string { return `${theme}\u0000${source}` }
+
+/** 同步读取已渲染 SVG（源码 + 主题为键）。重挂载/切换预览时直接出图，不闪加载态、不跳高度。 */
+export function getCachedMermaidSvg(rawSource: string, theme: AppTheme): string | undefined {
   const source = repairMermaidSource(rawSource)
-  if (!source) return ''
-  const mermaid = await ensureMermaidConfig(theme)
-  const renderId = `montree-mmd-${++renderSeq}`
-  cleanupMermaidTempDom(renderId)
-  try {
-    const { svg } = await mermaid.render(renderId, source)
+  const svg = svgCache.get(cacheKey(source, theme))
+  if (svg !== undefined) { svgCache.delete(cacheKey(source, theme)); svgCache.set(cacheKey(source, theme), svg) }
+  return svg
+}
+
+/**
+ * 直接渲染 Mermaid 源码为 SVG 矢量文本字符串。
+ * 供 React 组件（如 MermaidBlock）声明式挂载，避免 DOM 命令式水合竞态。
+ * 结果按源码 + 主题缓存（LRU）；同键并发复用同一请求；mermaid.render 非可重入，串行执行。
+ */
+export function renderMermaidSvg(rawSource: string, theme: AppTheme): Promise<string> {
+  const source = repairMermaidSource(rawSource)
+  if (!source) return Promise.resolve('')
+  const key = cacheKey(source, theme)
+  const cached = svgCache.get(key)
+  if (cached !== undefined) return Promise.resolve(cached)
+  const pending = inflight.get(key)
+  if (pending) return pending
+  const task = renderQueue.catch(() => undefined).then(async () => {
+    const mermaid = await ensureMermaidConfig(theme)
+    const renderId = `montree-mmd-${++renderSeq}`
     cleanupMermaidTempDom(renderId)
-    return svg
-  } catch (error) {
-    cleanupMermaidTempDom(renderId)
-    throw error
-  }
+    try {
+      const { svg } = await mermaid.render(renderId, source)
+      svgCache.set(key, svg)
+      while (svgCache.size > SVG_CACHE_LIMIT) svgCache.delete(svgCache.keys().next().value as string)
+      return svg
+    } finally {
+      cleanupMermaidTempDom(renderId)
+    }
+  })
+  renderQueue = task
+  inflight.set(key, task)
+  void task.finally(() => inflight.delete(key)).catch(() => undefined)
+  return task
 }
 
 /**

@@ -14,6 +14,9 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 | 文件 | 说明 |
 |------|------|
+| `workspace-render-isolation.spec.ts` | md→PDF→在线文档→本地 md 切换与 Mermaid 渲染时，聊天面板零重渲染（渲染计数探针）、聊天/工作区外框零位移 |
+| `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
+| `ai-edit-review-tools.spec.ts` / `ai-edit-multiwindow.spec.ts` | 逐句审阅、审阅面板、选区工具栏、行内补全；修改建议多窗口隔离 |
 | `app-smoke.spec.ts` | 启动、欢迎页、菜单；真实 IPC 拒绝未绑定窗口凭 workspaceId 访问远端 |
 | `agent-community.spec.ts` | 社区滚动跟随/上滑逃离、历史窗口与位置恢复回归 |
 | `agent-panel.spec.ts` | Agent 面板壳；mock ACP 的 320/390/480 输入栏布局、选区复制/引用与输入框粘贴/剪切（剪贴板边界桩）；Code mode 开关经真实 IPC 透传 `_meta.toolsMode=ptc` 到下一次新会话 |

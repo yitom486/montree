@@ -11,8 +11,6 @@ import { AnnotationNoteDialog } from '@/components/reader/AnnotationNoteDialog'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
 import { DeepAnswerDialog } from '@/components/reader/DeepAnswerDialog'
-import { useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
-import { DockedAgentPane } from '@/components/agent/DockedAgentPane'
 import { PdfBookSearch } from '@/components/reader/PdfBookSearch'
 import { useReaderBinary } from '@/hooks/reader/useReaderBinary'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
@@ -54,7 +52,6 @@ export function FoliateReaderViewer({
   workspaceRoot,
 }: FoliateReaderViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const dockedAgentVisible = useIsDockedAgentVisible()
   const { tocOpen, marksOpen, toggleToc, toggleMarks, closeToc, closeMarks } = useReaderSidePanels()
   const nav = useReaderNavigationStore((state) => state.nav)
   const readerFontSize = useAppSettingsStore((state) => state.readerFontSize)
@@ -264,9 +261,6 @@ export function FoliateReaderViewer({
             </div>
           </PaneErrorBoundary>
         </ReaderContentShell>
-        {dockedAgentVisible ? (
-          <DockedAgentPane workspaceRoot={workspaceRoot} />
-        ) : null}
       </div>
 
       <EpubMarkTooltip key={filePath} disabled={Boolean(interactions.inspector.active)} mark={interactions.hoveredMark}

@@ -544,7 +544,6 @@ function App() {
         onNewWindow={() => appApi.newWindow()}
         onQuit={quitApp}
         isDirty={isDirty}
-        suppressDockedAgent={(isReader && !!readerDocumentKind) || (isWebDoc && !!webPageUrl)}
       >
         {isWebDoc && webPageUrl ? (
           <WebDocWorkspaceMain
