@@ -153,5 +153,34 @@ describe('resolveAcpExecution', () => {
       })
     }
   })
-})
 
+  it('Agent 退出后继续写 stdin 不产生未捕获 EPIPE，并把断开原因写进 stderr 尾部', async () => {
+    const runtime = {
+      id: `epipe-probe-${Date.now()}`,
+      name: 'EPIPE Probe',
+      description: 'closes stdin then exits',
+      command: process.execPath,
+      // 先关掉读端再拖一会儿退出：复现「进程正在退出、管道读端已关」时写入触发 EPIPE 的竞态
+      args: ['-e', "require('fs').closeSync(0); setTimeout(() => process.exit(0), 800)"],
+      requiredEnvKeys: [],
+    }
+    const uncaught: unknown[] = []
+    const onUncaught = (error: unknown) => { uncaught.push(error) }
+    process.on('uncaughtException', onUncaught)
+    let exited = false
+    const handle = spawnAcpProcess({ runtime, cwd: process.cwd(), onExit: () => { exited = true } })
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      // 模拟 SDK 桥接在 Agent 退出途中的迟到写入
+      for (let i = 0; i < 20; i += 1) handle.child.stdin.write('{"jsonrpc":"2.0","method":"late"}\n')
+      await vi.waitFor(() => expect(handle.stderrTail.join('\n')).toMatch(/stdin 已断开/), { timeout: 5_000 })
+      await vi.waitFor(() => expect(exited).toBe(true), { timeout: 10_000 })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(uncaught).toEqual([])
+      expect(getAcpEarlyExitStderrDetail(handle, Date.now())).toContain('stdin 已断开')
+    } finally {
+      process.off('uncaughtException', onUncaught)
+      handle.kill()
+    }
+  })
+})

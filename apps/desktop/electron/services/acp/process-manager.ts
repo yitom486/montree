@@ -182,6 +182,22 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
       stderrTail.splice(0, stderrTail.length - ACP_EARLY_EXIT_STDERR_TAIL_LINES)
     }
   }
+  // Agent 进程已退出后，SDK 桥接（PassThrough → child.stdin）仍可能写入，
+  // stdin 会异步抛 EPIPE / ERR_STREAM_DESTROYED。无监听时 Node 视为未捕获异常，
+  // Electron 主进程弹出阻塞式错误框并卡死整个应用。这里统一兜住：记诊断、
+  // 写入 stderr 尾部供连接层拼进可恢复错误，真正的退出由下面 'exit' → onExit 上报 UI。
+  let streamErrorReported = false
+  const onStdioError = (stream: 'stdin' | 'stdout' | 'stderr') => bindAcpContext((error: NodeJS.ErrnoException) => {
+    logAcpDiagnostic('agent.stdio_error', { runtime: options.runtime.id, stream, code: error?.code ?? 'unknown' })
+    if (!streamErrorReported) {
+      streamErrorReported = true
+      pushStderrTailLine(`[montree] Agent ${stream} 已断开（${error?.code ?? error?.message ?? 'error'}），进程可能已退出`)
+    }
+  })
+  child.stdin.on('error', onStdioError('stdin'))
+  child.stdout.on('error', onStdioError('stdout'))
+  child.stderr.on('error', onStdioError('stderr'))
+
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', bindAcpContext((chunk: string) => {
     stderrBuffer += chunk

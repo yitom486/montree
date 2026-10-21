@@ -615,7 +615,8 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
           acpState.status === 'connecting' ||
           acpState.status === 'awaiting_auth'
         ) {
-          void disconnectAcp('Agent 进程已退出')
+          // 带上 stderr 尾部（含 stdin 断开原因），UI 显示可恢复错误，用户可直接重连
+          void disconnectAcp(withAcpEarlyExitDetail('Agent 进程已退出', getAcpEarlyExitStderrDetail(acpState.processHandle, Date.now())))
         }
       },
     })
