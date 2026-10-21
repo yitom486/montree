@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ProposalReviewBar } from '@/components/editor/ai-proposals/ProposalReviewBar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, RefreshCw, Settings2, WrapText } from 'lucide-react'
 import { useGroupRef } from 'react-resizable-panels'
@@ -124,6 +125,7 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
       <Button size="sm" variant="outline" disabled={!session.session || remote || exporting || session.phase === 'error'} onClick={() => void exportHtml()}><Download aria-hidden="true" />{exporting ? '正在导出…' : '导出 HTML'}</Button>
     </div>
     {error && <div className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive" role="alert">{error}</div>}
+    <ProposalReviewBar document={textDocument} />
     <ResizablePanelGroup groupRef={groupRef} orientation="horizontal" className="min-h-0 flex-1" disabled={viewMode !== 'split'}>
       <ResizablePanel id="typst-source" defaultSize="50%" minSize="15%" collapsible collapsedSize={0} className="min-w-0" aria-hidden={viewMode === 'preview'} inert={viewMode === 'preview'}>
         <TypstEditor ref={editorRef} filePath={filePath} value={content} textDocument={textDocument}

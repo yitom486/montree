@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { getDocumentKind, isOk } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { TextDocument } from '@/lib/editor/text-document'
+import '@/lib/editor/ai-proposals/install'
 import { notifyDocumentTools, registerDocumentTools } from '@/lib/agent/context/document-tool-registry'
 import { registerSelectionProvider, commitDocumentSelection, getStickyReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { clearDraftForFile } from './useDraftPersistence'
@@ -48,7 +49,7 @@ export function useTextDocumentTools(options: {
     if (!model) return
     const filePath = model.filePath
     const disposeTools = registerDocumentTools({ filePath, kind: 'text', isDirty: model.isDirty,
-      save: model.save, undo: model.undo, read: model.read, edit: model.edit })
+      save: model.save, undo: model.undo, read: model.read, edit: model.edit, propose: model.propose })
     const disposeSelection = registerSelectionProvider({ filePath,
       getSelectionText: () => model.selection()?.ranges.map((range) => range.text).join('\n') ?? null,
       getSelectionTarget: model.selectionSnapshot })

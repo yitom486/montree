@@ -1,5 +1,6 @@
 import { LOCAL_WORKSPACE_ID } from '@yitom/contracts'
 import type { DocumentSelection, SlideViewContext } from '@yitom/contracts'
+import type { ProposalOrigin } from '@/lib/editor/ai-proposals/proposal-types'
 
 export interface DocumentToolProvider {
   filePath: string
@@ -10,7 +11,9 @@ export interface DocumentToolProvider {
   save: () => Promise<void>
   undo: () => void
   read: (args: Record<string, unknown>) => unknown
-  edit: (args: Record<string, unknown>) => unknown
+  edit: (args: Record<string, unknown>, origin?: ProposalOrigin) => unknown
+  /** 文本文档：创建待用户确认的修改建议（montree_text_propose）。 */
+  propose?: (args: Record<string, unknown>, origin?: ProposalOrigin) => unknown
   getSlideView?: () => SlideViewContext
 }
 

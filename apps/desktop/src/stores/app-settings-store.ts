@@ -107,6 +107,8 @@ export interface AppSettingsState {
   verboseRendererLogs: boolean
   /** Markdown 编辑器内部模式：沉浸式实时预览 / 纯源码 */
   markdownEditorMode: MarkdownEditorMode
+  /** AI 审阅模式：Agent 直接 montree_text_edit 也改为待确认的修改建议 */
+  aiEditReviewMode: boolean
 }
 
 interface AppSettingsStore extends AppSettingsState {
@@ -130,6 +132,7 @@ interface AppSettingsStore extends AppSettingsState {
   setPdfOcrAgentAutoOcr: (enabled: boolean) => void
   setPdfOcrScale: (scale: PdfOcrScale) => void
   setVerboseRendererLogs: (enabled: boolean) => void
+  setAiEditReviewMode: (enabled: boolean) => void
   setMarkdownEditorMode: (mode: MarkdownEditorMode) => void
   toggleMarkdownEditorMode: () => void
   addRecentFile: (filePath: string) => void
@@ -170,6 +173,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       pdfOcrAgentAutoOcr: true,
       pdfOcrScale: DEFAULT_PDF_OCR_SCALE,
       verboseRendererLogs: false,
+      aiEditReviewMode: false,
+      setAiEditReviewMode: (enabled) => set({ aiEditReviewMode: enabled }),
 
       setAutoSaveEnabled: (enabled) => set({ autoSaveEnabled: enabled }),
 
@@ -298,6 +303,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         pdfOcrAgentAutoOcr: state.pdfOcrAgentAutoOcr,
         pdfOcrScale: state.pdfOcrScale,
         verboseRendererLogs: state.verboseRendererLogs,
+        aiEditReviewMode: state.aiEditReviewMode,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppSettingsState>
@@ -312,6 +318,7 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
           pdfOcrBackgroundPrefetch: p.pdfOcrBackgroundPrefetch ?? false,
           pdfOcrAgentAutoOcr: p.pdfOcrAgentAutoOcr ?? true,
           pdfOcrScale: p.pdfOcrScale ?? DEFAULT_PDF_OCR_SCALE,
+          aiEditReviewMode: p.aiEditReviewMode ?? false,
         }
       },
     },

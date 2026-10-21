@@ -200,7 +200,7 @@ export const TypstEditor = forwardRef<TypstEditorHandle, TypstEditorProps>(funct
         ...closeBracketsKeymap, ...completionKeymap, ...searchKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap,
       ]),
       EditorView.updateListener.of((update) => {
-        propsRef.current.textDocument?.accept(update.state)
+        propsRef.current.textDocument?.accept(update.state, update.changes)
         if (update.docChanged && !update.transactions.every((transaction) => transaction.annotation(Transaction.remote))) propsRef.current.onChange(update.state.doc.toString())
         if (!update.docChanged && !update.selectionSet) return
         clearTimeout(signatureTimer)

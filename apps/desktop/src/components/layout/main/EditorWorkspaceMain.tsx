@@ -59,6 +59,7 @@ import { useEditorUiStore, useFileUiState, type EditorViewMode } from '@/stores/
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { getDocumentKind, getFileExtension, type FileTreeNode } from '@yitom/contracts'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
+import { ProposalReviewBar } from '@/components/editor/ai-proposals/ProposalReviewBar'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
 const JsonTreeViewer = lazy(() =>
   import('@/components/data/JsonTreeViewer').then((m) => ({ default: m.JsonTreeViewer })),
@@ -522,12 +523,14 @@ export const EditorWorkspaceMain = forwardRef<
             <LogStreamViewer content={content} onChange={onContentChange} />
           </Suspense>
         ) : (
+          <div className="flex h-full min-h-0 flex-col">
+          <ProposalReviewBar document={textDocument} />
           <ResizablePanelGroup
             id={`markdown-editor-content-${viewMode}`}
             orientation="horizontal"
             defaultLayout={contentLayout.defaultLayout}
             onLayoutChanged={contentLayout.onLayoutChanged}
-            className="h-full min-h-0"
+            className="min-h-0 flex-1"
           >
             {showEditor && (
               <ResizablePanel
@@ -598,6 +601,7 @@ export const EditorWorkspaceMain = forwardRef<
               </ResizablePanel>
             )}
           </ResizablePanelGroup>
+          </div>
         )}
       </main>
     </div>

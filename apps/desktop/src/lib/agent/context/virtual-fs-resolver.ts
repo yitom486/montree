@@ -33,6 +33,7 @@ import { searchReaderContent } from './search-reader-content'
 import { inspectIndexedContentForAgent } from './inspect-indexed-content'
 import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
 import { requireDocumentTools, getDocumentTools } from './document-tool-registry'
+import { currentProposalOrigin } from './proposal-origin'
 
 function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload {
   const marksRaw = (args as { marks?: unknown } | undefined)?.marks
@@ -183,7 +184,9 @@ export async function resolveMontreeSnapshot(
   resource: MontreeSnapshotResource,
   args?: MontreeSnapshotArgs,
 ): Promise<string> {
-  switch (resource) {
+  // 'text-propose' 为桌面端扩展资源，待 @yitom/contracts 下次发布时并入联合类型。
+  const key = resource as MontreeSnapshotResource | 'text-propose'
+  switch (key) {
     case 'document-save':
     case 'document-undo': {
       const provider = getDocumentTools()
@@ -196,6 +199,12 @@ export async function resolveMontreeSnapshot(
       else provider.undo()
       return JSON.stringify(provider.read({}))
     }
+    case 'text-propose': {
+      const values = (args ?? {}) as Record<string, unknown>
+      const provider = requireDocumentTools('text', values)
+      if (!provider.propose) throw new Error('当前文档不支持修改建议')
+      return JSON.stringify(provider.propose(values, currentProposalOrigin('montree_text_propose')))
+    }
     case 'table-read':
     case 'table-edit':
     case 'text-read':
@@ -204,7 +213,8 @@ export async function resolveMontreeSnapshot(
     case 'slide-edit': {
       const values = (args ?? {}) as Record<string, unknown>
       const provider = requireDocumentTools(resource.startsWith('text') ? 'text' : resource.startsWith('table') ? 'table' : 'slide', values)
-      const result = resource.endsWith('read') ? provider.read(values) : provider.edit(values)
+      const result = resource.endsWith('read') ? provider.read(values)
+        : resource === 'text-edit' ? provider.edit(values, currentProposalOrigin('montree_text_edit')) : provider.edit(values)
       return JSON.stringify(resource === 'text-read' ? await withTextImages(result) : result)
     }
     case 'visual-context':
@@ -308,7 +318,7 @@ export async function resolveMontreeSnapshot(
       return JSON.stringify(applyTocDraftWrite(args), null, 2)
     }
     default: {
-      const _exhaustive: never = resource
+      const _exhaustive: never = key
       throw new Error(`未知的快照资源: ${String(_exhaustive)}`)
     }
   }

@@ -174,7 +174,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       if (!containerRef.current) return
 
       const updateListener = EditorView.updateListener.of((update) => {
-        textDocument?.accept(update.state)
+        textDocument?.accept(update.state, update.changes)
         if (!update.docChanged) return
         // 外部 setValue 同步时不回写，避免 CRLF→LF 等归一化造成误判 dirty
         if (update.transactions.every((tr) => tr.annotation(Transaction.remote))) return

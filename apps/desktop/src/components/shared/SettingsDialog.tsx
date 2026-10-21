@@ -162,6 +162,8 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
   const setPdfOcrScale = useAppSettingsStore((state) => state.setPdfOcrScale)
   const verboseRendererLogs = useAppSettingsStore((state) => state.verboseRendererLogs)
   const setVerboseRendererLogs = useAppSettingsStore((state) => state.setVerboseRendererLogs)
+  const aiEditReviewMode = useAppSettingsStore((state) => state.aiEditReviewMode)
+  const setAiEditReviewMode = useAppSettingsStore((state) => state.setAiEditReviewMode)
   const [clearingOcrCache, setClearingOcrCache] = useState(false)
   const {
     status: ocrComponentStatus,
@@ -472,6 +474,18 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
               >
                 关于
               </Button>
+            </SettingRow>
+          </section>
+
+          <Separator className="my-2" />
+
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI 编辑</h3>
+            <SettingRow
+              title="审阅模式"
+              description="Agent 直接改写 Markdown / Typst 时，先显示为修改建议，由你逐条接受或拒绝。"
+            >
+              <ToggleSwitch checked={aiEditReviewMode} onChange={setAiEditReviewMode} label="审阅模式" />
             </SettingRow>
           </section>
 

@@ -1,12 +1,20 @@
-import { EditorState, Transaction, type EditorStateConfig, type TransactionSpec } from '@codemirror/state'
+import { EditorState, Transaction, type ChangeDesc, type EditorStateConfig, type Extension, type TransactionSpec } from '@codemirror/state'
 import { history, historyField, isolateHistory, undo } from '@codemirror/commands'
 import type { EditorView } from '@codemirror/view'
 import MarkdownIt from 'markdown-it'
 import type { TextSelection } from '@yitom/contracts'
+import { ProposalManager } from './ai-proposals/proposal-manager'
+import type { ProposalOrigin } from './ai-proposals/proposal-types'
 
 const parser = new MarkdownIt()
 let nextRevision = 0
 const MAX_TEXT = 20_000
+/** 编辑器扩展工厂（建议可视化），由 ai-proposals/proposal-extension 注入，避免数据层依赖视图层。 */
+let proposalExtensionFactory: ((document: TextDocument) => Extension) | null = null
+export function setProposalExtensionFactory(factory: ((document: TextDocument) => Extension) | null): void { proposalExtensionFactory = factory }
+/** 审阅模式开关：开启时 edit() 改为创建待确认建议。 */
+let reviewModeSource: () => boolean = () => false
+export function setProposalReviewModeSource(source: () => boolean): void { reviewModeSource = source }
 
 function integer(value: unknown, name: string, min: number, max: number): number {
   if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) throw new Error(`${name} 越界或不是整数`)
@@ -30,6 +38,7 @@ export class TextDocument {
   private unitCache?: { revision: number; units: ReturnType<TextDocument['buildUnits']> }
   previewUnitIndex?: () => number
   onSelectionChange?: () => void
+  readonly proposals: ProposalManager
 
   constructor(public filePath: string, text: string, savedText: string, diskText: string,
     private readonly changed: (text: string) => void,
@@ -38,29 +47,43 @@ export class TextDocument {
     this.state = EditorState.create({ doc: text, extensions: [history(), EditorState.allowMultipleSelections.of(true)] })
     this.savedText = savedText
     this.diskText = diskText
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this
+    this.proposals = new ProposalManager({
+      get filePath() { return self.filePath },
+      get revision() { return self.revision },
+      get doc() { return self.state.doc },
+      applyProposalChanges: (changes) => this.dispatch({ changes, annotations: [Transaction.userEvent.of('input.montree.proposal'), isolateHistory.of('full')] }),
+    })
   }
   get text(): string { return this.state.doc.toString() }
   isDirty = (): boolean => this.text !== this.savedText
   markSaved(text: string, diskText: string): void { this.savedText = text; this.diskText = diskText; this.notify() }
 
   createEditorState(config: EditorStateConfig = {}): EditorState {
-    return EditorState.fromJSON(this.state.toJSON({ history: historyField }), config, { history: historyField })
+    const extra = proposalExtensionFactory?.(this)
+    const withProposals = extra ? { ...config, extensions: [config.extensions ?? [], extra] } : config
+    return EditorState.fromJSON(this.state.toJSON({ history: historyField }), withProposals, { history: historyField })
   }
   attach(view: EditorView): () => void {
     this.view = view
     this.accept(view.state)
     return () => { if (this.view === view) { this.accept(view.state); this.view = null } }
   }
-  accept(state: EditorState): void {
+  /** changes 为 startState→state 的变更；缺省时按原文核对建议（兜底）。 */
+  accept(state: EditorState, changes?: ChangeDesc): void {
     const changed = !this.state.doc.eq(state.doc)
     const selectionChanged = !this.state.selection.eq(state.selection)
     this.state = state
-    if (changed) { this.revision = ++nextRevision; this.unitCache = undefined; this.changed(this.text); this.notify() }
+    if (changed) {
+      if (changes && !changes.empty) this.proposals.mapChanges(changes)
+      else this.proposals.revalidate(state.doc)
+ this.revision = ++nextRevision; this.unitCache = undefined; this.changed(this.text); this.notify() }
     else if (selectionChanged) this.onSelectionChange?.()
   }
   private dispatch(spec: TransactionSpec): void {
     if (this.view) this.view.dispatch(spec)
-    else this.accept(this.state.update(spec).state)
+    else { const tr = this.state.update(spec); this.accept(tr.state, tr.changes) }
   }
   sync(text: string): void {
     if (text !== this.text) this.dispatch({ changes: { from: 0, to: this.state.doc.length, insert: text }, annotations: [Transaction.remote.of(true), isolateHistory.of('full')] })
@@ -75,7 +98,7 @@ export class TextDocument {
   undo = (): void => {
     const undone = undo({ state: this.state, dispatch: (transaction) => {
       if (this.view) this.view.dispatch(transaction)
-      else this.accept(transaction.state)
+      else this.accept(transaction.state, transaction.changes)
     } })
     if (!undone) throw new Error('当前没有可撤销的文本修改')
   }
@@ -185,7 +208,8 @@ export class TextDocument {
       text: doc.sliceString(from, returnedTo), truncated: returnedTo < to,
       scope: target === 'viewport' && !this.view ? 'section-fallback' : target }
   }
-  edit = (args: Record<string, unknown>) => {
+  /** 校验 montree_text_edit / montree_text_propose 共用的参数，返回按位置排序的修改。 */
+  private prepareEdits(args: Record<string, unknown>) {
     keys(args, ['documentPath', 'revision', 'selectionId', 'edits', 'expectedCount'])
     if (args.revision !== this.revision) throw new Error('文档版本已变化，请重新读取')
     if (!Array.isArray(args.edits) || !args.edits.length || args.edits.length > 100 || args.expectedCount !== args.edits.length) throw new Error('expectedCount 必须与 edits 数量完全匹配（1–100）')
@@ -204,13 +228,35 @@ export class TextDocument {
       if (selected && !selected.ranges.some((range) => from >= range.from && to <= range.to)) throw new Error('编辑目标不在当前选区内')
       total += row.text.length + to - from
       if (total > 200_000) throw new Error('单批文本超过 200000 字符')
-      return { from, to, insert: row.text.replace(/\r\n?/g, '\n') }
+      return { from, to, expectedText: row.expectedText, insert: row.text.replace(/\r\n?/g, '\n') }
     }).sort((a, b) => a.from - b.from || a.to - b.to)
     for (let i = 1; i < changes.length; i++) {
       const a = changes[i - 1], b = changes[i]
       if (b.from < a.to || (b.from === a.to && (a.from === a.to || b.from === b.to))) throw new Error('同批编辑范围重叠或插入位置重复')
     }
-    this.dispatch({ changes, annotations: [Transaction.userEvent.of('input.montree'), isolateHistory.of('full')] })
+    return changes
+  }
+  /** 直接编辑；审阅模式下改为创建待确认建议（需用户确认后才落入文档）。 */
+  edit = (args: Record<string, unknown>, origin?: ProposalOrigin) => {
+    if (reviewModeSource()) return this.propose(args, { ...origin, source: 'text-edit' })
+    const changes = this.prepareEdits(args)
+    this.dispatch({ changes: changes.map(({ from, to, insert }) => ({ from, to, insert })), annotations: [Transaction.userEvent.of('input.montree'), isolateHistory.of('full')] })
     return { ...this.read({}), editedCount: changes.length }
+  }
+  /** 创建修改建议：不改动文档，等待用户在编辑器内接受/拒绝。 */
+  propose = (args: Record<string, unknown>, origin?: ProposalOrigin) => {
+    const changes = this.prepareEdits(args)
+    const created = this.proposals.create(changes, { source: 'text-propose', ...origin })
+    return {
+      status: 'proposal_created', awaiting: 'user', message: '修改建议已创建，等待用户在编辑器中接受或拒绝；文档尚未改动。',
+      documentPath: this.filePath, revision: this.revision, proposedCount: created.length,
+      proposals: created.map(({ id, from, to, status }) => ({ id, from, to, status })),
+    }
+  }
+  /** 定位到某条建议（导航用）。 */
+  revealRange(from: number, to: number): void {
+    const length = this.state.doc.length
+    this.dispatch({ selection: { anchor: Math.min(from, length), head: Math.min(to, length) }, scrollIntoView: true })
+    this.view?.focus()
   }
 }
