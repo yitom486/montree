@@ -194,21 +194,57 @@ export function filterOcrHitLayerWords(words: readonly OcrPageWord[]): OcrPageWo
   return words.filter((_, index) => !drop.has(index))
 }
 
+const CJK = /[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/u
+
+function sameLine(a: OcrPageWord, b: OcrPageWord): boolean {
+  const overlap = Math.min(a.bbox.y1, b.bbox.y1) - Math.max(a.bbox.y0, b.bbox.y0)
+  return overlap > 0.5 * Math.min(a.bbox.y1 - a.bbox.y0, b.bbox.y1 - b.bbox.y0)
+}
+
+/**
+ * OCR 词之间的分隔符（附在前一词末尾）：OCR 只给逐词框，没有空白字符。
+ * 不补分隔时，划选/摘录/引文前后缀会把英文词粘成一串（"ReactisaJavaScript…"），
+ * 批注重新锚定、全文检索与 AI 制卡都拿到错误文本。拉丁词之间补空格（跨行同样补空格，按段落续行处理），
+ * 中日韩文字相邻不补。
+ */
+export function ocrWordSeparators(words: readonly OcrPageWord[]): string[] {
+  return words.map((word, index) => {
+    const next = words[index + 1]
+    if (!next) return ''
+    const tail = word.text.slice(-1), head = next.text.slice(0, 1)
+    if (!tail || !head || CJK.test(tail) || CJK.test(head)) return ''
+    return ' '
+  })
+}
+
+/** OCR 页纯文本（Agent 读页、检索用）：词间补空格，换行处补 \n */
+export function ocrWordsToPlainText(words: readonly OcrPageWord[]): string {
+  const separators = ocrWordSeparators(words)
+  return words.map((word, index) => {
+    const next = words[index + 1]
+    return word.text + (next && !sameLine(word, next) ? '\n' : separators[index])
+  }).join('')
+}
+
 export function ocrPageCacheToTextContent(cache: PdfOcrPageCache): TextContent {
   const { pageWidth, pageHeight, words } = cache
-  const items: TextItem[] = words.map((word) => {
-    const width = Math.max((word.bbox.x1 - word.bbox.x0) * pageWidth, 1)
+  const separators = ocrWordSeparators(words)
+  const items: TextItem[] = words.map((word, index) => {
+    const next = words[index + 1]
+    // 分隔空格占据到同行下一词左缘的间隙，字符比例换算的高亮框不缩短
+    const right = separators[index] && next && sameLine(word, next) && next.bbox.x0 > word.bbox.x1 ? next.bbox.x0 : word.bbox.x1
+    const width = Math.max((right - word.bbox.x0) * pageWidth, 1)
     const height = Math.max((word.bbox.y1 - word.bbox.y0) * pageHeight, 1)
     const x = word.bbox.x0 * pageWidth
     const y = pageHeight - word.bbox.y1 * pageHeight
     return {
-      str: word.text,
+      str: word.text + separators[index],
       dir: 'ltr',
       width,
       height,
       transform: [height, 0, 0, height, x, y],
       fontName: 'OCR',
-      hasEOL: false,
+      hasEOL: Boolean(next && !sameLine(word, next)),
     }
   })
   return { items, styles: {}, lang: null }

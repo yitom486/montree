@@ -69,6 +69,8 @@ interface SubsessionEntry extends SubsessionPersistedState {
   purpose: string
   key: string
   replyBuffer: string
+  /** 最近一次收到本会话增量的时间（drainTrailingUpdates 判静默） */
+  lastUpdateAt?: number
   prompting: boolean
   /** 本进程内新建（无需 load）；store 里捞回来的是 false，复用前先 load */
   fresh: boolean
@@ -240,6 +242,7 @@ export function accumulateSubsessionUpdate(
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
     if (text) entry.replyBuffer += text
+    entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
 }
@@ -257,6 +260,7 @@ export function accumulateSubsessionUpdateFor(
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
     if (text) entry.replyBuffer += text
+    entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
 }
@@ -383,6 +387,22 @@ export async function ensureSubsessionSession(
 
 type PromptOnceResult = { reply: string } | { error: true; errorCode?: string; retryable: boolean }
 
+const TRAILING_QUIET_MS = 120
+const TRAILING_MAX_MS = 1500
+
+/** @internal 导出供单测 */
+export async function drainTrailingUpdates(entry: { lastUpdateAt?: number; replyBuffer: string }): Promise<void> {
+  const started = Date.now()
+  for (;;) {
+    const now = Date.now()
+    if (now - started >= TRAILING_MAX_MS) return
+    const last = entry.lastUpdateAt ?? 0
+    // 已有回复且最近一段增量已静默；或尚无回复但等满静默窗口仍无增量（真正的空回复）
+    if (now - Math.max(last, started) >= TRAILING_QUIET_MS && (entry.replyBuffer.trim() || now - started >= TRAILING_QUIET_MS * 3)) return
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
 async function promptOnce(
   mapKey: string,
   sessionId: string,
@@ -424,6 +444,9 @@ async function promptOnce(
       // ACP_TIMEOUT 表示服务端可能仍在跑（toc 调用方要等工具草稿），不算会话已死，不自转
       return { error: true, errorCode: result.error.code, retryable: result.error.code !== 'ACP_TIMEOUT' }
     }
+    // prompt 应答与 session/update 通知走不同通道：ACP SDK 先结算应答、通知在异步处理队列里，
+    // 应答可能先于最后几段（短回复时是全部）文本到达渲染端。等增量静默后再取 replyBuffer。
+    await drainTrailingUpdates(entry)
     entry.promptCount += 1
     entry.lastUsedAt = Date.now()
     return { reply: entry.replyBuffer.trim() }

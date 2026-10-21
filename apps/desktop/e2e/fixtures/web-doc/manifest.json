@@ -8,5 +8,6 @@
   "https://e2e.montree.test/docs/agent-chapters": "agent-chapters.html",
   "https://e2e.montree.test/book/primitives.html": "mdbook-primitives.html",
   "https://e2e.montree.test/book/toc.html": "mdbook-toc.html",
-  "https://e2e.montree.test/book/primitives/literals.html": "mdbook-literals.html"
+  "https://e2e.montree.test/book/primitives/literals.html": "mdbook-literals.html",
+  "https://e2e.montree.test/react/learn/describing-the-ui": "react-describing-the-ui.html"
 }

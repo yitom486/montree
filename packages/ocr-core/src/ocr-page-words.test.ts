@@ -192,3 +192,18 @@ describe('filterOcrHitLayerWords', () => {
     expect(kept.map((word) => word.text)).toEqual(['丙', '丁', '甲', '乙'])
   })
 })
+
+describe('OCR 词间分隔', () => {
+  const word = (text: string, x0: number, y0: number) => ({ text, bbox: { x0, y0, x1: x0 + 0.05, y1: y0 + 0.02 }, confidence: 0.9 }) as never
+  it('拉丁词补空格、换行补 \\n，中日韩相邻不补', async () => {
+    const { ocrWordSeparators, ocrWordsToPlainText, ocrPageCacheToTextContent } = await import('./ocr-page-words')
+    const words = [word('React', 0.1, 0.1), word('is', 0.16, 0.1), word('fast.', 0.2, 0.1), word('组', 0.1, 0.2), word('件', 0.15, 0.2), word('UI', 0.2, 0.2)]
+    expect(ocrWordSeparators(words)).toEqual([' ', ' ', '', '', '', ''])
+    expect(ocrWordsToPlainText(words)).toBe('React is fast.\n组件UI')
+    const content = ocrPageCacheToTextContent({ page: 1, pageWidth: 100, pageHeight: 100, words } as never)
+    expect(content.items.map((item) => ('str' in item ? item.str : '')).join('')).toBe('React is fast.组件UI')
+    expect((content.items[2] as { hasEOL: boolean }).hasEOL).toBe(true)
+    // 分隔空格占据到下一词左缘：React 框宽 = 0.16 - 0.1
+    expect((content.items[0] as { width: number }).width).toBeCloseTo(6)
+  })
+})

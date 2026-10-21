@@ -1,5 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { pageHasNativeText } from '@montree/ocr-core'
+import { ocrWordsToPlainText, pageHasNativeText } from '@montree/ocr-core'
 import type { PdfOcrPageCache } from '@yitom/contracts'
 
 export async function readPdfPageNativeText(
@@ -11,7 +11,7 @@ export async function readPdfPageNativeText(
 }
 
 export function textFromOcrPageCache(cache: PdfOcrPageCache): string {
-  return cache.words.map((word) => word.text).join('')
+  return ocrWordsToPlainText(cache.words)
 }
 
 export function pdfPageNeedsOcr(nativeText: string): boolean {

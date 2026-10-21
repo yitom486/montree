@@ -14,15 +14,18 @@ export function mountOcrTextLayer(
   const hitWords = filterOcrHitLayerWords(cache.words)
   const layer = document.createElement('div')
   layer.className = 'textLayer'
+  // span 文本与几何 item.str 必须逐字一致（含词间分隔空格），选区偏移才能映射回引文
+  const textContent = ocrPageCacheToTextContent({ ...cache, words: hitWords })
 
   hitWords.forEach((word, index) => {
+    const item = textContent.items[index] as { str: string; width: number }
     const span = document.createElement('span')
-    span.textContent = word.text
+    span.textContent = item.str
     span.dataset.pdfTextItemIndex = String(index)
     span.style.position = 'absolute'
     span.style.left = `${word.bbox.x0 * viewport.width}px`
     span.style.top = `${word.bbox.y0 * viewport.height}px`
-    span.style.width = `${(word.bbox.x1 - word.bbox.x0) * viewport.width}px`
+    span.style.width = `${(item.width / cache.pageWidth) * viewport.width}px`
     span.style.height = `${(word.bbox.y1 - word.bbox.y0) * viewport.height}px`
     span.style.fontSize = `${Math.max(8, (word.bbox.y1 - word.bbox.y0) * viewport.height * 0.85)}px`
     span.style.lineHeight = '1'
@@ -33,6 +36,5 @@ export function mountOcrTextLayer(
   })
 
   host.replaceChildren(layer)
-  const textContent = ocrPageCacheToTextContent({ ...cache, words: hitWords })
   return registerPdfPageTextGeometry(pageRoot, viewport, textContent)
 }

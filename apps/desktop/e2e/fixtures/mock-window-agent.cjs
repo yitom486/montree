@@ -75,6 +75,11 @@ async function handle(message) {
       send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'agy-t1-s17',status:'completed',content:[]}}})
       output = 'EMPTY_TOOL_SAVED'
     }
+    // 智能制卡 / AI 笔记：确定性卡片 JSON（摘取原文首句作标题来源，便于断言）
+    if (command.startsWith('你是读书卡片助手')) {
+      const excerpt = (command.split('<原文>\n')[1] || '').split('\n</原文>')[0].trim()
+      output = JSON.stringify({ title: 'MOCK卡:' + excerpt.slice(0, 12), category: 'concept', aiSummary: 'MOCK摘要：' + excerpt.slice(0, 60), keyPoints: ['要点一：' + excerpt.slice(0, 20), '要点二'] })
+    }
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
@@ -133,6 +138,17 @@ async function handle(message) {
         }
         output = ''
       } else output = `SVG:${sessionId}|${diagramType}`
+    } else if (command.startsWith('mcp-call:')) {
+      // 像真实 Agent 一样经本窗口 MCP 调工具，并把结果作为工具卡片回放到时间线
+      const rest = command.slice('mcp-call:'.length)
+      const name = rest.slice(0, rest.indexOf(':'))
+      const args = JSON.parse(rest.slice(rest.indexOf(':') + 1))
+      const toolCallId = `mcp-${sessionId}-${++sequence}`
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title: name, kind: 'other', status: 'in_progress', rawInput: args } } })
+      const rpc = await mcpRequest(sessions.get(sessionId).mcp, 'tools/call', { name, arguments: args })
+      const resultText = rpc.result?.content?.[0]?.text ?? JSON.stringify(rpc.error ?? rpc.result)
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: rpc.result?.isError ? 'failed' : 'completed', content: [{ type: 'content', content: { type: 'text', text: resultText } }], rawOutput: rpc.result } } })
+      output = `MCP_CALLED:${name}`
     } else if (command === 'tools') {
       const { mcp } = sessions.get(sessionId)
       const rpc = await mcpRequest(mcp, 'tools/list')

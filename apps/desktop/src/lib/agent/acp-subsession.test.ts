@@ -283,3 +283,21 @@ describe('重置与传输错误透传', () => {
     expect(mockedPrompt).not.toHaveBeenCalled()
   })
 })
+
+describe('drainTrailingUpdates（prompt 应答先于尾部增量到达）', () => {
+  it('应答后晚到的文本块在读取回复前被等到', async () => {
+    const { drainTrailingUpdates } = await import('./acp-subsession')
+    const entry: { lastUpdateAt?: number; replyBuffer: string } = { replyBuffer: '' }
+    setTimeout(() => { entry.replyBuffer += '{"title":'; entry.lastUpdateAt = Date.now() }, 60)
+    setTimeout(() => { entry.replyBuffer += '"卡"}'; entry.lastUpdateAt = Date.now() }, 120)
+    await drainTrailingUpdates(entry)
+    expect(entry.replyBuffer).toBe('{"title":"卡"}')
+  })
+
+  it('真正的空回复在上限内返回', async () => {
+    const { drainTrailingUpdates } = await import('./acp-subsession')
+    const started = Date.now()
+    await drainTrailingUpdates({ replyBuffer: '' })
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+})

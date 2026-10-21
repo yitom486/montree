@@ -330,7 +330,8 @@ export async function adoptProposedMark(
   store.setExternalProposeOpen(false)
 }
 
-function selectionMatchesExcerpt(selection: string, excerpt: string): boolean {
+/** 当前选区是否就是该摘录（容忍首尾/长度微差）。 */
+export function selectionMatchesExcerpt(selection: string, excerpt: string): boolean {
   const sel = selection.trim()
   const ex = excerpt.trim()
   if (!sel || !ex) return false

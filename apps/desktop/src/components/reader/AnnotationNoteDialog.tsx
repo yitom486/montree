@@ -23,7 +23,8 @@ import {
 import { ProposeMarkChatBlock } from '@yitom/chat-ui'
 import { groupChatTimeline } from '@yitom/chat-core'
 import { ChatMessageBubble } from '@yitom/chat-ui'
-import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
+import { adoptProposedMark, dismissProposedMark, selectionMatchesExcerpt } from '@/lib/agent/context/propose-mark'
+import { toastMarkProposalFailure } from '@/lib/agent/mark-proposal-failure'
 import { respondPermissionRequest } from '@/lib/agent/permission-respond'
 import { useAcpPendingPermission } from '@/stores/acp-ui-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
@@ -188,6 +189,20 @@ export function AnnotationNoteDialog({
 
   const handleAdopt = () => {
     const text = (assist.pendingDraft?.note ?? note).trim()
+    const draftExcerpt = assist.pendingDraft?.excerpt?.trim() ?? ''
+    // Agent 按摘录提议的草稿：摘录与对话框当前选区不符时，按摘录定位落库，
+    // 不能写到残留选区（否则会覆盖上一条标记的批注）。
+    if (draftExcerpt && !selectionMatchesExcerpt(excerpt, draftExcerpt)) {
+      // 先关对话框（会清掉残留选区），再按摘录定位落库，避免与关闭时的选区清理交错
+      assist.discardDraft()
+      onOpenChange(false)
+      window.setTimeout(() => {
+        void adoptProposedMark({ note: text, excerpt: draftExcerpt }).catch((cause) => {
+          toastMarkProposalFailure(cause, {})
+        })
+      }, 0)
+      return
+    }
     onSave(text)
     assist.discardDraft()
     onOpenChange(false)
@@ -198,6 +213,8 @@ export function AnnotationNoteDialog({
     assist.discardDraft()
     onOpenChange(false)
   }
+
+  const shownExcerpt = assist.pendingDraft?.excerpt?.trim() || excerpt
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -238,7 +255,7 @@ export function AnnotationNoteDialog({
           ) : null}
         </DialogHeader>
 
-        {excerpt ? (
+        {shownExcerpt ? (
           <div className="shrink-0 space-y-1">
             <button
               type="button"
@@ -254,7 +271,7 @@ export function AnnotationNoteDialog({
             </button>
             {excerptOpen ? (
               <blockquote className="max-h-20 overflow-y-auto border-l-2 border-primary/40 pl-3 text-sm text-muted-foreground italic">
-                {excerpt}
+                {shownExcerpt}
               </blockquote>
             ) : null}
           </div>
