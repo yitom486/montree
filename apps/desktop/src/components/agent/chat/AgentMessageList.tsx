@@ -19,6 +19,7 @@ import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
 import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
 import { toast } from 'sonner'
+import { appApi } from '@/api/app-api'
 import { adoptProposedMark } from '@/lib/agent/context/propose-mark'
 import { toastMarkProposalFailure } from '@/lib/agent/mark-proposal-failure'
 import type { ProposedMark } from '@yitom/annotations'
@@ -85,6 +86,13 @@ const ThreadMessageList = memo(function ThreadMessageList({
       title: proposal.title,
     })
     toast.success(proposal.kind === 'highlight' || !note.trim() ? '已添加高亮' : '已保存批注')
+  }, [])
+  // 聊天正文链接：页内锚点（脚注回链）走默认；http(s)/mailto 交系统浏览器；其他协议一律不打开
+  const handleLinkClick = useCallback((href: string): boolean => {
+    if (href.startsWith('#')) return false
+    if (/^(https?:|mailto:)/i.test(href)) void appApi.openExternal(href)
+    else console.warn('[chat-link-blocked]', href)
+    return true
   }, [])
   const markProposalError = useCallback((cause: unknown, context: { flatIndex?: number }) => {
     toastMarkProposalFailure(cause, context)
@@ -153,6 +161,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
         }
         resolveMarkProposal={resolveMarkProposal}
         onAdoptMarkProposal={adoptMarkProposal}
+        onLinkClick={handleLinkClick}
         onMarkProposalError={markProposalError}
         onDismissProposedMark={dismissProposedMark}
         onPermissionRespond={(optionId) => {

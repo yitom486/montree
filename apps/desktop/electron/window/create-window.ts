@@ -1,3 +1,5 @@
+import { pathToFileURL } from 'node:url'
+import { decideNavigation } from './navigation-policy'
 import { BrowserWindow, app, dialog, nativeImage, shell } from 'electron'
 import { watch, type FSWatcher } from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -201,18 +203,18 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
 
   // 导航兜底：渲染器内非应用 origin 的跳转一律转系统浏览器，禁止远端内容
   // 占用应用窗口（preload 桥接只应服务本地 file:// 页面）。window.open 同理。
-  const isAppNavigation = (target: string): boolean => {
-    if (target.startsWith('file://') || target.startsWith('devtools://')) return true
-    const devUrl = process.env['ELECTRON_RENDERER_URL']
-    if (devUrl && target.startsWith(new URL(devUrl).origin)) return true
-    return false
-  }
-  window.webContents.on('will-navigate', (event, url) => {
-    if (isAppNavigation(url)) return
-    event.preventDefault()
+  const appEntryUrl = pathToFileURL(join(__dirname, '../renderer/index.html')).href
+  const openExternalSafely = (url: string): void => {
     void shell.openExternal(url).catch((cause) => {
       console.error('[open-external-failed]', url, cause)
     })
+  }
+  window.webContents.on('will-navigate', (event, url) => {
+    const decision = decideNavigation(url, appEntryUrl, process.env['ELECTRON_RENDERER_URL'])
+    if (decision === 'allow') return
+    event.preventDefault()
+    if (decision === 'external') openExternalSafely(url)
+    else console.warn('[navigation-blocked]', url)
   })
   // Artifact 预览框自身导航拦截（P1）：不信任运行时可改的 frame.name，
   // 以 frame-created 时登记的不可变 frameTreeNodeId 判定归属（改名不解除限制）。
@@ -267,11 +269,7 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     }
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (!isAppNavigation(url)) {
-      void shell.openExternal(url).catch((cause) => {
-        console.error('[open-external-failed]', url, cause)
-      })
-    }
+    if (decideNavigation(url, appEntryUrl, process.env['ELECTRON_RENDERER_URL']) === 'external') openExternalSafely(url)
     return { action: 'deny' }
   })
 

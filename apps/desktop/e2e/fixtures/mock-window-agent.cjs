@@ -40,7 +40,7 @@ const request = (method, params) => new Promise((resolve) => {
 })
 async function handle(message) {
   const { id, method, params = {} } = message
-  if (!method) { permissions.get(id)?.(message.result); permissions.delete(id); return }
+  if (!method) { permissions.get(id)?.(message.result ?? { __error: message.error }); permissions.delete(id); return }
   if (method === 'initialize') {
     result(id, { protocolVersion: 1, agentInfo: { name: 'mock-window', version: '1' }, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true }, promptCapabilities: { image: true }, _meta: { toolsMode: { values: ['native', 'ptc'] } } }, authMethods: [] })
   } else if (method === 'session/new' || method === 'session/load' || method === 'session/resume') {
@@ -138,6 +138,8 @@ async function handle(message) {
         }
         output = ''
       } else output = `SVG:${sessionId}|${diagramType}`
+    } else if (command.startsWith('echo-md:')) {
+      output = command.slice('echo-md:'.length)
     } else if (command.startsWith('mcp-call:')) {
       // 像真实 Agent 一样经本窗口 MCP 调工具，并把结果作为工具卡片回放到时间线
       const rest = command.slice('mcp-call:'.length)
@@ -157,6 +159,18 @@ async function handle(message) {
       const { mcp, cwd } = sessions.get(sessionId)
       const rpc = await mcpRequest(mcp, 'tools/call', { name: 'montree_read', arguments: { scope: 'viewport' } })
       output = `READ:${sessionId}|${cwd}|${rpc.result?.content?.[0]?.text}`
+    } else if (command.startsWith('terminal:')) {
+      // ACP terminal/create → wait_for_exit → output（客户端审批拦截时返回错误）
+      const spec = JSON.parse(command.slice('terminal:'.length))
+      const created = await request('terminal/create', { sessionId, command: spec.command, args: spec.args || [] })
+      if (created.__error) {
+        output = `TERMINAL:denied|${created.__error.message}`
+      } else {
+        await request('terminal/wait_for_exit', { sessionId, terminalId: created.terminalId })
+        const out = await request('terminal/output', { sessionId, terminalId: created.terminalId })
+        await request('terminal/release', { sessionId, terminalId: created.terminalId })
+        output = `TERMINAL:ok|${String(out.output || '').trim()}`
+      }
     } else if (command === 'permission') {
       const answer = await request('session/request_permission', { sessionId, toolCall: { toolCallId: `tool-${sessionId}`, title: `Permission ${sessionId}` }, options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }, { optionId: 'reject', name: 'Reject', kind: 'reject_once' }] })
       output = `PERMISSION:${sessionId}|${answer.outcome.outcome}|${answer.outcome.optionId || ''}`
