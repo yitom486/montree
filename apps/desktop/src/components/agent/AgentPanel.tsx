@@ -1,3 +1,4 @@
+import { subscribeAgentPrompts } from '@/lib/agent/agent-prompt-bus'
 import {
   ChevronDown,
   Loader2,
@@ -121,6 +122,11 @@ export const AgentPanel = memo(function AgentPanel({
   useHighlightTheme(theme)
 
   const selectChapterMarkPlan = useAcpUiStore((s) => s.selectChapterMarkPlan)
+
+  // 编辑器选区操作（润色/改写…）经提示总线回到当前会话
+  useEffect(() => subscribeAgentPrompts((request) => {
+    void sendPrompt({ text: request.displayText, prompt: [{ type: 'text', text: request.promptText }] })
+  }), [sendPrompt])
 
   const handleChapterPlanSelect = useCallback(
     (payload: ChapterMarkPlanSelectPayload) => {

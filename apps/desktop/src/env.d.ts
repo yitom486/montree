@@ -2,6 +2,7 @@
 
 import type { AppError, ElectronAPI, Result, TypstExportPayload, TypstExportResult } from '@yitom/contracts'
 import type { TerminalAPI } from '../contracts/terminal'
+import type { InlineCompletionAPI } from '../contracts/inline-completion'
 
 /**
  * 上游 contracts 补 `TYPST_EXPORT_HTML` 前，preload 经本仓字面通道透出，
@@ -15,6 +16,7 @@ declare global {
   interface Window {
     electronAPI?: MontreeElectronAPI
     montreeTerminal?: TerminalAPI
+    montreeInlineCompletion?: InlineCompletionAPI
   }
 }
 

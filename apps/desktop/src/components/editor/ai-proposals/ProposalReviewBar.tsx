@@ -1,24 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Check, ChevronLeft, ChevronRight, MoreHorizontal, PanelRight, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TextDocument } from '@/lib/editor/text-document'
 import { useEditProposals } from '@/hooks/editor/useEditProposals'
+import { ProposalReviewPanel } from './ProposalReviewPanel'
 
-function preview(text: string, max = 40): string {
-  const flat = text.replace(/\s+/g, ' ').trim()
-  return flat.length > max ? `${flat.slice(0, max)}…` : flat || '（空）'
+const PANEL_KEY = 'montree.proposalPanelOpen'
+const noop = () => () => {}
+
+function useNotice(document?: TextDocument) {
+  return useSyncExternalStore(document ? document.proposals.subscribe : noop, () => document?.proposals.notice() ?? null, () => null)
 }
 
-/** 审阅栏：当前文档的 AI 修改建议导航、全部接受/拒绝与列表。 */
-export function ProposalReviewBar({ document }: { document?: TextDocument }) {
+/** 紧凑审阅栏：计数、导航、接受/拒绝当前、更多（全部接受/拒绝）与右侧面板开关。 */
+export function ProposalReviewBar({ document, panelOpen, onTogglePanel }: { document?: TextDocument; panelOpen?: boolean; onTogglePanel?: () => void }) {
   const proposals = useEditProposals(document)
+  const notice = useNotice(document)
   const pending = useMemo(() => proposals.filter((item) => item.status === 'pending'), [proposals])
   const invalid = useMemo(() => proposals.filter((item) => item.status === 'invalid'), [proposals])
   const [index, setIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => { if (index >= pending.length) setIndex(Math.max(0, pending.length - 1)) }, [index, pending.length])
-  if (!document || (!pending.length && !invalid.length)) return null
+  if (!document || (!pending.length && !invalid.length && !notice)) return null
 
   const run = (action: () => unknown) => {
     try { setError(null); action() } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
@@ -27,15 +31,14 @@ export function ProposalReviewBar({ document }: { document?: TextDocument }) {
     if (!pending.length) return
     const target = (next + pending.length) % pending.length
     setIndex(target)
-    const item = pending[target]
-    document.revealRange(item.from, item.to)
+    document.revealRange(pending[target].from, pending[target].to)
   }
   const current = pending[index]
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1 border-b bg-emerald-500/5 px-2 py-1 text-xs" role="region" aria-label="AI 修改建议" data-testid="proposal-review-bar">
-      <Sparkles className="size-3.5 text-emerald-600" aria-hidden="true" />
-      <span className="font-medium" data-testid="proposal-review-count">
+    <div className="flex h-8 items-center gap-1 border-b bg-emerald-500/5 px-2 text-xs" role="region" aria-label="AI 修改建议" data-testid="proposal-review-bar">
+      <Sparkles className="size-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+      <span className="shrink-0 font-medium" data-testid="proposal-review-count">
         {pending.length ? `${pending.length} 处修改建议` : '无待处理建议'}
         {invalid.length ? <span className="ml-1 text-amber-600">· {invalid.length} 处已失效</span> : null}
       </span>
@@ -46,39 +49,53 @@ export function ProposalReviewBar({ document }: { document?: TextDocument }) {
           <Button size="icon-xs" variant="ghost" title="下一处" aria-label="下一处建议" onClick={() => go(index + 1)}><ChevronRight /></Button>
         </>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="xs" variant="ghost" aria-label="建议列表">列表<ChevronDown /></Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="max-h-80 w-80 overflow-y-auto">
-          <DropdownMenuLabel>修改建议</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {[...pending, ...invalid].map((item) => (
-            <DropdownMenuItem key={item.id} className="flex flex-col items-start gap-0.5"
-              onSelect={() => { if (item.status === 'pending') go(pending.indexOf(item)); else document.revealRange(item.from, item.from) }}>
-              <span className="text-[11px] text-muted-foreground">第 {document.state.doc.lineAt(Math.min(item.from, document.state.doc.length)).number} 行{item.status === 'invalid' ? ' · 已失效' : ''}</span>
-              <span className="line-through decoration-red-500/70">{preview(item.expectedText)}</span>
-              <span className="text-emerald-700 dark:text-emerald-400">{preview(item.replacement)}</span>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <div className="ml-auto flex items-center gap-1">
+      {notice && (
+        <span className="ml-1 flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-400" role="status" data-testid="proposal-notice">
+          <span className="truncate">{notice.text}</span>
+          <button type="button" className="shrink-0 opacity-70 hover:opacity-100" aria-label="关闭提示" onClick={document.proposals.dismissNotice}><X className="size-3" /></button>
+        </span>
+      )}
+      {error && <span className="truncate text-destructive" role="alert">{error}</span>}
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         {current && (
           <>
-            <Button size="xs" variant="outline" onClick={() => run(() => document.proposals.accept(current.id))} data-testid="proposal-accept-current"><Check />接受当前</Button>
-            <Button size="xs" variant="outline" onClick={() => run(() => document.proposals.reject(current.id))}><X />拒绝当前</Button>
+            <Button size="xs" variant="outline" onClick={() => run(() => document.proposals.accept(current.id))} data-testid="proposal-accept-current"><Check />接受</Button>
+            <Button size="xs" variant="outline" onClick={() => run(() => document.proposals.reject(current.id))} data-testid="proposal-reject-current"><X />拒绝</Button>
           </>
         )}
-        {invalid.length > 0 && <Button size="xs" variant="ghost" onClick={() => run(document.proposals.dismissInvalid)}>清除失效</Button>}
-        {pending.length > 1 && (
-          <>
-            <Button size="xs" variant="default" onClick={() => run(document.proposals.acceptAll)} data-testid="proposal-accept-all"><Check />全部接受</Button>
-            <Button size="xs" variant="ghost" onClick={() => run(document.proposals.rejectAll)} data-testid="proposal-reject-all"><X />全部拒绝</Button>
-          </>
+        {(pending.length > 1 || invalid.length > 0) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-xs" variant="ghost" aria-label="更多审阅操作" data-testid="proposal-more"><MoreHorizontal /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {pending.length > 1 && <DropdownMenuItem onSelect={() => run(document.proposals.acceptAll)} data-testid="proposal-accept-all"><Check />全部接受（{pending.length}）</DropdownMenuItem>}
+              {pending.length > 1 && <DropdownMenuItem onSelect={() => run(document.proposals.rejectAll)} data-testid="proposal-reject-all"><X />全部拒绝</DropdownMenuItem>}
+              {invalid.length > 0 && <DropdownMenuItem onSelect={() => run(document.proposals.dismissInvalid)} data-testid="proposal-dismiss-invalid">清除失效（{invalid.length}）</DropdownMenuItem>}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {onTogglePanel && (
+          <Button size="icon-xs" variant={panelOpen ? 'secondary' : 'ghost'} title="审阅面板" aria-label="审阅面板" aria-pressed={panelOpen} onClick={onTogglePanel} data-testid="proposal-panel-toggle"><PanelRight /></Button>
         )}
       </div>
-      {error && <span className="basis-full text-destructive" role="alert">{error}</span>}
+    </div>
+  )
+}
+
+/** 审阅栏 + 右侧可折叠审阅面板的布局外壳，包住编辑区。 */
+export function ProposalReviewLayout({ document, children }: { document?: TextDocument; children: ReactNode }) {
+  const proposals = useEditProposals(document)
+  const [panelOpen, setPanelOpen] = useState(() => { try { return localStorage.getItem(PANEL_KEY) === '1' } catch { return false } })
+  const toggle = () => setPanelOpen((open) => { try { localStorage.setItem(PANEL_KEY, open ? '0' : '1') } catch { /* ignore */ } return !open })
+  const showPanel = panelOpen && proposals.length > 0
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ProposalReviewBar document={document} panelOpen={showPanel} onTogglePanel={toggle} />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">{children}</div>
+        {showPanel && document && <ProposalReviewPanel document={document} onClose={toggle} />}
+      </div>
     </div>
   )
 }

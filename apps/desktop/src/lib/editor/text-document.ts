@@ -5,6 +5,7 @@ import MarkdownIt from 'markdown-it'
 import type { TextSelection } from '@yitom/contracts'
 import { ProposalManager } from './ai-proposals/proposal-manager'
 import type { ProposalOrigin } from './ai-proposals/proposal-types'
+import { proposalAcceptEffect, proposalHistoryField, proposalStateExtension } from './ai-proposals/proposal-history'
 
 const parser = new MarkdownIt()
 let nextRevision = 0
@@ -44,7 +45,7 @@ export class TextDocument {
     private readonly changed: (text: string) => void,
     private readonly notify: () => void,
     private readonly persist: (text: string, expectedContent: string) => Promise<void>) {
-    this.state = EditorState.create({ doc: text, extensions: [history(), EditorState.allowMultipleSelections.of(true)] })
+    this.state = EditorState.create({ doc: text, extensions: [history(), EditorState.allowMultipleSelections.of(true), proposalStateExtension] })
     this.savedText = savedText
     this.diskText = diskText
     // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -53,7 +54,7 @@ export class TextDocument {
       get filePath() { return self.filePath },
       get revision() { return self.revision },
       get doc() { return self.state.doc },
-      applyProposalChanges: (changes) => this.dispatch({ changes, annotations: [Transaction.userEvent.of('input.montree.proposal'), isolateHistory.of('full')] }),
+      applyProposalChanges: (changes, ids) => this.dispatch({ changes, effects: proposalAcceptEffect.of(ids), annotations: [Transaction.userEvent.of('input.montree.proposal'), isolateHistory.of('full')] }),
     })
   }
   get text(): string { return this.state.doc.toString() }
@@ -62,7 +63,7 @@ export class TextDocument {
 
   createEditorState(config: EditorStateConfig = {}): EditorState {
     const extra = proposalExtensionFactory?.(this)
-    const withProposals = extra ? { ...config, extensions: [config.extensions ?? [], extra] } : config
+    const withProposals = { ...config, extensions: [config.extensions ?? [], proposalStateExtension, extra ?? []] }
     return EditorState.fromJSON(this.state.toJSON({ history: historyField }), withProposals, { history: historyField })
   }
   attach(view: EditorView): () => void {
@@ -73,13 +74,20 @@ export class TextDocument {
   /** changes 为 startState→state 的变更；缺省时按原文核对建议（兜底）。 */
   accept(state: EditorState, changes?: ChangeDesc): void {
     const changed = !this.state.doc.eq(state.doc)
+    const previousLog = this.state.field(proposalHistoryField, false)
+    const log = state.field(proposalHistoryField, false)
     const selectionChanged = !this.state.selection.eq(state.selection)
     this.state = state
+    // 新状态链（重新挂载编辑器）从头计数；只消费同一条链上新增的事件
+    const events = log && previousLog && changes ? log.events.filter((event) => event.seq > previousLog.seq) : []
     if (changed) {
-      if (changes && !changes.empty) this.proposals.mapChanges(changes)
+      if (changes) this.proposals.handleUpdate(changes, events)
       else this.proposals.revalidate(state.doc)
- this.revision = ++nextRevision; this.unitCache = undefined; this.changed(this.text); this.notify() }
-    else if (selectionChanged) this.onSelectionChange?.()
+      this.revision = ++nextRevision; this.unitCache = undefined; this.changed(this.text); this.notify()
+    } else {
+      if (events.length && changes) this.proposals.handleUpdate(changes, events)
+      if (selectionChanged) this.onSelectionChange?.()
+    }
   }
   private dispatch(spec: TransactionSpec): void {
     if (this.view) this.view.dispatch(spec)

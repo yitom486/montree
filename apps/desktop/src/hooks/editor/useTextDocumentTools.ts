@@ -3,6 +3,7 @@ import { getDocumentKind, isOk } from '@yitom/contracts'
 import { fileApi } from '@/api/file-api'
 import { TextDocument } from '@/lib/editor/text-document'
 import '@/lib/editor/ai-proposals/install'
+import { registerLiveDocument } from '@/lib/editor/ai-proposals/live-documents'
 import { notifyDocumentTools, registerDocumentTools } from '@/lib/agent/context/document-tool-registry'
 import { registerSelectionProvider, commitDocumentSelection, getStickyReaderSelection, clearReaderSelection } from '@/lib/agent/context/reader-selection-registry'
 import { clearDraftForFile } from './useDraftPersistence'
@@ -42,7 +43,15 @@ export function useTextDocumentTools(options: {
     }
     return model
   }, [modelKey, options.session])
-  if (model && kind === 'typst' && options.filePath) model.filePath = options.filePath
+  if (model && kind === 'typst' && options.filePath && model.filePath !== options.filePath) {
+    // Typst 模型跨路径复用（另存为/切换），旧路径上的建议不得落到新文件
+    const stale = new Set(model.proposals.pending().map((item) => item.id))
+    const target = model
+    queueMicrotask(() => target.proposals.withdraw((item) => stale.has(item.id), '文档路径已变化'))
+    model.filePath = options.filePath
+  }
+  // 文件关闭/切换 → 释放建议列表（StrictMode 重挂会取消释放）
+  useEffect(() => (model ? registerLiveDocument(model) : undefined), [model])
   useEffect(() => { model?.sync(options.content) }, [model, options.content])
   useEffect(() => { model?.markSaved(options.savedContent, options.diskContent) }, [model, options.savedContent, options.diskContent])
   useEffect(() => {

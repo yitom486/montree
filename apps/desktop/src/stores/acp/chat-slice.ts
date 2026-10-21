@@ -9,6 +9,7 @@ import {
 import { classifyAcpUpdate } from '@/lib/agent/acp-update-adapter'
 import { pruneBlankThreads } from '@/lib/agent/acp-thread-prune'
 import { acpDevLog } from '@/lib/agent/acp-dev-log'
+import { emitThreadLifecycle } from '@/lib/agent/thread-lifecycle'
 import {
   dispatchOwnedChatEvent,
   reconcileOwnedChatThreadMetadata,
@@ -214,6 +215,7 @@ export const createChatSlice: StateCreator<
   },
 
   clearMessages: () => {
+    emitThreadLifecycle({ kind: 'clear', threadId: get().activeThreadId })
     set((s) => ({
       pendingMarkProposalSnapshotContents: [],
       pendingReplayUserText: null,
@@ -255,6 +257,7 @@ export const createChatSlice: StateCreator<
   },
 
   cancelActiveTools: () => {
+    emitThreadLifecycle({ kind: 'cancel', threadId: get().activeThreadId })
     set((s) =>
       patchActiveThread(s, (t) => {
         const feed = dispatchOwnedChatEvent(t, { type: 'cancel-tools' })
@@ -473,6 +476,7 @@ export const createChatSlice: StateCreator<
   },
 
   deleteThread: (threadId) => {
+    emitThreadLifecycle({ kind: 'delete', threadId })
     const pkg = getOwnedChatSessionStore()
     set((s) => {
       let threads = s.threads.filter((t) => t.id !== threadId)

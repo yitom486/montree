@@ -109,6 +109,10 @@ export interface AppSettingsState {
   markdownEditorMode: MarkdownEditorMode
   /** AI 审阅模式：Agent 直接 montree_text_edit 也改为待确认的修改建议 */
   aiEditReviewMode: boolean
+  /** 行内 AI 补全（ghost text）；仅在已配置模型时生效 */
+  aiInlineCompletion: boolean
+  /** 单独关闭行内补全的文件 */
+  inlineCompletionDisabledFiles: string[]
 }
 
 interface AppSettingsStore extends AppSettingsState {
@@ -133,6 +137,8 @@ interface AppSettingsStore extends AppSettingsState {
   setPdfOcrScale: (scale: PdfOcrScale) => void
   setVerboseRendererLogs: (enabled: boolean) => void
   setAiEditReviewMode: (enabled: boolean) => void
+  setAiInlineCompletion: (enabled: boolean) => void
+  toggleInlineCompletionForFile: (filePath: string) => void
   setMarkdownEditorMode: (mode: MarkdownEditorMode) => void
   toggleMarkdownEditorMode: () => void
   addRecentFile: (filePath: string) => void
@@ -175,6 +181,14 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       verboseRendererLogs: false,
       aiEditReviewMode: false,
       setAiEditReviewMode: (enabled) => set({ aiEditReviewMode: enabled }),
+      aiInlineCompletion: true,
+      inlineCompletionDisabledFiles: [],
+      setAiInlineCompletion: (enabled) => set({ aiInlineCompletion: enabled }),
+      toggleInlineCompletionForFile: (filePath) => set((state) => ({
+        inlineCompletionDisabledFiles: state.inlineCompletionDisabledFiles.includes(filePath)
+          ? state.inlineCompletionDisabledFiles.filter((item) => item !== filePath)
+          : [...state.inlineCompletionDisabledFiles, filePath].slice(-500),
+      })),
 
       setAutoSaveEnabled: (enabled) => set({ autoSaveEnabled: enabled }),
 
@@ -304,6 +318,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         pdfOcrScale: state.pdfOcrScale,
         verboseRendererLogs: state.verboseRendererLogs,
         aiEditReviewMode: state.aiEditReviewMode,
+        aiInlineCompletion: state.aiInlineCompletion,
+        inlineCompletionDisabledFiles: state.inlineCompletionDisabledFiles,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppSettingsState>
@@ -319,6 +335,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
           pdfOcrAgentAutoOcr: p.pdfOcrAgentAutoOcr ?? true,
           pdfOcrScale: p.pdfOcrScale ?? DEFAULT_PDF_OCR_SCALE,
           aiEditReviewMode: p.aiEditReviewMode ?? false,
+          aiInlineCompletion: p.aiInlineCompletion ?? true,
+          inlineCompletionDisabledFiles: Array.isArray(p.inlineCompletionDisabledFiles) ? p.inlineCompletionDisabledFiles : [],
         }
       },
     },

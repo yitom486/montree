@@ -15,7 +15,12 @@ const mocks = vi.hoisted(() => ({
   spawn: vi.fn(), initialize: vi.fn(), restore: vi.fn(), sessionRequest: vi.fn(),
   active: 0, maximum: 0,
 }))
-vi.mock('electron', () => ({ app: { getVersion: () => '0.4.12', getAppPath: () => process.cwd(), getPath: () => 'D:/test-home' } }))
+// userData 指向系统临时目录：曾用字面量 'D:/test-home'，在 Linux/macOS 上会在仓库内生成 `D:` 目录
+vi.mock('electron', async () => {
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  return { app: { getVersion: () => '0.4.12', getAppPath: () => process.cwd(), getPath: () => join(tmpdir(), 'montree-acp-connection-test-home') } }
+})
 vi.mock('./agent-resources', () => ({ initializeAgentResources: async () => process.cwd()+'/apps/desktop/resources/agent', montreeAgentResourceDir: () => process.cwd()+'/apps/desktop/resources/agent' }))
 vi.mock('./agent-sandbox-cwd', () => ({ resolveAgentCwd: () => ({ cwd: 'D:\\books', source: 'workspace' }) }))
 vi.mock('../bun-runtime', async (original) => ({ ...await original<typeof import('../bun-runtime')>(), ensureBunForCommand: async () => ({ ok: true }) }))

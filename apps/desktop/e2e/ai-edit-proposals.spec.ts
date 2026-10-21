@@ -76,14 +76,21 @@ test('AI 修改建议：MCP 提议→编辑器内差异→逐条/全部接受拒
     await editor.locator('[data-proposal-action="accept"]').first().click()
     await expect(page.getByTestId('proposal-review-count')).toHaveText('1 处修改建议')
     expect(await text()).toBe('>' + source.replace('quick brown', 'slow red'))
-    // 接受是一次普通撤销
+    // 接受是一次普通撤销：撤销后建议回到待审，重做再次接受
     await editor.click(); await page.keyboard.press('Control+z')
     expect(await text()).toBe('>' + source)
+    await expect(page.getByTestId('proposal-review-count')).toHaveText('2 处修改建议')
+    await page.keyboard.press('Control+y')
+    expect(await text()).toBe('>' + source.replace('quick brown', 'slow red'))
+    await expect(page.getByTestId('proposal-review-count')).toHaveText('1 处修改建议')
+    await page.keyboard.press('Control+z')
+    await expect(page.getByTestId('proposal-review-count')).toHaveText('2 处修改建议')
     // 切换到阅读模式再回来，建议仍在
     await page.keyboard.press('Control+3'); await expect(page.locator('.cm-editor')).toHaveCount(0)
     await expect(bar).toBeVisible()
-    await page.keyboard.press('Control+1'); await expect(editor.locator('.cm-ai-proposal-del')).toHaveCount(1)
-    await bar.getByRole('button', { name: '拒绝当前' }).click()
+    await page.keyboard.press('Control+1'); await expect(editor.locator('.cm-ai-proposal-del')).toHaveCount(2)
+    await page.getByTestId('proposal-reject-current').click()
+    await page.getByTestId('proposal-reject-current').click()
     await expect(bar).toHaveCount(0)
     expect(await text()).toBe('>' + source)
 
@@ -95,17 +102,23 @@ test('AI 修改建议：MCP 提议→编辑器内差异→逐条/全部接受拒
     await editor.locator('.cm-ai-proposal-del').click({ position: { x: 2, y: 4 } })
     await page.keyboard.type('x')
     await expect(page.getByTestId('proposal-review-count')).toContainText('1 处已失效')
-    await bar.getByRole('button', { name: '清除失效' }).click()
+    await page.getByTestId('proposal-more').click()
+    await page.getByTestId('proposal-dismiss-invalid').click()
     await expect(bar).toHaveCount(0)
 
     // 全部接受 = 单个事务
     state = await value('montree_text_read', { documentPath: md })
     const now = await text(), dog = now.indexOf('dog'), title = now.indexOf('标题')
     await value('montree_text_propose', { documentPath: md, revision: state.revision, expectedCount: 2, edits: [{ from: dog, to: dog + 3, expectedText: 'dog', text: 'cat' }, { from: title, to: title + 2, expectedText: '标题', text: '新标题' }] })
+    await page.getByTestId('proposal-more').click()
     await page.getByTestId('proposal-accept-all').click()
     expect(await text()).toBe(now.replace('dog', 'cat').replace('标题', '新标题'))
     await editor.click(); await page.keyboard.press('Control+z')
     expect(await text()).toBe(now)
+    await expect(page.getByTestId('proposal-review-count')).toHaveText('2 处修改建议')
+    await page.getByTestId('proposal-more').click()
+    await page.getByTestId('proposal-reject-all').click()
+    await expect(bar).toHaveCount(0)
 
     // Typst 多行建议
     await page.keyboard.press('Control+p')

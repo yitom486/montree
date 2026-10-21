@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ChangeSet, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { history } from '@codemirror/commands'
+import { history, isolateHistory, redo, undo } from '@codemirror/commands'
 import { TextDocument, setProposalExtensionFactory, setProposalReviewModeSource } from '../text-document'
 import { proposalExtension } from './proposal-extension'
 import { mapProposal, rangesConflict } from './proposal-mapping'
@@ -56,7 +56,32 @@ describe('ProposalManager data layer', () => {
     expect(() => doc.proposals.reject(id)).toThrow('已处理')
     doc.undo()
     expect(doc.text).toBe('one two three')
+    // 撤销接受 → 建议回到待审，位置复原
+    expect(doc.proposals.get(id)).toMatchObject({ status: 'pending', from: 4, to: 7 })
+    redo({ state: doc.state, dispatch: (tr) => doc.accept(tr.state, tr.changes) })
+    expect(doc.text).toBe('one 2 three')
     expect(doc.proposals.get(id)?.status).toBe('accepted')
+    doc.undo()
+    doc.proposals.accept(id)
+    expect(doc.text).toBe('one 2 three')
+  })
+
+  it('undo restores an accepted proposal even after later unrelated typing, in a mounted editor', () => {
+    const { doc, propose } = fixture('alpha beta')
+    const view = new EditorView({ state: doc.createEditorState({ extensions: [history(), EditorView.updateListener.of((u) => doc.accept(u.state, u.changes))] }), parent: document.createElement('div') })
+    const detach = doc.attach(view)
+    propose([{ from: 6, to: 10, expectedText: 'beta', text: 'BETA!' }])
+    const id = doc.proposals.list()[0].id
+    doc.proposals.accept(id)
+    view.dispatch({ changes: { from: 0, insert: '> ' }, annotations: isolateHistory.of('full') })
+    expect(doc.proposals.get(id)).toMatchObject({ status: 'accepted', from: 8, to: 13 })
+    undo(view) // 撤销输入
+    undo(view) // 撤销接受
+    expect(view.state.doc.toString()).toBe('alpha beta')
+    expect(doc.proposals.get(id)).toMatchObject({ status: 'pending', from: 6, to: 10 })
+    redo(view)
+    expect(doc.proposals.get(id)?.status).toBe('accepted')
+    detach(); view.destroy()
   })
 
   it('rejects exactly once and leaves text unchanged', () => {
@@ -213,12 +238,54 @@ describe('ProposalManager data layer', () => {
     expect(doc.text).toBe('xx zz!')
   })
 
-  it('dispose invalidates open proposals and blocks new ones', () => {
+  it('dispose (file close) clears the list and blocks new proposals', () => {
     const { doc, propose } = fixture('abc')
     propose([{ from: 0, to: 1, expectedText: 'a', text: 'A' }])
     doc.proposals.dispose()
-    expect(doc.proposals.list()[0].status).toBe('invalid')
+    expect(doc.proposals.list()).toHaveLength(0)
     expect(() => propose([{ from: 2, to: 3, expectedText: 'c', text: 'C' }])).toThrow('已关闭')
+  })
+})
+
+describe('sentence review and withdrawal', () => {
+  it('splits into sentences, applies only the chosen ones in one transaction, undo restores', () => {
+    const original = '第一句话。第二句话！Third one. Fourth?'
+    const { doc, propose } = fixture(original)
+    propose([{ from: 0, to: original.length, expectedText: original, text: '第一句改了。第二句话！Third changed. Fourth?' }])
+    const id = doc.proposals.list()[0].id
+    expect(doc.proposals.startHunkReview(id)).toBe(true)
+    const item = doc.proposals.get(id)!
+    expect(item.hunks!.map((h) => h.original)).toEqual(['第一句话。', 'Third one. '])
+    doc.proposals.setHunkDecision(id, 0, false)
+    doc.proposals.setHunkDecision(id, 1, true)
+    expect(doc.proposals.commitHunks(id)).toBe(1)
+    expect(doc.text).toBe('第一句话。第二句话！Third changed. Fourth?')
+    expect(doc.proposals.get(id)).toMatchObject({ status: 'accepted', appliedText: '第一句话。第二句话！Third changed. Fourth?' })
+    doc.undo()
+    expect(doc.text).toBe(original)
+    expect(doc.proposals.get(id)?.status).toBe('pending')
+  })
+  it('committing with nothing chosen rejects; single-sentence proposals are not split', () => {
+    const { doc, propose } = fixture('One. Two.')
+    propose([{ from: 0, to: 9, expectedText: 'One. Two.', text: 'Uno. Dos.' }])
+    const id = doc.proposals.list()[0].id
+    doc.proposals.startHunkReview(id)
+    expect(doc.proposals.commitHunks(id)).toBe(0)
+    expect(doc.proposals.get(id)?.status).toBe('rejected')
+    const other = fixture('Only one sentence')
+    other.propose([{ from: 0, to: 4, expectedText: 'Only', text: 'Just' }])
+    expect(other.doc.proposals.startHunkReview(other.doc.proposals.list()[0].id)).toBe(false)
+  })
+  it('withdraws a thread\'s pending proposals with a visible note', () => {
+    const { doc, propose } = fixture('a b c')
+    propose([{ from: 0, to: 1, expectedText: 'a', text: 'A' }], { threadId: 't1' })
+    propose([{ from: 4, to: 5, expectedText: 'c', text: 'C' }], { threadId: 't2' })
+    expect(doc.proposals.discardThread('t1', '对话已取消')).toBe(1)
+    expect(doc.proposals.list().find((p) => p.threadId === 't1')).toMatchObject({ status: 'rejected', note: '对话已取消' })
+    expect(doc.proposals.notice()?.text).toContain('对话已取消')
+    expect(doc.proposals.pending()).toHaveLength(1)
+    doc.proposals.dismissNotice()
+    expect(doc.proposals.notice()).toBeNull()
   })
 })
 
@@ -272,6 +339,26 @@ describe('proposal CodeMirror extension', () => {
     view.contentDOM.querySelector<HTMLButtonElement>('[data-proposal-action="reject"]')!.click()
     await flush()
     expect(doc.text).toBe('= Title\n#let a = 1\n#let b = 2\n')
+    expect(view.contentDOM.querySelector('.cm-ai-proposal')).toBeNull()
+    cleanup()
+  })
+
+  it('sentence-by-sentence review in the editor: 逐句 → choose → apply in one transaction', async () => {
+    const original = '第一句。第二句。Third.'
+    const { doc, propose, view, cleanup } = mount(original)
+    propose([{ from: 0, to: original.length, expectedText: original, text: '第一句改。第二句。Third!' }])
+    await flush()
+    view.contentDOM.querySelector<HTMLButtonElement>('[data-proposal-action="hunks"]')!.click()
+    await flush()
+    const rows = view.contentDOM.querySelectorAll('.cm-ai-hunk')
+    expect(rows).toHaveLength(2)
+    expect(view.contentDOM.querySelectorAll('.cm-ai-hunk-undecided')).toHaveLength(2)
+    view.contentDOM.querySelector<HTMLButtonElement>('[data-proposal-action="hunk-accept"][data-hunk-index="1"]')!.click()
+    await flush()
+    expect(view.contentDOM.querySelector('.cm-ai-hunk-footer')?.textContent).toContain('已采纳 1/2 句')
+    view.contentDOM.querySelector<HTMLButtonElement>('[data-proposal-action="hunks-commit"]')!.click()
+    await flush()
+    expect(doc.text).toBe('第一句。第二句。Third!')
     expect(view.contentDOM.querySelector('.cm-ai-proposal')).toBeNull()
     cleanup()
   })

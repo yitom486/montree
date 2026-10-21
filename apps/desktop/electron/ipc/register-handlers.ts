@@ -1,5 +1,6 @@
 import { registerTypstHandlers } from './typst-handlers'
 import { registerTerminalHandlers } from './terminal-handlers'
+import { registerInlineCompletionHandlers } from './inline-completion-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
@@ -535,6 +536,7 @@ export function registerIpcHandlers(): void {
   registerAcpWindowHandlers()
   registerTypstHandlers()
   registerTerminalHandlers()
+  registerInlineCompletionHandlers()
   if (process.env.E2E_READER_VISUAL === '1') {
     Object.assign(globalThis, {
       __montreeE2eVisualTools: (name: string, args?: Record<string, unknown>) =>
@@ -546,6 +548,12 @@ export function registerIpcHandlers(): void {
       withTestWindow(() => callDocumentTool(name, { readSnapshot: handleSnapshotRequest }, args)),
       __montreeE2eDocumentSnapshot: (resource: Parameters<typeof handleSnapshotRequest>[0], args?: Parameters<typeof handleSnapshotRequest>[1]) => withTestWindow(() => handleSnapshotRequest(resource, args)),
       __montreeE2eMcpEndpoint: () => withTestWindow(async () => { const server = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest }); return { url: server.url, authToken: server.authToken } }),
+      // 多窗口隔离：按 webContents id 为指定窗口单独起一个 MCP 端点
+      __montreeE2eMcpEndpointForWindow: async (webContentsId: number) => {
+        const target = BrowserWindow.getAllWindows().find((window) => window.webContents.id === webContentsId)
+        if (!target) throw new Error('窗口不存在')
+        return withAcpWindow(target.webContents, async () => { const server = await startMontreeMcpServer({ readSnapshot: handleSnapshotRequest }); return { url: server.url, authToken: server.authToken } })
+      },
     })
   }
 

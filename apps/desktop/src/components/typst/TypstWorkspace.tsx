@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ProposalReviewBar } from '@/components/editor/ai-proposals/ProposalReviewBar'
+import { ProposalReviewLayout } from '@/components/editor/ai-proposals/ProposalReviewBar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, RefreshCw, Settings2, WrapText } from 'lucide-react'
 import { useGroupRef } from 'react-resizable-panels'
@@ -125,8 +125,8 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
       <Button size="sm" variant="outline" disabled={!session.session || remote || exporting || session.phase === 'error'} onClick={() => void exportHtml()}><Download aria-hidden="true" />{exporting ? '正在导出…' : '导出 HTML'}</Button>
     </div>
     {error && <div className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive" role="alert">{error}</div>}
-    <ProposalReviewBar document={textDocument} />
-    <ResizablePanelGroup groupRef={groupRef} orientation="horizontal" className="min-h-0 flex-1" disabled={viewMode !== 'split'}>
+    <div className="min-h-0 flex-1"><ProposalReviewLayout document={textDocument}>
+    <ResizablePanelGroup groupRef={groupRef} orientation="horizontal" className="h-full min-h-0" disabled={viewMode !== 'split'}>
       <ResizablePanel id="typst-source" defaultSize="50%" minSize="15%" collapsible collapsedSize={0} className="min-w-0" aria-hidden={viewMode === 'preview'} inert={viewMode === 'preview'}>
         <TypstEditor ref={editorRef} filePath={filePath} value={content} textDocument={textDocument}
           uri={remote ? null : session.session?.uri ?? null} sessionKey={session.session?.sessionId} capabilities={session.session?.capabilities} diagnostics={session.diagnostics}
@@ -143,6 +143,7 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
           </div>}
       </ResizablePanel>
     </ResizablePanelGroup>
+    </ProposalReviewLayout></div>
     <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Typst 配置</DialogTitle><DialogDescription>字体和运行时供本机文档共用，固定入口仅用于当前文件。保存后重启服务。</DialogDescription></DialogHeader>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { RemoteConnectModal } from './RemoteConnectModal'
 import { cn } from '@/lib/utils'
+import { InlineCompletionToggle } from '@/components/editor/InlineCompletionToggle'
 
 export interface StatusBarProps {
   terminalVisible?: boolean
@@ -188,6 +189,7 @@ export function StatusBar({
         {/* 右侧：文档格式与编码 */}
         <div className="flex items-center gap-3">
           <button type="button" aria-label="切换终端" aria-pressed={terminalVisible} title="终端 (Ctrl+`)" onClick={onToggleTerminal} className="flex items-center gap-1 hover:text-foreground"><Terminal className="size-3" /><span>终端</span></button>
+          {activeFilePath && (documentKind === 'markdown' || documentKind === 'typst') && <InlineCompletionToggle filePath={activeFilePath} />}
           {documentKind && (
             <span className="uppercase tracking-wider text-[10px] font-mono text-muted-foreground/80">
               {documentKind}

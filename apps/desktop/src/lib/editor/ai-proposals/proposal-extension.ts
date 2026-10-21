@@ -3,6 +3,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, typ
 import type { ProposalManager } from './proposal-manager'
 import type { EditProposal } from './proposal-types'
 import { wordDiff } from './proposal-diff'
+import { splitIntoHunks } from './proposal-hunks'
 
 /**
  * AI 修改建议可视化：独立 CodeMirror 扩展（不混入 live-preview）。
@@ -13,25 +14,43 @@ export const setProposalsEffect = StateEffect.define<readonly EditProposal[]>()
 export interface ProposalActions {
   accept: (id: string) => void
   reject: (id: string) => void
+  startHunks: (id: string) => void
+  decideHunk: (id: string, index: number, accepted: boolean) => void
+  commitHunks: (id: string) => void
+  cancelHunks: (id: string) => void
 }
 
-function button(label: string, action: 'accept' | 'reject', proposal: EditProposal, actions: ProposalActions): HTMLButtonElement {
+type ButtonAction = 'accept' | 'reject' | 'hunks' | 'hunk-accept' | 'hunk-reject' | 'hunks-commit' | 'hunks-cancel'
+const TITLES: Record<ButtonAction, string> = {
+  accept: '接受此修改', reject: '拒绝此修改', hunks: '逐句审阅', 'hunk-accept': '采纳此句', 'hunk-reject': '不采纳此句',
+  'hunks-commit': '应用所选句子', 'hunks-cancel': '退出逐句审阅',
+}
+
+function button(label: string, action: ButtonAction, proposal: EditProposal, run: () => void, extra?: { index?: number; pressed?: boolean }): HTMLButtonElement {
   const el = document.createElement('button')
   el.type = 'button'
   el.className = `cm-ai-proposal-btn cm-ai-proposal-btn-${action}`
   el.textContent = label
-  el.title = action === 'accept' ? '接受此修改' : '拒绝此修改'
+  el.title = TITLES[action]
   el.dataset.proposalAction = action
   el.dataset.proposalId = proposal.id
-  el.setAttribute('aria-label', `${el.title}`)
+  if (extra?.index !== undefined) el.dataset.hunkIndex = String(extra.index)
+  if (extra?.pressed !== undefined) el.setAttribute('aria-pressed', String(extra.pressed))
+  el.setAttribute('aria-label', el.title)
   // mousedown 阻止编辑器夺焦/移动光标；click 才执行，避免拖选误触。
   el.addEventListener('mousedown', (event) => { event.preventDefault(); event.stopPropagation() })
-  el.addEventListener('click', (event) => {
-    event.preventDefault(); event.stopPropagation()
-    if (action === 'accept') actions.accept(proposal.id)
-    else actions.reject(proposal.id)
-  })
+  el.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); run() })
   return el
+}
+
+const hunkCountCache = new WeakMap<EditProposal, number>()
+function hunkCount(proposal: EditProposal): number {
+  let count = hunkCountCache.get(proposal)
+  if (count === undefined) {
+    count = proposal.expectedText.length + proposal.replacement.length > 20_000 ? 0 : splitIntoHunks(proposal.expectedText, proposal.replacement).length
+    hunkCountCache.set(proposal, count)
+  }
+  return count
 }
 
 function renderReplacement(proposal: EditProposal, into: HTMLElement): void {
@@ -55,9 +74,11 @@ class ProposalWidget extends WidgetType {
   constructor(readonly proposal: EditProposal, readonly block: boolean, readonly actions: ProposalActions) { super() }
   eq(other: ProposalWidget): boolean {
     return other.proposal.id === this.proposal.id && other.proposal.status === this.proposal.status &&
-      other.proposal.replacement === this.proposal.replacement && other.block === this.block
+      other.proposal.replacement === this.proposal.replacement && other.block === this.block &&
+      other.proposal.hunkDecisions === this.proposal.hunkDecisions && other.proposal.hunks === this.proposal.hunks
   }
   toDOM(): HTMLElement {
+    if (this.proposal.hunks && this.proposal.hunkDecisions) return this.hunkDOM()
     const root = document.createElement(this.block ? 'div' : 'span')
     root.className = `cm-ai-proposal ${this.block ? 'cm-ai-proposal-block' : 'cm-ai-proposal-inline'}`
     root.dataset.proposalId = this.proposal.id
@@ -71,9 +92,46 @@ class ProposalWidget extends WidgetType {
     } else renderReplacement(this.proposal, body)
     const bar = document.createElement('span')
     bar.className = 'cm-ai-proposal-actions'
-    if (this.proposal.status === 'pending') bar.append(button('✓ 接受', 'accept', this.proposal, this.actions))
-    bar.append(button(this.proposal.status === 'invalid' ? '忽略' : '✕ 拒绝', 'reject', this.proposal, this.actions))
+    const { id } = this.proposal
+    if (this.proposal.status === 'pending') bar.append(button('✓ 接受', 'accept', this.proposal, () => this.actions.accept(id)))
+    bar.append(button(this.proposal.status === 'invalid' ? '忽略' : '✕ 拒绝', 'reject', this.proposal, () => this.actions.reject(id)))
+    if (this.proposal.status === 'pending' && hunkCount(this.proposal) >= 2) bar.append(button('逐句', 'hunks', this.proposal, () => this.actions.startHunks(id)))
     root.append(body, bar)
+    return root
+  }
+  /** 逐句审阅：每句原文/新文并列，单独采纳或不采纳，最后一次提交。 */
+  private hunkDOM(): HTMLElement {
+    const { id, hunks, hunkDecisions } = this.proposal as Required<Pick<EditProposal, 'hunks' | 'hunkDecisions'>> & EditProposal
+    const root = document.createElement('div')
+    root.className = 'cm-ai-proposal cm-ai-proposal-block cm-ai-proposal-hunks'
+    root.dataset.proposalId = id
+    root.setAttribute('contenteditable', 'false')
+    const list = document.createElement('div')
+    list.className = 'cm-ai-hunk-list'
+    hunks.forEach((hunk, index) => {
+      const row = document.createElement('div')
+      const decision = hunkDecisions[index]
+      row.className = `cm-ai-hunk ${decision === true ? 'cm-ai-hunk-accepted' : decision === false ? 'cm-ai-hunk-rejected' : ''}`
+      row.dataset.hunkIndex = String(index)
+      const before = document.createElement('span'); before.className = 'cm-ai-hunk-original'; before.textContent = hunk.original || '（插入）'
+      const arrow = document.createElement('span'); arrow.className = 'cm-ai-hunk-arrow'; arrow.textContent = '→'
+      const after = document.createElement('span'); after.className = 'cm-ai-hunk-insert'; after.textContent = hunk.insert || '（删除）'
+      const actions = document.createElement('span'); actions.className = 'cm-ai-proposal-actions'
+      actions.append(
+        button('✓', 'hunk-accept', this.proposal, () => this.actions.decideHunk(id, index, true), { index, pressed: decision === true }),
+        button('✕', 'hunk-reject', this.proposal, () => this.actions.decideHunk(id, index, false), { index, pressed: decision === false }),
+      )
+      row.append(before, arrow, after, actions)
+      list.append(row)
+    })
+    const footer = document.createElement('div')
+    footer.className = 'cm-ai-hunk-footer'
+    const chosen = hunkDecisions.filter((value) => value === true).length
+    const label = document.createElement('span'); label.textContent = `已采纳 ${chosen}/${hunks.length} 句`
+    footer.append(label,
+      button(`应用所选（${chosen}）`, 'hunks-commit', this.proposal, () => this.actions.commitHunks(id)),
+      button('退出逐句', 'hunks-cancel', this.proposal, () => this.actions.cancelHunks(id)))
+    root.append(list, footer)
     return root
   }
   ignoreEvent(): boolean { return true }
@@ -90,6 +148,16 @@ export function buildProposalDecorations(state: EditorState, proposals: readonly
     if (proposal.status !== 'pending' && proposal.status !== 'invalid') continue
     if (proposal.to > length || proposal.from > proposal.to) continue
     const attributes = { 'data-proposal-id': proposal.id }
+    if (proposal.status === 'pending' && proposal.hunks && proposal.hunkDecisions) {
+      proposal.hunks.forEach((hunk, index) => {
+        if (hunk.from === hunk.to) return
+        const decision = proposal.hunkDecisions![index]
+        const cls = decision === true ? 'cm-ai-proposal-del' : decision === false ? 'cm-ai-hunk-kept' : 'cm-ai-hunk-undecided'
+        ranges.push(Decoration.mark({ class: cls, attributes: { ...attributes, 'data-hunk-index': String(index) } }).range(proposal.from + hunk.from, proposal.from + hunk.to))
+      })
+      ranges.push(Decoration.widget({ widget: new ProposalWidget(proposal, true, actions), block: true, side: 1 }).range(state.doc.lineAt(proposal.to).to))
+      continue
+    }
     const multiline = isMultiline(state, proposal)
     if (proposal.from < proposal.to && proposal.status === 'pending') {
       ranges.push(Decoration.mark({ class: 'cm-ai-proposal-del', attributes, inclusiveStart: false, inclusiveEnd: false }).range(proposal.from, proposal.to))
@@ -124,14 +192,40 @@ const proposalTheme = EditorView.baseTheme({
   '.cm-ai-proposal-actions': { display: 'inline-flex', gap: '2px', marginLeft: '4px', verticalAlign: 'baseline', userSelect: 'none' },
   '.cm-ai-proposal-btn': { font: '500 11px/1.4 system-ui, sans-serif', padding: '0 6px', border: '1px solid rgba(127,127,127,0.35)', borderRadius: '4px', background: 'var(--background, #fff)', color: 'inherit', cursor: 'pointer' },
   '.cm-ai-proposal-btn-accept:hover': { backgroundColor: 'rgba(34, 197, 94, 0.2)', borderColor: 'rgba(22, 163, 74, 0.7)' },
+  '.cm-ai-hunks': { flexDirection: 'column', alignItems: 'stretch' },
+  '.cm-ai-hunk-list': { display: 'flex', flexDirection: 'column', gap: '2px' },
+  '.cm-ai-hunk': { display: 'flex', alignItems: 'baseline', gap: '6px', padding: '1px 4px', borderRadius: '3px', whiteSpace: 'pre-wrap' },
+  '.cm-ai-hunk-accepted': { backgroundColor: 'rgba(34, 197, 94, 0.16)' },
+  '.cm-ai-hunk-rejected': { opacity: '0.55' },
+  '.cm-ai-hunk-original': { textDecoration: 'line-through', textDecorationColor: 'rgba(220, 38, 38, 0.85)', flex: '1', minWidth: '0' },
+  '.cm-ai-hunk-rejected .cm-ai-hunk-original': { textDecoration: 'none' },
+  '.cm-ai-hunk-rejected .cm-ai-hunk-insert': { textDecoration: 'line-through' },
+  '.cm-ai-hunk-insert': { color: 'rgb(21, 128, 61)', flex: '1', minWidth: '0' },
+  '.cm-ai-hunk-arrow': { opacity: '0.5' },
+  '.cm-ai-hunk-footer': { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '11px', opacity: '0.9' },
+  '.cm-ai-hunk-undecided': { backgroundColor: 'rgba(234, 179, 8, 0.16)' },
+  '.cm-ai-hunk-kept': { backgroundColor: 'rgba(127, 127, 127, 0.1)' },
+  '.cm-ai-proposal-btn[aria-pressed="true"]': { backgroundColor: 'rgba(34, 197, 94, 0.25)', borderColor: 'rgba(22, 163, 74, 0.7)' },
+  '.cm-ai-proposal-btn-hunk-reject[aria-pressed="true"]': { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderColor: 'rgba(220, 38, 38, 0.7)' },
   '.cm-ai-proposal-btn-reject:hover': { backgroundColor: 'rgba(239, 68, 68, 0.18)', borderColor: 'rgba(220, 38, 38, 0.7)' },
 })
 
 /** 编辑器扩展：订阅 ProposalManager，变化时以 effect 推送；IME 组合输入期间延后推送，避免打断输入法。 */
-export function proposalExtension(manager: ProposalManager, actions: ProposalActions = {
-  accept: (id) => { try { manager.accept(id) } catch (error) { console.warn('[proposals] accept failed', error) } },
-  reject: (id) => { try { manager.reject(id) } catch (error) { console.warn('[proposals] reject failed', error) } },
-}): Extension {
+const safely = (label: string, run: () => unknown) => { try { run() } catch (error) { console.warn(`[proposals] ${label} failed`, error) } }
+export function defaultProposalActions(manager: ProposalManager): ProposalActions {
+  return {
+    accept: (id) => safely('accept', () => manager.accept(id)),
+    reject: (id) => safely('reject', () => manager.reject(id)),
+    startHunks: (id) => safely('hunks', () => manager.startHunkReview(id)),
+    decideHunk: (id, index, accepted) => safely('hunk', () => {
+      const current = manager.get(id)?.hunkDecisions?.[index]
+      manager.setHunkDecision(id, index, current === accepted ? null : accepted)
+    }),
+    commitHunks: (id) => safely('commit', () => manager.commitHunks(id)),
+    cancelHunks: (id) => safely('cancel', () => manager.cancelHunkReview(id)),
+  }
+}
+export function proposalExtension(manager: ProposalManager, actions: ProposalActions = defaultProposalActions(manager)): Extension {
   const field = StateField.define<DecorationSet>({
     create: (state) => buildProposalDecorations(state, manager.list(), actions),
     update(value, tr) {

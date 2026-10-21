@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
+import { INLINE_COMPLETION_IPC, type InlineCompletionAPI } from '../contracts/inline-completion'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { IPC } from '@yitom/contracts'
 import type { AppError } from '@yitom/contracts'
@@ -429,3 +430,9 @@ const terminalAPI: TerminalAPI = {
   },
 }
 contextBridge.exposeInMainWorld('montreeTerminal', terminalAPI)
+const inlineCompletionAPI: InlineCompletionAPI = {
+  complete: (request) => ipcRenderer.invoke(INLINE_COMPLETION_IPC.complete, request),
+  cancel: (requestId) => ipcRenderer.invoke(INLINE_COMPLETION_IPC.cancel, requestId),
+  status: () => ipcRenderer.invoke(INLINE_COMPLETION_IPC.status),
+}
+contextBridge.exposeInMainWorld('montreeInlineCompletion', inlineCompletionAPI)

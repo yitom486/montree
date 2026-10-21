@@ -164,6 +164,8 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
   const setVerboseRendererLogs = useAppSettingsStore((state) => state.setVerboseRendererLogs)
   const aiEditReviewMode = useAppSettingsStore((state) => state.aiEditReviewMode)
   const setAiEditReviewMode = useAppSettingsStore((state) => state.setAiEditReviewMode)
+  const aiInlineCompletion = useAppSettingsStore((state) => state.aiInlineCompletion)
+  const setAiInlineCompletion = useAppSettingsStore((state) => state.setAiInlineCompletion)
   const [clearingOcrCache, setClearingOcrCache] = useState(false)
   const {
     status: ocrComponentStatus,
@@ -486,6 +488,12 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
               description="Agent 直接改写 Markdown / Typst 时，先显示为修改建议，由你逐条接受或拒绝。"
             >
               <ToggleSwitch checked={aiEditReviewMode} onChange={setAiEditReviewMode} label="审阅模式" />
+            </SettingRow>
+            <SettingRow
+              title="行内补全"
+              description="停顿后在光标处显示灰色续写建议：Tab 接受、Ctrl/Cmd+→ 逐词接受、Esc 忽略、Alt+] 切换候选。使用 Agent 面板中配置的自定义模型供应商；未配置时不生效。可在状态栏为单个文件关闭。"
+            >
+              <ToggleSwitch checked={aiInlineCompletion} onChange={setAiInlineCompletion} label="行内补全" />
             </SettingRow>
           </section>
 
