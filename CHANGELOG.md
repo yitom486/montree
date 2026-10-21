@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.19] - 2026-10-22
+
 - **AI 修改建议（审阅层）**：Markdown / Typst 新增 MCP 工具 `montree_text_propose`（参数同 `montree_text_edit`，同样校验 revision / expectedText / Unicode 边界），Agent 的修改先以“删除线原文 + 绿色替换文本”显示在 CodeMirror 编辑器内，附行内接受/拒绝按钮；多行修改用整行标记 + 块级预览。编辑器上方审阅栏可上一处/下一处导航、查看列表、全部接受/全部拒绝。建议绑定文档模型（切换预览、卸载编辑器不丢失），随用户输入映射位置；用户改动目标范围则失效、不自动合并；接受恰好一次且为单个可撤销事务；迟到的、指向其他文档的调用一律拒绝。设置新增「AI 编辑 · 审阅模式」：开启后 Agent 直接 `montree_text_edit` 也改为待确认建议。
 
 - **切换文档不再闪动聊天面板**：此前阅读器（PDF / EPUB / 在线文档）把 Agent 面板挂在各自内框里，编辑器则挂在外壳右侧。在 Markdown、PDF、在线文档之间切换时，面板整树卸载再重挂（消息列表重建、滚动位置丢失），宽度也在外壳百分比和阅读器固定像素之间来回跳，整页都会重新排版。现在聊天面板始终挂在外壳，与文档类型无关。聊天面板隐藏时主区仍铺满（修正 Typst 预览缩放回归）。文档区与聊天区外框使用 `contain: strict` 隔离，工作区内容（工具栏、滚动条、异步渲染）的尺寸变化不再外溢。新增 E2E：用渲染计数探针断言切换时聊天面板零重渲染，外框零位移。
@@ -593,7 +597,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.18...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.19...HEAD
+[0.4.19]: https://github.com/yitom486/montree/compare/v0.4.18...v0.4.19
 [0.4.18]: https://github.com/yitom486/montree/compare/v0.4.17...v0.4.18
 [0.4.17]: https://github.com/yitom486/montree/compare/v0.4.16...v0.4.17
 [0.4.16]: https://github.com/yitom486/montree/compare/v0.4.15...v0.4.16
