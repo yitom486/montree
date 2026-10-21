@@ -63,7 +63,7 @@ async function annotate(page: Page, note: string) {
  * Agent 经本窗口 MCP 调 montree_propose_mark 按摘录提议 AI 笔记（mock Agent 与真实 Agent 同一路径），
  * 聊天里出现提议卡，用户「采用并保存」后落库。摘录必须能在渲染后的正文里重新定位。
  */
-async function agentProposeNote(page: Page, excerpt: string, note: string) {
+async function agentProposeNote(page: Page, excerpt: string, note: string): Promise<string> {
   const chat = page.getByRole('region', { name: 'Agent 聊天' })
   const composer = chat.locator('textarea').first()
   await composer.fill(`mcp-call:montree_propose_mark:${JSON.stringify({ excerpt, note })}`)
@@ -73,11 +73,15 @@ async function agentProposeNote(page: Page, excerpt: string, note: string) {
   await draft.click()
   const adopt = chat.getByRole('button', { name: '采用并保存', exact: true }).last()
   await expect(adopt).toBeVisible({ timeout: 30_000 })
+  // 采用前在卡片里改稿：写库的必须是改后的文本
+  const edited = `${note}（用户改稿）`
+  await chat.locator('[data-testid="propose-mark-card"] textarea').last().fill(edited)
   await adopt.click()
   // 卡片落定为已采用；写库失败会弹「未找到/失败」类提示
   const failure = page.locator('[data-sonner-toast]').filter({ hasText: /失败|未找到|无法|未就绪/ })
   await expect(chat.getByRole('button', { name: '采用并保存', exact: true })).toHaveCount(0, { timeout: 15_000 })
   expect(await failure.allTextContents()).toEqual([])
+  return edited
 }
 /** 三击选段，直到选区工具栏出现（iframe 刚载入时选区监听可能尚未绑定，首次三击会丢） */
 async function tripleSelect(page: Page, target: Locator) {
@@ -121,7 +125,7 @@ test('React 在线文档：划重点 / 批注 / 智能制卡，重载后持久�
     await tripleSelect(page, third)
     await smartCard(page)
     await expect(frame.locator('[data-mark-id]').first()).toBeVisible()
-    await agentProposeNote(page, 'You can declare many components in one file', 'AI 笔记：一个文件可声明多个组件')
+    const webNote = await agentProposeNote(page, 'You can declare many components in one file', 'AI 笔记：一个文件可声明多个组件')
     await shot(page, 'react-webdoc-annotations.png')
     await expect.poll(async () => (await frame.locator('[data-mark-id]').evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length, { timeout: 15_000 }).toBe(4)
 
@@ -132,6 +136,8 @@ test('React 在线文档：划重点 / 批注 / 智能制卡，重载后持久�
     // 重新锚定到原文：高亮仍覆盖原句文字
     const anchored = await after.locator('[data-mark-id]').evaluateAll((els) => els.map((el) => el.textContent ?? '').join(' '))
     expect(anchored).toContain('React is a JavaScript library')
+    // 落库的是改后的批注
+    await expect(page.locator('#main').getByText(webNote).first()).toBeAttached({ timeout: 15_000 })
     await shot(page, 'react-webdoc-after-reload.png')
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))
@@ -201,7 +207,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
     await smartCard(page)
     const marks = panel.locator('[data-mark-id]')
     await expect.poll(async () => (await marks.evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length).toBe(3)
-    await agentProposeNote(page, 'like buttons, text, and images.', 'AI 笔记：UI 由小单元构成')
+    const pdfNote = await agentProposeNote(page, 'like buttons, text, and images.', 'AI 笔记：UI 由小单元构成')
     await expect.poll(async () => (await marks.evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length).toBe(4)
     await shot(page, 'react-scanned-pdf-annotations.png')
     // 卡片轨中的摘录保留词间空格
@@ -210,6 +216,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
     await page.reload()
     await expect(page.locator('#main').getByText(/已识别 \d+\/\d+/)).toBeVisible({ timeout: 60_000 })
     await expect.poll(async () => (await page.locator('#main [data-mark-id]').evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length, { timeout: 30_000 }).toBe(4)
+    await expect(page.locator('#main').getByText(pdfNote).first()).toBeAttached({ timeout: 15_000 })
     await shot(page, 'react-scanned-pdf-after-reload.png')
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))

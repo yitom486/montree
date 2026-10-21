@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@yitom/contracts": "0.1.24",
+    "@yitom/contracts": "0.1.25",
     "@montree/workspace-core": "workspace:*"
   },
   "exports": {

@@ -21,7 +21,7 @@ import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
 import { toast } from 'sonner'
 import { adoptProposedMark } from '@/lib/agent/context/propose-mark'
 import { toastMarkProposalFailure } from '@/lib/agent/mark-proposal-failure'
-import type { MarkProposalStatus, ProposedMark } from '@yitom/annotations'
+import type { ProposedMark } from '@yitom/annotations'
 import { dismissProposedMark } from '@/lib/agent/context/propose-mark'
 import { respondPermissionRequest } from '@/lib/agent/permission-respond'
 import { openChapterForMarkRecovery, promptSelectTextForMarkRecovery } from '@/lib/agent/mark-proposal-failure'
@@ -73,42 +73,22 @@ const ThreadMessageList = memo(function ThreadMessageList({
 }: AgentMessageListProps) {
   const messages = useAcpActiveMessages()
   const pendingPermission = useAcpPendingPermission()
-  const resolveMarkProposalInStore = useAcpUiStore((s) => s.resolveMarkProposal)
-  const messagesForAdoptRef = useRef(messages)
-  messagesForAdoptRef.current = messages
-  // chat-ui 气泡内的提议卡不带 onAdopt，「采用并保存」只回传落定状态；
-  // 宿主在此按提议摘录真正写库。
-  const resolveMarkProposal = useCallback(
-    (proposalId: string, status: Exclude<MarkProposalStatus, 'pending'>) => {
-      if (status !== 'adopted') {
-        resolveMarkProposalInStore(proposalId, status)
-        return
-      }
-      const proposal = findProposal(messagesForAdoptRef.current, proposalId)
-      if (!proposal) {
-        resolveMarkProposalInStore(proposalId, status)
-        return
-      }
-      // 先同步落定（与卡片内部状态一致，避免卡片在异步写库期间重排），再写库；失败提示可重试
-      resolveMarkProposalInStore(proposalId, status)
-      void adoptProposedMark({
-        note: proposal.note,
-        excerpt: proposal.excerpt,
-        flatIndex: proposal.flatIndex,
-        kind: proposal.kind,
-        category: proposal.category,
-        title: proposal.title,
-      }).then(
-        () => {
-          toast.success(proposal.kind === 'highlight' || !proposal.note.trim() ? '已添加高亮' : '已保存批注')
-        },
-        (cause) => {
-          toastMarkProposalFailure(cause, { flatIndex: proposal.flatIndex })
-        },
-      )
-    },
-    [resolveMarkProposalInStore],
-  )
+  const resolveMarkProposal = useAcpUiStore((s) => s.resolveMarkProposal)
+  // 「采用并保存」：按提议摘录写库，note 为用户在卡片里改过的文本；成功后包内再落定 adopted
+  const adoptMarkProposal = useCallback(async (proposal: ProposedMark, note: string) => {
+    await adoptProposedMark({
+      note,
+      excerpt: proposal.excerpt,
+      flatIndex: proposal.flatIndex,
+      kind: proposal.kind,
+      category: proposal.category,
+      title: proposal.title,
+    })
+    toast.success(proposal.kind === 'highlight' || !note.trim() ? '已添加高亮' : '已保存批注')
+  }, [])
+  const markProposalError = useCallback((cause: unknown, context: { flatIndex?: number }) => {
+    toastMarkProposalFailure(cause, context)
+  }, [])
   const prompting = useAcpUiStore((s) => s.prompting)
   const threadId = useAcpUiStore((s) => s.activeThreadId)
   // 线程级用量（usage_update 落库）：存量引用，替换时才变，不抖动订阅
@@ -172,6 +152,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
           </div>
         }
         resolveMarkProposal={resolveMarkProposal}
+        onAdoptMarkProposal={adoptMarkProposal}
+        onMarkProposalError={markProposalError}
         onDismissProposedMark={dismissProposedMark}
         onPermissionRespond={(optionId) => {
           if (pendingPermission) respondPermissionRequest(pendingPermission, optionId)
@@ -200,12 +182,3 @@ const ThreadMessageList = memo(function ThreadMessageList({
   )
 })
 
-function findProposal(messages: readonly unknown[], proposalId: string): ProposedMark | null {
-  for (const raw of messages) {
-    const message = raw as { markProposal?: ProposedMark; markProposals?: Array<{ proposal: ProposedMark }> }
-    if (message.markProposal?.id === proposalId) return message.markProposal
-    const row = message.markProposals?.find((item) => item.proposal.id === proposalId)
-    if (row) return row.proposal
-  }
-  return null
-}
