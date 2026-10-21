@@ -6,6 +6,9 @@
 
 ## [未发布]
 
+- **CI 恢复与发版闸门**：修复 Agent 聊天 E2E 一直红的根因——测试仍往旧键 `montree-acp-ui` 播种，而聊天单权威迁移后应用读 `montree-acp-metadata/v2` + `montree-chat-session/v1`，种子被忽略、面板退回默认运行时；新增共享播种 helper。Release 工作流改为先完整复用 CI（含 E2E），CI 红则不打包、不发布。
+- **Release 产物清理**：上传清单只收 `latest*.yml`，`builder-debug.yml` 不再进入 GitHub Release。
+
 ---
 
 ## [0.4.18] - 2026-10-20

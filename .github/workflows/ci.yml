@@ -4,6 +4,14 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # Release 工作流复用本文件：发版前必须先跑完整 CI（含 E2E），红了就不打包不发布
+  workflow_call:
+    inputs:
+      ref:
+        description: 要检出的 git ref（tag 或提交）；留空则用触发事件的 ref
+        required: false
+        type: string
+        default: ''
 
 jobs:
   quality:
@@ -13,6 +21,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.ref }}
           submodules: recursive
 
       - name: 安装 Bun
@@ -43,6 +52,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.ref }}
           submodules: recursive
 
       - name: 安装 Bun

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { seedMockChatThread } from './helpers/seed-chat'
 
 /**
  * Mermaid 双修（真实 Electron + mock 回放，无真实模型）：
@@ -8,6 +9,8 @@ import { launchBuiltApp } from './helpers/launch-app'
  */
 async function openPanel(page: Page) {
   const panel = page.locator('aside[aria-label="Agent 聊天"]:visible')
+  // reload 后面板异步挂载：先等它自己出现，避免误点「AI 伴读」把已打开的面板切走
+  await panel.first().waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
   if ((await panel.count()) === 0) {
     await page.getByRole('button', { name: 'AI 伴读', exact: true }).click()
   }
@@ -33,17 +36,7 @@ test.describe('Mermaid 主题与滚轮', () => {
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
-      await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
-          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'mermaid-dark',
-          threads: [{ id: 'mermaid-dark', runtimeId: 'mock-window', title: '图', createdAt: now, updatedAt: now, messages: [] }],
-        } }))
-        const raw = JSON.parse(localStorage.getItem('markdown-editor-ui') ?? '{"state":{}}')
-        raw.state = { ...(raw.state ?? {}), theme: 'dark' }
-        localStorage.setItem('markdown-editor-ui', JSON.stringify(raw))
-      })
-      await window.reload()
+      await seedMockChatThread(window, { id: 'mermaid-dark', title: '图' }, { theme: 'dark' })
       const panel = await openPanel(window)
       await panel.locator('textarea').fill('stream')
       await panel.getByRole('button', { name: '发送', exact: true }).click()

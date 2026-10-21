@@ -22,46 +22,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: 类型检查与单元测试
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
-          # foliate 后端是 git submodule；缺了它 @foliate/* 解析失败，单测/构建必挂
-          submodules: recursive
-
-      - name: 安装 Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: 安装依赖
-        run: bun install --frozen-lockfile
-
-      - name: 类型检查
-        run: bun run typecheck
-
-      - name: 文档清单检查
-        run: bun run lint:docs
-
-      - name: 依赖边界检查
-        run: bun run lint:deps
-
-      - name: 单元与集成测试
-        run: bun run test
-
-      - name: 构建应用
-        run: bun run build
-
-      - name: 体积与打包清单检查
-        run: bun run check:bundle
+  # 发版闸门：完整复用 CI（类型检查/单测/构建/体积检查/E2E），任何一项红都不会打包和发布
+  ci:
+    name: CI 闸门
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
   build:
     name: 打包 (${{ matrix.name }})
-    needs: quality
+    needs: ci
     strategy:
       fail-fast: false
       matrix:
@@ -109,7 +79,7 @@ jobs:
           path: |
             release/*.exe
             release/*.exe.blockmap
-            release/*.yml
+            # 只收自动更新清单；builder-debug.yml 等调试产物不进 Release
             release/latest*.yml
             release/*.dmg
             release/*.zip
@@ -121,7 +91,7 @@ jobs:
 
   publish:
     name: 创建 GitHub Release
-    needs: build
+    needs: [ci, build]
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}

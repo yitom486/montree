@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { seedMockChatThread } from './helpers/seed-chat'
 
 /**
  * S1 Streamdown 正文链路（真实 Electron + mock 流式，无真实模型）：
@@ -10,6 +11,8 @@ import { launchBuiltApp } from './helpers/launch-app'
 
 async function openPanel(page: Page) {
   const panel = page.locator('aside[aria-label="Agent 聊天"]:visible')
+  // reload 后面板异步挂载：先等它自己出现，避免误点「AI 伴读」把已打开的面板切走
+  await panel.first().waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
   if ((await panel.count()) === 0) {
     await page.getByRole('button', { name: 'AI 伴读', exact: true }).click()
   }
@@ -27,14 +30,7 @@ test.describe('Streamdown 正文 S1', () => {
       await window.setViewportSize({ width: 1600, height: 900 })
       await window.waitForLoadState('domcontentloaded')
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
-      await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
-          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'agy-status',
-          threads: [{ id: 'agy-status', runtimeId: 'mock-window', title: 'agy 状态回归', createdAt: now, updatedAt: now, messages: [] }],
-        } }))
-      })
-      await window.reload()
+      await seedMockChatThread(window, { id: 'agy-status', title: 'agy 状态回归' })
       const panel = await openPanel(window)
       await panel.locator('textarea').fill('agy-status-flow')
       await panel.getByRole('button', { name: '发送', exact: true }).click()
@@ -68,15 +64,7 @@ test.describe('Streamdown 正文 S1', () => {
       await window.setViewportSize({ width: 1600, height: 900 })
       await window.waitForLoadState('domcontentloaded')
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
-      await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('markdown-editor-ui', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
-          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'status-ui',
-          threads: [{ id: 'status-ui', runtimeId: 'mock-window', title: '状态回归', createdAt: now, updatedAt: now, messages: [] }],
-        } }))
-      })
-      await window.reload()
+      await seedMockChatThread(window, { id: 'status-ui', title: '状态回归' }, { theme: 'dark' })
       const panel = await openPanel(window)
       await panel.locator('textarea').fill('status-flow')
       await panel.getByRole('button', { name: '发送', exact: true }).click()
@@ -123,14 +111,7 @@ test.describe('Streamdown 正文 S1', () => {
       })
       // Exercise the user's submission path: it also settles streaming after the ACP response.
       // A raw IPC prompt bypasses that completion handler and leaves buttons disabled forever.
-      await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
-          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'stream-ui',
-          threads: [{ id: 'stream-ui', runtimeId: 'mock-window', title: '流式回归', createdAt: now, updatedAt: now, messages: [] }],
-        } }))
-      })
-      await window.reload()
+      await seedMockChatThread(window, { id: 'stream-ui', title: '流式回归' })
       const panel = await openPanel(window)
       await window.evaluate(() => {
         const probe = { samples: [] as number[], names: [] as string[] }
@@ -290,14 +271,7 @@ test.describe('Streamdown 正文 S1', () => {
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
-      await window.evaluate(() => {
-        const now = Date.now()
-        localStorage.setItem('montree-acp-ui', JSON.stringify({ version: 0, state: {
-          panelOpen: true, hudDisplayMode: 'docked', selectedRuntimeId: 'mock-window', activeThreadId: 'stream-follow',
-          threads: [{ id: 'stream-follow', runtimeId: 'mock-window', title: '跟随回归', createdAt: now, updatedAt: now, messages: [] }],
-        } }))
-      })
-      await window.reload()
+      await seedMockChatThread(window, { id: 'stream-follow', title: '跟随回归' })
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })
