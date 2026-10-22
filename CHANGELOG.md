@@ -4,7 +4,7 @@
 
 **发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
 
-- 修复：Windows 扫描版 PDF OCR（打开即自动识别与「识别本页」）下载识别引擎时改用系统 `System32\tar.exe` 解压 zip；自动识别失败写入诊断日志；E2E 改为覆盖不点按钮的自动 OCR，并恢复 Windows 用例与打包冒烟。
+- 修复：Windows 扫描版 PDF OCR（打开即自动识别与「识别本页」）下载识别引擎时改用系统 `System32\tar.exe` 解压 zip；自动识别失败写入诊断日志；E2E 改为覆盖不点按钮的自动 OCR，并恢复打包冒烟。
 
 - 修复：Windows 上按需下载 Typst 运行时改用系统 `System32\tar.exe` 解压 zip，避免 PATH 中 GNU tar 解压失败。
 

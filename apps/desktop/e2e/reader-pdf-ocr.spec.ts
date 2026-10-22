@@ -74,7 +74,7 @@ test.describe('扫描版 PDF 单页 OCR', () => {
 
       // 自动 OCR 链路：不点「识别本页」，必须自行出文字层；失败诊断来自渲染进程 console 与错误 toast
       const done = panel.getByText(/已识别 \d+\/\d+/)
-      const errorToast = window.locator('[data-sonner-toast][data-type="error"]')
+      const errorToast = window.locator('[data-sonner-toast][data-type="error"]').filter({ hasText: /OCR|识别/ })
       const deadline = Date.now() + 240_000
       while (!(await done.isVisible())) {
         if (autoOcrFailures.length) throw new Error(`自动 OCR 失败：${autoOcrFailures.join(' | ')}`)

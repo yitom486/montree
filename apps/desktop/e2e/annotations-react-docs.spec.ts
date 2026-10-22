@@ -192,7 +192,13 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
       await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
       await page.mouse.up()
       // 回归：OCR 逐词 span 之间必须有空格，选区/摘录不能粘成一串
-      expect(await page.evaluate(() => getSelection()?.toString().trim())).toMatch(new RegExp(`^${first} .* ${last}$`))
+      const selected = await page.evaluate(() => getSelection()?.toString().trim() ?? '')
+      if (!selected) {
+        // 诊断：落点命中的元素与两端词框（Windows 曾出现空选区）
+        const hit = await page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? `${el.tagName}.${el.className} "${(el.textContent ?? '').slice(0, 40)}"` : 'null' }, [a.x + 1, a.y + a.height / 2])
+        console.log(`[selection-diag] empty selection; hit=${hit} a=${JSON.stringify(a)} b=${JSON.stringify(b)} endX=${endX}`)
+      }
+      expect(selected).toMatch(new RegExp(`^${first} .* ${last}$`))
     }
     const selectLine = async (needle: RegExp) => {
       const words: Record<string, [string, string]> = { 'JavaScript library': ['React', 'rendering'], 'user interfaces': ['user', 'units'], 'Components are reusable': ['Components', 'that'] }
