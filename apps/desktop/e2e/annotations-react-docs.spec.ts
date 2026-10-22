@@ -176,7 +176,8 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
     const selectWords = async (first: string, last: string) => {
       const from = layer.locator('span', { hasText: new RegExp(`^${first}\\s?$`) }).first()
       const to = layer.locator('span', { hasText: new RegExp(`^${last}\\s?$`) }).first()
-      await from.scrollIntoViewIfNeeded()
+      // 居中滚入：Windows 窗口内容区更矮，scrollIntoViewIfNeeded 会把词停在底部状态栏（z-10 覆盖）下面，拖选打在状态栏上
+      await from.evaluate((node) => node.scrollIntoView({ block: 'center' }))
       const a = (await from.boundingBox())!, b = (await to.boundingBox())!
       await page.mouse.move(a.x + 1, a.y + a.height / 2)
       await page.mouse.down()
