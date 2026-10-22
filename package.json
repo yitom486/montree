@@ -40,6 +40,7 @@
     "test:e2e:web-doc": "playwright test --config apps/desktop/playwright.config.ts apps/desktop/e2e/web-doc-smoke.spec.ts",
     "test:all": "bun run typecheck && bun run test && bun run build && bun run test:e2e",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "doctor": "bun run scripts/doctor.ts",
     "lint:docs": "bun run scripts/lint-docs.ts",
     "lint:deps": "bun run scripts/check-deps.ts",
     "check:bundle": "bun run scripts/check-bundle.ts",

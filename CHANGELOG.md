@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **本地测试环境**：本地约 29 个单测文件的“原生模块”失败，根因是 Node 20（缺 `node:sqlite`、`Object.groupBy`、`Iterator`、`WebSocket`、`stripTypeScriptTypes`）；终端 E2E 失败是缺 `make`/C++ 编译器，node-pty 在 Linux 没有编译出来。新增 `.node-version`（24），CI 用 `setup-node` 固定版本；Node 低于 22.13 时 vitest 直接给出可执行提示；新增 `bun run doctor` 检查 Node、编译工具、node-pty、Electron、Typst 运行时与 xvfb 并给出修复命令。
+
 - **E2E 稳定性**：截图不再删除 toast DOM（会让 React 在 insertBefore/removeChild 上崩溃），统一用 `screenshotWithoutToasts` 以样式隐藏。在线文档三击选段的偶发失败查明是 iframe 交互监听尚未绑定，阅读器绑定后在 iframe 上标记 `data-web-doc-interactive`，用例先等标记再三击，去掉重试循环。新增用例一律 `retries: 0`。ppt-slideshow / agent-rich-result / annotations 各重复 5 轮共 50 次，本地 0 次失败。
 
 - **聊天链接安全打开**：升级 `@yitom/*` 到 0.1.26（修复 `ChatMarkdown` 覆盖外层 `onLinkClick`）。Agent 聊天里的 http(s)/mailto 链接交系统浏览器打开，`file:`、自定义协议等一律拦截；主窗口 `will-navigate` 与 `window.open` 统一走白名单策略（仅应用入口页、开发服务器与 devtools），被拦截的目标记日志。新增 E2E。

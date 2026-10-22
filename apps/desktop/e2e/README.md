@@ -5,15 +5,24 @@ Playwright 驱动**已构建**的 Electron 应用（`out/main/main.js`）。运�
 `terminal.spec.ts`：用户终端面板的真实 PTY 输入、Git 命令、新文件落盘、标签切换、隐藏保留和关闭释放，使用独立临时工作区。Agent 原生工具实测另见 `scripts/probe-opencode-native-tools.mjs`（可选，需安装 OpenCode 2.0.22）。
 
 ```bash
+bun run doctor            # 检查本地 Node/原生模块/Typst/xvfb 是否就绪
 bun run build
 bun run test:e2e          # 全部 E2E
 bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 ```
 
+高 DPI：`E2E_DEVICE_SCALE_FACTOR=1.5 bun run test:e2e …` 以 `--force-device-scale-factor` 启动（CI 的 Windows 作业跑 1x 与 1.5x）。截图请用 `helpers/screenshot.ts` 的 `screenshotWithoutToasts`（样式隐藏 toast，**不要删除 toast DOM**，会让 React 崩溃）。
+
 ## 用例
 
 | 文件 | 说明 |
 |------|------|
+| `chat-links.spec.ts` | 聊天链接：http(s) 交系统浏览器，`file:`/自定义协议、主框架跳转与 `window.open` 被拦截 |
+| `agent-terminal-approval.spec.ts` | Agent `terminal/create` 审批卡：拒绝 / 允许一次 / 信任此工作区，审计日志与信任文件 |
+| `ai-edit-lifecycle.spec.ts` | 修改建议按 MCP `_meta.toolCallId` 去重；审阅模式拦截直接编辑；清空对话撤回全部建议 |
+| `agent-epipe.spec.ts` | 回合中杀掉 Agent 进程后再写 stdin（EPIPE）：主进程无未捕获异常/错误框，可重连 |
+| `ime-composition.spec.ts` | CDP 真实输入法组合（`Input.imeSetComposition`）：编辑器实时预览行与聊天输入框，组合中 Enter 不发送 |
+| `window-width-stability.spec.ts` | 奇数窗口宽度、滚动条临界内容、拖动分隔条后外框宽度静置不抖动；`E2E_DEVICE_SCALE_FACTOR` 模拟 125%/150% |
 | `workspace-render-isolation.spec.ts` | md→PDF→在线文档→本地 md 切换与 Mermaid 渲染时，聊天面板零重渲染（渲染计数探针）、聊天/工作区外框零位移 |
 | `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
 | `annotations-react-docs.spec.ts` | React 官方文档（在线文档快照 + 扫描版 PDF/OCR，mock Agent）：划重点、批注、智能制卡、Agent 经 MCP 提议 AI 笔记并采用，重载后持久化与重新锚定 |

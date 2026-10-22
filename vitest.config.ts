@@ -1,6 +1,13 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
+// 单测依赖 Node 内置能力（node:sqlite、Object.groupBy、Iterator、WebSocket、stripTypeScriptTypes），
+// 低版本 Node 下约 29 个文件会以“原生模块”形式误报失败。直接给出可执行的提示。
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number)
+if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 13)) {
+  throw new Error(`单测需要 Node >= 22.13（推荐 24，见 .node-version），当前为 ${process.versions.node}`)
+}
+
 export default defineConfig({
   resolve: {
     // 数组形式：contracts barrel 精确匹配 + 子路径（core/*、types/*）精确前缀，
