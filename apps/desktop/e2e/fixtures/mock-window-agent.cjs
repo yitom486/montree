@@ -64,6 +64,12 @@ async function handle(message) {
       }
     }
     if (!command) command = blocks.map((block) => block.text || '').join('') || ''
+    if (command === 'pid') {
+      // EPIPE E2E：测试据此直接杀掉 Agent 进程
+      text(sessionId, `PID:${process.pid}`)
+      waiting.set(sessionId, id)
+      return
+    }
     if (command === 'wait') {
       waiting.set(sessionId, id)
       text(sessionId, `WAIT:${sessionId}`)

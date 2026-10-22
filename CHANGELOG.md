@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **输入法与 EPIPE 回归测试**：新增 CDP 真实输入法组合 E2E，覆盖编辑器实时预览标题行、粗体行与聊天输入框，组合中按 Enter 不发送，提交后文本恰好一次、无拼音残留，保存内容正确。新增“回合中杀掉 Agent 进程后再写 stdin”E2E：主进程无未捕获异常、不弹错误框，可重连并继续对话。
+
 - **修改建议/批注提议按 toolCallId 精确关联**：Agent 在 MCP `tools/call` 的 `_meta` 里带 toolCallId（`toolCallId`、`acp/toolCallId`、`claudecode/toolUseId` 等）时，宿主把它交给 `montree_text_propose` / `montree_text_edit` / `montree_propose_mark`。修改建议按它去重：同一调用重放或迟到时不再新建卡片。批注提议在结果中回显 toolCallId，由 chat-core 0.1.26 精确挂到对应工具消息，不再靠“最近一条同名工具”的猜测。没有 `_meta` 时仍走原来的启发式。新增 E2E 覆盖去重、审阅模式拦截直接编辑、清空对话撤回全部建议。
 
 - **本地测试环境**：本地约 29 个单测文件的“原生模块”失败，根因是 Node 20（缺 `node:sqlite`、`Object.groupBy`、`Iterator`、`WebSocket`、`stripTypeScriptTypes`）；终端 E2E 失败是缺 `make`/C++ 编译器，node-pty 在 Linux 没有编译出来。新增 `.node-version`（24），CI 用 `setup-node` 固定版本；Node 低于 22.13 时 vitest 直接给出可执行提示；新增 `bun run doctor` 检查 Node、编译工具、node-pty、Electron、Typst 运行时与 xvfb 并给出修复命令。
