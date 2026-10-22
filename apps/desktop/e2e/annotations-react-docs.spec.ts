@@ -178,6 +178,17 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
       const to = layer.locator('span', { hasText: new RegExp(`^${last}\\s?$`) }).first()
       // 居中滚入：Windows 窗口内容区更矮，scrollIntoViewIfNeeded 会把词停在底部状态栏（z-10 覆盖）下面，拖选打在状态栏上
       await from.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+      // Windows 窗口客户区更矮（标题栏），末行可能仍压在底部状态栏下且已滚到底：缩小页面直到落点命中文字层
+      const onLayer = async () => {
+        const box = (await from.boundingBox())!
+        return page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.pdf-text-layer-host')), [box.x + 1, box.y + box.height / 2])
+      }
+      for (let i = 0; i < 6 && !(await onLayer()); i += 1) {
+        console.log(`[selection-diag] word not reachable, zoom out #${i + 1}; ${await page.evaluate(() => { const v = document.querySelector('[data-reader-viewport]') as HTMLElement | null; return `inner=${innerHeight} viewport=${v?.clientHeight}/${v?.scrollHeight} top=${v?.scrollTop}` })}`)
+        await page.getByRole('button', { name: '缩小页面' }).click()
+        await page.waitForTimeout(300)
+        await from.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+      }
       const a = (await from.boundingBox())!, b = (await to.boundingBox())!
       await page.mouse.move(a.x + 1, a.y + a.height / 2)
       await page.mouse.down()
