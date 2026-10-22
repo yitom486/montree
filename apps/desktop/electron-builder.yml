@@ -125,7 +125,7 @@ files:
   - '!node_modules/pdfjs-dist/{build,web,types,image_decoders}{,/**}'
   # musl 构建只给 Alpine 用，桌面发行版不需要
   - '!node_modules/@firecrawl/pdf-inspector-linux-x64-musl{,/**}'
-  - '!node_modules/{@codemirror,codemirror,codemirror-lang-typst,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
+  - '!node_modules/{@codemirror,codemirror,codemirror-lang-typst,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,pele,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
 electronLanguages:
   - zh-CN
   - en-US

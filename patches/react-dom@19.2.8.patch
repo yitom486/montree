@@ -1,0 +1,47 @@
+diff --git a/cjs/react-dom-client.development.js b/cjs/react-dom-client.development.js
+index b9bb0b5b..312f0a86 100644
+--- a/cjs/react-dom-client.development.js
++++ b/cjs/react-dom-client.development.js
+@@ -3780,6 +3780,15 @@
+       }
+       return kind;
+     }
++    // Treat browser host objects as opaque in DEV performance tracks. See react#36430.
++    function isDevToolsHostObject(value) {
++      if (value === null || typeof value !== "object") return false;
++      try {
++        return value === value.window || typeof value.nodeType === "number";
++      } catch (_error) {
++        return true;
++      }
++    }
+     function addObjectToProperties(object, properties, indent, prefix) {
+       for (var key in object)
+         hasOwnProperty.call(object, key) &&
+@@ -3793,6 +3802,13 @@
+       indent,
+       prefix
+     ) {
++      if (isDevToolsHostObject(value)) {
++        properties.push([
++          prefix + "\u00a0\u00a0".repeat(indent) + propertyName,
++          "[Browser object]"
++        ]);
++        return;
++      }
+       switch (typeof value) {
+         case "object":
+           if (null === value) {
+@@ -3975,7 +3991,11 @@
+                   [ADDED + isDeeplyEqual, "\u2026"]
+                 );
+             else {
+-              if (!(3 <= indent))
++              if (
++                !(3 <= indent) &&
++                !isDevToolsHostObject(key) &&
++                !isDevToolsHostObject(nextValue)
++              )
+                 if (
+                   "object" === typeof key &&
+                   "object" === typeof nextValue &&

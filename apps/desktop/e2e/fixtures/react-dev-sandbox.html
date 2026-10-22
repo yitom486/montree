@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>React development sandbox regression</title></head>
+  <body>
+    <iframe title="Isolated first" sandbox="allow-scripts"></iframe>
+    <iframe title="Isolated second" sandbox="allow-scripts"></iframe>
+    <div id="root"></div>
+    <script type="module">
+      import React, { StrictMode, useEffect, useState } from 'react'
+      import { createRoot } from 'react-dom/client'
+
+      const frames = [...document.querySelectorAll('iframe')]
+      await Promise.all(frames.map((frame) => new Promise((resolve) => {
+        frame.onload = resolve
+        frame.srcdoc = '<p>Isolated preview</p>'
+      })))
+
+      function PreviewConsumer({ frameWindow, frameNode }) {
+        useEffect(() => {}, [frameWindow, frameNode])
+        return React.createElement('p', null, frameWindow && frameNode ? 'Preview ready' : 'No preview')
+      }
+
+      function App() {
+        const [selected, setSelected] = useState(0)
+        const [count, setCount] = useState(0)
+        const [text, setText] = useState('')
+        return React.createElement(React.Fragment, null,
+          React.createElement(PreviewConsumer, { frameWindow: frames[selected].contentWindow, frameNode: frames[selected] }),
+          React.createElement('button', { onClick: () => setCount((value) => value + 1) }, `Count: ${count}`),
+          React.createElement('button', { onClick: () => setSelected((value) => 1 - value) }, 'Switch preview'),
+          React.createElement('input', { placeholder: 'Type here', value: text, onChange: (event) => setText(event.target.value) }),
+          React.createElement('p', null, `Typed: ${text}`),
+          React.createElement('output', null, `Selected: ${selected}`),
+        )
+      }
+
+      createRoot(document.getElementById('root')).render(React.createElement(StrictMode, null, React.createElement(App)))
+    </script>
+  </body>
+</html>

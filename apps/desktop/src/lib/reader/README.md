@@ -1,5 +1,7 @@
 # lib/reader
 
+在线文档中的 Mermaid 代码块由宿主 Pele 管线出图，并保留折叠源码和复制按钮。公式使用随应用打包的 KaTeX 样式/字体，兼容 Sphinx 公式编号；真实网页与断网资源验证见 `../../../e2e/web-doc-rendering.spec.ts`。
+
 EPUB / PDF / MOBI / 在线文档 渲染端专属逻辑，按域分子目录（2026-09 由平铺重构）。
 通用导航/选区/标记/排版等 27 模块已迁 `@montree/reader-core`（`packages/reader-core/src/`）；标注合并/纯核/Anki 构建见 `@montree/annotations`；在线文档目录抽取/站点谓词见 `@montree/web-doc`。
 

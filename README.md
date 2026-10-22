@@ -118,6 +118,8 @@ bun run pack:linux  # 打包 Linux 安装包
 
 Typst 文档可从文件树的新建菜单创建，或直接打开 `.typ` 文件。分屏中的「Typst 配置」可以指定 Tinymist 路径、额外字体目录和固定主文件。开发构建缺少运行时不影响 Markdown/阅读器；正式 `pack*` 会自动准备运行时。支持的随包目标为 Windows x64、macOS arm64、Linux x64；WSL/SSH 文档暂不提供 Typst 编译和代码提示。
 
+开发模式使用 [React DOM 19.2.8 兼容补丁](./patches/react-dom@19.2.8.patch)，由根 `package.json` 的 `patchedDependencies` 声明，`bun install` 自动应用。补丁仅让开发版性能日志跳过 Window/DOM 对象，避免读取沙盒 iframe 属性时抛出 `SecurityError` 并导致整个页面停止更新（[React #36430](https://github.com/react/react/issues/36430)）；不改变 iframe 隔离与生产渲染逻辑。升级 React DOM 时需复核补丁，并运行 `bun run test:e2e apps/desktop/e2e/react-dev-sandbox.spec.ts`，确认初次挂载、iframe 切换、点击和输入均正常后再调整或移除。
+
 ---
 
 ### 聊天与 ACP 包依赖

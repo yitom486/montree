@@ -27,7 +27,7 @@ import {
   stripDisallowedWebDocEmbeds,
 } from '@/lib/reader/web-doc/web-doc-embeds'
 import {
-  buildWebDocKatexStylesheetLink,
+  buildWebDocKatexStyles,
   buildWebDocMathCss,
   enhanceWebDocMath,
 } from '@/lib/reader/web-doc/web-doc-math'
@@ -1406,7 +1406,7 @@ export function buildWebDocReaderDocument(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${safeTitle}</title>
-  ${buildWebDocKatexStylesheetLink()}
+  ${buildWebDocKatexStyles()}
   <style>${layoutCss}</style>
   <style>${codeBlockCss}</style>
   <style>${inlineCodeCss}</style>
@@ -1496,6 +1496,11 @@ export function buildWebDocReaderDocument(
     body .web-doc-table-scroll .ltx_border_r { border-right: 1px solid currentColor; }
     /* 无宽高的图标 SVG（如「编辑此页」）否则会按 viewBox 撑满版面 */
     svg { max-width: 100%; height: auto; max-height: min(70vh, 28rem); }
+    .web-doc-mermaid { margin: 1.25em 0; }
+    .web-doc-mermaid > .mermaid,
+    .web-doc-mermaid > .mermaid-hydrating { display: flex; justify-content: center; overflow-x: auto; padding: 1rem; }
+    .web-doc-mermaid > div > svg { max-height: none; flex-shrink: 0; }
+    .web-doc-mermaid > details > summary { cursor: pointer; font-size: 0.85em; opacity: 0.75; }
     .people-daily-edition-nav {
       display: flex;
       flex-wrap: wrap;
@@ -1514,7 +1519,7 @@ export function buildWebDocReaderDocument(
     }
   </style>
 </head>
-<body><main class="web-doc-reader-content">${body}</main>${buildWebDocTabsRuntimeScript()}${buildWebDocPlaygroundRuntimeScript()}</body>
+<body><main id="montree-web-doc-content" class="web-doc-reader-content">${body}</main>${buildWebDocTabsRuntimeScript()}${buildWebDocPlaygroundRuntimeScript()}</body>
 </html>`
 }
 

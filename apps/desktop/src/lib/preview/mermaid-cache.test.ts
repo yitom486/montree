@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('pele', () => ({ render: () => { throw new Error('unsupported diagram fixture') } }))
+
 const render = vi.fn(async (_id: string, source: string) => {
   await new Promise((resolve) => setTimeout(resolve, 5))
   return { svg: `<svg data-src="${source}"></svg>` }

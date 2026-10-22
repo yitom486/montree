@@ -334,7 +334,7 @@ describe('web-doc-html', () => {
     )
     expect(readerDocument).not.toContain('data-montree-source-href')
     expect(readerDocument).toContain('data-component-part="card-content-container"')
-    expect(readerDocument).toContain('<main class="web-doc-reader-content">')
+    expect(readerDocument).toContain('<main id="montree-web-doc-content" class="web-doc-reader-content">')
     expect(readerDocument).toContain('</main>')
 
     expect(readerDocument).toContain('tabindex="-1"')
@@ -1211,5 +1211,18 @@ describe('web-doc-html', () => {
     expect(root.querySelector('.code-block-lines')).toBeNull()
     expect(root.querySelector('.code-block-line-number')).toBeNull()
     expect(root.querySelector('img')?.getAttribute('src')).toBe('https://example.com/docs/shot.png')
+  })
+
+  it('Markdown 源中的 Mermaid 和数学公式经过消毒后仍保留可渲染信息', () => {
+    const content = buildWebDocPageContentFromMarkdown(
+      '# Math\n\n$E=mc^2$\n\n$$\n\\frac{a}{b}\n$$\n\n```mermaid\nflowchart LR\nA --> B\n```',
+      'https://example.com/math', 'generic-ssr',
+    )
+    const doc = new DOMParser().parseFromString(buildWebDocReaderDocument(content, 'light'), 'text/html')
+    expect(doc.querySelectorAll('.katex')).toHaveLength(2)
+    expect(doc.querySelector('.katex-display')).not.toBeNull()
+    expect(doc.querySelector('.katex-error')).toBeNull()
+    expect(doc.querySelector('.mermaid')?.getAttribute('data-mermaid-source')).toContain('A --> B')
+    expect(doc.querySelector('details pre')?.textContent).toContain('flowchart LR')
   })
 })

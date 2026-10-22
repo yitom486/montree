@@ -45,6 +45,7 @@ import { toast } from 'sonner'
 import { applyCopyButtonFeedback, getCodeBlockTextFromCopyButton } from '@/lib/preview/code-block-copy'
 import { activateWebDocCodeTab } from '@/lib/reader/web-doc/web-doc-code-blocks'
 import { buildWebDocReaderDocument } from '@/lib/reader/web-doc/web-doc-html'
+import { hydrateMermaidInElement } from '@/lib/preview/mermaid-hydrate'
 import {
   detectWebDocIframeEscape,
   isCrossOriginIframeEscape,
@@ -211,6 +212,18 @@ export function useWebDocSession({
     useReaderNavigationStore.getState().syncWeb(units, pageUrl)
     useReaderNavigationStore.getState().setReady(true)
   }, [data, pageUrl, units])
+
+  // iframe 内由宿主渲染图表；切页或卸载后不再写入旧文档。
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument
+    if (!iframeReady || !doc?.body) return
+    let alive = true
+    const cancelled = () => !alive || iframeRef.current?.contentDocument !== doc
+    void hydrateMermaidInElement(doc.body, theme, { force: true, cancelled, reason: 'web-doc' })
+      .then(() => { if (!cancelled()) scheduleWebMarkLayout() })
+      .catch((error) => { if (!cancelled()) reportRuntimeError(error, { source: 'web-doc:mermaid', silentToast: true }) })
+    return () => { alive = false }
+  }, [iframeReady, iframeRef, readerDocument, scheduleWebMarkLayout, theme])
 
   // Mark overlays layout update
   useEffect(() => {

@@ -62,7 +62,7 @@
 | `preview-sanitize` | 预览 HTML 消毒选项 |
 | `render-preview` / `.test.ts` | 独立预览与实时预览共享 Markdown/DOMPurify/本地图片解析，HTML 属性经 DOM 解析，重复资源合并读取 |
 | `code-block-copy` / `code-block-chrome` | 代码块「复制」按钮 DOM 与共享工具栏 HTML |
-| `mermaid-hydrate` / `mermaid-debug` / `mermaid-repair` | 在容器内渲染 Mermaid、错误容错与源码断行自愈 |
+| `mermaid-hydrate` / `mermaid-debug` / `mermaid-repair` | Pele 优先渲染 Mermaid 源码，失败时回退 Mermaid；SVG 消毒、亮暗主题与独立 SVG 导出、缓存、错误容错与源码断行自愈；`preview/pele-rendering.test.ts` 验证真实引擎 |
 
 ## reader/
 

@@ -5,6 +5,21 @@ import { activateWebDocCodeTab, enhanceWebDocCodeBlocks } from './web-doc-code-b
 import { buildWebDocReaderDocument, extractWebDocArticle } from './web-doc-html'
 
 describe('enhanceWebDocCodeBlocks', () => {
+  it.each([
+    '<pre class="mermaid">flowchart LR\nA --&gt; B</pre>',
+    '<pre><code class="language-mermaid">flowchart LR\nA --&gt; B</code></pre>',
+    '<div class="language-mermaid"><pre><code>flowchart LR\nA --&gt; B</code></pre></div>',
+  ])('为 Mermaid 保留图表宿主与可复制的源码，重复增强不会套娃：%s', (html) => {
+    const enhanced = enhanceWebDocCodeBlocks(html)
+    const doc = new DOMParser().parseFromString(enhanceWebDocCodeBlocks(enhanced), 'text/html')
+    expect(doc.querySelectorAll('.web-doc-mermaid')).toHaveLength(1)
+    expect(doc.querySelector('.mermaid')?.getAttribute('data-mermaid-source')).toBe('flowchart LR\nA --> B')
+    expect(doc.querySelector('details summary')?.textContent).toBe('Mermaid 源码')
+    expect(doc.querySelector('details pre')?.textContent).toBe('flowchart LR\nA --> B')
+    expect(doc.querySelector('details .code-block-lang')?.textContent).toBe('mermaid')
+    expect(doc.querySelectorAll('details .mermaid')).toHaveLength(0)
+  })
+
   it('react.dev Sandpack pre 识别 javascript', () => {
     const html = `<pre class="sp-cm sp-pristine sp-javascript"><code>function MyButton() {}</code></pre>`
     const enhanced = enhanceWebDocCodeBlocks(html)

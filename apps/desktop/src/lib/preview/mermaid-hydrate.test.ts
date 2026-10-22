@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAgentMarkdown } from '@/lib/agent/agent-markdown'
 
+vi.mock('pele', () => ({ render: () => { throw new Error('unsupported diagram fixture') } }))
+
 const renderMock = vi.fn(async (_id: string, source: string) => ({
   svg: `<svg xmlns="http://www.w3.org/2000/svg" data-test="1"><title>${source.slice(0, 12)}</title></svg>`,
 }))

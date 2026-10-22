@@ -25,6 +25,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `window-width-stability.spec.ts` | 奇数窗口宽度、滚动条临界内容、拖动分隔条后外框宽度静置不抖动；`E2E_DEVICE_SCALE_FACTOR` 模拟 125%/150% |
 | `workspace-render-isolation.spec.ts` | md→PDF→在线文档→本地 md 切换与 Mermaid 渲染时，聊天面板零重渲染（渲染计数探针）、聊天/工作区外框零位移 |
 | `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
+| `react-dev-sandbox.spec.ts` / `fixtures/react-dev-sandbox.html` | 独立 Vite 开发服务 + Electron：React 开发版收到沙盒 iframe 的 Window/DOM 属性后，初次挂载、切换、点击和输入仍可用，无渲染异常 |
 | `annotations-react-docs.spec.ts` | React 官方文档（在线文档快照 + 扫描版 PDF/OCR，mock Agent）：划重点、批注、智能制卡、Agent 经 MCP 提议 AI 笔记并采用，重载后持久化与重新锚定 |
 | `ai-edit-review-tools.spec.ts` / `ai-edit-multiwindow.spec.ts` | 逐句审阅、审阅面板、选区工具栏、行内补全；修改建议多窗口隔离 |
 | `inline-completion-settings.spec.ts` | 设置页单独配置补全 provider（预设/Base URL/模型/本地空 Key）与 ChatGPT 登录入口，保存/清除状态切换 |
@@ -60,6 +61,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |
 | `web-doc-smoke.spec.ts` | 在线文档：正文选段批注保存及重载恢复、优先渲染 `rel=alternate` Markdown 源（失败回退 HTML）、真实 localhost HTTP 服务读取 mdBook/目录/跨章导航，Rust 代码语法高亮/亮暗主题/逐字复制、mdBook 独立 toc.html 章节树/子章跳转/底栏返回、打开、地址栏换页、目录跳转、论文 SVG 图片与表格对齐/合并/横向滚动 |
 | `web-doc-xss.spec.ts` | 在线文档 XSS 回归（真浏览器）：恶意载荷不执行、正文完好 |
+| `web-doc-rendering.spec.ts` | Markdown 优先读取后的 Pele 流程/时序图、源码复制、亮暗主题、KaTeX 行内/分式/矩阵与离线本地字体；`E2E_WEB_DOC_RENDERING_LIVE=1` 额外实测 MkDocs Math 与 D2L 线性代数真实网页，并输出截图和公式数量 |
 | `reader-visual-context.spec.ts` | 网页/Markdown/EPUB/PDF 图片发现、图片地址和图注、主进程阅读区 PNG 截图（`E2E_READER_VISUAL` 门控，不连接 AI） |
 
 ## 在线文档 Fixture

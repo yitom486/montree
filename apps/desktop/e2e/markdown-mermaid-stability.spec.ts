@@ -22,6 +22,7 @@ test('实时预览 Mermaid：上方输入不重建图、不跳高度；切换源
     const block = page.locator('#main .cm-live-block[data-preview-kind="fence"]')
     const svg = block.locator('[data-testid="mermaid-block"] svg[id]')
     await expect(svg).toBeVisible({ timeout: 20_000 })
+    await expect(svg).toHaveAttribute('data-montree-renderer', 'pele')
     await page.waitForTimeout(500)
 
     // 监视：图节点被移除次数 + 块高度变化

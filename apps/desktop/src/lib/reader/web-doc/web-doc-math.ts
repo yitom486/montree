@@ -1,9 +1,20 @@
 import katex from 'katex'
+import katexStyles from 'katex/dist/katex.min.css?inline'
 
 const INLINE_WRAP = /^\\\(([\s\S]*)\\\)$/
 const DISPLAY_WRAP = /^\\\[([\s\S]*)\\\]$/
 const DOLLAR_DISPLAY = /^\$\$([\s\S]*)\$\$$/
 const DOLLAR_INLINE = /^\$([\s\S]*)\$$/
+
+// 阅读器正文重置使用 !important；恢复 KaTeX 自带字号/行高，避免上下标被拉成正文大小。
+const KATEX_TYPOGRAPHY_CSS = (String(katexStyles).match(/[^{}]+\{[^{}]*\}/g) ?? []).flatMap((rule) => {
+  const opening = rule.indexOf('{')
+  const selectors = rule.slice(0, opening).trim()
+  if (!selectors.includes('.katex') || selectors.startsWith('@')) return []
+  const declarations = [...rule.slice(opening + 1, -1).matchAll(/(?:^|;)\s*(font-size|line-height)\s*:\s*([^;]+)/g)]
+    .map((match) => `${match[1]}:${match[2].replace(/\s*!important$/, '')} !important;`).join('')
+  return declarations ? [`${selectors.split(',').map((selector) => `#montree-web-doc-content ${selector.trim()}`).join(',')}{${declarations}}`] : []
+}).join('\n')
 
 function unwrapTex(raw: string): { tex: string; displayMode: boolean } | null {
   const text = raw.trim()
@@ -41,17 +52,24 @@ function renderTexToHtml(tex: string, displayMode: boolean): string {
 export function renderWebDocMathElements(root: ParentNode): void {
   root.querySelectorAll('.arithmatex, .math, .katex-error').forEach((node) => {
     if (!(node instanceof HTMLElement)) return
+    if (node.closest('pre, code')) return
     if (node.querySelector('.katex')) return
 
-    const parsed = unwrapTex(node.textContent ?? '')
+    // Sphinx 将编号和锚点放在公式容器内，它们不属于 LaTeX 源码。
+    const source = node.cloneNode(true) as Element
+    source.querySelectorAll('.eqno').forEach((number) => number.remove())
+    const parsed = unwrapTex(source.textContent ?? '')
     if (!parsed) return
 
     const displayMode =
       parsed.displayMode ||
+      node.matches('div.math') ||
       node.classList.contains('display') ||
       node.classList.contains('arithmatex-display')
 
+    const numbers = [...node.querySelectorAll(':scope > .eqno')]
     node.innerHTML = renderTexToHtml(parsed.tex, displayMode)
+    node.prepend(...numbers)
     node.classList.add('web-doc-math-rendered')
   })
 }
@@ -110,7 +128,7 @@ export function renderWebDocMathInText(root: ParentNode): void {
 }
 
 export function enhanceWebDocMath(html: string): string {
-  if (!html.includes('arithmatex') && !html.includes('\\(') && !html.includes('\\[') && !html.includes('class="math"')) {
+  if (!/arithmatex|katex-error|\\\(|\\\[|\$\$|class=["'][^"']*\bmath\b/.test(html)) {
     return html
   }
 
@@ -123,17 +141,21 @@ export function enhanceWebDocMath(html: string): string {
   return root.innerHTML
 }
 
-/** iframe srcdoc 内嵌 KaTeX 样式（CDN，与 package katex 大版本对齐） */
-export function buildWebDocKatexStylesheetLink(): string {
-  return '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css" crossorigin="anonymous" />'
+/** 使用随应用打包的同版本样式和字体；srcdoc 中的资源地址以宿主为基准。 */
+export function buildWebDocKatexStyles(): string {
+  const css = String(katexStyles).replace(/url\((['"]?)([^)'"\s]+)\1\)/g, (match, _quote: string, url: string) => {
+    try { return `url("${new URL(url, window.location.href).href}")` } catch { return match }
+  })
+  return `<style data-web-doc-katex>${css}</style>`
 }
 
 export function buildWebDocMathCss(): string {
   return `
+    ${KATEX_TYPOGRAPHY_CSS}
     .web-doc-math-rendered {
       display: inline;
     }
-    .web-doc-math-rendered .katex-display {
+    .katex-display {
       margin: 0.75em 0;
       overflow-x: auto;
       overflow-y: hidden;
@@ -142,5 +164,8 @@ export function buildWebDocMathCss(): string {
     .math .katex {
       font-size: 1.05em;
     }
+    body .katex, body .katex * { max-width: none !important; box-sizing: content-box !important; }
+    body .katex svg { height: inherit !important; max-height: none !important; }
+    .math > .eqno { float: right; margin-left: 0.75em; }
   `
 }

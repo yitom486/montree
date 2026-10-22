@@ -555,6 +555,29 @@ export function enhanceWebDocCodeBlocks(html: string): string {
   normalizeWebDocTabbedSets(root)
   normalizeWebDocLatexListings(root)
 
+  // 原文放在折叠区继续复用复制工具栏；图表由宿主的 Pele 管线渲染。
+  for (const pre of root.querySelectorAll('pre')) {
+    if (pre.closest('.web-doc-mermaid') || pre.querySelector('svg')) continue
+    if (!pre.classList.contains('mermaid') && detectCodeLanguage(pre) !== 'mermaid') continue
+    const source = pre.getAttribute('data-mermaid-source') ?? pre.textContent ?? ''
+    if (!source.trim()) continue
+    const figure = doc.createElement('figure')
+    figure.className = 'web-doc-mermaid'
+    const diagram = doc.createElement('div')
+    diagram.className = 'mermaid'
+    diagram.setAttribute('data-mermaid-source', source)
+    diagram.textContent = source
+    const details = doc.createElement('details')
+    const summary = doc.createElement('summary')
+    summary.textContent = 'Mermaid 源码'
+    details.appendChild(summary)
+    pre.replaceWith(figure)
+    pre.classList.remove('mermaid', 'mermaid-hydrating')
+    pre.setAttribute('data-language', 'mermaid')
+    details.appendChild(pre)
+    figure.append(diagram, details)
+  }
+
   for (const host of collectCodeBlockHosts(root)) {
     wrapCodeBlockHost(host)
   }

@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import {
   mermaidError,
@@ -10,6 +11,42 @@ import { repairMermaidSource } from '@/lib/preview/mermaid-repair'
 let mermaidInitialized = false
 let mermaidTheme: AppTheme = 'dark'
 let renderSeq = 0
+
+const DIAGRAM_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif'
+
+/** Pele 优先；主题写入 SVG，下载后也不依赖应用的样式表。 */
+async function renderDiagramSvg(renderId: string, source: string, theme: AppTheme): Promise<{ svg: string }> {
+  try {
+    const { render } = await import('pele')
+    const result = render(source, {
+      idPrefix: renderId,
+      fontFamily: DIAGRAM_FONT,
+      responsive: true,
+      autoDirection: false,
+    })
+    // 与 Markdown 预览保持一致：包一层，避免 DOM 实现剥掉唯一的根 SVG。
+    const fragment = DOMPurify.sanitize(`<div>${result.svg}</div>`, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      RETURN_DOM_FRAGMENT: true,
+    })
+    const svg = fragment.querySelector('svg')
+    if (!svg) throw new Error('Pele returned an empty SVG')
+    svg.id = renderId
+    const colors = theme === 'dark'
+      ? { bg: '#0f172a', fg: '#e0e7ff', muted: '#94a3b8', line: '#818cf8', surface: '#1e1b4b', 'surface-alt': '#1e293b', border: '#6366f1', accent: '#a5b4fc' }
+      : { bg: '#ffffff', fg: '#312e81', muted: '#64748b', line: '#6366f1', surface: '#f5f3ff', 'surface-alt': '#f1f5f9', border: '#818cf8', accent: '#4f46e5' }
+    for (const [name, color] of Object.entries(colors)) svg.style.setProperty(`--pele-${name}`, color)
+    svg.style.setProperty('--pele-radius', '8px')
+    svg.setAttribute('data-montree-renderer', 'pele')
+    return { svg: svg.outerHTML }
+  } catch (error) {
+    // 不通过兼容回退绕过 Pele 的源码、边数或输出大小限制。
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'limit') throw error
+    mermaidWarn('pele:fallback', { message: error instanceof Error ? error.message : String(error) })
+    const mermaid = await ensureMermaidConfig(theme)
+    return mermaid.render(renderId, source)
+  }
+}
 
 function ensureMermaidConfig(theme: AppTheme): Promise<typeof import('mermaid').default> {
   return import('mermaid').then(({ default: mermaid }) => {
@@ -113,7 +150,7 @@ export function getCachedMermaidSvg(rawSource: string, theme: AppTheme): string 
 /**
  * 直接渲染 Mermaid 源码为 SVG 矢量文本字符串。
  * 供 React 组件（如 MermaidBlock）声明式挂载，避免 DOM 命令式水合竞态。
- * 结果按源码 + 主题缓存（LRU）；同键并发复用同一请求；mermaid.render 非可重入，串行执行。
+ * Pele 优先，Mermaid 兼容回退；结果按源码 + 主题缓存（LRU），同键并发复用，串行执行。
  */
 export function renderMermaidSvg(rawSource: string, theme: AppTheme): Promise<string> {
   const source = repairMermaidSource(rawSource)
@@ -124,11 +161,10 @@ export function renderMermaidSvg(rawSource: string, theme: AppTheme): Promise<st
   const pending = inflight.get(key)
   if (pending) return pending
   const task = renderQueue.catch(() => undefined).then(async () => {
-    const mermaid = await ensureMermaidConfig(theme)
     const renderId = `montree-mmd-${++renderSeq}`
     cleanupMermaidTempDom(renderId)
     try {
-      const { svg } = await mermaid.render(renderId, source)
+      const { svg } = await renderDiagramSvg(renderId, source, theme)
       svgCache.set(key, svg)
       while (svgCache.size > SVG_CACHE_LIMIT) svgCache.delete(svgCache.keys().next().value as string)
       return svg
@@ -143,7 +179,7 @@ export function renderMermaidSvg(rawSource: string, theme: AppTheme): Promise<st
 }
 
 /**
- * 把容器内尚未出图的 `.mermaid` 用 `mermaid.render` 写成 SVG。
+ * 把容器内尚未出图的 `.mermaid` 用 Pele（失败时回退 Mermaid）写成 SVG。
  * 取消时不回写 DOM，避免过期异步把新图冲成源码。
  */
 export async function hydrateMermaidInElement(
@@ -178,7 +214,6 @@ export async function hydrateMermaidInElement(
     return
   }
 
-  const mermaid = await ensureMermaidConfig(theme)
   if (cancelled()) {
     mermaidWarn(`${reason}:cancelled-after-import`)
     return
@@ -220,7 +255,7 @@ export async function hydrateMermaidInElement(
 
     const t0 = performance.now()
     try {
-      const { svg } = await mermaid.render(renderId, source)
+      const { svg } = await renderDiagramSvg(renderId, source, theme)
       cleanupMermaidTempDom(renderId)
       const ms = Math.round(performance.now() - t0)
 
