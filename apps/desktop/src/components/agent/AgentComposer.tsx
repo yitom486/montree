@@ -382,13 +382,14 @@ export function AgentComposer({
       />
 
       <PromptInputFooter className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 px-2 py-2">
-        <div data-slot="agent-composer-controls" className="flex min-w-0 flex-wrap items-center gap-1">{toolbarStart}</div>
+        {/* 控件不可溢出到发送按钮上（Windows 1x 窄聊天栏时下拉触发器曾盖住发送键） */}
+        <div data-slot="agent-composer-controls" className="flex min-w-0 flex-wrap items-center gap-1 overflow-hidden">{toolbarStart}</div>
         <PromptInputSubmit
           type={prompting ? 'button' : 'submit'}
           status={prompting ? 'streaming' : 'ready'}
           aria-label={prompting ? '停止' : '发送'}
           title={prompting ? '停止' : '发送'}
-          className="size-8 shrink-0 self-end rounded-lg bg-foreground text-background transition-colors hover:bg-foreground/85 disabled:opacity-30 motion-reduce:transition-none"
+          className="relative z-10 size-8 shrink-0 self-end rounded-lg bg-foreground text-background transition-colors hover:bg-foreground/85 disabled:opacity-30 motion-reduce:transition-none"
           disabled={!prompting && !canSend}
           onClick={prompting ? stop : undefined}
         >{prompting ? <Square className="size-3.5" /> : <ArrowUp className="size-4" />}</PromptInputSubmit>
