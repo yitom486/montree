@@ -35,10 +35,16 @@ async function state(app: ElectronApplication, documentPath: string) {
   }, documentPath)
 }
 async function expectFit(page: Page) {
-  const dimensions = await page.locator('[data-ppt-presentation-stage]').evaluate((node) => {
+  const read = () => page.locator('[data-ppt-presentation-stage]').evaluate((node) => {
     const stage = node.getBoundingClientRect(); const canvas = node.querySelector('[data-slide-canvas]')!.getBoundingClientRect()
     return { stage: { left: stage.left, right: stage.right, top: stage.top, bottom: stage.bottom }, canvas: { left: canvas.left, right: canvas.right, top: canvas.top, bottom: canvas.bottom, width: canvas.width, height: canvas.height } }
   })
+  // 舞台宽度由 ResizeObserver 回填；窗口/全屏拒绝后的首帧可能仍是方形，等比例稳定后再量边界。
+  await expect.poll(async () => {
+    const { canvas } = await read()
+    return canvas.width > 0 && canvas.height > 0 && Math.abs(canvas.width / canvas.height - 16 / 9) < 0.005
+  }, { timeout: 15_000 }).toBe(true)
+  const dimensions = await read()
   expect(dimensions.canvas.width).toBeGreaterThan(0)
   expect(dimensions.canvas.width / dimensions.canvas.height).toBeCloseTo(16 / 9, 2)
   expect(dimensions.canvas.left).toBeGreaterThanOrEqual(dimensions.stage.left - 1)
