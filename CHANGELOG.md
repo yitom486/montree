@@ -4,13 +4,17 @@
 
 **发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
 
+## [未发布]
+
+---
+
+## [0.4.20] - 2026-10-22
+
 - 修复：Agent 输入框底部控件在窄聊天栏下溢出并盖住「发送」按钮（Windows 1x 发现）。
 
 - 修复：Windows 扫描版 PDF OCR（打开即自动识别与「识别本页」）下载识别引擎时改用系统 `System32\tar.exe` 解压 zip；自动识别失败写入诊断日志；E2E 改为覆盖不点按钮的自动 OCR，并恢复打包冒烟。
 
 - 修复：Windows 上按需下载 Typst 运行时改用系统 `System32\tar.exe` 解压 zip，避免 PATH 中 GNU tar 解压失败。
-
-## [未发布]
 
 - **修复：在线文档目录与大纲在 TanStack 这类多产品文档站上解析不到位**（以 tanstack.com/ai 为例）：
   - **侧栏目录选错了导航**：页面里顶栏 nav 的链接比文档侧栏多，按链接数打分时顶栏胜出，目录变成 Blog、Shop 之类的全站链接。现在额外看链接是否与当前页同分区（共享前两级路径），没有同分区链接的导航降权；`aria-label` 为 mobile/social/legal 的导航也降权。
@@ -637,7 +641,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.19...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.20...HEAD
+[0.4.20]: https://github.com/yitom486/montree/compare/v0.4.19...v0.4.20
 [0.4.19]: https://github.com/yitom486/montree/compare/v0.4.18...v0.4.19
 [0.4.18]: https://github.com/yitom486/montree/compare/v0.4.17...v0.4.18
 [0.4.17]: https://github.com/yitom486/montree/compare/v0.4.16...v0.4.17
