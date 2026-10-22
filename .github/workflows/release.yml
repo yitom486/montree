@@ -48,7 +48,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           # 同上：构建期静态 import @foliate/*，缺 submodule 直接炸
@@ -73,7 +73,7 @@ jobs:
         run: ls -la release/
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.os }}
           path: |
@@ -97,7 +97,7 @@ jobs:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: 检出发布版本的更新日志
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
 
@@ -110,7 +110,7 @@ jobs:
         run: bun run scripts/release-notes.ts "$RELEASE_TAG" release-notes.md
 
       - name: 下载全部安装包
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: installers-*
@@ -120,7 +120,7 @@ jobs:
         run: find artifacts -type f | sort
 
       - name: 创建 GitHub Release 并上传安装包
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: artifacts/*

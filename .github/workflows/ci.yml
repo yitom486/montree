@@ -19,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           submodules: recursive
 
       - name: 安装 Node（版本见 .node-version）
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
 
@@ -55,13 +55,13 @@ jobs:
     needs: quality
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           submodules: recursive
 
       - name: 安装 Node（版本见 .node-version）
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
 
@@ -112,13 +112,13 @@ jobs:
         scale: ['1', '1.5']
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           submodules: recursive
 
       - name: 安装 Node（版本见 .node-version）
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
 
@@ -179,7 +179,7 @@ jobs:
 
       - name: 上传失败产物
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-e2e-${{ matrix.scale }}x
           path: |
