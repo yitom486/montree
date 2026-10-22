@@ -5,6 +5,9 @@ import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 import { connectMockAgent, mockAgentEnv, sendToAgent } from './helpers/mock-agent'
 
+// 新用例不允许靠重试掩盖抖动（全局 CI retries=1 对本文件关闭）
+test.describe.configure({ retries: 0 })
+
 /**
  * Agent 无头终端（ACP terminal/create）审批：拒绝 → 允许一次 → 信任此工作区 → 之后免审；
  * 每次决定写入审计日志。

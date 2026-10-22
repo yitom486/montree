@@ -444,8 +444,11 @@ export function useWebDocSession({
       const onMarkLeave = () => { hoveredMarkIdRef.current = null; setHoveredMark(null); setMarkTooltipPos(null) }
       doc.addEventListener('mouseleave', onMarkLeave)
       syncActiveHeadingFromScroll()
+      // 交互监听已绑定：E2E 与辅助工具据此判断可以开始选区操作
+      iframe.dataset.webDocInteractive = 'true'
 
       frameCleanupRef.current = () => {
+        delete iframe.dataset.webDocInteractive
         doc.removeEventListener('click', onCodeChromeClick)
         doc.removeEventListener('click', onClickCapture, true)
         doc.removeEventListener('keydown', onKeyDownCapture, true)

@@ -30,6 +30,7 @@ test.describe('在线文档阅读', () => {
       const frame = webDocFrame(window)
       const paragraph = frame.getByText('A chapter about primitive types in Rust.', { exact: true })
       await expect(paragraph).toBeVisible()
+      await expect(window.locator('iframe[data-web-doc-interactive="true"]')).toHaveCount(1)
       await paragraph.click({ clickCount: 3 })
       expect(await paragraph.evaluate(el => el.ownerDocument.getSelection()?.toString())).toContain('primitive types')
       const toolbar = window.getByRole('toolbar', { name: '选区操作' })

@@ -83,13 +83,11 @@ async function agentProposeNote(page: Page, excerpt: string, note: string): Prom
   expect(await failure.allTextContents()).toEqual([])
   return edited
 }
-/** 三击选段，直到选区工具栏出现（iframe 刚载入时选区监听可能尚未绑定，首次三击会丢） */
+/** 三击选段。先等阅读器把交互监听绑定到 iframe（data-web-doc-interactive），否则早到的三击没有监听者，工具栏不会出现 */
 async function tripleSelect(page: Page, target: Locator) {
-  const toolbar = page.getByRole('toolbar', { name: '选区操作' })
-  await expect(async () => {
-    await target.click({ clickCount: 3 })
-    await expect(toolbar).toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 20_000 })
+  await expect(page.locator('iframe[data-web-doc-interactive="true"]')).toHaveCount(1)
+  await target.click({ clickCount: 3 })
+  await expect(page.getByRole('toolbar', { name: '选区操作' })).toBeVisible()
 }
 async function smartCard(page: Page) {
   const toolbar = page.getByRole('toolbar', { name: '选区操作' })

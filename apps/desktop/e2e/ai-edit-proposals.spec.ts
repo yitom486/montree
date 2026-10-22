@@ -3,14 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { screenshotWithoutToasts } from './helpers/screenshot'
 
 const shotDir = process.env.PROPOSAL_SCREENSHOT_DIR
 
 async function shot(page: Page, info: { outputPath: (name: string) => string }, name: string, target: Page | Locator = page) {
-  // 启动时与本用例无关的提示 toast 会遮挡审阅栏，截图前移除
-  await page.evaluate(() => document.querySelectorAll('[data-sonner-toast]').forEach((toast) => toast.remove()))
-  await target.screenshot({ path: info.outputPath(name) })
-  if (shotDir) { await mkdir(shotDir, { recursive: true }); await target.screenshot({ path: join(shotDir, name) }) }
+  await screenshotWithoutToasts(target, info.outputPath(name))
+  if (shotDir) { await mkdir(shotDir, { recursive: true }); await screenshotWithoutToasts(target, join(shotDir, name)) }
 }
 async function open(page: Page, file: string) {
   await page.keyboard.press('Control+p')

@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **E2E 稳定性**：截图不再删除 toast DOM（会让 React 在 insertBefore/removeChild 上崩溃），统一用 `screenshotWithoutToasts` 以样式隐藏。在线文档三击选段的偶发失败查明是 iframe 交互监听尚未绑定，阅读器绑定后在 iframe 上标记 `data-web-doc-interactive`，用例先等标记再三击，去掉重试循环。新增用例一律 `retries: 0`。ppt-slideshow / agent-rich-result / annotations 各重复 5 轮共 50 次，本地 0 次失败。
+
 - **聊天链接安全打开**：升级 `@yitom/*` 到 0.1.26（修复 `ChatMarkdown` 覆盖外层 `onLinkClick`）。Agent 聊天里的 http(s)/mailto 链接交系统浏览器打开，`file:`、自定义协议等一律拦截；主窗口 `will-navigate` 与 `window.open` 统一走白名单策略（仅应用入口页、开发服务器与 devtools），被拦截的目标记日志。新增 E2E。
 
 - **Agent 终端命令需审批**：Agent 请求 `terminal/create` 时先弹审批卡（允许一次 / 信任此工作区 / 拒绝），拒绝或未确认则不启动进程；信任的工作区记在 `agent-terminal-trust.json`，每次决定写入 `logs/agent-terminal-audit.jsonl`。新增单测与 E2E。

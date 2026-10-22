@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { screenshotWithoutToasts } from './helpers/screenshot'
 
 const shotDir = process.env.PROPOSAL_SCREENSHOT_DIR
 
 async function shot(page: Page, info: { outputPath: (name: string) => string }, name: string, target: Page | Locator = page) {
-  await page.evaluate(() => document.querySelectorAll('[data-sonner-toast]').forEach((toast) => toast.remove()))
-  await target.screenshot({ path: info.outputPath(name) })
-  if (shotDir) { await mkdir(shotDir, { recursive: true }); await target.screenshot({ path: join(shotDir, name) }) }
+  await screenshotWithoutToasts(target, info.outputPath(name))
+  if (shotDir) { await mkdir(shotDir, { recursive: true }); await screenshotWithoutToasts(target, join(shotDir, name)) }
 }
 
 test('逐句审阅、侧边审阅面板、选区工具栏、行内补全', async ({}, info) => {

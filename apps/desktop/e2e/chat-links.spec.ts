@@ -5,6 +5,9 @@ import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 import { connectMockAgent, mockAgentEnv, sendToAgent } from './helpers/mock-agent'
 
+// 新用例不允许靠重试掩盖抖动（全局 CI retries=1 对本文件关闭）
+test.describe.configure({ retries: 0 })
+
 /**
  * 聊天正文链接与窗口导航防护：
  * - http(s) 链接交系统浏览器（shell.openExternal），应用窗口不跳走；
