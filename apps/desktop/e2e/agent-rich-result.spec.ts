@@ -435,8 +435,16 @@ test.describe('富结果生产链路 S2', () => {
       await expect.poll(async () => readFile(path, 'utf8').catch(() => null)).toBe(result.html)
       // 原生用户主题入口：切到深色后打开预览，截图记录实际主题效果。
       const theme = window.locator('button[aria-label="切换主题"]')
-      for (let i = 0; i < 3 && !(await window.locator('html').evaluate((el) => el.classList.contains('dark'))); i++) await theme.click()
-      await expect(window.locator('html')).toHaveClass(/dark/)
+      const html = window.locator('html')
+      for (let i = 0; i < 3; i += 1) {
+        const current = (await html.getAttribute('class')) ?? ''
+        if (current.split(/\s+/).includes('dark')) break
+        const next = current.split(/\s+/).includes('light') ? 'sepia' : current.split(/\s+/).includes('sepia') ? 'dark' : 'light'
+        await theme.click()
+        // View Transitions 在下一帧才改 class；等本次切换落定再决定是否继续点，避免多点一次又转回浅色。
+        await expect(html).toHaveClass(new RegExp(`(?:^|\\s)${next}(?:\\s|$)`))
+      }
+      await expect(html).toHaveClass(/dark/)
       await card.getByRole('button', { name: '打开预览' }).click()
       const frame = window.getByTestId('artifact-frame')
       await expect(window.getByTestId('artifact-status')).toHaveAttribute('data-ready', 'true')
