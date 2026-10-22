@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- **安装包瘦身**：
+  - **Tinymist 改为首次使用时下载**：打开 Typst 文件时，从固定版本的上游发布下载约 31 MB 的归档，流式校验 SHA-256，解压后原子安装到 userData；状态栏显示下载进度，完成或失败时弹提示。已配置自定义路径、或开发环境已准备随包资源时不下载。安装包只带许可证。
+  - **asar 只带主进程运行时闭包**：`files` 先排除全部 `node_modules`，再按白名单加回。此前渲染端依赖（Univer、lucide、mermaid 等，已由 Vite 打进 `out/renderer`）也重复进了 asar。`check:bundle` 新增 6.4：自动核对白名单覆盖每个包的传递依赖，缺一项即失败。
+  - **原生包按平台裁剪**：node-pty 只保留本平台预编译产物，去掉调试符号（.pdb）、源码与构建中间文件；pdf-inspector 只保留本平台二进制，去掉 musl 版；pdfjs 只留主进程用的 legacy 构建；pdfjs 的可选画布 `@napi-rs/canvas`（62 MB）不再打包。
+  - **压缩**：AppImage 与 deb 改用 xz。
+  - **体积**：Linux 本机同一提交对比，AppImage 274 → 116 MiB，deb 205 → 115 MiB。Windows 安装包体积由 CI Windows 作业打包后写入运行摘要。
+
 - **Windows E2E**：CI 新增 `windows-latest` 作业，分 1x 与 1.5x（150% 缩放）两档，跑启动冒烟、渲染隔离、在线文档批注、Typst（真实 Tinymist）、终端、修改建议审阅/行内补全、聊天链接、终端审批与窗口宽度稳定用例，失败时上传产物。E2E 可用 `E2E_DEVICE_SCALE_FACTOR` 模拟高 DPI。新增窗口宽度稳定 E2E：在奇数窗口宽度、滚动条临界内容和拖动分隔条之后，外框宽度静置时不得来回跳。各 Job 用 `.node-version` 固定 Node。
 
 - **输入法与 EPIPE 回归测试**：新增 CDP 真实输入法组合 E2E，覆盖编辑器实时预览标题行、粗体行与聊天输入框，组合中按 Enter 不发送，提交后文本恰好一次、无拼音残留，保存内容正确。新增“回合中杀掉 Agent 进程后再写 stdin”E2E：主进程无未捕获异常、不弹错误框，可重连并继续对话。

@@ -30,6 +30,23 @@ interface TypstWorkspaceProps {
 }
 const defaultConfig: TypstConfig = { executablePath: '', fontPaths: [], systemFonts: true, entryPath: '' }
 
+const MB = (bytes: number) => (bytes / 1024 / 1024).toFixed(1)
+/** 首次使用 Typst 时主进程按需下载 Tinymist：订阅进度，返回状态栏文案（未在下载时为 null）。 */
+function useTypstRuntimeDownload(): string | null {
+  const [text, setText] = useState<string | null>(null)
+  useEffect(() => typstApi.onEvent((event) => {
+    if (event.type !== 'notification' || event.method !== 'montree/runtimeDownload') return
+    const p = (event.params ?? {}) as { received?: number; total?: number | null; phase?: string; message?: string }
+    if (p.phase === 'done') { setText(null); toast.success('Typst 运行时已下载并通过校验'); return }
+    if (p.phase === 'error') { setText(null); toast.error(`Typst 运行时下载失败：${p.message ?? '未知错误'}`); return }
+    if (p.phase === 'verify') { setText('正在校验 Typst 运行时…'); return }
+    if (p.phase === 'extract') { setText('正在安装 Typst 运行时…'); return }
+    const received = p.received ?? 0
+    setText(p.total ? `首次使用，正在下载 Typst 运行时 ${MB(received)} / ${MB(p.total)} MB（${Math.floor((received / p.total) * 100)}%）` : `首次使用，正在下载 Typst 运行时 ${MB(received)} MB…`)
+  }), [])
+  return text
+}
+
 export function TypstWorkspace({ filePath, content, onContentChange, textDocument, workspaceRoot, viewMode = 'split', onOpenFile }: TypstWorkspaceProps) {
   const theme = useEditorUiStore((state) => state.theme)
   const fontSize = useAppSettingsStore((state) => state.editorFontSize)
@@ -43,6 +60,7 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draft, setDraft] = useState<TypstConfig>(defaultConfig)
   const [actionError, setActionError] = useState<string | null>(null)
+  const runtimeDownload = useTypstRuntimeDownload()
   const [exporting, setExporting] = useState(false)
   const configKey = queryKeys.typstConfig(filePath)
   const configQuery = useQuery({ queryKey: configKey, enabled: !remote, retry: false,
@@ -95,7 +113,7 @@ export function TypstWorkspace({ filePath, content, onContentChange, textDocumen
 
   const error = actionError ?? session.message ?? session.session?.previewError ?? configQuery.error?.message ??
     (session.session?.previewUrl && !previewUrl ? 'Typst 返回了无法使用的预览地址，请重启服务。' : null)
-  const status = remote ? '远程工作区暂不支持 Typst 编译与提示' : session.phase === 'starting' ? '正在启动 Typst…' : session.phase === 'syncing' ? '正在同步修改，预览可能尚未更新…' : session.phase === 'error' ? 'Typst 服务不可用' : hasCompileErrors || session.compileStatus === 'compileError' ? '最近一次编译有错误，显示最近成功的预览' : session.compileStatus === 'compiling' ? '正在排版，预览显示最近结果…' : session.compileStatus === 'compileSuccess' ? '最近一次排版已完成' : 'Typst 编辑服务已连接'
+  const status = remote ? '远程工作区暂不支持 Typst 编译与提示' : runtimeDownload && session.phase === 'starting' ? runtimeDownload : session.phase === 'starting' ? '正在启动 Typst…' : session.phase === 'syncing' ? '正在同步修改，预览可能尚未更新…' : session.phase === 'error' ? 'Typst 服务不可用' : hasCompileErrors || session.compileStatus === 'compileError' ? '最近一次编译有错误，显示最近成功的预览' : session.compileStatus === 'compiling' ? '正在排版，预览显示最近结果…' : session.compileStatus === 'compileSuccess' ? '最近一次排版已完成' : 'Typst 编辑服务已连接'
   const exportPdf = async () => {
     setExporting(true); setActionError(null)
     try {

@@ -9,6 +9,8 @@ import { TINYMIST_VERSION, type TypstConfig, type TypstEvent, type TypstOpenPayl
 import { LspProcess } from './lsp-process'
 
 const execFileAsync = promisify(execFile)
+/** 运行时下载进度事件（经 TYPST_EVENT 通道推送，sessionId 为空）。 */
+export const TYPST_RUNTIME_DOWNLOAD_METHOD = 'montree/runtimeDownload'
 const MAX_CONTENT = 4 * 1024 * 1024
 const METHODS = new Set(['textDocument/completion', 'completionItem/resolve', 'textDocument/hover', 'textDocument/signatureHelp', 'textDocument/definition', 'textDocument/formatting', 'textDocument/documentSymbol'])
 const DEFAULT_CONFIG: TypstConfig = { executablePath: '', fontPaths: [], systemFonts: true, entryPath: '' }
@@ -18,6 +20,12 @@ interface Project { owner: number; root: string; process: LspProcess; documents:
 export interface TypstServiceOptions {
   userData: string
   bundledExecutable: string
+  /** 安装包不带 Tinymist 时的按需安装：返回已安装路径（未安装返回 null）与安装入口。 */
+  runtime?: {
+    installed: () => Promise<string | null>
+    install: (onProgress: (progress: { received: number; total: number | null; phase: string }) => void) => Promise<string>
+    expectedPath: string
+  }
   emit: (owner: number, event: TypstEvent) => void
 }
 
@@ -90,11 +98,25 @@ export class TypstService {
   }
   private async executable(): Promise<string> {
     const config = await this.getConfig()
-    return config.executablePath || this.options.bundledExecutable
+    if (config.executablePath) return config.executablePath
+    if (existsSync(this.options.bundledExecutable) || !this.options.runtime) return this.options.bundledExecutable
+    return (await this.options.runtime.installed()) ?? this.options.runtime.expectedPath
+  }
+  /** 未配置自定义路径、随包也没有时，按需下载 Tinymist，并把进度推给发起窗口。 */
+  private async ensureRuntime(owner: number): Promise<void> {
+    const runtime = this.options.runtime
+    if (!runtime || (await this.getConfig()).executablePath || existsSync(this.options.bundledExecutable) || await runtime.installed()) return
+    const notify = (params: Record<string, unknown>) => this.options.emit(owner, { sessionId: '', type: 'notification', method: TYPST_RUNTIME_DOWNLOAD_METHOD, params, version: null } as TypstEvent)
+    try {
+      await runtime.install((progress) => notify({ ...progress }))
+    } catch (error) {
+      notify({ phase: 'error', message: error instanceof Error ? error.message : String(error) })
+      invalid(`Typst 运行时下载失败：${error instanceof Error ? error.message : String(error)}`, 'CONNECTION_ERROR')
+    }
   }
   async status(): Promise<TypstRuntimeStatus> {
     const executablePath = await this.executable()
-    if (!existsSync(executablePath)) return { available: false, executablePath, version: null, message: 'Typst 运行时尚未准备，请配置 Tinymist 0.15.8 路径或准备随包资源' }
+    if (!existsSync(executablePath)) return { available: false, executablePath, version: null, message: this.options.runtime && !(await this.getConfig()).executablePath ? `Typst 运行时（Tinymist ${TINYMIST_VERSION}）未安装，首次打开 Typst 文件时会自动下载并校验` : 'Typst 运行时尚未准备，请配置 Tinymist 0.15.8 路径或准备随包资源' }
     try {
       let verifiedBundleVersion: string | null = null
       if (!(await this.getConfig()).executablePath) {
@@ -126,6 +148,7 @@ export class TypstService {
   }
   private async createProject(owner: number, root: string, config: TypstConfig): Promise<Project> {
     const generation = this.ownerGeneration.get(owner) ?? 0
+    await this.ensureRuntime(owner)
     const status = await this.status()
     if (!status.available) invalid(status.message, status.version ? 'VERSION_MISMATCH' : 'FILE_NOT_FOUND')
     const cache = path.join(this.options.userData, 'typst')

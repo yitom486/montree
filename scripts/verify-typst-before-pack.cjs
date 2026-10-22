@@ -22,8 +22,16 @@ function verifyTypstResource(resourceDir, platform, arch) {
   return manifest
 }
 
+/** Tinymist 改为首次使用时下载：打包只校验随包许可证。 */
+function verifyTypstLicense(resourceDir) {
+  let license
+  try { license = readFileSync(join(resourceDir, 'LICENSE')) }
+  catch { throw new Error('缺少 Typst 许可证；请先执行 bun run prepare:typst') }
+  if (createHash('sha256').update(license).digest('hex') !== 'a9f29769fd3a7ee2976e6e161a93e16461fa305c088c4806242e50ec8ef86bce') throw new Error('Typst 许可证缺失或校验失败')
+}
+
 module.exports = async function beforePack(context) {
-  const arch = { 0: 'ia32', 1: 'x64', 2: 'arm', 3: 'arm64', 4: 'universal' }[context.arch]
-  verifyTypstResource(resolve(context.packager.projectDir, 'apps/desktop/resources/typst'), context.electronPlatformName, arch)
+  verifyTypstLicense(resolve(context.packager.projectDir, 'apps/desktop/resources/typst'))
 }
 module.exports.verifyTypstResource = verifyTypstResource
+module.exports.verifyTypstLicense = verifyTypstLicense

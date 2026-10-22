@@ -33,3 +33,24 @@ describe('Typst path and runtime boundaries', () => {
     } finally { service.disposeAll(); await rm(root, { recursive: true, force: true }) }
   })
 })
+
+describe('Typst 按需运行时', () => {
+  it('未随包时 status 提示自动下载；打开项目前先下载并推送进度', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'montree-typst-lazy-'))
+    const events: unknown[] = []
+    let installs = 0
+    const service = new TypstService({
+      userData: root, bundledExecutable: path.join(root, 'missing', 'tinymist'), emit: (_owner, event) => events.push(event),
+      runtime: { installed: async () => null, expectedPath: path.join(root, 'dl', 'tinymist'), install: async (onProgress) => { installs++; onProgress({ received: 5, total: 10, phase: 'download' }); throw new Error('offline') } },
+    })
+    try {
+      expect((await service.status()).message).toMatch(/首次打开 Typst 文件时会自动下载/)
+      await expect((service as unknown as { createProject: (o: number, r: string, c: unknown) => Promise<unknown> }).createProject(7, root, {})).rejects.toThrow(/下载失败：offline/)
+      expect(installs).toBe(1)
+      expect(events).toEqual([
+        expect.objectContaining({ method: 'montree/runtimeDownload', params: { received: 5, total: 10, phase: 'download' } }),
+        expect.objectContaining({ method: 'montree/runtimeDownload', params: { phase: 'error', message: 'offline' } }),
+      ])
+    } finally { service.disposeAll(); await rm(root, { recursive: true, force: true }) }
+  })
+})

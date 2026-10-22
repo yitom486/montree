@@ -4,6 +4,7 @@ import { writeFile, rename, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { IPC, ok, err, type AppError, type Result, type TypstConfig, type TypstExportPayload, type TypstOpenPayload, type TypstRequestPayload, type TypstSyncPayload } from '@yitom/contracts'
 import { TypstService } from '../services/typst/typst-service'
+import { ensureTinymist, installedTinymist, tinymistInstallDir } from '../services/typst/tinymist-download'
 import { getWindowWorkspaceDescriptor } from '../services/workspace-bindings'
 import { resolveExportSavePath } from '../services/export-save-path'
 
@@ -14,10 +15,18 @@ const owners = new Set<number>()
  *（`typst:export-html`）；contracts 补上后切回 `IPC.TYPST_EXPORT_HTML`。
  */
 export const TYPST_EXPORT_HTML_CHANNEL = 'typst:export-html'
+const typstResources = () => process.env.E2E_TYPST_RESOURCES_DIR || path.join(app.isPackaged ? process.resourcesPath : path.join(process.cwd(), 'apps', 'desktop', 'resources'), 'typst')
+/** 按需下载的 Tinymist 放在 userData（E2E 可用 MONTREE_TINYMIST_DIR 指定）。 */
+const downloadRoot = () => process.env.MONTREE_TINYMIST_DIR || path.join(app.getPath('userData'), 'typst', 'runtime')
 function runtime(): TypstService {
   service ??= new TypstService({
     userData: app.getPath('userData'),
-    bundledExecutable: path.join(app.isPackaged ? process.resourcesPath : path.join(process.cwd(), 'apps', 'desktop', 'resources'), 'typst', process.platform === 'win32' ? 'tinymist.exe' : 'tinymist'),
+    bundledExecutable: path.join(typstResources(), process.platform === 'win32' ? 'tinymist.exe' : 'tinymist'),
+    runtime: {
+      installed: () => installedTinymist(downloadRoot()),
+      install: (onProgress) => ensureTinymist({ root: downloadRoot(), licensePath: path.join(typstResources(), 'LICENSE'), onProgress, ...(process.env.MONTREE_TINYMIST_BASE_URL ? { baseUrl: process.env.MONTREE_TINYMIST_BASE_URL } : {}) }),
+      expectedPath: path.join(tinymistInstallDir(downloadRoot()), process.platform === 'win32' ? 'tinymist.exe' : 'tinymist'),
+    },
     emit: (owner, event) => {
       const window = BrowserWindow.getAllWindows().find(win => win.webContents.id === owner)
       if (window && !window.webContents.isDestroyed()) window.webContents.send(IPC.TYPST_EVENT, event)

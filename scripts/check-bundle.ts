@@ -189,5 +189,36 @@ if (failures === 0) {
   pass(`主进程 ${mainDeps.size} 个裸包依赖均已打包或明确内联`)
 }
 
+// ---- 6.4 运行时闭包：files 先 `!node_modules/**` 再按白名单加回，白名单必须覆盖每个包的传递依赖 ----
+// 刻意不打包（主进程路径不会加载，已在打包版 E2E 验证）：
+const INTENTIONALLY_EXCLUDED = new Set([
+  'react', 'react-dom', 'scheduler', 'lucide-react', // @yitom/* 的 UI 依赖，主进程只用其纯逻辑入口
+  '@napi-rs/canvas', // pdfjs 可选画布：主进程只读页面几何，不渲染
+])
+const closureMissing = new Set<string>()
+const resolveDependency = (name: string, fromDir: string): string | null => {
+  for (let dir = fromDir; ; dir = dirname(dir)) {
+    const candidate = join(dir, 'node_modules', name, 'package.json')
+    if (existsSync(candidate)) return dirname(candidate)
+    if (dirname(dir) === dir) return null
+  }
+}
+const visited = new Set<string>()
+const visitDependency = (name: string, fromDir: string) => {
+  if (INTENTIONALLY_EXCLUDED.has(name) || [...INTENTIONALLY_EXCLUDED].some((prefix) => name.startsWith(`${prefix}-`))) return
+  const dir = resolveDependency(name, fromDir)
+  if (!dir || visited.has(dir)) return
+  visited.add(dir)
+  // 嵌套在白名单包自身 node_modules 里的依赖随父包一起打进去
+  const nested = dir.slice(root.length).split('node_modules').length > 2
+  if (!nested && !whitelisted.has(name) && !/^@firecrawl\/pdf-inspector-/.test(name)) closureMissing.add(name)
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { dependencies?: Record<string, string>; optionalDependencies?: Record<string, string> }
+  for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies })) visitDependency(dep, dir)
+}
+const topFiles = yml.split(/\n(?:win|mac|linux):/)[0]
+for (const match of topFiles.matchAll(/^\s+- node_modules\/(@[^/\s*]+\/[^/\s*]+|[^/\s*]+)\/\*\*\/\*/gm)) visitDependency(match[1] ?? '', root)
+if (closureMissing.size) fail(`主进程运行时闭包缺包（electron-builder.yml files 需加 node_modules/<包>/**/*）: ${[...closureMissing].sort().join(', ')}`)
+else pass(`主进程运行时闭包 ${visited.size} 个包均在打包白名单内`)
+
 console.log(failures > 0 ? `\ncheck:bundle 未通过：${failures} 项` : '\ncheck:bundle 全部通过')
 process.exit(failures > 0 ? 1 : 0)

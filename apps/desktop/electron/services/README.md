@@ -104,6 +104,8 @@
 ## Typst
 
 - `typst/typst-service.ts`：Tinymist 0.15.8 校验、窗口/项目语言进程、未保存文本同步、隔离预览与内存 PDF 导出；配置及包缓存位于 userData/typst。
+- `typst/tinymist-assets.ts`：固定版本 Tinymist 各平台归档名与 SHA-256（prepare-typst、打包校验与按需下载共用）。
+- `typst/tinymist-download.ts` / `.test.ts`：安装包不带 Tinymist，首次使用时按固定版本下载，流式 SHA-256 校验，`tar` 解压到临时目录后原子就位（userData/typst/runtime），带进度，并发共享一次下载，失败不留半成品。
 - `typst/lsp-process.ts`：受限 Content-Length UTF-8 字节分帧、请求超时与进程清理。
 - `typst/typst-live.test.ts`：有运行时时执行真实 Unicode 缓冲区、补全、诊断、预览和 PDF 内容回归；工具缺失时跳过，不能据此宣称真实验证通过。
 

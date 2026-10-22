@@ -11,6 +11,9 @@ directories:
 files:
   - out/**/*
   - package.json
+  # 先排除全部 node_modules，再按白名单加回主进程运行时闭包（渲染端依赖已由 Vite 打进 out/renderer，
+  # 不需要再以 node_modules 形式进 asar；check:bundle 6.3 保证主进程 import 的包都在白名单里）
+  - '!node_modules/**'
   - apps/desktop/src/components/agent/LICENSE.beautiful-ui
   - apps/desktop/src/components/agent/LICENSE.beui
   - apps/desktop/resources/LICENSE.react-artifact.txt
@@ -58,6 +61,70 @@ files:
   - node_modules/@google/genai/**/*
   - node_modules/gemini-tts-studio/**/*
   - node_modules/microsoft-cognitiveservices-speech-sdk/**/*
+  # 上述包的传递依赖闭包（check:bundle 6.4 自动核对，缺一项即失败）
+  - node_modules/@azure/abort-controller/**/*
+  - node_modules/@azure/core-auth/**/*
+  - node_modules/@azure/core-util/**/*
+  - node_modules/@protobufjs/aspromise/**/*
+  - node_modules/@protobufjs/base64/**/*
+  - node_modules/@protobufjs/codegen/**/*
+  - node_modules/@protobufjs/eventemitter/**/*
+  - node_modules/@protobufjs/fetch/**/*
+  - node_modules/@protobufjs/float/**/*
+  - node_modules/@protobufjs/path/**/*
+  - node_modules/@protobufjs/pool/**/*
+  - node_modules/@protobufjs/utf8/**/*
+  - node_modules/@types/retry/**/*
+  - node_modules/@types/webrtc/**/*
+  - node_modules/@typespec/ts-http-runtime/**/*
+  - node_modules/@yitom/contracts/**/*
+  - node_modules/agent-base/**/*
+  - node_modules/base64-js/**/*
+  - node_modules/bent/**/*
+  - node_modules/bignumber.js/**/*
+  - node_modules/buffer-equal-constant-time/**/*
+  - node_modules/bytesish/**/*
+  - node_modules/caseless/**/*
+  - node_modules/clsx/**/*
+  - node_modules/data-uri-to-buffer/**/*
+  - node_modules/debug/**/*
+  - node_modules/ecdsa-sig-formatter/**/*
+  - node_modules/extend/**/*
+  - node_modules/fetch-blob/**/*
+  - node_modules/formdata-polyfill/**/*
+  - node_modules/gaxios/**/*
+  - node_modules/gcp-metadata/**/*
+  - node_modules/google-auth-library/**/*
+  - node_modules/google-logging-utils/**/*
+  - node_modules/hono/**/*
+  - node_modules/http-proxy-agent/**/*
+  - node_modules/https-proxy-agent/**/*
+  - node_modules/is-stream/**/*
+  - node_modules/json-bigint/**/*
+  - node_modules/jwa/**/*
+  - node_modules/jws/**/*
+  - node_modules/long/**/*
+  - node_modules/ms/**/*
+  - node_modules/node-addon-api/**/*
+  - node_modules/node-domexception/**/*
+  - node_modules/node-fetch/**/*
+  - node_modules/p-retry/**/*
+  - node_modules/protobufjs/**/*
+  - node_modules/retry/**/*
+  - node_modules/safe-buffer/**/*
+  - node_modules/tailwind-merge/**/*
+  - node_modules/tslib/**/*
+  - node_modules/web-streams-polyfill/**/*
+  - node_modules/ws/**/*
+  # 体积：原生包只留运行所需。调试符号、源码与构建脚本不进安装包；其他平台的预编译产物按平台在下方剔除
+  - '!node_modules/node-pty/{deps,src,third_party,scripts,typings,binding.gyp}{,/**}'
+  - '!node_modules/node-pty/**/*.pdb'
+  - '!node_modules/node-pty/build/{Makefile,*.mk,config.gypi,obj.target,node-addon-api}{,/**}'
+  - '!node_modules/node-pty/build/Release/{obj.target,.deps}{,/**}'
+  # pdfjs：主进程只用 legacy 构建（+ 字体/CMap/wasm），渲染端由 Vite 打包
+  - '!node_modules/pdfjs-dist/{build,web,types,image_decoders}{,/**}'
+  # musl 构建只给 Alpine 用，桌面发行版不需要
+  - '!node_modules/@firecrawl/pdf-inspector-linux-x64-musl{,/**}'
   - '!node_modules/{@codemirror,codemirror,codemirror-lang-typst,@tanstack,@vscode,dompurify,highlight.js,katex,markdown-it,markdown-it-task-lists,mermaid,next-themes,radix-ui,react,react-dom,react-resizable-panels,sonner,zustand,d3,d3-*,cytoscape*,dagre*,cose-base,layout-base,khroma,stylus,pug,coffeescript}/**'
 electronLanguages:
   - zh-CN
@@ -68,12 +135,11 @@ asarUnpack:
 # main 在 resourcesPath/remote-server（开发期为本目录）定位并校验后启动
 beforePack: ./scripts/verify-typst-before-pack.cjs
 extraResources:
+  # Tinymist（约 74 MB）不再随包：首次使用 Typst 时按固定版本下载并校验 SHA-256（见 services/typst/tinymist-download.ts），
+  # 安装包只带许可证
   - from: apps/desktop/resources/typst
     to: typst
     filter:
-      - tinymist.exe
-      - tinymist
-      - manifest.json
       - LICENSE
   - from: apps/desktop/resources/remote-server
     to: remote-server
@@ -83,6 +149,11 @@ extraResources:
 
 win:
   icon: apps/desktop/resources/icon.ico
+  # 平台级 files 必须带至少一个正向模式，否则 electron-builder 会补默认的 **/*（把整个仓库打进 asar）
+  files:
+    - package.json
+    - '!node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}{,/**}'
+    - '!node_modules/@firecrawl/pdf-inspector-{darwin,linux}-*{,/**}'
   target:
     - nsis
 
@@ -110,6 +181,11 @@ nsis:
 
 mac:
   icon: apps/desktop/resources/icon.png
+  # 平台级 files 必须带至少一个正向模式，否则 electron-builder 会补默认的 **/*（把整个仓库打进 asar）
+  files:
+    - package.json
+    - '!node_modules/node-pty/prebuilds/{win32-*,darwin-x64}{,/**}'
+    - '!node_modules/@firecrawl/pdf-inspector-{win32,linux}-*{,/**}'
   category: public.app-category.productivity
   # 无 Apple 开发者证书时跳过公证；用户需在「隐私与安全性」中允许打开
   hardenedRuntime: false
@@ -126,6 +202,11 @@ mac:
 
 linux:
   icon: apps/desktop/resources/icon.png
+  # 平台级 files 必须带至少一个正向模式，否则 electron-builder 会补默认的 **/*（把整个仓库打进 asar）
+  files:
+    - package.json
+    - '!node_modules/node-pty/prebuilds{,/**}'
+    - '!node_modules/@firecrawl/pdf-inspector-{win32,darwin}-*{,/**}'
   category: Office
   maintainer: yitom486 <yitom486@gmail.com>
   desktop:
@@ -138,3 +219,9 @@ linux:
   target:
     - AppImage
     - deb
+# AppImage 用 squashfs：默认 gzip 改为 xz（体积更小，启动解压略慢但可接受）；deb 用 xz
+appImage:
+  # electron-builder 26 起支持；旧版本忽略该键
+  compression: xz
+deb:
+  compression: xz
