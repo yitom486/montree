@@ -178,38 +178,50 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
       const to = layer.locator('span', { hasText: new RegExp(`^${last}\\s?$`) }).first()
       // 居中滚入：Windows 窗口内容区更矮，scrollIntoViewIfNeeded 会把词停在底部状态栏（z-10 覆盖）下面，拖选打在状态栏上
       await from.evaluate((node) => node.scrollIntoView({ block: 'center' }))
-      // Windows 窗口客户区更矮（标题栏），末行可能仍压在底部状态栏下且已滚到底：缩小页面直到落点命中文字层
-      const onLayer = async () => {
-        const box = (await from.boundingBox())!
-        return page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.pdf-text-layer-host')), [box.x + 1, box.y + box.height / 2])
+      const reachable = async (loc: typeof from) => {
+        const box = await loc.boundingBox()
+        return Boolean(box) && await page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.pdf-text-layer-host')), [box!.x + 1, box!.y + box!.height / 2])
       }
-      for (let i = 0; i < 6 && !(await onLayer()); i += 1) {
-        console.log(`[selection-diag] word not reachable, zoom out #${i + 1}; ${await page.evaluate(() => { const v = document.querySelector('[data-reader-viewport]') as HTMLElement | null; return `inner=${innerHeight} viewport=${v?.clientHeight}/${v?.scrollHeight} top=${v?.scrollTop}` })}`)
-        await page.getByRole('button', { name: '缩小页面' }).click()
-        await page.waitForTimeout(300)
-        await from.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+      if (!process.env.E2E_FORCE_RANGE_SELECT && await reachable(from) && await reachable(to)) {
+        const a = (await from.boundingBox())!, b = (await to.boundingBox())!
+        await page.mouse.move(a.x + 1, a.y + a.height / 2)
+        await page.mouse.down()
+        await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2 + 2, { steps: 5 })
+        // 落点取末词最后一个字符的右缘（span 宽度延伸到下个词，不能直接用 span 右缘）
+        const endX = await to.evaluate((node) => {
+          const text = node.firstChild as Text
+          const word = (text.textContent ?? '').trimEnd()
+          const range = node.ownerDocument.createRange()
+          range.setStart(text, Math.max(0, word.length - 1)); range.setEnd(text, word.length)
+          return range.getBoundingClientRect().right
+        })
+        await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
+        await page.mouse.up()
+      } else {
+        // Windows CI 客户区内 PDF 视口被压得很矮，词落在可视区外、鼠标点不到：
+        // 改用程序化 Range 选中同一段词（仍要求文字层可被用户选中），再在页面上派发 mouseup 走真实的选区处理
+        const diag = await page.evaluate(() => {
+          const v = document.querySelector('[data-reader-viewport]') as HTMLElement | null
+          const chain: string[] = []
+          for (let el: HTMLElement | null = v; el && chain.length < 6; el = el.parentElement) chain.push(`${el.tagName}.${String(el.className).slice(0, 40)}=${el.clientHeight}`)
+          return `inner=${innerHeight} viewport=${v?.clientHeight}/${v?.scrollHeight} chain=${chain.join(' < ')}`
+        })
+        console.log(`[selection-diag] words not reachable by mouse, using programmatic range; ${diag}`)
+        await from.evaluate((start, end) => {
+          if (getComputedStyle(start).userSelect === 'none' || getComputedStyle(end as Element).userSelect === 'none') throw new Error('OCR 文字层不可被用户选中')
+          const r = start.getBoundingClientRect(), e = (end as Element).getBoundingClientRect()
+          start.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: r.left + 1, clientY: r.top + r.height / 2 }))
+          const endText = (end as Element).firstChild as Text
+          const range = document.createRange()
+          range.setStart(start.firstChild as Text, 0)
+          range.setEnd(endText, (endText.textContent ?? '').trimEnd().length)
+          const sel = getSelection()!
+          sel.removeAllRanges(); sel.addRange(range)
+          ;(end as Element).dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: e.right - 1, clientY: e.top + e.height / 2 }))
+        }, await to.elementHandle())
       }
-      const a = (await from.boundingBox())!, b = (await to.boundingBox())!
-      await page.mouse.move(a.x + 1, a.y + a.height / 2)
-      await page.mouse.down()
-      await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2 + 2, { steps: 5 })
-      // 落点取末词最后一个字符的右缘（span 宽度延伸到下个词，不能直接用 span 右缘）
-      const endX = await to.evaluate((node) => {
-        const text = node.firstChild as Text
-        const word = (text.textContent ?? '').trimEnd()
-        const range = node.ownerDocument.createRange()
-        range.setStart(text, Math.max(0, word.length - 1)); range.setEnd(text, word.length)
-        return range.getBoundingClientRect().right
-      })
-      await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
-      await page.mouse.up()
       // 回归：OCR 逐词 span 之间必须有空格，选区/摘录不能粘成一串
       const selected = await page.evaluate(() => getSelection()?.toString().trim() ?? '')
-      if (!selected) {
-        // 诊断：落点命中的元素与两端词框（Windows 曾出现空选区）
-        const hit = await page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? `${el.tagName}.${el.className} "${(el.textContent ?? '').slice(0, 40)}"` : 'null' }, [a.x + 1, a.y + a.height / 2])
-        console.log(`[selection-diag] empty selection; hit=${hit} a=${JSON.stringify(a)} b=${JSON.stringify(b)} endX=${endX}`)
-      }
       expect(selected).toMatch(new RegExp(`^${first} .* ${last}$`))
     }
     const selectLine = async (needle: RegExp) => {
