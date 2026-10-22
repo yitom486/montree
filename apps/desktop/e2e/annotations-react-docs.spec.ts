@@ -146,8 +146,6 @@ test('React 在线文档：划重点 / 批注 / 智能制卡，重载后持久�
 })
 
 test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，重载后持久化并重新锚定', async () => {
-  // Windows CI 上「识别本页」240s 内无结果（Linux 正常），待单独排查 OCR 原生链路
-  test.fixme(process.platform === 'win32', 'Windows OCR 识别本页不出结果，单独排查')
   test.setTimeout(300_000)
   const workspace = await mkdtemp(join(tmpdir(), 'montree-react-pdf-'))
   await copyFile(join(__dirname, 'fixtures', 'ocr', 'scanned-react.pdf'), join(workspace, 'scanned-react.pdf'))

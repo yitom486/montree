@@ -289,7 +289,10 @@ export function usePdfDocumentSession({
       return
     }
     if (hasPendingPageOcr(current)) return
-    void runPageOcr(current).catch(() => {})
+    // 静默（不弹框），但留诊断：工具栏「识别本页」仍可手动重试；E2E 据此直接报出失败原因
+    void runPageOcr(current).catch((cause: unknown) => {
+      console.warn(`[pdf-auto-ocr] 第 ${current} 页自动识别失败：${cause instanceof Error ? cause.message : String(cause)}`)
+    })
   }, [hasPendingPageOcr, isImportRunningRef, ocrPageCachesRef, runPageOcr])
 
   const handleWordLayerMissing = useCallback(

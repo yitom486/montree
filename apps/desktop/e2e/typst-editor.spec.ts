@@ -117,12 +117,9 @@ test('真实 Tinymist：补全/诊断、未保存预览/PDF、模式切换撤销
     const renderedPage = frame.locator('svg:has(.tsel)').first()
     const renderedWidth = (await renderedPage.boundingBox())!.width
     await renderedPage.click({ position: { x: 80, y: 80 } })
-    // Windows CI：在预览 iframe 内按 Ctrl+= 不放大（宽度只差 1px），Linux/mac 正常；待单独排查快捷键路由
-    if (process.platform !== 'win32') {
-      await page.keyboard.press(`${mod}+=`)
-      await expect.poll(async () => (await renderedPage.boundingBox())!.width).toBeGreaterThan(renderedWidth + 1)
-      await page.keyboard.press(`${mod}+-`)
-    }
+    await page.keyboard.press(`${mod}+=`)
+    await expect.poll(async () => (await renderedPage.boundingBox())!.width).toBeGreaterThan(renderedWidth + 1)
+    await page.keyboard.press(`${mod}+-`)
 
     const width = (await workspacePanel.boundingBox())!.width
     await page.getByRole('button', { name: '单栏编辑', exact: true }).click()

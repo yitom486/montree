@@ -29,6 +29,8 @@ import {
  * 与 tesseract 两套运行时并存一个版本，下个版本删 tesseract 后合流。
  */
 
+import { systemTarCommand } from '../system-tar'
+
 const execFileAsync = promisify(execFile)
 
 export interface InspectorOcrPaths {
@@ -209,8 +211,8 @@ async function installNativeLib(
   const staging = join(tempDir, 'staging')
   await rm(staging, { recursive: true, force: true })
   await mkdir(staging, { recursive: true })
-  // Windows tar.exe 同时处理 tgz 与 zip
-  await execFileAsync('tar', ['-xf', archivePath, '-C', staging])
+  // Windows System32\tar.exe（bsdtar）同时处理 tgz 与 zip；不能用 PATH 里可能先命中的 GNU tar
+  await execFileAsync(systemTarCommand(), ['-xf', archivePath, '-C', staging])
   const found = await findFileRecursive(staging, lib.libFile)
   if (!found) {
     throw new Error(`压缩包内找不到 ${lib.libFile}`)
@@ -333,7 +335,7 @@ export async function ensureInspectorOcrRuntime(
       const ortExtract = join(tempDir, 'ort-staging')
       await rm(ortExtract, { recursive: true, force: true })
       await mkdir(ortExtract, { recursive: true })
-      await execFileAsync('tar', ['-xf', ortArchive, '-C', ortExtract])
+      await execFileAsync(systemTarCommand(), ['-xf', ortArchive, '-C', ortExtract])
       const ortLib = await findFileRecursive(ortExtract, ortEntry.libFile)
       if (!ortLib) {
         throw new Error(`压缩包内找不到 ${ortEntry.libFile}`)

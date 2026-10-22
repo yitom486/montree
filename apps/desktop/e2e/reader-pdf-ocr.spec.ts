@@ -7,7 +7,7 @@ import { launchBuiltApp } from './helpers/launch-app'
 
 /**
  * 扫描版 PDF 单页 OCR 回归：
- * 1. 无文字层当前页会自动识别；若仍显示「本页未识别」，再经「更多工具 → 识别本页」触发；
+ * 1. 无文字层当前页打开即自动识别（不点按钮）：自动失败时把 [pdf-auto-ocr] 诊断直接作为失败原因；
  * 2. 工具栏出现「已识别」且文字层含识别文本（几何链路不断）。
  * 引擎走主进程 pdf-inspector（失败回退 tesseract，不影响断言）。
  * 本地如设 PDFIUM_LIB_PATH / ORT_DYLIB_PATH / PDF_INSPECTOR_MODEL_CACHE
@@ -49,6 +49,10 @@ test.describe('扫描版 PDF 单页 OCR', () => {
 
     try {
       const window = await app.firstWindow()
+      const autoOcrFailures: string[] = []
+      window.on('console', (msg) => {
+        if (msg.text().includes('[pdf-auto-ocr]')) autoOcrFailures.push(msg.text())
+      })
       await window.waitForLoadState('domcontentloaded')
       await expect(window.getByRole('button',   { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
@@ -68,17 +72,16 @@ test.describe('扫描版 PDF 单页 OCR', () => {
       const more = panel.getByRole('button', { name: '更多工具' })
       await expect(more).toBeVisible({ timeout: 20_000 })
 
-      const unread = panel.getByText(/本页未识别/)
-      const busy = panel.getByText(/识别中…/)
+      // 自动 OCR 链路：不点「识别本页」，必须自行出文字层；失败诊断来自渲染进程 console 与错误 toast
       const done = panel.getByText(/已识别 \d+\/\d+/)
-      await expect(unread.or(busy).or(done)).toBeVisible({ timeout: 20_000 })
-
-      if (await unread.isVisible()) {
-        await more.click()
-        await window.getByRole('menuitem', { name: '识别本页', exact: true }).click()
+      const errorToast = window.locator('[data-sonner-toast][data-type="error"]')
+      const deadline = Date.now() + 240_000
+      while (!(await done.isVisible())) {
+        if (autoOcrFailures.length) throw new Error(`自动 OCR 失败：${autoOcrFailures.join(' | ')}`)
+        if (await errorToast.count()) throw new Error(`OCR 错误提示：${await errorToast.first().textContent()}`)
+        if (Date.now() > deadline) throw new Error('自动 OCR 240s 内未出结果（无失败诊断）')
+        await window.waitForTimeout(500)
       }
-
-      await expect(done).toBeVisible({ timeout: 240_000 })
       await expect(panel.locator('.pdf-text-layer-host')).toContainText('Hello', {
         timeout: 10_000,
       })

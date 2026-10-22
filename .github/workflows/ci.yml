@@ -147,6 +147,7 @@ jobs:
           apps/desktop/e2e/terminal.spec.ts
           apps/desktop/e2e/ai-edit-review-tools.spec.ts
           apps/desktop/e2e/chat-links.spec.ts
+          apps/desktop/e2e/reader-pdf-ocr.spec.ts
           apps/desktop/e2e/agent-terminal-approval.spec.ts
           apps/desktop/e2e/window-width-stability.spec.ts
         env:
