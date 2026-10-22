@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **Windows E2E**：CI 新增 `windows-latest` 作业，分 1x 与 1.5x（150% 缩放）两档，跑启动冒烟、渲染隔离、在线文档批注、Typst（真实 Tinymist）、终端、修改建议审阅/行内补全、聊天链接、终端审批与窗口宽度稳定用例，失败时上传产物。E2E 可用 `E2E_DEVICE_SCALE_FACTOR` 模拟高 DPI。新增窗口宽度稳定 E2E：在奇数窗口宽度、滚动条临界内容和拖动分隔条之后，外框宽度静置时不得来回跳。各 Job 用 `.node-version` 固定 Node。
+
 - **输入法与 EPIPE 回归测试**：新增 CDP 真实输入法组合 E2E，覆盖编辑器实时预览标题行、粗体行与聊天输入框，组合中按 Enter 不发送，提交后文本恰好一次、无拼音残留，保存内容正确。新增“回合中杀掉 Agent 进程后再写 stdin”E2E：主进程无未捕获异常、不弹错误框，可重连并继续对话。
 
 - **修改建议/批注提议按 toolCallId 精确关联**：Agent 在 MCP `tools/call` 的 `_meta` 里带 toolCallId（`toolCallId`、`acp/toolCallId`、`claudecode/toolUseId` 等）时，宿主把它交给 `montree_text_propose` / `montree_text_edit` / `montree_propose_mark`。修改建议按它去重：同一调用重放或迟到时不再新建卡片。批注提议在结果中回显 toolCallId，由 chat-core 0.1.26 精确挂到对应工具消息，不再靠“最近一条同名工具”的猜测。没有 `_meta` 时仍走原来的启发式。新增 E2E 覆盖去重、审阅模式拦截直接编辑、清空对话撤回全部建议。
