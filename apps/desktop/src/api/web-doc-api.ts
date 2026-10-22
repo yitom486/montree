@@ -1,13 +1,15 @@
 import type {
   WebDocDiscoverTocPayload,
   WebDocDiscoverTocResult,
-  WebDocFetchPayload,
-  WebDocFetchResult,
 } from '@yitom/contracts'
 import type { AppError } from '@yitom/contracts'
 import type { Result } from '@yitom/contracts'
 import type { ElectronAPI } from '@yitom/contracts'
 import { err } from '@yitom/contracts'
+import type {
+  WebDocFetchPayloadWithMarkdown,
+  WebDocFetchResultWithMarkdown,
+} from '../../contracts/web-doc'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined
@@ -21,7 +23,9 @@ function requireElectronAPI(): Result<ElectronAPI, AppError> {
 }
 
 export const webDocApi = {
-  async fetchPage(payload: WebDocFetchPayload): Promise<Result<WebDocFetchResult, AppError>> {
+  async fetchPage(
+    payload: WebDocFetchPayloadWithMarkdown,
+  ): Promise<Result<WebDocFetchResultWithMarkdown, AppError>> {
     const api = requireElectronAPI()
     if (!api.ok) return api
     return api.value.fetchWebDocPage(payload)

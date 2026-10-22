@@ -3,7 +3,12 @@ import overviewHtml from './__fixtures__/tanstack-ai-overview.html?raw'
 import aiLlmsTxt from './__fixtures__/tanstack-ai-llms.txt?raw'
 import { describe, expect, it } from 'vitest'
 import { extractGenericWebDocToc } from './extract-toc-links'
-import { extractLlmsTxtToc, looksLikeDocsIndexCandidate, resolveLlmsTxtCandidates } from './extract-llms-toc'
+import {
+  extractLlmsTocSection,
+  extractLlmsTxtToc,
+  looksLikeDocsIndexCandidate,
+  resolveLlmsTxtCandidates,
+} from './extract-llms-toc'
 
 const fixture = (name: string) => (name.endsWith('.html') ? overviewHtml : aiLlmsTxt)
 const PAGE = 'https://tanstack.com/ai/latest/docs/getting-started/overview'
@@ -40,5 +45,24 @@ describe('TanStack 文档（多产品站、顶栏 nav 链接比侧栏多）', ()
     expect(entries.some((e) => e.href.includes('github.com'))).toBe(false)
     expect(entries.some((e) => e.label === 'Docs index')).toBe(false)
     expect(entries.find((e) => e.label === 'Transports')?.level).toBe(1)
+  })
+
+  it('真实 llms 索引能派生当前 Tutorials 分组，而不是全站平铺', () => {
+    const entries = extractLlmsTxtToc(fixture('tanstack-ai-llms.txt'), 'https://tanstack.com')
+    const section = extractLlmsTocSection(
+      entries,
+      'https://tanstack.com/ai/latest/docs/tutorials/basic-chat',
+    )
+    expect(section?.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:Tutorials',
+      '1:Basic Chat',
+      '1:Generate Image',
+      '1:Streaming Structured Table',
+      '1:Evaluate a ticket',
+      '1:Subagents',
+      '1:Persisted subagents',
+      '1:Build an MCP Server',
+      '1:Computer Use',
+    ])
   })
 })

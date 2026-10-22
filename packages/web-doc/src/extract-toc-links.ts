@@ -256,11 +256,31 @@ function resolveSameOriginHref(hrefRaw: string, base: URL): string | null {
   return absolute.toString()
 }
 
+function isResponsiveHiddenList(openTag: string): boolean {
+  if (/\baria-hidden=["']true["']/i.test(openTag)) return true
+  const className = openTag.match(/\bclass=["']([^"']*)["']/i)?.[1] ?? ''
+  // Tailwind 的 `md:hidden` 表示桌面端隐藏（常见于移动端顶栏），不是桌面侧栏。
+  return /(?:^|\s)(?:sm|md|lg|xl|2xl):hidden(?:\s|$)/.test(className)
+}
+
+const SIDEBAR_LABEL_OPEN_RE =
+  /<(div|span|p)\b[^>]*\bclass=["'][^"']*(?:sidebar|nav|menu|section)[-_](?:label|title|heading|group)[^"']*["'][^>]*>/gi
+
+function findNextSidebarLabel(
+  html: string,
+  from: number,
+): { index: number; tag: string } | null {
+  SIDEBAR_LABEL_OPEN_RE.lastIndex = from
+  const match = SIDEBAR_LABEL_OPEN_RE.exec(html)
+  return match ? { index: match.index, tag: match[1]!.toLowerCase() } : null
+}
+
 /**
  * 从文档站侧栏 nav 提取层级目录。
  * - 保留 DOM 顺序
  * - 嵌套 `<ul>` 增加缩进（MkDocs 内层 nav 里的 ul 一并计入）
- * - `<h2>`/`<h3>`/`<h4>` 分组标题合成父节点
+ * - `<h2>`/`<h3>`/`<h4>`、summary、sidebar-label 分组标题合成父节点
+ * - 跳过仅移动端显示的顶栏（如 Tailwind `md:hidden`）
  */
 export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTocEntry[] {
   const navHtml = pickDocsNavHtml(html, baseUrl)
@@ -281,6 +301,7 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
   let pendingGroup: { label: string; level: number; depth: number } | null = null
   let activeGroupLevel: number | null = null
   let groupBaseDepth = 0
+  let skipListDepth: number | null = null
 
   const push = (entry: WebDocTocEntry, asLeaf: boolean): boolean => {
     const label = entry.label.length > 80 ? `${entry.label.slice(0, 80)}…` : entry.label
@@ -313,6 +334,8 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
     const olClose = navHtml.indexOf('</ol>', pos)
     const detailsClose = navHtml.indexOf('</details>', pos)
     const summaryOpen = navHtml.indexOf('<summary', pos)
+    const sidebarLabel = findNextSidebarLabel(navHtml, pos)
+    const nextLabel = sidebarLabel?.index ?? -1
     const aMatches = ['<a ', '<a\n', '<a\t', '<a>'].map((token) => navHtml.indexOf(token, pos))
     const nextA = aMatches.filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), Infinity)
     const headingMatches = ['<h2', '<h3', '<h4'].map((token) => navHtml.indexOf(token, pos))
@@ -325,6 +348,7 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
       olClose,
       detailsClose,
       summaryOpen,
+      nextLabel,
       nextA === Infinity ? -1 : nextA,
       nextH === Infinity ? -1 : nextH,
     ].filter((index) => index >= 0)
@@ -332,20 +356,19 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
 
     const next = Math.min(...candidates)
 
-    if (next === ulOpen) {
-      pos = bumpDepth(1, ulOpen, 3)
+    if (next === ulOpen || next === olOpen) {
+      const index = next
+      const gt = navHtml.indexOf('>', index)
+      const openTag = gt >= 0 ? navHtml.slice(index, gt + 1) : ''
+      const hidden = isResponsiveHiddenList(openTag)
+      pos = bumpDepth(1, index, 3)
+      if (hidden) skipListDepth ??= depth
       continue
     }
-    if (next === ulClose) {
-      pos = bumpDepth(-1, ulClose, 5)
-      continue
-    }
-    if (next === olOpen) {
-      pos = bumpDepth(1, olOpen, 3)
-      continue
-    }
-    if (next === olClose) {
-      pos = bumpDepth(-1, olClose, 5)
+    if (next === ulClose || next === olClose) {
+      const index = next
+      pos = bumpDepth(-1, index, 5)
+      if (skipListDepth !== null && depth < skipListDepth) skipListDepth = null
       continue
     }
     if (next === detailsClose) {
@@ -391,8 +414,30 @@ export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTo
       continue
     }
 
+    if (next === nextLabel && sidebarLabel) {
+      const closeTag = navHtml.indexOf('>', nextLabel)
+      const endLabel = navHtml.indexOf(`</${sidebarLabel.tag}>`, closeTag)
+      if (closeTag < 0 || endLabel < 0) break
+      const label = stripTags(navHtml.slice(closeTag + 1, endLabel))
+      pos = endLabel + sidebarLabel.tag.length + 3
+      if (label && label.length >= 2 && label.length <= 80) {
+        pendingGroup = {
+          label,
+          level: Math.max(0, depth > 0 ? depth - 1 : 0),
+          depth,
+        }
+        activeGroupLevel = null
+        groupBaseDepth = 0
+      }
+      continue
+    }
+
     const closeTag = navHtml.indexOf('</a>', nextA)
     if (closeTag < 0) break
+    if (skipListDepth !== null && depth >= skipListDepth) {
+      pos = closeTag + 4
+      continue
+    }
 
     const anchorHtml = navHtml.slice(nextA, closeTag + 4)
     pos = closeTag + 4

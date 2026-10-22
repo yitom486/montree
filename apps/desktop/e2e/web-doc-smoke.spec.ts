@@ -47,6 +47,47 @@ test.describe('在线文档阅读', () => {
     } finally { await app.close() }
   })
 
+  test('优先渲染站点声明的 Markdown 源，失败才回退 HTML', async () => {
+    const server = createServer((req, res) => {
+      if (req.url === '/docs/page') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html>
+          <html><head><link rel="alternate" type="text/markdown" href="/docs/page.md"></head>
+          <body><article><h1>HTML Fallback</h1><p>这段 HTML 不应成为正文。</p></article></body></html>`)
+        return
+      }
+      if (req.url === '/docs/page.md') {
+        res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' }).end(
+          '# Markdown Source\n\n这段正文来自 Markdown 源。\n\n```ts\nconst fromMarkdown = true\n```',
+        )
+        return
+      }
+      res.writeHead(404).end()
+    })
+    await new Promise<void>(resolve => server.listen(0, 'localhost', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('本机测试服务未监听')
+    const origin = `http://localhost:${address.port}`
+    try {
+      const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: '' })
+      try {
+        const window = await app.firstWindow()
+        await window.waitForLoadState('domcontentloaded')
+        await welcomeWebDocUrlField(window).fill(`${origin}/docs/page`)
+        await welcomeWebDocUrlField(window).press('Enter')
+        const frame = webDocFrame(window)
+        await expect(frame.getByRole('heading', { name: 'Markdown Source', exact: true })).toBeVisible()
+        await expect(frame.getByText('这段正文来自 Markdown 源。')).toBeVisible()
+        await expect(frame.getByText('const fromMarkdown = true')).toBeVisible()
+        await expect(frame.locator('.code-block-lines')).toHaveCount(0)
+        await expect(frame.getByText('HTML Fallback')).toHaveCount(0)
+      } finally {
+        await app.close()
+      }
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()))
+    }
+  })
+
   test('本地mdBook：真实HTTP读取、目录跳转与Rust高亮', async () => {
     const files: Record<string, string> = {
       '/book/primitives.html': 'mdbook-primitives.html',

@@ -10,7 +10,8 @@ import type { RendererErrorPayload } from '@yitom/contracts'
 import type { WindowInit } from '@yitom/contracts'
 import type { ElectronAPI } from '@yitom/contracts'
 import type { TypstExportPayload } from '@yitom/contracts'
-import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@yitom/contracts'
+import type { WebDocDiscoverTocPayload } from '@yitom/contracts'
+import type { WebDocFetchPayloadWithMarkdown } from '../contracts/web-doc'
 import type { DetectPdfTocPagesPayload, GetPdfOcrTocPayload, GetPdfOcrPagePayload, ListPdfOcrPagesPayload, RecognizePdfPagePayload, RecognizePdfTocPayload, SavePdfOcrTocPayload } from '@yitom/contracts'
 import type { ClassifyPdfDocumentPayload, ExtractPdfBookMarkdownPayload } from '@yitom/contracts'
 import type { RosettaActiveImport, RosettaBodyWatermarkApplyPayload, RosettaBodyWatermarkPreviewPayload, RosettaImportPayload, RosettaImportStatus, RosettaInspectContentPayload, RosettaQuery, RosettaTocRebuildPayload } from '@yitom/contracts'
@@ -254,7 +255,7 @@ const electronAPI: ElectronAPI = {
   },
   probeAgyCli: () => ipcRenderer.invoke(IPC.ACP_PROBE_AGY_CLI),
   installAgyCli: () => ipcRenderer.invoke(IPC.ACP_INSTALL_AGY_CLI),
-  fetchWebDocPage: (payload: WebDocFetchPayload) =>
+  fetchWebDocPage: (payload: WebDocFetchPayloadWithMarkdown) =>
     ipcRenderer.invoke(IPC.WEB_DOC_FETCH_PAGE, payload),
   discoverWebDocToc: (payload: WebDocDiscoverTocPayload) =>
     ipcRenderer.invoke(IPC.WEB_DOC_DISCOVER_TOC, payload),

@@ -4,10 +4,13 @@ import { toAppError } from '@yitom/contracts'
 import type {
   WebDocDiscoverTocPayload,
   WebDocDiscoverTocResult,
-  WebDocFetchPayload,
-  WebDocFetchResult,
   WebDocTocEntry,
 } from '@yitom/contracts'
+import type {
+  WebDocFetchPayloadWithMarkdown,
+  WebDocFetchResultWithMarkdown,
+  WebDocMarkdownSource,
+} from '../../contracts/web-doc'
 import {
   extractGenericWebDocToc,
   extractMdBookToc,
@@ -16,6 +19,7 @@ import {
   resolveWebDocTocDiscoveryUrl,
 } from '@montree/web-doc'
 import {
+  extractLlmsTocSection,
   extractLlmsTxtToc,
   normalizeLlmsDocHref,
   resolveLlmsTxtCandidates,
@@ -66,6 +70,35 @@ function httpStatusErrorMessage(status: number): string {
 
 function toFetchError(message: string): Result<never, AppError> {
   return err({ code: 'FILE_READ_ERROR', message })
+}
+
+function htmlAttribute(tag: string, name: string): string | null {
+  const match = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(tag)
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null
+}
+
+/**
+ * 文档站常用 `<link rel="alternate" type="text/markdown">` 暴露正文 Markdown 源。
+ * 只读取声明，不猜测 URL；抓取失败时调用方仍回退 HTML。
+ */
+function resolveMarkdownAlternateUrl(
+  html: string,
+  pageUrl: string,
+  localOrigin?: string,
+): string | null {
+  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
+    const rel = htmlAttribute(tag, 'rel')?.toLowerCase().split(/\s+/) ?? []
+    if (!rel.includes('alternate')) continue
+    if (!htmlAttribute(tag, 'type')?.toLowerCase().startsWith('text/markdown')) continue
+    const href = htmlAttribute(tag, 'href')?.replace(/&amp;/gi, '&')
+    if (!href) continue
+    try {
+      return normalizeWebDocUrl(new URL(href, pageUrl).toString(), localOrigin)
+    } catch {
+      continue
+    }
+  }
+  return null
 }
 
 /**
@@ -130,9 +163,9 @@ async function readResponseTextLimited(response: Response): Promise<string> {
 }
 
 export async function fetchWebDocPage(
-  payload: WebDocFetchPayload,
+  payload: WebDocFetchPayloadWithMarkdown,
   localOrigin = getWebDocLoopbackOrigin(payload.url),
-): Promise<Result<WebDocFetchResult, AppError>> {
+): Promise<Result<WebDocFetchResultWithMarkdown, AppError>> {
   try {
     const fixtureResult = await tryFetchE2eWebDocFixture(payload.url)
     if (fixtureResult) return fixtureResult
@@ -154,10 +187,19 @@ export async function fetchWebDocPage(
       return toFetchError('页面内容为空')
     }
 
-    return ok({
+    const result: WebDocFetchResultWithMarkdown = {
       url: response.url || normalized,
       html,
-    })
+    }
+    if (payload.preferMarkdown) {
+      const markdownUrl = resolveMarkdownAlternateUrl(html, result.url, localOrigin)
+      if (markdownUrl) {
+        const markdown = await fetchWebDocMarkdown(markdownUrl, localOrigin)
+        if (markdown) result.markdown = markdown
+      }
+    }
+
+    return ok(result)
   } catch (cause) {
     if (cause instanceof Error && cause.name === 'AbortError') {
       return err({ code: 'ACP_TIMEOUT', message: '抓取页面超时' })
@@ -169,10 +211,11 @@ export async function fetchWebDocPage(
   }
 }
 
-/** 抓取站点目录索引（如 Mintlify `/llms.txt`），允许 text/plain */
+/** 抓取纯文本资源（目录索引 / Markdown 源），允许 text/plain 与 text/markdown */
 async function fetchWebDocPlainText(
   url: string,
   localOrigin?: string,
+  label = '目录索引',
 ): Promise<Result<{ url: string; text: string }, AppError>> {
   try {
     const normalized = normalizeWebDocUrl(url, localOrigin)
@@ -184,7 +227,7 @@ async function fetchWebDocPlainText(
 
     const text = await readResponseTextLimited(response)
     if (!text.trim()) {
-      return toFetchError('目录索引为空')
+      return toFetchError(`${label}为空`)
     }
 
     return ok({
@@ -193,13 +236,22 @@ async function fetchWebDocPlainText(
     })
   } catch (cause) {
     if (cause instanceof Error && cause.name === 'AbortError') {
-      return err({ code: 'ACP_TIMEOUT', message: '抓取目录索引超时' })
+      return err({ code: 'ACP_TIMEOUT', message: `抓取${label}超时` })
     }
     if (cause instanceof Error && cause.message) {
       return toFetchError(cause.message)
     }
-    return err(toAppError(cause, '抓取目录索引失败'))
+    return err(toAppError(cause, `抓取${label}失败`))
   }
+}
+
+async function fetchWebDocMarkdown(
+  url: string,
+  localOrigin?: string,
+): Promise<WebDocMarkdownSource | null> {
+  const result = await fetchWebDocPlainText(url, localOrigin, 'Markdown 源')
+  if (!result.ok || /^\s*<(?:!doctype|html)\b/i.test(result.value.text)) return null
+  return { url: result.value.url, text: result.value.text }
 }
 
 /**
@@ -282,6 +334,12 @@ export async function discoverWebDocToc(
     // 站点级全站索引（如 llms.txt 等）：支持双轨并行
     if (!siteEntries && looksLikeDocsIndexCandidate(fetchResult.value.html)) {
       siteEntries = await discoverLlmsTxtToc(fetchResult.value.url, fetchResult.value.html, pageUrl.origin, localOrigin)
+    }
+
+    // 站点原生 llms.txt 已按模块/分组建树：当前页所在子树优先于 HTML 导航猜测。
+    if (siteEntries) {
+      const nativeSection = extractLlmsTocSection(siteEntries, fetchResult.value.url)
+      if (nativeSection) sectionEntries = nativeSection
     }
 
     const hasSection = sectionEntries.length > 0

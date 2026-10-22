@@ -189,6 +189,63 @@ function extractLlmsTxtTocByPath(text: string, baseOrigin: string): WebDocTocEnt
   return entries
 }
 
+function normalizeTocDocumentHref(href: string): string | null {
+  try {
+    const url = new URL(href)
+    url.hash = ''
+    url.search = ''
+    if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1)
+    }
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 站点原生 llms 目录通常已经按「模块 → 分节 → 页面」建树；
+ * 当前页最深节点所在的子树就是原站当前侧栏，优先级高于 HTML 导航猜测。
+ */
+export function extractLlmsTocSection(
+  entries: WebDocTocEntry[],
+  currentHref: string,
+): WebDocTocEntry[] | undefined {
+  const current = normalizeTocDocumentHref(currentHref)
+  if (!current) return undefined
+
+  let currentIndex = -1
+  let currentLevel = -1
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i]!
+    if (normalizeTocDocumentHref(entry.href) !== current) continue
+    if (entry.level >= currentLevel) {
+      currentIndex = i
+      currentLevel = entry.level
+    }
+  }
+  if (currentIndex < 0 || currentLevel <= 0) return undefined
+
+  let parentIndex = -1
+  let parentLevel = -1
+  for (let i = currentIndex - 1; i >= 0; i -= 1) {
+    const entry = entries[i]!
+    if (entry.level < currentLevel && entry.level > parentLevel) {
+      parentIndex = i
+      parentLevel = entry.level
+    }
+  }
+  if (parentIndex < 0) return undefined
+
+  const section: WebDocTocEntry[] = []
+  for (let i = parentIndex; i < entries.length; i += 1) {
+    const entry = entries[i]!
+    if (i > parentIndex && entry.level <= parentLevel) break
+    section.push({ ...entry, level: entry.level - parentLevel })
+  }
+  return section.length >= 2 ? section : undefined
+}
+
 /**
  * 是否值得尝试站点级目录索引（llms.txt）。
  * 以页面是否声明 /llms.txt 为主；sidebar 仅作弱启发（许多 docs 主题通用）。

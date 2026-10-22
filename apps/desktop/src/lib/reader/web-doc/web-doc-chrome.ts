@@ -1060,6 +1060,9 @@ export function normalizeWebDocSandpackPlaygrounds(root: HTMLElement): void {
  * 在阅读模式或纯净排版中缺少原站定位 CSS 时，会导致行号作为普通文本被拼接到代码正文首部，严重破坏可读性、复制与导出。
  */
 export function stripCodeBlockLineNumbers(root: ParentNode): void {
+  // 编辑器 Markdown 渲染器自带的行号栏；阅读器不需要，留着会占一行把代码挤下去。
+  root.querySelectorAll('.code-block-lines').forEach((el) => el.remove())
+
   const gutterSelectors = [
     '.syntax-highlighter-line-numbers',
     '.syntax-highlighter-line-number',
@@ -1108,6 +1111,35 @@ export function stripCodeBlockLineNumbers(root: ParentNode): void {
   })
 }
 
+/**
+ * 静态阅读不执行站点脚本，Tabs 的按钮只剩文本；直接保留会挤成一串。
+ * 把 tablist 归一化为可换行的只读标签，正文面板仍按原顺序保留。
+ */
+export function normalizeWebDocStaticTabs(root: HTMLElement): void {
+  const doc = root.ownerDocument
+  root.querySelectorAll<HTMLElement>('[role="tablist"]').forEach((list) => {
+    if (list.closest('.sandpack, .sp-wrapper, .sp-tabs, .web-doc-tabs, .web-doc-playground, pre, .code-block')) return
+    const tabs = Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]'))
+    const labels = [...new Set(tabs.map((tab) => (
+      tab.getAttribute('aria-label') ?? tab.textContent ?? ''
+    ).replace(/\s+/g, ' ').trim()).filter(Boolean))]
+    if (labels.length < 2) return
+
+    const wrap = doc.createElement('div')
+    wrap.className = 'web-doc-static-tabs'
+    wrap.setAttribute('role', 'group')
+    const label = list.getAttribute('aria-label')?.trim()
+    if (label) wrap.setAttribute('aria-label', label)
+    for (const text of labels) {
+      const chip = doc.createElement('span')
+      chip.className = 'web-doc-static-tab'
+      chip.textContent = text
+      wrap.appendChild(chip)
+    }
+    list.replaceWith(wrap)
+  })
+}
+
 function stripGenericChrome(root: HTMLElement, pageUrl: string): void {
   root.querySelectorAll('form, [role="navigation"], nav').forEach((node) => node.remove())
   // Shadow DOM 模板是惰性内容；正文抽取不执行脚本，留在大纲里只会膨胀 DOM。
@@ -1119,6 +1151,7 @@ function stripGenericChrome(root: HTMLElement, pageUrl: string): void {
 
   stripDocsEditChrome(root)
   stripDocsFooterAndFeedbackChrome(root)
+  normalizeWebDocStaticTabs(root)
   preserveSemanticButtonText(root)
 
   // 常见 docs 主题：面包屑工具条、标题旁「复制链接」图标（不绑域名）

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
+  buildWebDocPageContentFromMarkdown,
   buildWebDocPlaygroundRuntimeScript,
   buildWebDocReaderDocument,
   extractDocumentTitle,
@@ -1173,5 +1174,42 @@ describe('web-doc-html', () => {
     root.innerHTML = result.bodyHtml
     expect(root.querySelector('.web-doc-card-grid')).toBeNull()
     expect(root.querySelector('.web-doc-card')).toBeNull()
+  })
+
+  it('静态 Tab 列表归一化为可读标签，避免按钮文本黏连', () => {
+    const html = `<article><h1>Tabs</h1>
+      <div role="tablist" aria-label="Agents">
+        <button role="tab">Claude Code</button>
+        <button role="tab">Grok</button>
+        <button role="tab">Build</button>
+      </div>
+      <p>正文</p>
+    </article>`
+    const result = extractWebDocArticle(html, 'https://example.com/docs/tabs')
+    const root = document.createElement('div')
+    root.innerHTML = result.bodyHtml
+    expect(root.querySelector('[role="tablist"]')).toBeNull()
+    expect(root.querySelector('.web-doc-static-tabs')?.children).toHaveLength(3)
+    expect([...root.querySelectorAll('.web-doc-static-tab')].map((node) => node.textContent))
+      .toEqual(['Claude Code', 'Grok', 'Build'])
+  })
+
+  it('Markdown 源渲染标题、相对链接、表格、代码与图片', () => {
+    const content = buildWebDocPageContentFromMarkdown(
+      '---\ntitle: Frontmatter\n---\n\n# Agent Skills\n\nSee [Quick Start](./quick-start).\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n```ts\nconst x = 1\n```\n\n![shot](./shot.png)',
+      'https://example.com/docs/guide',
+      'generic-ssr',
+    )
+    expect(content.title).toBe('Agent Skills')
+    const root = document.createElement('div')
+    root.innerHTML = content.bodyHtml
+    expect(root.textContent).toContain('Agent Skills')
+    expect(root.textContent).not.toContain('title: Frontmatter')
+    expect(root.querySelector('a')?.getAttribute('href')).toBe('https://example.com/docs/quick-start')
+    expect(root.querySelector('table')).not.toBeNull()
+    expect(root.querySelector('pre code')?.textContent).toContain('const x = 1')
+    expect(root.querySelector('.code-block-lines')).toBeNull()
+    expect(root.querySelector('.code-block-line-number')).toBeNull()
+    expect(root.querySelector('img')?.getAttribute('src')).toBe('https://example.com/docs/shot.png')
   })
 })

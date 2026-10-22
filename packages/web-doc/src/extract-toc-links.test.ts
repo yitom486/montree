@@ -168,6 +168,38 @@ describe('extractStructuredNavToc', () => {
     expect(entries.some((e) => /Deprecated|Non-standard/.test(e.label))).toBe(false)
   })
 
+  it('忽略仅移动端显示的顶栏，并把 sidebar-label 识别为分组', () => {
+    const html = `<!DOCTYPE html><html><body>
+      <nav aria-label="AI documentation">
+        <ul class="flex list-none gap-4 md:hidden">
+          <li><a href="/ai/latest">Home</a></li>
+          <li><a href="/ai/latest/docs/getting-started/overview">Get Started</a></li>
+          <li><a href="/ai/latest/docs/tutorials/basic-chat">Tutorial</a></li>
+        </ul>
+        <div class="flex flex-col gap-4">
+          <div class="ts-sidebar-label">Tutorials</div>
+          <ul class="list-none">
+            <li><a href="/ai/latest/docs/tutorials/basic-chat">Basic Chat</a></li>
+            <li><a href="/ai/latest/docs/tutorials/generate-image">Generate Image</a></li>
+            <li><a href="/ai/latest/docs/tutorials/evaluate">Evaluate a ticket</a></li>
+          </ul>
+        </div>
+      </nav>
+    </body></html>`
+
+    const entries = extractStructuredNavToc(
+      html,
+      'https://tanstack.com/ai/latest/docs/tutorials/basic-chat',
+    )
+    expect(entries.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:Tutorials',
+      '1:Basic Chat',
+      '1:Generate Image',
+      '1:Evaluate a ticket',
+    ])
+    expect(entries.some((e) => e.label === 'Home')).toBe(false)
+  })
+
   it('summary 分组没有链接时不生成空分组', () => {
     const html = `<!DOCTYPE html><html><body>
       <nav id="sidebar" aria-label="Documentation"><ol>

@@ -43,7 +43,8 @@ import type {
   AcpProviderSavePayload,
   AcpProxySettings,
 } from '@yitom/contracts'
-import type { WebDocDiscoverTocPayload, WebDocFetchPayload } from '@yitom/contracts'
+import type { WebDocDiscoverTocPayload } from '@yitom/contracts'
+import type { WebDocFetchPayloadWithMarkdown } from '../../contracts/web-doc'
 import { saveBinaryDocument } from '../services/binary-document-service'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
@@ -954,10 +955,13 @@ export function registerIpcHandlers(): void {
   )
 
   // --- 在线文档 ---
-  ipcMain.handle(IPC.WEB_DOC_FETCH_PAGE, async (_event, payload: WebDocFetchPayload) => {
+  ipcMain.handle(IPC.WEB_DOC_FETCH_PAGE, async (_event, payload: WebDocFetchPayloadWithMarkdown) => {
     const urlResult = parseWebDocUrlInput(payload?.url, true)
     if (!urlResult.ok) return urlResult
-    return fetchWebDocPage({ url: urlResult.value })
+    return fetchWebDocPage({
+      url: urlResult.value,
+      preferMarkdown: Boolean(payload?.preferMarkdown),
+    })
   })
 
   ipcMain.handle(IPC.WEB_DOC_DISCOVER_TOC, async (_event, payload: WebDocDiscoverTocPayload) => {

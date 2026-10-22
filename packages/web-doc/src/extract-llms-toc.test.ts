@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractLlmsTocSection,
   extractLlmsTxtToc,
   humanizePathSegment,
   normalizeLlmsDocHref,
@@ -48,5 +49,23 @@ describe('extractLlmsTxtToc', () => {
     })
     expect(humanizePathSegment('get-started')).toBe('Get Started')
     expect(humanizePathSegment('v1')).toBe('v1')
+  })
+
+  it('从站点原生目录派生当前页所在分组，而不是取全站平铺列表', () => {
+    const entries = [
+      { href: 'https://docs.example/tutorial', label: 'Tutorial', level: 0 },
+      { href: 'https://docs.example/tutorial/basic', label: 'Tutorials', level: 1 },
+      { href: 'https://docs.example/tutorial/basic', label: 'Basic Chat', level: 2 },
+      { href: 'https://docs.example/tutorial/image', label: 'Generate Image', level: 2 },
+      { href: 'https://docs.example/guides/streaming', label: 'Guides', level: 0 },
+      { href: 'https://docs.example/guides/streaming', label: 'Streaming', level: 1 },
+    ]
+
+    expect(extractLlmsTocSection(entries, 'https://docs.example/tutorial/basic')).toEqual([
+      { href: 'https://docs.example/tutorial/basic', label: 'Tutorials', level: 0 },
+      { href: 'https://docs.example/tutorial/basic', label: 'Basic Chat', level: 1 },
+      { href: 'https://docs.example/tutorial/image', label: 'Generate Image', level: 1 },
+    ])
+    expect(extractLlmsTocSection(entries, 'https://docs.example/missing')).toBeUndefined()
   })
 })

@@ -1,6 +1,7 @@
 import { buildWebDocPlaygroundRuntimeScript } from './web-doc-runtime-scripts'
 import DOMPurify from 'dompurify'
 import { Readability } from '@mozilla/readability'
+import { renderMarkdown } from '@/lib/editor/markdown'
 import type { WebDocPageContent, WebDocSiteId } from '@yitom/contracts'
 import {
   normalizeWebDocBaselineIndicators,
@@ -12,6 +13,7 @@ import {
   normalizeWebDocStandaloneFigures,
   backfillWebDocCardHrefs,
   extractNextFlightCardHrefs,
+  stripCodeBlockLineNumbers,
   stripWebDocChrome,
 } from '@/lib/reader/web-doc/web-doc-chrome'
 import { buildReaderLayoutCss, READER_PALETTE, type EpubThemeMode } from '@yitom/reader-core'
@@ -1139,6 +1141,39 @@ export function buildWebDocCardGridCss(theme: EpubThemeMode): string {
   `
 }
 
+export function buildWebDocStaticTabsCss(theme: EpubThemeMode): string {
+  const palette = READER_PALETTE[theme]
+  const isDark = theme === 'dark'
+  const surface = isDark ? '#27272a' : '#f4f4f5'
+  const border = isDark ? '#3f3f46' : '#e4e4e7'
+
+  return `
+    /* 站点 Tabs 在静态阅读中的只读降级（见 normalizeWebDocStaticTabs） */
+    body .web-doc-static-tabs {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 0.4rem 0.5rem !important;
+      margin: 0.9rem 0 !important;
+    }
+    body .web-doc-static-tab {
+      display: inline-flex !important;
+      align-items: center !important;
+      max-width: 100% !important;
+      padding: 0.2rem 0.65rem !important;
+      border: 1px solid ${border} !important;
+      border-radius: 999px !important;
+      background: ${surface} !important;
+      color: ${palette.text} !important;
+      font-size: 0.82em !important;
+      line-height: 1.5 !important;
+      overflow-wrap: anywhere !important;
+    }
+    body .web-doc-semantic-control + .web-doc-semantic-control {
+      margin-left: 0.4rem !important;
+    }
+  `
+}
+
 export function buildWebDocPlaygroundCss(theme: EpubThemeMode): string {
   const palette = READER_PALETTE[theme]
   const isDark = theme === 'dark'
@@ -1325,6 +1360,7 @@ export function buildWebDocReaderDocument(
   const compatTableCss = buildWebDocCompatTableCss(theme)
   const docMetaCss = buildWebDocDocMetaCss(theme)
   const cardGridCss = buildWebDocCardGridCss(theme)
+  const staticTabsCss = buildWebDocStaticTabsCss(theme)
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss(theme)
   const playgroundCss = buildWebDocPlaygroundCss(theme)
@@ -1338,6 +1374,7 @@ export function buildWebDocReaderDocument(
     )
     const root = doc.getElementById('montree-reader-body')
     if (!root) return content.bodyHtml
+    stripCodeBlockLineNumbers(root)
     normalizeWebDocCards(root)
     normalizeWebDocCallouts(root)
     normalizeWebDocBaselineIndicators(root)
@@ -1378,6 +1415,7 @@ export function buildWebDocReaderDocument(
   <style>${compatTableCss}</style>
   <style>${docMetaCss}</style>
   <style>${cardGridCss}</style>
+  <style>${staticTabsCss}</style>
   <style>${mathCss}</style>
   <style>${embedCss}</style>
   <style>${playgroundCss}</style>
@@ -1488,6 +1526,53 @@ export function buildWebDocPageContent(
   const article = extractWebDocArticle(html, pageUrl, siteId)
   return {
     ...article,
+    baseUrl: pageUrl,
+    siteId,
+  }
+}
+
+/** 站点导出的原始 Markdown 可能带 YAML frontmatter，正文渲染前剥离。 */
+function stripMarkdownFrontmatter(markdown: string): string {
+  return markdown.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
+}
+
+function markdownTitle(markdown: string, pageUrl: string): string {
+  const heading = /^ {0,3}#\s+(.+?)\s*#*\s*$/m.exec(markdown)?.[1]?.trim()
+  if (heading) return heading
+  try {
+    const segment = new URL(pageUrl).pathname.split('/').filter(Boolean).pop()
+    return segment ? decodeURIComponent(segment) : pageUrl
+  } catch {
+    return pageUrl
+  }
+}
+
+/**
+ * 文档站提供 Markdown 源时优先走这里：复用编辑器同一套 Markdown 渲染，
+ * 再按阅读器的相对链接/消毒/标题锚点规则收口。交互组件仍不会执行。
+ */
+export function buildWebDocPageContentFromMarkdown(
+  markdown: string,
+  pageUrl: string,
+  siteId: WebDocSiteId,
+): WebDocPageContent {
+  const source = stripMarkdownFrontmatter(markdown)
+  const rendered = renderMarkdown(source)
+  const doc = new DOMParser().parseFromString(
+    `<div id="montree-markdown-root">${rendered}</div>`,
+    'text/html',
+  )
+  const root = doc.getElementById('montree-markdown-root')
+  if (!root) {
+    return { title: markdownTitle(source, pageUrl), bodyHtml: '', baseUrl: pageUrl, siteId }
+  }
+  rewriteRelativeUrls(root, pageUrl)
+  stripCodeBlockLineNumbers(root)
+  const sanitized = sanitizeWebDocBodyHtml(root.innerHTML)
+  const { bodyHtml } = ensureWebDocHeadingIds(sanitized)
+  return {
+    title: markdownTitle(source, pageUrl),
+    bodyHtml,
     baseUrl: pageUrl,
     siteId,
   }

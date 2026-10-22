@@ -51,6 +51,40 @@ describe('web-doc-service', () => {
     expect(result.value.html).toContain('<article>')
   })
 
+  it('preferMarkdown 读取 rel=alternate Markdown 源，失败时仍保留 HTML', async () => {
+    const fetch = vi.fn(async (input: string) => {
+      if (input === 'https://docs.example/page') {
+        return new Response(
+          '<!DOCTYPE html><html><head><link rel="alternate" type="text/markdown" href="/page.md"></head><body><article><h1>Page</h1><p>HTML</p></article></body></html>',
+          { headers: { 'content-type': 'text/html' } },
+        )
+      }
+      if (input === 'https://docs.example/page.md') {
+        return new Response('# Page\n\nMarkdown body', { headers: { 'content-type': 'text/markdown' } })
+      }
+      return new Response('', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    const result = await fetchWebDocPage({ url: 'https://docs.example/page', preferMarkdown: true })
+    expect(isOk(result)).toBe(true)
+    if (!isOk(result)) return
+    expect(result.value.html).toContain('HTML')
+    expect(result.value.markdown).toEqual({
+      url: 'https://docs.example/page.md',
+      text: '# Page\n\nMarkdown body',
+    })
+
+    fetch.mockImplementation(async (input: string) => input === 'https://docs.example/page'
+      ? new Response('<!DOCTYPE html><html><head><link rel="alternate" type="text/markdown" href="/page.md"></head><body><article><h1>Page</h1><p>HTML</p></article></body></html>', { headers: { 'content-type': 'text/html' } })
+      : new Response('', { status: 404 }))
+    const fallback = await fetchWebDocPage({ url: 'https://docs.example/page', preferMarkdown: true })
+    expect(isOk(fallback)).toBe(true)
+    if (!isOk(fallback)) return
+    expect(fallback.value.markdown).toBeUndefined()
+    expect(fallback.value.html).toContain('HTML')
+  })
+
   it('HTTP 错误返回 FILE_READ_ERROR', async () => {
     const result = await fetchWebDocPage({ url: 'https://fail.example/docs' })
     expect(result.ok).toBe(false)
@@ -133,6 +167,56 @@ describe('web-doc-service', () => {
     // 附带双轨数据
     expect(result.value.sectionEntries?.length).toBe(2)
     expect(result.value.siteEntries?.length).toBe(4)
+  })
+
+  it('站点原生 llms 目录包含当前页时优先派生当前板块', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const u = String(input)
+        if (u === 'https://docs.example/tutorials/basic-chat') {
+          return new Response(`<!DOCTYPE html><html><head>
+            <link rel="alternate" type="text/markdown" href="/tutorials/basic-chat.md">
+            <a href="/llms.txt">llms</a>
+          </head><body>
+            <nav><ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/docs/getting-started">Get Started</a></li>
+              <li><a href="/tutorials/basic-chat">Tutorial</a></li>
+              <li><a href="/guides/streaming">Guides</a></li>
+            </ul></nav>
+            <article><h1>Basic Chat</h1></article>
+          </body></html>`, { status: 200, headers: { 'content-type': 'text/html' } })
+        }
+        if (u === 'https://docs.example/llms.txt') {
+          return new Response(`# Site
+## Tutorials
+- [Basic Chat](https://docs.example/tutorials/basic-chat.md)
+- [Generate Image](https://docs.example/tutorials/generate-image.md)
+## Guides
+- [Streaming](https://docs.example/guides/streaming.md)
+`, { status: 200, headers: { 'content-type': 'text/plain' } })
+        }
+        return new Response('', { status: 404 })
+      }),
+    )
+
+    const result = await discoverWebDocToc({ url: 'https://docs.example/tutorials/basic-chat' })
+    expect(isOk(result)).toBe(true)
+    if (!isOk(result)) return
+    expect(result.value.sectionEntries?.map((e) => `${e.level}:${e.label}`)).toEqual([
+      '0:Tutorials',
+      '1:Basic Chat',
+      '1:Generate Image',
+    ])
+    expect(result.value.siteEntries?.map((e) => e.label)).toEqual([
+      'Tutorials',
+      'Basic Chat',
+      'Generate Image',
+      'Guides',
+      'Streaming',
+    ])
+    expect(result.value.entries[0]?.label).toBe('Tutorials')
   })
 
   it('当独立子页面自身无侧栏时回退到根路径发现通用目录', async () => {
