@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.21] - 2026-10-22
+
 - **行内补全独立配置**：补全与聊天模型分开配置，设置页可单独选择 OpenAI 兼容 API Key 或 ChatGPT 登录；保留旧 Agent 自定义供应商作为回退，本地 localhost 允许空 Key。
 
 - **ChatGPT 登录补全**：新增 Codex OAuth PKCE 登录、token 自动刷新与退出登录，凭据只存主进程 userData；支持 `gpt-6-luna` / `gpt-6.1-sol` / `gpt-6-astra`，补全默认使用最低思考等级。ChatGPT 补全直接走 Codex Responses SSE，不经过 ACP 会话，也不读取 Codex/OpenCode 本地登录文件。
@@ -651,7 +655,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.20...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.21...HEAD
+[0.4.21]: https://github.com/yitom486/montree/compare/v0.4.20...v0.4.21
 [0.4.20]: https://github.com/yitom486/montree/compare/v0.4.19...v0.4.20
 [0.4.19]: https://github.com/yitom486/montree/compare/v0.4.18...v0.4.19
 [0.4.18]: https://github.com/yitom486/montree/compare/v0.4.17...v0.4.18
