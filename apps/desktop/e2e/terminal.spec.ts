@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchBuiltApp } from './helpers/launch-app'
 
 test('真实 PTY：输入、Git、创建文件、隐藏保留与关闭释放', async ({}, info) => {
-  const root = await mkdtemp(join(tmpdir(), 'montree-terminal-e2e-'))
+  // Windows 的 %TEMP% 可能是 8.3 短路径（RUNNER~1），PTY 报告长路径：统一用 native realpath 展开
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), 'montree-terminal-e2e-')))
   await writeFile(join(root, 'ready.md'), '# Ready\n')
   const app = await launchBuiltApp({ E2E_AUTO_OPEN_PATH: root })
   try {

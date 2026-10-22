@@ -48,7 +48,8 @@ test('切换文档（md→pdf→在线文档→本地 md）与 Mermaid 渲染：
     await expect(page.locator('#main [data-testid="mermaid-block"] svg[id]').first()).toBeVisible({ timeout: 20_000 })
     await page.waitForTimeout(800)
     const base = await frames(page)
-    expect(base.agent.width).toBeGreaterThan(150)
+    // 150% 缩放下 1280 物理像素宽的屏幕只有约 850 CSS 像素，面板最小宽度随之变窄
+    expect(base.agent.width).toBeGreaterThan(120)
 
     const check = async (label: string) => {
       await page.waitForTimeout(600)
