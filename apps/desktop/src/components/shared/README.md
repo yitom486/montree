@@ -5,6 +5,7 @@
 | 文件 | 功能 |
 |------|------|
 | `SettingsDialog` / `AboutDialog` / `UpdatePromptHost` | 设置、关于、更新提示 |
+| `InlineCompletionProviderSettings` | 行内补全专用 provider：API Key/OpenAI 兼容接口或 ChatGPT OAuth 登录、预设/Base URL/模型/Key、按接口动态获取模型 id，支持清除配置恢复跟随 Agent 与本地空 Key |
 | `SyncSettingsSection` | WebDAV 云同步配置与状态管理面板 |
 | `TtsSettingsSection` | 语音朗读（TTS）配置：Google Gemini / 微软 Azure Speech / Local OpenAI / 服务默认切换、双 Key 容灾、Region/音色选择、试听与本地缓存管理 |
 | `QuickOpenDialog` | 全局快速切换文件对话框（Ctrl+P） |

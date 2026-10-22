@@ -101,6 +101,18 @@
 |------|------|
 | `react-artifact-service.ts` / `.test.ts` | 96KiB 单文件 JSX/TSX 离线转换；Sucrase 独立懒块内联打包，不执行模型源码；生成预置 React 运行库 HTML，由 iframe CSP 限制运行 |
 
+## AI 行内补全
+
+| 文件 | 功能 |
+|------|------|
+| `ai/inline-completion-service.ts` | 补全请求去重/取消、8 秒超时、runner 调用与候选清洗 |
+| `ai/inline-completion-provider.ts` | 补全专用 provider 配置（认证方式/模型/Base URL/Key，落盘 userData/ai/inline-completion-provider.json）；支持 API Key 与 ChatGPT 登录，缺失时回退旧 agent/provider.json，本地 localhost 允许空 Key |
+| `ai/inline-completion-model.ts` | 从专用 provider（或旧 Agent provider）创建补全 runner；ChatGPT 走 Codex Responses，DeepSeek 自动关闭 thinking，不经过 ACP 会话 |
+| `ai/inline-completion-models.ts` | 按 Base URL/Key 读取 OpenAI 兼容 `GET /models`，供设置页动态选择模型 id；本地空 Key 可用 |
+| `ai/chatgpt-auth.ts` | ChatGPT/Codex OAuth PKCE、token 刷新与 userData/ai/chatgpt-auth.json 持久化；凭据不进入渲染进程 |
+| `ai/chatgpt-completion.ts` | ChatGPT Codex Responses SSE 补全请求与文本增量解析 |
+| `ai/inline-completion-prompt.ts` | 文档标题/标题路径/块类型提示、CJK 与单行块清洗 |
+
 ## Typst
 
 - `typst/typst-service.ts`：Tinymist 0.15.8 校验、窗口/项目语言进程、未保存文本同步、隔离预览与内存 PDF 导出；配置及包缓存位于 userData/typst。

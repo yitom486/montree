@@ -6,6 +6,16 @@
 
 ## [未发布]
 
+- **行内补全独立配置**：补全与聊天模型分开配置，设置页可单独选择 OpenAI 兼容 API Key 或 ChatGPT 登录；保留旧 Agent 自定义供应商作为回退，本地 localhost 允许空 Key。
+
+- **ChatGPT 登录补全**：新增 Codex OAuth PKCE 登录、token 自动刷新与退出登录，凭据只存主进程 userData；支持 `gpt-6-luna` / `gpt-6.1-sol` / `gpt-6-astra`，补全默认使用最低思考等级。ChatGPT 补全直接走 Codex Responses SSE，不经过 ACP 会话，也不读取 Codex/OpenCode 本地登录文件。
+
+- **DeepSeek 等动态模型**：设置页可按 Base URL/Key 请求 OpenAI 兼容 `GET /models` 并下拉选择模型，不再依赖预设模型 id；同一地址可复用已保存 Key。DeepSeek 官方接口自动关闭 thinking，避免补全默认进入 high reasoning。
+
+- **补全稳定性**：修复中文输入法提交后不触发、配置保存后同步状态缓存仍为未配置、旧 preload 缺少 ChatGPT 方法导致未捕获异常等问题；补全失败会给出可见提示。输入模式补全增加文档标题、标题路径与 Markdown 块类型上下文，并完善 CJK/单行清洗。
+
+- **测试**：新增 ChatGPT OAuth/刷新/SSE、provider 状态、动态模型列表、补全服务与输入法触发单测，以及补全设置 E2E。
+
 ---
 
 ## [0.4.20] - 2026-10-22

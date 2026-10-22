@@ -1,10 +1,14 @@
-import { generateText, type LanguageModel } from 'ai'
 import type { InlineCompletionRequest, InlineCompletionResult, InlineCompletionStatus } from '../../../contracts/inline-completion'
 import { buildInlineCompletionPrompt, cleanCompletion } from './inline-completion-prompt'
 
+export interface InlineCompletionRunner {
+  id: string
+  generate: (input: { system: string; prompt: string; signal: AbortSignal }) => Promise<string>
+}
+
 export interface InlineCompletionModelSource {
   /** 当前可用模型；未配置返回 null */
-  resolve: () => Promise<{ model: LanguageModel; id: string } | null>
+  resolve: () => Promise<InlineCompletionRunner | null>
 }
 
 /**
@@ -34,9 +38,9 @@ export function createInlineCompletionService(source: InlineCompletionModelSourc
       const resolved = await source.resolve()
       if (!resolved) return { requestId: request.requestId, items: [], reason: 'not-configured' }
       const { system, prompt } = buildInlineCompletionPrompt(request)
-      const result = await generateText({ model: resolved.model, system, prompt, temperature: 0.2, maxOutputTokens: 160, abortSignal: controller.signal, maxRetries: 0 })
+      const text = await resolved.generate({ system, prompt, signal: controller.signal })
       if (controller.signal.aborted) return { requestId: request.requestId, items: [], reason: 'cancelled' }
-      const items = [...new Set(result.text.split(/\n?<ALT>\n?/).map((item) => cleanCompletion(item, request)).filter(Boolean))]
+      const items = [...new Set(text.split(/\n?<ALT>\n?/).map((item) => cleanCompletion(item, request)).filter(Boolean))]
       return { requestId: request.requestId, items }
     } catch (error) {
       if (controller.signal.aborted) return { requestId: request.requestId, items: [], reason: 'cancelled' }

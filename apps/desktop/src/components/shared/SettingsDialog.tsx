@@ -38,6 +38,7 @@ import { clearAllPdfOcrCache } from '@/api/ocr-api'
 import { useOcrComponent } from '@/hooks/reader/useOcrComponent'
 import { SyncSettingsSection } from './SyncSettingsSection'
 import { TtsSettingsSection } from './TtsSettingsSection'
+import { InlineCompletionProviderSettings } from './InlineCompletionProviderSettings'
 import { isWslPath } from '@yitom/contracts'
 import { toast } from 'sonner'
 
@@ -491,10 +492,11 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
             </SettingRow>
             <SettingRow
               title="行内补全"
-              description="停顿后在光标处显示灰色续写建议：Tab 接受、Ctrl/Cmd+→ 逐词接受、Esc 忽略、Alt+] 切换候选。使用 Agent 面板中配置的自定义模型供应商；未配置时不生效。可在状态栏为单个文件关闭。"
+              description="停顿后在光标处显示灰色续写建议：Tab 接受、Ctrl/Cmd+→ 逐词接受、Esc 忽略、Alt+] 切换候选。默认使用 Agent 的自定义模型供应商，也可以单独配置补全模型。可在状态栏为单个文件关闭。"
             >
               <ToggleSwitch checked={aiInlineCompletion} onChange={setAiInlineCompletion} label="行内补全" />
             </SettingRow>
+            <InlineCompletionProviderSettings />
           </section>
 
           <Separator className="my-2" />

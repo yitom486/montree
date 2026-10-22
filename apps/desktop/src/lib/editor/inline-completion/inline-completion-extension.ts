@@ -1,13 +1,23 @@
 import { Prec, StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
-import { syntaxTree } from '@codemirror/language'
+import type { InlineCompletionHints } from '../../../../contracts/inline-completion'
+import { buildInlineCompletionHints, fenceLanguageAt } from './inline-completion-context'
+
+export { fenceLanguageAt } from './inline-completion-context'
 
 /**
  * Copilot 式行内补全（ghost text）：停顿后在光标处显示灰色建议。
  * Tab 接受、Esc/继续输入消失、Ctrl/Cmd+→ 逐词接受、Alt+] / Alt+[ 切换候选。
  * 输入法组合期间不请求；继续输入会取消在途请求；代码块内仅在声明了语言时触发。
  */
-export interface InlineCompletionContext { prefix: string; suffix: string; language: string; pos: number }
+export interface InlineCompletionContext {
+  prefix: string
+  suffix: string
+  language: string
+  pos: number
+  /** 仅 Markdown 提供；Typst 没有 Markdown 标题/块语义 */
+  hints?: InlineCompletionHints
+}
 export interface InlineCompletionOptions {
   fetch: (context: InlineCompletionContext, signal: AbortSignal) => Promise<string[]>
   enabled: () => boolean
@@ -67,19 +77,6 @@ export const ghostField = StateField.define<Ghost | null>({
   }),
 })
 
-/** 光标处所在的代码块语言（Markdown 围栏）；不在代码块返回 undefined，无语言的代码块返回 ''。 */
-export function fenceLanguageAt(state: EditorState, pos: number): string | undefined {
-  const node = syntaxTree(state).resolveInner(pos, -1)
-  for (let cur: typeof node | null = node; cur; cur = cur.parent) {
-    if (cur.name === 'FencedCode' || cur.name === 'CodeBlock') {
-      if (cur.name === 'CodeBlock') return ''
-      const info = cur.getChild('CodeInfo')
-      return info ? state.sliceDoc(info.from, info.to).trim().toLowerCase() : ''
-    }
-  }
-  return undefined
-}
-
 /** 是否适合在此处触发：单光标、行尾或后随空白/标点、不在空行开头连续空白中。 */
 export function shouldTrigger(state: EditorState): boolean {
   const range = state.selection.main
@@ -117,6 +114,7 @@ export function inlineCompletion(options: InlineCompletionOptions): Extension {
       this.schedule()
     }
     schedule() {
+      if (this.timer) clearTimeout(this.timer)
       this.timer = setTimeout(() => { this.timer = null; void this.request() }, debounceMs)
     }
     cancel() {
@@ -135,8 +133,9 @@ export function inlineCompletion(options: InlineCompletionOptions): Extension {
       }
       const controller = new AbortController()
       this.controller = controller
+      const hints = options.language === 'markdown' ? buildInlineCompletionHints(state, pos) : undefined
       try {
-        const items = await options.fetch({ prefix: state.sliceDoc(Math.max(0, pos - maxPrefix), pos), suffix: state.sliceDoc(pos, Math.min(state.doc.length, pos + maxSuffix)), language, pos }, controller.signal)
+        const items = await options.fetch({ prefix: state.sliceDoc(Math.max(0, pos - maxPrefix), pos), suffix: state.sliceDoc(pos, Math.min(state.doc.length, pos + maxSuffix)), language, pos, ...(hints ? { hints } : {}) }, controller.signal)
         if (controller.signal.aborted || this.view.state.doc !== state.doc || this.view.state.selection.main.head !== pos || this.view.composing) return
         const usable = items.filter((item) => item && item.trim())
         if (usable.length) this.view.dispatch({ effects: setGhost.of({ pos, items: usable, index: 0 }) })
@@ -147,6 +146,8 @@ export function inlineCompletion(options: InlineCompletionOptions): Extension {
   }, {
     eventHandlers: {
       compositionstart() { this.cancel(); if (this.view.state.field(ghostField)) this.view.dispatch({ effects: setGhost.of(null) }) },
+      // 中文/日文输入法提交后不会产生 input.type 事务，需要在这里重新排队。
+      compositionend() { this.schedule() },
       blur() { this.cancel() },
     },
   })

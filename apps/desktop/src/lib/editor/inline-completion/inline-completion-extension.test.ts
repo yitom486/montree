@@ -27,11 +27,27 @@ describe('inline completion ghost text', () => {
     expect(fetch).not.toHaveBeenCalled()
     await wait()
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect((fetch.mock.calls[0] as unknown[])[0]).toMatchObject({ prefix: 'The quick brown', suffix: '', language: 'markdown' })
+    expect((fetch.mock.calls[0] as unknown[])[0]).toMatchObject({
+      prefix: 'The quick brown',
+      suffix: '',
+      language: 'markdown',
+      hints: { block: 'paragraph' },
+    })
     expect(view.contentDOM.querySelector('.cm-ai-ghost')?.textContent).toBe(' fox jumps.')
     expect(key('Tab')).toBe(true)
     expect(view.state.doc.toString()).toBe('The quick brown fox jumps.')
     expect(view.state.field(ghostField)).toBeNull()
+    cleanup()
+  })
+  it('requests after IME composition ends even without an input.type transaction', async () => {
+    const fetch = vi.fn(async () => ['，继续。'])
+    const { view, cleanup } = mount('你好', fetch)
+    const pos = view.state.selection.main.head
+    view.dispatch({ changes: { from: pos, insert: '春' }, selection: { anchor: pos + 1 } })
+    view.contentDOM.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '春' }))
+    await wait()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(view.state.doc.toString()).toContain('春')
     cleanup()
   })
   it('Esc dismisses; typing a non-matching char dismisses; matching chars type through', async () => {

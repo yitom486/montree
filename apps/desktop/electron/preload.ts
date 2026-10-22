@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
 import { INLINE_COMPLETION_IPC, type InlineCompletionAPI } from '../contracts/inline-completion'
+import {
+  INLINE_COMPLETION_CHATGPT_IPC,
+  INLINE_COMPLETION_MODEL_IPC,
+  INLINE_COMPLETION_PROVIDER_IPC,
+} from '../contracts/inline-completion-provider'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { IPC } from '@yitom/contracts'
 import type { AppError } from '@yitom/contracts'
@@ -435,5 +440,12 @@ const inlineCompletionAPI: InlineCompletionAPI = {
   complete: (request) => ipcRenderer.invoke(INLINE_COMPLETION_IPC.complete, request),
   cancel: (requestId) => ipcRenderer.invoke(INLINE_COMPLETION_IPC.cancel, requestId),
   status: () => ipcRenderer.invoke(INLINE_COMPLETION_IPC.status),
+  providerStatus: () => ipcRenderer.invoke(INLINE_COMPLETION_PROVIDER_IPC.get),
+  saveProvider: (payload) => ipcRenderer.invoke(INLINE_COMPLETION_PROVIDER_IPC.save, payload),
+  clearProvider: () => ipcRenderer.invoke(INLINE_COMPLETION_PROVIDER_IPC.clear),
+  chatGptStatus: () => ipcRenderer.invoke(INLINE_COMPLETION_CHATGPT_IPC.status),
+  loginChatGpt: () => ipcRenderer.invoke(INLINE_COMPLETION_CHATGPT_IPC.login),
+  logoutChatGpt: () => ipcRenderer.invoke(INLINE_COMPLETION_CHATGPT_IPC.logout),
+  listProviderModels: (payload) => ipcRenderer.invoke(INLINE_COMPLETION_MODEL_IPC.list, payload),
 }
 contextBridge.exposeInMainWorld('montreeInlineCompletion', inlineCompletionAPI)

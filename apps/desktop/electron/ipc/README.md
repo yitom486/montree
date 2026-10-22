@@ -10,7 +10,7 @@
 
 通道名与 payload 类型在 `packages/contracts/src/ipc/`（`@montree/contracts`，原 `shared/ipc/`）。有返回值的一律 `Result<T, AppError>`；用户取消 `CANCELLED`。
 
-- `inline-completion-handlers.ts`：行内补全 IPC（请求/取消/状态），按窗口取消在途请求；`E2E_INLINE_COMPLETION_MOCK=1` 时使用模拟模型。
+- `inline-completion-handlers.ts`：行内补全 IPC（请求/取消/状态/专用 provider/ChatGPT 登录/动态模型列表），按窗口取消在途请求；`E2E_INLINE_COMPLETION_MOCK=1` 时使用模拟模型。
 - `typst-handlers.ts`：Typst IPC 主窗口/本机宿主校验、会话归属、导出对话框与原子 PDF 写入。
 
 - `typst-handlers.test.ts`：主 frame 与可信窗口、远端拒绝、跨窗请求归属、导出取消与过期修订零写入回归。

@@ -27,6 +27,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
 | `annotations-react-docs.spec.ts` | React 官方文档（在线文档快照 + 扫描版 PDF/OCR，mock Agent）：划重点、批注、智能制卡、Agent 经 MCP 提议 AI 笔记并采用，重载后持久化与重新锚定 |
 | `ai-edit-review-tools.spec.ts` / `ai-edit-multiwindow.spec.ts` | 逐句审阅、审阅面板、选区工具栏、行内补全；修改建议多窗口隔离 |
+| `inline-completion-settings.spec.ts` | 设置页单独配置补全 provider（预设/Base URL/模型/本地空 Key）与 ChatGPT 登录入口，保存/清除状态切换 |
 | `app-smoke.spec.ts` | 启动、欢迎页、菜单；真实 IPC 拒绝未绑定窗口凭 workspaceId 访问远端 |
 | `agent-community.spec.ts` | 社区滚动跟随/上滑逃离、历史窗口与位置恢复回归 |
 | `agent-panel.spec.ts` | Agent 面板壳；mock ACP 的 320/390/480 输入栏布局、选区复制/引用与输入框粘贴/剪切（剪贴板边界桩）；Code mode 开关经真实 IPC 透传 `_meta.toolsMode=ptc` 到下一次新会话 |

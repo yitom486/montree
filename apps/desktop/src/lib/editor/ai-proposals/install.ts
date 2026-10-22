@@ -10,11 +10,13 @@ import { requestAgentPrompt, setAgentPanelOpener } from '@/lib/agent/agent-promp
 import { toast } from 'sonner'
 import type { TextDocument } from '../text-document'
 import { inlineCompletion } from '../inline-completion/inline-completion-extension'
-import { fetchInlineCompletions, inlineCompletionConfigured, refreshInlineCompletionStatus } from '../inline-completion/inline-completion-client'
+import { fetchInlineCompletions, refreshInlineCompletionStatus } from '../inline-completion/inline-completion-client'
 
 export function inlineCompletionEnabledFor(filePath: string): boolean {
   const settings = useAppSettingsStore.getState()
-  return settings.aiInlineCompletion && !settings.inlineCompletionDisabledFiles.includes(filePath) && inlineCompletionConfigured()
+  // 不再用同步状态缓存拦截请求：配置保存后的首次输入可能仍读到旧值。
+  // 未配置时主进程会快速返回 not-configured，不会发起网络请求。
+  return settings.aiInlineCompletion && !settings.inlineCompletionDisabledFiles.includes(filePath)
 }
 
 function requestSelectionEdit(document: TextDocument, action: Parameters<typeof buildSelectionEditPrompt>[1], instruction?: string): void {
