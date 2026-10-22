@@ -13,6 +13,16 @@ import { getTypstAsset, isSafeArchiveMember, TINYMIST_RELEASE_BASE, TINYMIST_VER
 
 const execFileAsync = promisify(execFile)
 
+/**
+ * Windows 必须用系统自带的 bsdtar（System32\tar.exe，可解 zip）；PATH 里若先命中 Git 的 GNU tar，
+ * 它不认识 zip 且会把 `C:` 当远程主机。
+ */
+function tarCommand(): string {
+  if (process.platform !== 'win32') return 'tar'
+  const system = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+  return existsSync(system) ? system : 'tar'
+}
+
 export interface TinymistDownloadProgress { received: number; total: number | null; phase: 'download' | 'verify' | 'extract' | 'done' }
 export interface InstallTinymistOptions {
   /** 安装根目录（通常为 userData/typst/runtime）；实际放在 `<root>/<version>-<platform>-<arch>`。 */
@@ -64,7 +74,7 @@ async function findExecutable(dir: string, name: string): Promise<string[]> {
 }
 
 async function listArchive(archive: string): Promise<string[]> {
-  const { stdout } = await execFileAsync('tar', ['-tf', archive], { windowsHide: true, maxBuffer: 4 * 1024 * 1024 })
+  const { stdout } = await execFileAsync(tarCommand(), ['-tf', archive], { windowsHide: true, maxBuffer: 4 * 1024 * 1024 })
   return stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
 }
 
@@ -115,7 +125,7 @@ export async function installTinymist(options: InstallTinymistOptions): Promise<
     report({ received, total, phase: 'extract' })
     const members = await listArchive(archive)
     if (!members.length || members.some((name) => !isSafeArchiveMember(name.replace(/\/$/, '') || '.'))) throw new Error('Typst 运行时归档成员无效')
-    await execFileAsync('tar', ['-xf', archive, '-C', path.join(staging, 'x')], { windowsHide: true })
+    await execFileAsync(tarCommand(), ['-xf', archive, '-C', path.join(staging, 'x')], { windowsHide: true })
     const candidates = await findExecutable(path.join(staging, 'x'), asset.executable)
     if (candidates.length !== 1) throw new Error('归档中缺失或包含重复的 Tinymist 可执行文件')
     const extracted = await realpath(candidates[0])

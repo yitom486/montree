@@ -68,7 +68,9 @@ test('安装包不带 Tinymist：首次打开 Typst 文件时显示下载进度�
       await expect(status).toBeVisible({ timeout: 30_000 })
       const dir = process.env.ROUND4_SCREENSHOT_DIR
       if (dir) await page.screenshot({ path: join(dir, 'typst-runtime-download.png') })
-      await expect(page.getByText('Typst 运行时已下载并通过校验')).toBeVisible({ timeout: 120_000 })
+      const ok = page.getByText('Typst 运行时已下载并通过校验'), failed = page.getByText(/Typst 运行时下载失败[:：].*/)
+      await expect(ok.or(failed)).toBeVisible({ timeout: 120_000 })
+      if (await failed.isVisible()) throw new Error(String(await failed.textContent()))
       await expect(page.getByRole('status').filter({ hasText: /最近一次排版已完成|Typst 编辑服务已连接/ })).toBeVisible({ timeout: 60_000 })
       const manifest = JSON.parse(await readFile(join(runtimeDir, `0.15.8-${process.platform}-${process.arch}`, 'manifest.json'), 'utf8'))
       expect(manifest).toMatchObject({ version: '0.15.8', archiveSha256: asset.sha256, source: 'download' })

@@ -171,7 +171,7 @@ jobs:
           apps/desktop/e2e/app-smoke.spec.ts
           apps/desktop/e2e/terminal.spec.ts
           apps/desktop/e2e/typst-runtime-download.spec.ts
-          apps/desktop/e2e/reader-pdf-ocr.spec.ts
+          apps/desktop/e2e/chat-links.spec.ts
         env:
           CI: true
           E2E_PACKAGED_EXE: release/win-unpacked/Montree.exe
