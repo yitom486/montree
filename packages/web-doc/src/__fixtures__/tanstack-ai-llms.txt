@@ -1,0 +1,60 @@
+# TanStack AI docs
+
+> TanStack AI is a TypeScript library for building AI features and agents. It ships the agent loop, provider adapters, durability, interrupts, sandboxes, and tools, and plugs into the server, database, and UI you already have.
+
+- [Docs index](https://tanstack.com/ai/latest/docs/index.md): This same Markdown index.
+- [LLMs index](https://tanstack.com/ai/latest/llms.txt): This same Markdown index.
+- [Library home](https://tanstack.com/ai/latest)
+- [GitHub](https://github.com/tanstack/ai)
+- Packages: @tanstack/ai-client, @tanstack/ai.
+- Frameworks: React, Vue, Solid, Svelte, Preact, Angular, Octane, Vanilla.
+
+Use this index as the routing layer for the docs. Fetch one linked Markdown page at a time, and prefer framework-specific pages when the user names a framework.
+
+## Get Started
+
+### Getting Started
+
+- [Overview](https://tanstack.com/ai/latest/docs/getting-started/overview.md) (added 2026-04-15, updated 2026-10-21)
+- [Quick Start](https://tanstack.com/ai/latest/docs/getting-started/quick-start.md) (added 2026-04-15, updated 2026-10-21)
+- [Quick Start: React Native](https://tanstack.com/ai/latest/docs/getting-started/quick-start-react-native.md) (added 2026-05-28)
+- [Quick Start: Server Only](https://tanstack.com/ai/latest/docs/getting-started/quick-start-server.md) (added 2026-04-15, updated 2026-10-08)
+- [Devtools](https://tanstack.com/ai/latest/docs/getting-started/devtools.md) (added 2026-04-15, updated 2026-08-21)
+- [Agent Skills (TanStack Intent)](https://tanstack.com/ai/latest/docs/getting-started/agent-skills.md) (added 2026-04-17, updated 2026-09-09)
+### Comparison
+
+- [TanStack AI vs Vercel AI SDK](https://tanstack.com/ai/latest/docs/comparison/vercel-ai-sdk.md) (added 2026-04-15, updated 2026-09-29)
+
+## Tutorial
+
+### Tutorials
+
+- [Basic Chat](https://tanstack.com/ai/latest/docs/tutorials/basic-chat.md) (added 2026-09-17)
+- [Generate Image](https://tanstack.com/ai/latest/docs/tutorials/generate-image.md) (added 2026-09-17)
+- [Streaming Structured Table](https://tanstack.com/ai/latest/docs/tutorials/streaming-structured-table.md) (added 2026-09-17)
+- [Evaluate a ticket](https://tanstack.com/ai/latest/docs/tutorials/evaluate.md) (added 2026-09-18)
+- [Subagents](https://tanstack.com/ai/latest/docs/tutorials/subagents.md) (added 2026-09-21)
+- [Persisted subagents](https://tanstack.com/ai/latest/docs/tutorials/subagents-persisted.md) (added 2026-09-22)
+- [Build an MCP Server](https://tanstack.com/ai/latest/docs/tutorials/mcp-server.md) (added 2026-09-22)
+- [Computer Use](https://tanstack.com/ai/latest/docs/tutorials/computer-use.md) (added 2026-10-21)
+
+## Guides
+
+### Chat & Streaming
+
+- [Streaming](https://tanstack.com/ai/latest/docs/chat/streaming.md) (added 2026-04-15, updated 2026-10-07)
+- [Stream Events](https://tanstack.com/ai/latest/docs/chat/stream-events.md) (added 2026-08-26, updated 2026-10-13)
+- [Subagents](https://tanstack.com/ai/latest/docs/chat/subagents.md) (added 2026-09-21, updated 2026-10-14)
+- [Agentic Cycle](https://tanstack.com/ai/latest/docs/chat/agentic-cycle.md) (added 2026-04-15, updated 2026-10-13)
+- [Thinking & Reasoning](https://tanstack.com/ai/latest/docs/chat/thinking-content.md) (added 2026-04-15, updated 2026-10-09)
+- [Reasoning](https://tanstack.com/ai/latest/docs/chat/reasoning.md) (added 2026-10-09)
+- [Message Queue](https://tanstack.com/ai/latest/docs/chat/queueing.md) (added 2026-08-26)
+### Transports
+
+- [Overview](https://tanstack.com/ai/latest/docs/transports/overview.md) (added 2026-10-08)
+- [Server-Sent Events](https://tanstack.com/ai/latest/docs/transports/sse.md) (added 2026-10-08)
+- [HTTP Stream](https://tanstack.com/ai/latest/docs/transports/http-stream.md) (added 2026-10-08)
+- [JSON](https://tanstack.com/ai/latest/docs/transports/json.md) (added 2026-10-08, updated 2026-10-12)
+- [WebSockets](https://tanstack.com/ai/latest/docs/transports/websockets.md) (added 2026-10-08)
+- [React Native](https://tanstack.com/ai/latest/docs/transports/react-native.md) (added 2026-10-08)
+- [Server Functions](https://tanstack.com/ai/latest/docs/transports/server-functions.md) (added 2026-10-08)

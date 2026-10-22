@@ -881,6 +881,9 @@ export function pickArticleRoot(
         baseEl.href = pageUrl
         cloneDoc.head.appendChild(baseEl)
       }
+      // Readability 会按 class 权重删掉 h1/h2（`scroll-my-20` 之类的工具类命中其 /scroll/ 负权重），
+      // 导致正文大纲只剩 h3。标题本身就是正文结构，这里先去掉标题的 class 再交给它。
+      cloneDoc.querySelectorAll('h1[class],h2[class],h3[class]').forEach((h) => h.removeAttribute('class'))
       const reader = new Readability(cloneDoc)
       const parsed = reader.parse()
       if (parsed?.content) {

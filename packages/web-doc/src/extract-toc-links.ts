@@ -116,7 +116,7 @@ export function extractBalancedElements(html: string, tagName: string): string[]
  *    - 链接绝大多数为 #hash 锚点、或标有 On this page/docs-toc 的导航直接降权排除；
  * 2. 优先重奖含有大量跨页面相对路径链接、具有 sidebar 标识与多层分组的导航容器。
  */
-export function pickDocsNavHtml(html: string): string | null {
+export function pickDocsNavHtml(html: string, baseUrl?: string): string | null {
   const cleaned = stripScriptsAndStyles(html)
   const navBlocks = extractBalancedElements(cleaned, 'nav')
   if (navBlocks.length === 0) {
@@ -124,6 +124,7 @@ export function pickDocsNavHtml(html: string): string | null {
     return sidebar ?? null
   }
 
+  const sectionPrefix = docsSectionPrefix(baseUrl)
   const scored = navBlocks.map((block) => {
     const openTag = block.match(/^<nav\b[^>]*>/i)?.[0] ?? ''
     let score = 0
@@ -152,7 +153,23 @@ export function pickDocsNavHtml(html: string): string | null {
 
     const isHeaderOrFooter =
       /md-header|md-footer|md-nav--secondary/i.test(openTag) ||
-      /aria-label=["'][^"']*(页眉|页脚|header|footer)[^"']*["']/i.test(openTag)
+      /aria-label=["'][^"']*(页眉|页脚|header|footer|mobile|social|legal)[^"']*["']/i.test(openTag)
+
+    // 与当前页同分区（共享前两级路径，如 /ai/latest/）的跨页链接：文档侧栏的核心特征，
+    // 全站顶栏/页脚链接多指向别的板块，不计分。
+    let sectionAnchorCount = 0
+    if (sectionPrefix) {
+      for (const a of allAnchors) {
+        const h = a.match(/\bhref=["']([^"']+)["']/i)?.[1]?.trim()
+        if (!h || h.startsWith('#')) continue
+        try {
+          const u = new URL(h, baseUrl)
+          if (u.origin === sectionPrefix.origin && u.pathname.startsWith(sectionPrefix.path)) sectionAnchorCount += 1
+        } catch {
+          // 非法链接忽略
+        }
+      }
+    }
 
     // 页内大纲与页眉页脚强力降权，严防错选
     if (isMostlyHash || isInPageToc) {
@@ -189,6 +206,11 @@ export function pickDocsNavHtml(html: string): string | null {
 
     // 跨页有效链接数重奖
     score += Math.min(crossPageAnchorCount * 4, 160)
+    if (sectionPrefix) {
+      score += Math.min(sectionAnchorCount * 6, 180)
+      // 一个同分区链接都没有的导航，基本不是当前文档的侧栏
+      if (crossPageAnchorCount >= 3 && sectionAnchorCount === 0) score -= 80
+    }
     const ulCount = (block.match(/<ul\b/gi) ?? []).length
     score += Math.min(ulCount * 3, 30)
     const nestedNavCount = (block.match(/<nav\b/gi) ?? []).length
@@ -201,6 +223,19 @@ export function pickDocsNavHtml(html: string): string | null {
   const best = scored[0]
   if (!best || best.score <= 0 || best.crossPageAnchorCount < 2) return null
   return best.block
+}
+
+/** 当前页所在文档分区：前两级目录（/ai/latest/docs/x → /ai/latest/）；路径太浅则不启用 */
+function docsSectionPrefix(baseUrl?: string): { origin: string; path: string } | null {
+  if (!baseUrl) return null
+  try {
+    const u = new URL(baseUrl)
+    const dirs = u.pathname.split('/').filter(Boolean).slice(0, -1)
+    if (dirs.length < 1) return null
+    return { origin: u.origin, path: `/${dirs.slice(0, 2).join('/')}/` }
+  } catch {
+    return null
+  }
 }
 
 function resolveSameOriginHref(hrefRaw: string, base: URL): string | null {
@@ -228,7 +263,7 @@ function resolveSameOriginHref(hrefRaw: string, base: URL): string | null {
  * - `<h2>`/`<h3>`/`<h4>` 分组标题合成父节点
  */
 export function extractStructuredNavToc(html: string, baseUrl: string): WebDocTocEntry[] {
-  const navHtml = pickDocsNavHtml(html)
+  const navHtml = pickDocsNavHtml(html, baseUrl)
   if (!navHtml) return []
 
   const base = new URL(baseUrl)

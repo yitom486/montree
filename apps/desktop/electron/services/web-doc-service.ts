@@ -17,8 +17,9 @@ import {
 } from '@montree/web-doc'
 import {
   extractLlmsTxtToc,
+  normalizeLlmsDocHref,
+  resolveLlmsTxtCandidates,
   looksLikeDocsIndexCandidate,
-  resolveLlmsTxtUrl,
 } from '@montree/web-doc'
 import { tryFetchE2eWebDocFixture } from './web-doc/e2e-fixture'
 import { extractPeopleDailyToc } from '@montree/web-doc'
@@ -201,6 +202,29 @@ async function fetchWebDocPlainText(
   }
 }
 
+/**
+ * 依次尝试 llms.txt 候选（页面声明 → 路径前缀 → 根）。优先采用包含当前页的索引，
+ * 否则取第一个可用的；HTML 回退页（SPA 对未知路径返回 200 + 首页）一律跳过。
+ */
+async function discoverLlmsTxtToc(
+  pageHref: string,
+  html: string,
+  origin: string,
+  localOrigin: string | null | undefined,
+): Promise<WebDocTocEntry[] | undefined> {
+  const current = normalizeLlmsDocHref(pageHref, origin)
+  let fallback: WebDocTocEntry[] | undefined
+  for (const url of resolveLlmsTxtCandidates(pageHref, html)) {
+    const result = await fetchWebDocPlainText(url, localOrigin ?? undefined)
+    if (!result.ok || /^\s*<(?:!doctype|html)\b/i.test(result.value.text)) continue
+    const entries = extractLlmsTxtToc(result.value.text, origin)
+    if (entries.length < 3) continue
+    if (current && entries.some((e) => e.href === current)) return entries
+    fallback ??= entries
+  }
+  return fallback
+}
+
 export async function discoverWebDocToc(
   payload: WebDocDiscoverTocPayload,
 ): Promise<Result<WebDocDiscoverTocResult, AppError>> {
@@ -249,16 +273,7 @@ export async function discoverWebDocToc(
             sectionEntries = extractSameOriginDocLinks(rootFetch.value.html, rootFetch.value.url)
           }
           if (looksLikeDocsIndexCandidate(rootFetch.value.html)) {
-            const llmsUrl = resolveLlmsTxtUrl(rootFetch.value.url, rootFetch.value.html)
-            if (llmsUrl) {
-              const llmsResult = await fetchWebDocPlainText(llmsUrl, localOrigin)
-              if (llmsResult.ok) {
-                const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
-                if (fromLlms.length >= 3) {
-                  siteEntries = fromLlms
-                }
-              }
-            }
+            siteEntries = await discoverLlmsTxtToc(fetchResult.value.url, rootFetch.value.html, pageUrl.origin, localOrigin)
           }
         }
       }
@@ -266,16 +281,7 @@ export async function discoverWebDocToc(
 
     // 站点级全站索引（如 llms.txt 等）：支持双轨并行
     if (!siteEntries && looksLikeDocsIndexCandidate(fetchResult.value.html)) {
-      const llmsUrl = resolveLlmsTxtUrl(fetchResult.value.url, fetchResult.value.html)
-      if (llmsUrl) {
-        const llmsResult = await fetchWebDocPlainText(llmsUrl, localOrigin)
-        if (llmsResult.ok) {
-          const fromLlms = extractLlmsTxtToc(llmsResult.value.text, pageUrl.origin)
-          if (fromLlms.length >= 3) {
-            siteEntries = fromLlms
-          }
-        }
-      }
+      siteEntries = await discoverLlmsTxtToc(fetchResult.value.url, fetchResult.value.html, pageUrl.origin, localOrigin)
     }
 
     const hasSection = sectionEntries.length > 0

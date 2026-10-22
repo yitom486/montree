@@ -1,6 +1,8 @@
 import type { WebDocTocEntry } from '@yitom/contracts'
 
 const MAX_TOC_ENTRIES = 240
+/** 分区 llms.txt 动辄数百篇，按标题建树时放宽上限 */
+const MAX_LLMS_TOC_ENTRIES = 800
 
 export function isVersionPathSegment(segment: string): boolean {
   return /^v\d+$/i.test(segment)
@@ -59,6 +61,63 @@ export function structuralPathParts(parts: string[]): {
  * 按 URL 路径段建树；版本号段（v1/v2）保留为中间层，对齐原站。
  */
 export function extractLlmsTxtToc(text: string, baseOrigin: string): WebDocTocEntry[] {
+  const headingMode = extractLlmsTxtTocByHeadings(text, baseOrigin)
+  if (headingMode.length) return headingMode
+  return extractLlmsTxtTocByPath(text, baseOrigin)
+}
+
+/**
+ * llms.txt 自带 `##`/`###` 分组标题时（多数分区索引都有），按标题建树，
+ * 与原站侧栏分组一致；首个标题之前的链接（索引自引用、仓库、主页）跳过，跨站链接跳过。
+ */
+function extractLlmsTxtTocByHeadings(text: string, baseOrigin: string): WebDocTocEntry[] {
+  const lines = text.split(/\r?\n/)
+  const headingLevels = lines
+    .map((line) => /^(#{2,6})\s+\S/.exec(line)?.[1]?.length)
+    .filter((n): n is number => typeof n === 'number')
+  if (headingLevels.length === 0) return []
+  const minLevel = Math.min(...headingLevels)
+  let origin: string
+  try {
+    origin = new URL(baseOrigin).origin
+  } catch {
+    return []
+  }
+
+  const entries: WebDocTocEntry[] = []
+  const seen = new Set<string>()
+  let pendingGroups: { label: string; level: number }[] = []
+  let currentDepth = -1
+  let seenHeading = false
+
+  for (const line of lines) {
+    const heading = /^(#{2,6})\s+(.+?)\s*#*\s*$/.exec(line)
+    if (heading) {
+      seenHeading = true
+      const level = heading[1]!.length - minLevel
+      pendingGroups = pendingGroups.filter((g) => g.level < level)
+      pendingGroups.push({ label: heading[2]!.trim(), level })
+      currentDepth = level
+      continue
+    }
+    if (!seenHeading) continue
+    const link = /^\s*-\s*\[([^\]]+)\]\(([^)\s]+)\)/.exec(line)
+    if (!link) continue
+    const href = normalizeLlmsDocHref(link[2]!.trim(), origin)
+    if (!href || new URL(href).origin !== origin || seen.has(href)) continue
+    seen.add(href)
+    // 分组节点挂在首个子页上（与路径建树一致，点击分组即打开首篇）
+    for (const group of pendingGroups) {
+      entries.push({ href, label: group.label, level: group.level })
+    }
+    pendingGroups = []
+    entries.push({ href, label: link[1]!.trim(), level: currentDepth + 1 })
+    if (entries.length >= MAX_LLMS_TOC_ENTRIES) break
+  }
+  return entries.length >= 3 ? entries : []
+}
+
+function extractLlmsTxtTocByPath(text: string, baseOrigin: string): WebDocTocEntry[] {
   const entries: WebDocTocEntry[] = []
   const seenLeaves = new Set<string>()
   const emittedGroups = new Set<string>()
@@ -140,6 +199,9 @@ export function looksLikeDocsIndexCandidate(html: string): boolean {
   if (/\/llms\.txt/i.test(html)) return true
   if (/<nav\b[^>]*\bid=["']sidebar["']/i.test(html)) return true
   if (/<nav\b[^>]*aria-label=["'][^"']*pages[^"']*["']/i.test(html)) return true
+  // 页面提供自身的 Markdown 版本（`<a href="…/page.md">`、`rel=alternate type=text/markdown`）：文档站通常同时提供 llms.txt
+  if (/<link\b[^>]*type=["']text\/markdown["']/i.test(html)) return true
+  if (/\bhref=["'][^"'#?]+\.md["']/i.test(html)) return true
   return false
 }
 
@@ -160,3 +222,30 @@ export function resolveLlmsTxtUrl(pageUrl: string, html: string): string | null 
     return null
   }
 }
+
+/**
+ * llms.txt 候选（由近到远）：页面声明的 → 路径各级前缀下的 `llms.txt` → 根 `/llms.txt`。
+ * 多产品文档站（如 /ai/latest/docs/…）的根 llms.txt 常只是产品路由表，分区索引在路径前缀下。
+ */
+export function resolveLlmsTxtCandidates(pageUrl: string, html: string, max = 4): string[] {
+  const out: string[] = []
+  const push = (u: string) => {
+    if (!out.includes(u)) out.push(u)
+  }
+  try {
+    const base = new URL(pageUrl)
+    const fromHtml = html.match(/\bhref=["']([^"']*llms\.txt)["']/i)?.[1]
+    if (fromHtml) push(new URL(fromHtml, base).toString())
+    const parts = base.pathname.split('/').filter(Boolean)
+    // 去掉末段（当前页），从最深的目录前缀往上，至多取 2 段前缀
+    const dirs = parts.slice(0, -1)
+    for (let i = Math.min(dirs.length, 2); i >= 1; i--) {
+      push(new URL(`/${dirs.slice(0, i).join('/')}/llms.txt`, base.origin).toString())
+    }
+    push(new URL('/llms.txt', base.origin).toString())
+  } catch {
+    return out
+  }
+  return out.slice(0, max)
+}
+
