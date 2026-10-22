@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs'
+/// <reference types="vite/client" />
+import overviewHtml from './__fixtures__/tanstack-ai-overview.html?raw'
+import aiLlmsTxt from './__fixtures__/tanstack-ai-llms.txt?raw'
 import { describe, expect, it } from 'vitest'
 import { extractGenericWebDocToc } from './extract-toc-links'
 import { extractLlmsTxtToc, looksLikeDocsIndexCandidate, resolveLlmsTxtCandidates } from './extract-llms-toc'
 
-const fixture = (name: string) => readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8')
+const fixture = (name: string) => (name.endsWith('.html') ? overviewHtml : aiLlmsTxt)
 const PAGE = 'https://tanstack.com/ai/latest/docs/getting-started/overview'
 
 describe('TanStack 文档（多产品站、顶栏 nav 链接比侧栏多）', () => {

@@ -1,14 +1,10 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { extractWebDocArticle } from './web-doc-html'
 import { extractWebDocHeadings } from './web-doc-outline'
+import html from '../../../../../../packages/web-doc/src/__fixtures__/tanstack-ai-overview.html?raw'
 
-const html = readFileSync(
-  resolve(__dirname, '../../../../../../packages/web-doc/src/__fixtures__/tanstack-ai-overview.html'),
-  'utf8',
-)
+
 
 describe('无 article/main 的文档页走 Readability 时保留 h2', () => {
   it('TanStack 标题带 scroll-my-* 工具类也不被当成噪音删掉', () => {
