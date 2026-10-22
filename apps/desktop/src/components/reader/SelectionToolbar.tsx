@@ -54,6 +54,9 @@ export interface SelectionToolbarProps {
   onDismiss: () => void
 }
 
+/** 制卡菜单大致高度（6 预设 + 更多要求），用于决定向上还是向下展开。 */
+const CARD_MENU_HEIGHT = 260
+
 export function SelectionToolbar({
   x,
   y,
@@ -74,6 +77,7 @@ export function SelectionToolbar({
 }: SelectionToolbarProps) {
   const [copied, setCopied] = useState(false)
   const [cardMenuOpen, setCardMenuOpen] = useState(false)
+  const [cardMenuBelow, setCardMenuBelow] = useState(false)
   const [answerMenuOpen, setAnswerMenuOpen] = useState(false)
 
   const handleCopy = () => {
@@ -193,7 +197,11 @@ export function SelectionToolbar({
             className="h-7 gap-1 rounded-lg border border-primary/25 bg-primary/10 px-2 text-xs font-medium text-primary shadow-xs hover:bg-primary/20"
             title="选方向调 AI 提炼为知识卡片（未连接自动直连）"
             disabled={cardPresetPending}
-            onClick={() => setCardMenuOpen((v) => !v)}
+            onClick={(event) => {
+              // 选区靠近窗口顶部（小窗口 / 高 DPI 下常见）时向下展开，避免菜单被标题栏挡住
+              setCardMenuBelow(event.currentTarget.getBoundingClientRect().top < CARD_MENU_HEIGHT + 56)
+              setCardMenuOpen((v) => !v)
+            }}
           >
             {cardPresetPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -204,7 +212,7 @@ export function SelectionToolbar({
           </Button>
           {cardMenuOpen ? (
             <CardPresetMenuContent
-              className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2"
+              className={cardMenuBelow ? "absolute top-full left-1/2 mt-2 -translate-x-1/2" : "absolute bottom-full left-1/2 mb-2 -translate-x-1/2"}
               pending={cardPresetPending}
               onPick={(presetId, customText) => {
                 setCardMenuOpen(false)
