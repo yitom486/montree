@@ -4,6 +4,8 @@
 
 **发版时**：日常把要点写在 `[未发布]` → 执行 `bun run release`（默认 **patch** 自动 +1）→ 确认后 `bun run release:push` 推送 tag 触发 GitHub Release。不必手算版本号；大改动用 `bun run release -- minor` / `major`。不必罗列每条 commit 或小修复。
 
+- 修复：Windows 上按需下载 Typst 运行时改用系统 `System32\tar.exe` 解压 zip，避免 PATH 中 GNU tar 解压失败。
+
 ## [未发布]
 
 - **修复：选区靠近窗口顶部时，智能制卡菜单被标题栏挡住**：菜单原先固定向上展开，在小窗口或 Windows 高 DPI 下会被标题栏盖住点不到。现在上方空间不够时向下展开。这个问题由 Windows E2E 作业发现。
