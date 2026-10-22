@@ -254,6 +254,33 @@ export function adaptMontreeTools(
 /**
  * 工具调用适配器：兼容 Agent 调用 montree_xxx 或历史 inkdown_xxx，统一映射到底层 SDK。
  */
+/** 宿主内部参数名：把 MCP 请求 `_meta` 里的 ACP toolCallId 带进提议工具（不出现在工具 schema 中）。 */
+export const ACP_TOOL_CALL_ID_ARG = '__acpToolCallId'
+const TOOL_CALL_ID_META_KEYS = ['toolCallId', 'acp/toolCallId', 'claudecode/toolUseId', 'codex/toolCallId'] as const
+
+/** 从 MCP tools/call 的 `params._meta` 读取 Agent 侧 toolCallId（各 Agent 键名不同）。 */
+export function readMcpToolCallId(params: unknown): string | null {
+  const meta = params && typeof params === 'object' ? (params as { _meta?: unknown })._meta : undefined
+  if (!meta || typeof meta !== 'object') return null
+  for (const key of TOOL_CALL_ID_META_KEYS) {
+    const value = (meta as Record<string, unknown>)[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return null
+}
+
+/** 提议类工具（批注提议、文本修改建议/审阅模式下的直接编辑）：把 `_meta` toolCallId 注入参数，让提议卡按 toolCallId 精确挂到对应工具消息。 */
+export function withAcpToolCallId(message: McpRpcMessage): McpRpcMessage {
+  if (message.method !== 'tools/call') return message
+  const name = typeof message.params?.name === 'string' ? message.params.name : ''
+  if (!/(propose_mark|text_propose|text_edit)$/.test(name)) return message
+  const toolCallId = readMcpToolCallId(message.params)
+  if (!toolCallId) return message
+  const rawArgs = message.params?.arguments
+  const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs as Record<string, unknown> : {}
+  return { ...message, params: { ...message.params, arguments: { ...args, [ACP_TOOL_CALL_ID_ARG]: toolCallId } } }
+}
+
 export async function callAdaptedMontreeTool(
   name: string,
   context: InkdownMcpToolContext,
@@ -286,6 +313,7 @@ export async function callAdaptedMontreeTool(
   }
 
   if (sdkName === 'inkdown_propose_mark') {
+    const acpToolCallId = typeof args?.[ACP_TOOL_CALL_ID_ARG] === 'string' ? args[ACP_TOOL_CALL_ID_ARG] as string : undefined
     const marks = args?.marks
     const excerpt = args?.excerpt
     const note = typeof args?.note === 'string' ? args.note : ''
@@ -309,6 +337,7 @@ export async function callAdaptedMontreeTool(
       ...(typeof args?.category === 'string' ? { category: args.category } : {}),
       ...(typeof args?.title === 'string' ? { title: args.title } : {}),
       ...(Array.isArray(marks) ? { marks } : {}),
+      ...(acpToolCallId ? { toolCallId: acpToolCallId } : {}),
     } as any)
     return { content: [{ type: 'text' as const, text }] }
   }
@@ -397,7 +426,7 @@ async function serveMcpServer(
         let rpcResponse: Record<string, unknown> | null
         if (isVisual && message.id != null) {
           try {
-            const rawArgs = message.params?.arguments
+            const rawArgs = withAcpToolCallId(message).params?.arguments
             const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs as Record<string, unknown> : undefined
             const invoke = DOCUMENT_TOOLS.some((tool) => tool.name === visualName) ? callDocumentTool : callReaderVisualTool
             rpcResponse = { jsonrpc: '2.0', id: message.id, result: await invoke(visualName, context, args) }
@@ -405,7 +434,7 @@ async function serveMcpServer(
             rpcResponse = { jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: error instanceof Error ? error.message : '视觉工具失败' }], isError: true } }
           }
         } else {
-          rpcResponse = await handleMontreeMcpRpc(message, context, tools, call)
+          rpcResponse = await handleMontreeMcpRpc(withAcpToolCallId(message), context, tools, call)
         }
         if (!rpcResponse) {
           response.writeHead(202).end()

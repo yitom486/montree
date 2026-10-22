@@ -386,3 +386,20 @@ describe('montree-mcp-server HTTP JSON-RPC 端点与协议交互测试', () => {
 })
 
 
+
+import { readMcpToolCallId, withAcpToolCallId, ACP_TOOL_CALL_ID_ARG } from './montree-mcp-server'
+
+describe('MCP _meta toolCallId → 提议工具参数', () => {
+  it('读取各 Agent 的 _meta 键', () => {
+    expect(readMcpToolCallId({ _meta: { toolCallId: 'a' } })).toBe('a')
+    expect(readMcpToolCallId({ _meta: { 'claudecode/toolUseId': 'toolu_1' } })).toBe('toolu_1')
+    expect(readMcpToolCallId({ _meta: { other: 1 } })).toBeNull()
+    expect(readMcpToolCallId({})).toBeNull()
+  })
+  it('只给 propose_mark 注入，其他工具原样', () => {
+    const mark = withAcpToolCallId({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'montree_propose_mark', arguments: { excerpt: 'x' }, _meta: { toolCallId: 't1' } } } as never)
+    expect((mark.params as { arguments: Record<string, unknown> }).arguments).toEqual({ excerpt: 'x', [ACP_TOOL_CALL_ID_ARG]: 't1' })
+    const read = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'montree_read', arguments: {}, _meta: { toolCallId: 't2' } } } as never
+    expect(withAcpToolCallId(read)).toBe(read)
+  })
+})

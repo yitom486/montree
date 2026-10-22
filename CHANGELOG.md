@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+- **修改建议/批注提议按 toolCallId 精确关联**：Agent 在 MCP `tools/call` 的 `_meta` 里带 toolCallId（`toolCallId`、`acp/toolCallId`、`claudecode/toolUseId` 等）时，宿主把它交给 `montree_text_propose` / `montree_text_edit` / `montree_propose_mark`。修改建议按它去重：同一调用重放或迟到时不再新建卡片。批注提议在结果中回显 toolCallId，由 chat-core 0.1.26 精确挂到对应工具消息，不再靠“最近一条同名工具”的猜测。没有 `_meta` 时仍走原来的启发式。新增 E2E 覆盖去重、审阅模式拦截直接编辑、清空对话撤回全部建议。
+
 - **本地测试环境**：本地约 29 个单测文件的“原生模块”失败，根因是 Node 20（缺 `node:sqlite`、`Object.groupBy`、`Iterator`、`WebSocket`、`stripTypeScriptTypes`）；终端 E2E 失败是缺 `make`/C++ 编译器，node-pty 在 Linux 没有编译出来。新增 `.node-version`（24），CI 用 `setup-node` 固定版本；Node 低于 22.13 时 vitest 直接给出可执行提示；新增 `bun run doctor` 检查 Node、编译工具、node-pty、Electron、Typst 运行时与 xvfb 并给出修复命令。
 
 - **E2E 稳定性**：截图不再删除 toast DOM（会让 React 在 insertBefore/removeChild 上崩溃），统一用 `screenshotWithoutToasts` 以样式隐藏。在线文档三击选段的偶发失败查明是 iframe 交互监听尚未绑定，阅读器绑定后在 iframe 上标记 `data-web-doc-interactive`，用例先等标记再三击，去掉重试循环。新增用例一律 `retries: 0`。ppt-slideshow / agent-rich-result / annotations 各重复 5 轮共 50 次，本地 0 次失败。

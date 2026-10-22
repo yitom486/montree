@@ -33,7 +33,7 @@ import { searchReaderContent } from './search-reader-content'
 import { inspectIndexedContentForAgent } from './inspect-indexed-content'
 import type { MontreeActiveDocument, MontreeReadingState } from './turn-context'
 import { requireDocumentTools, getDocumentTools } from './document-tool-registry'
-import { currentProposalOrigin } from './proposal-origin'
+import { currentProposalOrigin, takeAcpToolCallId } from './proposal-origin'
 
 function parseMarkProposalArgs(args?: MontreeSnapshotArgs): MarkProposalPayload {
   const marksRaw = (args as { marks?: unknown } | undefined)?.marks
@@ -201,7 +201,7 @@ export async function resolveMontreeSnapshot(
       const values = (args ?? {}) as Record<string, unknown>
       const provider = requireDocumentTools('text', values)
       if (!provider.propose) throw new Error('当前文档不支持修改建议')
-      return JSON.stringify(provider.propose(values, currentProposalOrigin('montree_text_propose')))
+      return JSON.stringify(provider.propose(values, currentProposalOrigin('montree_text_propose', takeAcpToolCallId(values))))
     }
     case 'table-read':
     case 'table-edit':
@@ -210,9 +210,10 @@ export async function resolveMontreeSnapshot(
     case 'slide-read':
     case 'slide-edit': {
       const values = (args ?? {}) as Record<string, unknown>
+      const acpToolCallId = takeAcpToolCallId(values)
       const provider = requireDocumentTools(resource.startsWith('text') ? 'text' : resource.startsWith('table') ? 'table' : 'slide', values)
       const result = resource.endsWith('read') ? provider.read(values)
-        : resource === 'text-edit' ? provider.edit(values, currentProposalOrigin('montree_text_edit')) : provider.edit(values)
+        : resource === 'text-edit' ? provider.edit(values, currentProposalOrigin('montree_text_edit', acpToolCallId)) : provider.edit(values)
       return JSON.stringify(resource === 'text-read' ? await withTextImages(result) : result)
     }
     case 'visual-context':
@@ -282,12 +283,12 @@ export async function resolveMontreeSnapshot(
     case 'create-note':
     case 'propose-note':
       return JSON.stringify(await createNoteForAgent(args?.note ?? ''), null, 2)
-    case 'propose-mark':
-      return JSON.stringify(
-        await proposeMarkAtForAgentResult(parseMarkProposalArgs(args)),
-        null,
-        2,
-      )
+    case 'propose-mark': {
+      const result = await proposeMarkAtForAgentResult(parseMarkProposalArgs(args))
+      // 宿主从 MCP `_meta` 拿到的 ACP toolCallId 回显在结果里，聊天侧据此把提议卡挂到对应工具消息
+      const toolCallId = typeof args?.toolCallId === 'string' && args.toolCallId ? args.toolCallId : null
+      return JSON.stringify(toolCallId && result && typeof result === 'object' ? { ...result, toolCallId } : result, null, 2)
+    }
     case 'suggest-chapters': {
       const chapters = Array.isArray(args?.chapters)
         ? args.chapters
