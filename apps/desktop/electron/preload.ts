@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
+import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
 import { INLINE_COMPLETION_IPC, type InlineCompletionAPI } from '../contracts/inline-completion'
 import {
@@ -456,3 +457,9 @@ const agentInspectionAPI: AgentInspectionAPI = {
   reveal: (request) => ipcRenderer.invoke(AGENT_INSPECTION_IPC.reveal, request),
 }
 contextBridge.exposeInMainWorld('montreeAgentInspection', agentInspectionAPI)
+const htmlPreviewAPI: HtmlPreviewAPI = {
+  register: (filePath) => ipcRenderer.invoke(HTML_PREVIEW_IPC.register, filePath),
+  update: (token, html) => ipcRenderer.invoke(HTML_PREVIEW_IPC.update, token, html),
+  release: (token) => ipcRenderer.invoke(HTML_PREVIEW_IPC.release, token),
+}
+contextBridge.exposeInMainWorld('montreeHtmlPreview', htmlPreviewAPI)

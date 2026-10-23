@@ -49,6 +49,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开；路径栏定位/窄栏/未保存提示；右键菜单、Shift+F10、禁用项、Escape 与复制路径参数（剪贴板边界桩） |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
 | `internal-document-links.spec.ts` | HTML 侧栏相对链接、跨文件/同页锚点与 Markdown 相对内链在应用内切换文档；断言不会把应用入口载入 HTML iframe（preload 缺失页） |
+| `html-preview-isolation.spec.ts` | 本地 HTML 预览独立源：页面访问不到 `parent.electronAPI`/终端接口，localStorage、相对 CSS/JS 正常，工具栏缩放经桥接生效 |
 | `html-reader-content.spec.ts` | 本地 HTML 阅读 MCP：脚本执行后的可见纯文本、隐藏节点过滤、标题 TOC 与搜索回归，确保返回渲染正文而非 HTML 源码 |
 | `text-tools-integration.spec.ts` | mock 模型输出 → 真实 HTTP MCP → IPC → Markdown/TXT/**Typst** 缓冲区；精确选区、重复原文、批量拒绝原子性、全部视图/共享撤销、未保存手动输入、CRLF 保存重开、跨文档及外部冲突校验；Typst 验证 `format=typst`、行分段、选区和保存/撤销 |
 | `ppt-tools-integration.spec.ts` | mock 模型工具调用输出 → 真实 HTTP MCP → IPC → PPT 模型/预览/磁盘保存与重开；局部样式保留、拒绝原子性、外部冲突、可见页/选区页和按需检查器，附前后截图与工具记录 |

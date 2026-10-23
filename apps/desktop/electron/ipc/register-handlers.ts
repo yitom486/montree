@@ -3,6 +3,7 @@ import { registerTerminalHandlers } from './terminal-handlers'
 import { registerInlineCompletionHandlers } from './inline-completion-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
 import { registerAgentInspectionHandlers } from './agent-inspection-handlers'
+import { registerHtmlPreviewHandlers } from './html-preview-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC, ok, err } from '@yitom/contracts'
@@ -537,6 +538,7 @@ export function registerIpcHandlers(): void {
   setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()
   registerAgentInspectionHandlers()
+  registerHtmlPreviewHandlers()
   registerTypstHandlers()
   registerTerminalHandlers()
   registerInlineCompletionHandlers()

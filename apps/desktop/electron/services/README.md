@@ -115,6 +115,8 @@
 
 ## Typst
 
+- `html-preview/html-preview-protocol.ts` / `.test.ts`：`montree-html://<工作区哈希>/<相对路径>` 独立源协议。主文档取渲染端推送的内存文本（`?t=` 定位，含未保存修改），子资源只读基准目录（工作区根或文件目录）内的磁盘文件，越界/盘符/备用数据流路径拒绝；HTML 响应注入桥接脚本。
+- `html-preview/bridge-script.ts`：注入预览页的桥接脚本与插入位置（head 开头，不破坏 doctype）；经 postMessage 处理缩放、锚点、链接拦截、渲染正文快照（隐藏节点标 hidden）、视口文本与选区。
 - `typst/typst-service.ts`：Tinymist 0.15.8 校验、窗口/项目语言进程、未保存文本同步、隔离预览与内存 PDF 导出；配置及包缓存位于 userData/typst。
 - `typst/tinymist-assets.ts`：固定版本 Tinymist 各平台归档名与 SHA-256（prepare-typst、打包校验与按需下载共用）。
 - `typst/tinymist-download.ts` / `.test.ts`：安装包不带 Tinymist，首次使用时按固定版本下载，流式 SHA-256 校验，`tar` 解压到临时目录后原子就位（userData/typst/runtime），带进度，并发共享一次下载，失败不留半成品。

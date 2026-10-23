@@ -12,6 +12,14 @@ vi.mock('@/api/app-api', () => ({
   },
 }))
 
+const htmlPreview = vi.hoisted(() => ({
+  register: vi.fn(async () => ({ token: 'token-1', url: 'about:blank?t=token-1' })),
+  update: vi.fn(async (_token: string, _html: string) => undefined),
+  release: vi.fn(async () => undefined),
+}))
+
+vi.mock('@/api/html-preview-api', () => ({ htmlPreviewApi: htmlPreview }))
+
 vi.mock('@/api/file-api', () => ({
   fileApi: {
     readImage: vi.fn().mockResolvedValue({ ok: false, error: { code: 'FILE_NOT_FOUND', message: 'Not found' } }),
@@ -50,7 +58,11 @@ describe('HtmlViewer', () => {
 
     const iframe = container.querySelector('iframe')
     expect(iframe).not.toBeNull()
-    expect(iframe?.getAttribute('srcdoc')).toContain('Hello Montree HTML')
+    // 预览改由独立源协议加载：文本推送到主进程，iframe 只拿版本化地址，不再内联 srcdoc
+    expect(iframe?.hasAttribute('srcdoc')).toBe(false)
+    expect(iframe?.getAttribute('src')).toMatch(/^about:blank\?t=token-1&v=\d+$/)
+    expect(htmlPreview.register).toHaveBeenCalledWith(filePath)
+    expect(htmlPreview.update).toHaveBeenLastCalledWith('token-1', expect.stringContaining('Hello Montree HTML'))
   })
 
   it('支持切换至源码编辑模式', async () => {
@@ -82,11 +94,14 @@ describe('HtmlViewer', () => {
       await act(async () => {
         root.render(createElement(HtmlViewer, { filePath: samplePath, content }))
       })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      })
 
       expect(container.textContent).toContain('08-数据可视化与3D交互看板.html')
       const iframe = container.querySelector('iframe')
       expect(iframe).not.toBeNull()
-      const srcDoc = iframe?.getAttribute('srcdoc') || ''
+      const srcDoc = String(htmlPreview.update.mock.calls.at(-1)?.[1] ?? '')
       expect(srcDoc).toContain('Montree 3D 全息交互数据看板')
       expect(srcDoc).toContain('cubeCanvas')
       expect(srcDoc).toContain('分布式工作负载监控')

@@ -40,6 +40,18 @@ import { html } from '@codemirror/lang-html'
 import { buildThemeExtensions } from '@/lib/editor/codemirror-theme'
 import { resolveLocalLink, takeLocalAnchor } from '@/lib/workspace/resolve-local-link'
 import { readHtmlReaderContent } from '@/lib/html/reader-content'
+import {
+  clearReaderSelection,
+  commitReaderSelection,
+  registerSelectionProvider,
+} from '@/lib/agent/context/reader-selection-registry'
+import { htmlPreviewApi } from '@/api/html-preview-api'
+import {
+  HTML_PREVIEW_BRIDGE_CHANNEL,
+  type HtmlPreviewFrameMessage,
+  type HtmlPreviewHostMessage,
+  type HtmlPreviewRegistration,
+} from '../../../contracts/html-preview'
 
 export type HtmlViewMode = 'preview' | 'split' | 'source'
 export type HtmlPreviewTheme = 'auto' | 'light' | 'dark'
@@ -59,6 +71,21 @@ interface HtmlSourceEditorProps {
   onChange?: (val: string) => void
   readOnly?: boolean
   theme: AppTheme
+}
+
+/** 解析为惰性文档（不执行脚本、不加载资源），并剔除脚本/样式/模板，供阅读正文提取。 */
+function parseInertBody(html: string): HTMLElement {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  doc.querySelectorAll('script, style, template').forEach((element) => element.remove())
+  return doc.body
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 /** CodeMirror 6 驱动的 HTML 源代码高亮编辑器 */
@@ -151,13 +178,19 @@ export const HtmlViewer = memo(function HtmlViewer({
   const [isReloading, setIsReloading] = useState(false)
 
   // 预览防抖值（避免在 split 模式打字时频繁全量刷新 iframe）
-  const [debouncedContent, setDebouncedContent] = useState(content)
+  // 记录防抖值所属文件：切换文件时立即同步，避免新文件的预览会话先加载旧文件内容（会提前消费跨文件锚点）
+  const [debounced, setDebounced] = useState({ filePath, content })
   useEffect(() => {
+    if (debounced.filePath !== filePath) {
+      setDebounced({ filePath, content })
+      return
+    }
     const timer = setTimeout(() => {
-      setDebouncedContent(content)
+      setDebounced({ filePath, content })
     }, 200)
     return () => clearTimeout(timer)
-  }, [content])
+  }, [content, filePath, debounced.filePath])
+  const debouncedContent = debounced.content
 
   // 本地图片解析与 Base64 缓存映射
   const imageRefs = useMemo(() => {
@@ -233,97 +266,154 @@ export const HtmlViewer = memo(function HtmlViewer({
     return `${themeStyle}\n${htmlWithImages}`
   }, [debouncedContent, imageRefs, previewTheme])
 
+  // 预览页在 montree-html:// 独立源中运行，宿主拿不到它的 DOM：缩放/锚点/链接/阅读正文全部经桥接 postMessage。
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const sourceBody = useMemo(() => {
-    const doc = new DOMParser().parseFromString(content, 'text/html')
-    doc.querySelectorAll('script, style, template').forEach((element) => element.remove())
-    return doc.body
-  }, [content])
-  // 阅读 MCP 以已渲染 DOM 为准；源码树只作为 iframe 尚未就绪/源码模式的后备。
-  const readHtmlContent = useCallback(() => {
-    const body = iframeRef.current?.contentDocument?.body
-    const root = body && body.childNodes.length > 0 ? body : sourceBody
-    return readHtmlReaderContent(root)
+  const viewModeRef = useRef(viewMode)
+  viewModeRef.current = viewMode
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const sourceBody = useMemo(() => parseInertBody(content), [content])
+  /** 桥接推来的渲染后正文（隐藏节点已标 hidden、脚本样式已剔除）与视口文本 */
+  const snapshotRef = useRef<{ body: HTMLElement; viewport: string } | null>(null)
+  const selectionRef = useRef('')
+
+  // 阅读 MCP 以已渲染 DOM 快照为准；源码树只作为预览尚未就绪/源码模式的后备。
+  const readerRoot = useCallback((): HTMLElement => {
+    const snapshot = viewModeRef.current !== 'source' ? snapshotRef.current : null
+    return snapshot && snapshot.body.childNodes.length > 0 ? snapshot.body : sourceBody
   }, [sourceBody])
+  const readHtmlContent = useCallback(() => readHtmlReaderContent(readerRoot()), [readerRoot])
   useDocumentReader({
     filePath,
-    root: () => iframeRef.current?.contentDocument?.body ?? sourceBody,
+    root: readerRoot,
     text: () => readHtmlContent().text,
     units: () => readHtmlContent().units,
+    viewportText: () =>
+      (viewModeRef.current !== 'source' ? snapshotRef.current?.viewport : undefined) ?? readHtmlContent().text,
+    selectionManaged: true,
   })
 
-  // 应用缩放并拦截外部链接安全跳转
-  const handleIframeLoad = useCallback(() => {
-    setIsReloading(false)
-    const doc = iframeRef.current?.contentDocument
-    if (!doc) return
-
-    if (doc.body) {
-      doc.body.style.zoom = `${zoom}%`
+  useEffect(() => {
+    selectionRef.current = ''
+    const dispose = registerSelectionProvider({
+      filePath,
+      getSelectionText: () => (viewModeRef.current !== 'source' && selectionRef.current) || null,
+    })
+    return () => {
+      dispose()
+      clearReaderSelection()
     }
+  }, [filePath])
 
-    const pendingAnchor = takeLocalAnchor(filePath)
-    if (pendingAnchor) {
-      try {
-        doc.getElementById(decodeURIComponent(pendingAnchor))?.scrollIntoView({ block: 'start' })
-      } catch {
-        // 目标文档没有该锚点时保持顶部
-      }
-    }
-
-    doc.addEventListener(
-      'click',
-      (e) => {
-        const anchor = (e.target as Element | null)?.closest('a')
-        if (!anchor) return
-        const href = anchor.getAttribute('href')
-        if (!href) return
-
-        if (href.startsWith('#')) return // 页面内锚点跳转
-
-        // srcdoc 的基地址是应用页面；不拦截相对链接会把应用自身加载进预览框（preload 缺失页）。
-        const localTarget = resolveLocalLink(filePath, href)
-        if (localTarget) {
-          e.preventDefault()
-          e.stopPropagation()
-          const rawHash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : ''
-          if (localTarget === filePath) {
-            if (rawHash) {
-              try {
-                doc.getElementById(decodeURIComponent(rawHash))?.scrollIntoView({ block: 'start' })
-              } catch {
-                // 非法锚点保持页面不动
-              }
-            }
-            return
-          }
-          if (onOpenLocalFile) onOpenLocalFile(localTarget, rawHash || undefined)
-          else toast.error('当前 HTML 视图无法打开该本地链接')
+  // 每个文件一个预览会话；主文档由下方推送当前文本（含未保存修改），iframe 以版本号重新加载
+  const [preview, setPreview] = useState<HtmlPreviewRegistration | null>(null)
+  useEffect(() => {
+    let disposed = false
+    let token: string | null = null
+    setPreview(null)
+    snapshotRef.current = null
+    htmlPreviewApi
+      .register(filePath)
+      .then((registration) => {
+        if (disposed) {
+          void htmlPreviewApi.release(registration.token)
           return
         }
-
-        if (
-          href.startsWith('http://') ||
-          href.startsWith('https://') ||
-          href.startsWith('mailto:') ||
-          href.startsWith('tel:')
-        ) {
-          e.preventDefault()
-          e.stopPropagation()
-          void appApi.openExternal(href)
-        }
-      },
-      { capture: true },
-    )
-  }, [zoom, filePath, onOpenLocalFile])
-
-  // 缩放变化时动态同步已加载的 iframe
-  useEffect(() => {
-    const doc = iframeRef.current?.contentDocument
-    if (doc?.body) {
-      doc.body.style.zoom = `${zoom}%`
+        token = registration.token
+        setPreview(registration)
+      })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : 'HTML 预览初始化失败'))
+    return () => {
+      disposed = true
+      if (token) void htmlPreviewApi.release(token)
     }
-  }, [zoom])
+  }, [filePath])
+
+  const [frameSrc, setFrameSrc] = useState<string | null>(null)
+  const frameVersionRef = useRef(0)
+  useEffect(() => {
+    if (!preview) {
+      setFrameSrc(null)
+      return
+    }
+    if (debounced.filePath !== filePath) return
+    let cancelled = false
+    htmlPreviewApi
+      .update(preview.token, renderedDoc)
+      .then(() => {
+        if (!cancelled) setFrameSrc(`${preview.url}&v=${++frameVersionRef.current}`)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : 'HTML 预览刷新失败')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [preview, renderedDoc, reloadKey, debounced.filePath, filePath])
+
+  const postToFrame = useCallback((message: HtmlPreviewHostMessage) => {
+    iframeRef.current?.contentWindow?.postMessage(message, '*')
+  }, [])
+
+  // 链接请求来自不可信页面：只放行用户刚点击过（父窗口带瞬时激活）的跳转，且只做受限动作
+  const openLink = useCallback(
+    (href: string) => {
+      if (navigator.userActivation && !navigator.userActivation.isActive) return
+      // 相对链接按当前文件解析；不在预览框内自行导航，跨文件交给工作区统一打开。
+      const localTarget = resolveLocalLink(filePath, href)
+      if (localTarget) {
+        const rawHash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : ''
+        if (localTarget === filePath) {
+          if (rawHash) postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'anchor', id: safeDecode(rawHash) })
+          return
+        }
+        if (onOpenLocalFile) onOpenLocalFile(localTarget, rawHash || undefined)
+        else toast.error('当前 HTML 视图无法打开该本地链接')
+        return
+      }
+      const external = href.startsWith('//') ? `https:${href}` : href
+      if (/^(?:https?|mailto|tel):/i.test(external)) void appApi.openExternal(external)
+    },
+    [filePath, onOpenLocalFile, postToFrame],
+  )
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const frame = iframeRef.current?.contentWindow
+      if (!frame || event.source !== frame) return
+      const data = event.data as Partial<HtmlPreviewFrameMessage> | null
+      if (!data || data.channel !== HTML_PREVIEW_BRIDGE_CHANNEL) return
+      if (data.type === 'link' && typeof data.href === 'string') {
+        openLink(data.href)
+      } else if (data.type === 'snapshot' && typeof data.html === 'string') {
+        snapshotRef.current = {
+          body: parseInertBody(data.html),
+          viewport: typeof data.viewport === 'string' ? data.viewport : '',
+        }
+      } else if (data.type === 'viewport' && typeof data.viewport === 'string') {
+        if (snapshotRef.current) snapshotRef.current.viewport = data.viewport
+      } else if (data.type === 'selection' && typeof data.text === 'string') {
+        selectionRef.current = data.text
+        if (data.commit && data.text.trim()) commitReaderSelection(filePath, data.text)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [filePath, openLink])
+
+  // 先同步缩放再滚到跨文件跳转带来的锚点，顺序与桥接处理顺序一致
+  const handleIframeLoad = useCallback(() => {
+    setIsReloading(false)
+    postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'zoom', zoom: zoomRef.current })
+    const pendingAnchor = takeLocalAnchor(filePath)
+    if (pendingAnchor) {
+      postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'anchor', id: safeDecode(pendingAnchor) })
+    }
+  }, [filePath, postToFrame])
+
+  useEffect(() => {
+    postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'zoom', zoom })
+  }, [zoom, postToFrame])
 
   const handleRefresh = useCallback(() => {
     setIsReloading(true)
@@ -352,15 +442,17 @@ export const HtmlViewer = memo(function HtmlViewer({
 
   const renderIframe = () => (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      <iframe
-        ref={iframeRef}
-        key={reloadKey}
-        title="HTML Preview"
-        srcDoc={renderedDoc}
-        sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups"
-        className="h-full w-full border-0 bg-transparent"
-        onLoad={handleIframeLoad}
-      />
+      {frameSrc ? (
+        // allow-same-origin 保留的是预览页自己的 montree-html:// 源（存储、相对资源照常可用），与应用窗口天然跨源
+        <iframe
+          ref={iframeRef}
+          title="HTML Preview"
+          src={frameSrc}
+          sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups"
+          className="h-full w-full border-0 bg-transparent"
+          onLoad={handleIframeLoad}
+        />
+      ) : null}
     </div>
   )
 

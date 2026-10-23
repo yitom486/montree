@@ -9,6 +9,7 @@ import { createWindow } from './window/create-window'
 import { extractExternalFilePaths, pendingExternalFiles } from './window/external-file'
 import { installAppMenu } from './window/app-menu'
 import { registerIpcHandlers } from './ipc/register-handlers'
+import { registerHtmlPreviewScheme } from './ipc/html-preview-handlers'
 import { workspaceTerminals } from './services/terminal-runtime'
 import { initAppUpdater } from './services/app-updater'
 import { disposeAllAcp } from './services/acp/acp-client'
@@ -16,6 +17,9 @@ import { configureAcpDiagnostics } from './services/acp/mcp/diagnostics'
 import { closeAllBookDbs } from './services/book-db/open-book-db'
 import { disposeAllWorkspaceWatches } from './services/workspace-watcher'
 import { syncManager } from './services/sync/sync-manager'
+
+// HTML 预览独立源协议须在 ready 之前声明特权
+registerHtmlPreviewScheme()
 
 // 注册应用自定义深度协议 montree:// 与历史 montree://
 if (process.defaultApp) {
