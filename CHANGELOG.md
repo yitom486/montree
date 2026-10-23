@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.23] - 2026-10-23
+
 - **HTML / Markdown 本地内链**：本地 HTML 侧栏链接和 Markdown 相对链接现在按当前文档目录解析并在应用内切换；支持跨文件锚点与同页锚点，外部链接仍交给系统浏览器。修复 `srcdoc` 相对链接把 Montree 自身加载进 iframe、出现 preload 缺失提示的问题。
 
 - **HTML 阅读 MCP**：本地 HTML 通过 `montree_read` 返回 iframe 渲染后的可见纯文本和标题目录，排除导航、页脚、脚本与隐藏内容；支持视图、章节、目录和搜索读取，并要求 Agent 不再用原生文件读取或 `montree_text_read` 解析 HTML 源码。补充懒加载期间的纯文本后备，避免刚打开文档时读不到正文。
@@ -667,7 +671,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.22...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.23...HEAD
+[0.4.23]: https://github.com/yitom486/montree/compare/v0.4.22...v0.4.23
 [0.4.22]: https://github.com/yitom486/montree/compare/v0.4.21...v0.4.22
 [0.4.21]: https://github.com/yitom486/montree/compare/v0.4.20...v0.4.21
 [0.4.20]: https://github.com/yitom486/montree/compare/v0.4.19...v0.4.20
