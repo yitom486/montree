@@ -141,31 +141,27 @@ export function buildWebDocPlaygroundRuntimeScript(): string {
       '<' + '/script></body></html>';
   }
 
-  function initPlayground(pg) {
+  function runPlayground(pg, btn) {
     var sourceEl = pg.querySelector('.web-doc-playground-source');
     var iframe = pg.querySelector('.web-doc-playground-iframe');
     if (!sourceEl || !iframe) return;
     var code = sourceEl.textContent || '';
     if (!code) return;
+    /* 写 srcdoc 前重设沙箱：只给脚本不给同源，示例代码碰不到阅读器与应用窗口 */
+    iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.srcdoc = createRunnerDoc(code);
+    if (btn) {
+      btn.textContent = '⚡ 重新运行';
+      btn.setAttribute('title', '重新运行沙箱示例');
+    }
   }
 
-  function initAll() {
-    var pgs = document.querySelectorAll('.web-doc-playground');
-    pgs.forEach(initPlayground);
-  }
-
+  /* 示例代码来自网页，只在用户点击后运行，不随页面加载自动执行 */
   document.addEventListener('click', function(e) {
     var btn = e.target && e.target.closest ? e.target.closest('.web-doc-playground-run-btn') : null;
     if (!btn) return;
     var pg = btn.closest('.web-doc-playground');
-    if (pg) initPlayground(pg);
+    if (pg) runPlayground(pg, btn);
   });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAll);
-  } else {
-    initAll();
-  }
 })();</script>`
 }

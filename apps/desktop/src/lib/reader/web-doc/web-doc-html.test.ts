@@ -983,10 +983,13 @@ describe('web-doc-html', () => {
     source.textContent = hostile
     const frame = document.createElement('iframe')
     frame.className = 'web-doc-playground-iframe'
-    pg.append(source, frame)
+    const run = document.createElement('button')
+    run.className = 'web-doc-playground-run-btn'
+    pg.append(source, frame, run)
     document.body.append(pg)
     try {
       new Function(inner)()
+      run.click()
       const srcdoc = frame.getAttribute('srcdoc') ?? (frame as HTMLIFrameElement).srcdoc ?? ''
       expect(srcdoc).toContain('u003c/script')
       // runner 自身闭合唯一，恶意载荷不得提前终结脚本块

@@ -66,13 +66,31 @@ export function isAllowedWebDocEmbedIframe(node: Element): boolean {
   return isAllowedWebDocEmbedUrl(node.getAttribute('src'))
 }
 
+/** 演示区只允许脚本，不给同源：页面代码在不透明源里运行，够不到阅读器与应用窗口。 */
+export const WEB_DOC_PLAYGROUND_SANDBOX = 'allow-scripts'
+
+/**
+ * 收紧保留下来的 iframe：页面自带的 srcdoc 一律丢弃（srcdoc 优先于 src，且继承阅读器的源）；
+ * 演示区 iframe 的类名页面也能伪造，所以不论来源都强制写死沙箱。
+ */
+export function hardenWebDocIframe(node: Element): void {
+  node.removeAttribute('srcdoc')
+  if (node.classList.contains('web-doc-playground-iframe')) {
+    node.setAttribute('sandbox', WEB_DOC_PLAYGROUND_SANDBOX)
+    node.removeAttribute('src')
+    node.removeAttribute('allow')
+  }
+}
+
 /** 移除不安全的 script/object/embed，以及非白名单 iframe */
 export function stripDisallowedWebDocEmbeds(root: ParentNode): void {
   root.querySelectorAll('script, object, embed').forEach((node) => node.remove())
   root.querySelectorAll('iframe').forEach((node) => {
     if (!isAllowedWebDocEmbedIframe(node)) {
       node.remove()
+      return
     }
+    hardenWebDocIframe(node)
   })
 }
 
@@ -83,6 +101,7 @@ export function normalizeAllowedWebDocEmbeds(root: ParentNode): void {
       node.remove()
       return
     }
+    hardenWebDocIframe(node)
     node.setAttribute('loading', 'lazy')
     node.setAttribute('referrerpolicy', 'no-referrer-when-downgrade')
     // Python Tutor 需要同页脚本通信较少；保持默认 sandbox 外放行（不设 sandbox）

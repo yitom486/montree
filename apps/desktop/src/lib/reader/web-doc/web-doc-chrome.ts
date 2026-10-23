@@ -3,6 +3,7 @@ import {
   normalizeWebDocClientRenderedTables,
   normalizeWebDocEmbedPlaceholders,
   stripDisallowedWebDocEmbeds,
+  WEB_DOC_PLAYGROUND_SANDBOX,
 } from '@/lib/reader/web-doc/web-doc-embeds'
 import { stripHrttChrome } from '@/lib/reader/web-doc/hrtt-extract'
 import { MONTREE_SOURCE_HREF_ATTR } from '@/lib/reader/web-doc/web-doc-link'
@@ -998,8 +999,9 @@ export function normalizeWebDocSandpackPlaygrounds(root: HTMLElement): void {
     const runBtn = doc.createElement('button')
     runBtn.type = 'button'
     runBtn.className = 'web-doc-playground-btn web-doc-playground-run-btn'
-    runBtn.setAttribute('title', '重新运行沙箱示例')
-    runBtn.textContent = '⚡ 重新运行'
+    // 示例代码来自网页，不自动执行：用户点击后才在隔离沙箱里运行
+    runBtn.setAttribute('title', '在隔离沙箱中运行示例')
+    runBtn.textContent = '▶ 运行示例'
     actions.appendChild(runBtn)
 
     header.appendChild(tabsWrap)
@@ -1031,9 +1033,14 @@ export function normalizeWebDocSandpackPlaygrounds(root: HTMLElement): void {
     const iframe = doc.createElement('iframe')
     iframe.className = 'web-doc-playground-iframe'
     iframe.setAttribute('title', `${tab} Preview`)
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+    iframe.setAttribute('sandbox', WEB_DOC_PLAYGROUND_SANDBOX)
+
+    const placeholder = doc.createElement('div')
+    placeholder.className = 'web-doc-playground-placeholder'
+    placeholder.textContent = '点击「▶ 运行示例」加载预览（示例代码在隔离沙箱中执行）'
 
     frameWrap.appendChild(iframe)
+    frameWrap.appendChild(placeholder)
     previewPane.appendChild(previewHead)
     previewPane.appendChild(frameWrap)
 

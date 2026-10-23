@@ -22,6 +22,7 @@ import { buildWebDocCodeBlockCss, buildWebDocTabsRuntimeScript, enhanceWebDocCod
 import { buildWebDocCompatTableCss } from '@/lib/reader/web-doc/web-doc-compat'
 import {
   buildWebDocEmbedCss,
+  hardenWebDocIframe,
   normalizeAllowedWebDocEmbeds,
   normalizeWebDocImageObjects,
   stripDisallowedWebDocEmbeds,
@@ -1050,9 +1051,8 @@ export function sanitizeWebDocBodyHtml(html: string): string {
       'allow',
       'allowfullscreen',
       'open',
-      'srcdoc',
+      // 不放行 srcdoc/sandbox：页面自带的内联文档会继承阅读器（即应用）的源；演示区沙箱由 hardenWebDocIframe 统一写入
       'data-filename',
-      'sandbox',
     ],
   })
 
@@ -1332,6 +1332,19 @@ export function buildWebDocPlaygroundCss(theme: EpubThemeMode): string {
       border: 0 !important;
       display: block !important;
     }
+    /* 未点击运行前不显示空白预览框，只显示提示 */
+    body .web-doc-playground-iframe:not([srcdoc]) { display: none !important; }
+    body .web-doc-playground-iframe[srcdoc] ~ .web-doc-playground-placeholder { display: none !important; }
+    body .web-doc-playground-placeholder {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 220px !important;
+      padding: 1rem !important;
+      font-size: 0.85rem !important;
+      opacity: 0.7 !important;
+      text-align: center !important;
+    }
   `
 }
 
@@ -1382,6 +1395,8 @@ export function buildWebDocReaderDocument(
     normalizeWebDocCardGrids(root)
     normalizeWebDocStandaloneFigures(root)
     normalizeWebDocSandpackPlaygrounds(root)
+    // 缓存里可能有修复前生成的 bodyHtml（演示区带同源沙箱或 srcdoc），生成阅读文档前统一收紧
+    root.querySelectorAll('iframe').forEach(hardenWebDocIframe)
     root.querySelectorAll('table').forEach((table) => {
       if (table.parentElement?.classList.contains('web-doc-table-scroll') || table.parentElement?.closest('table')) return
       const wrapper = doc.createElement('div')
