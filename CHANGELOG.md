@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.22] - 2026-10-23
+
 - **修复：MCP / Skills 资源详情状态偶发不稳**：会话连接/断开空窗时，显式空会话不再被误判为旧会话；未连接时仍可查看本地 Skills。MCP 每 3 秒轮询的瞬时失败不再清空上次成功结果，Skills/MCP 查询自动重试一次，手动刷新不再被后台轮询禁用；补充窗口/会话归属单测、组件回归与建会话前 E2E。
 
 ---
@@ -657,7 +661,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.21...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.22...HEAD
+[0.4.22]: https://github.com/yitom486/montree/compare/v0.4.21...v0.4.22
 [0.4.21]: https://github.com/yitom486/montree/compare/v0.4.20...v0.4.21
 [0.4.20]: https://github.com/yitom486/montree/compare/v0.4.19...v0.4.20
 [0.4.19]: https://github.com/yitom486/montree/compare/v0.4.18...v0.4.19
