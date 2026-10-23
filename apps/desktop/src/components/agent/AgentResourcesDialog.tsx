@@ -106,13 +106,27 @@ function SkillBody({ skill, context }: { skill: SkillDetail; context: AgentInspe
 export function AgentResourcesDialog({ context, kind, onClose }: { context: AgentInspectionContext; kind: 'mcp' | 'skills' | null; onClose: () => void }) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   const inspection = useAgentInspection(context, kind)
   const data = inspection.data
   const items = kind === 'mcp' ? data?.mcps ?? [] : data?.skills ?? []
   const filtered = items.filter((item) => `${item.name} ${'description' in item ? item.description : ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0]
   const detail = useAgentSkill(context, kind === 'skills' ? selected?.id ?? null : null)
+  // 轮询/刷新失败时不要用错误页覆盖上一次成功结果，否则 3 秒一次的瞬时失败会让面板闪成空白。
+  const inspectionFailed = inspection.isError && !data
+  const detailFailed = detail.isError && !detail.data
   const title = kind === 'mcp' ? 'MCP 连接详情' : 'Skills 技能详情'
+  const refresh = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await inspection.refetch()
+      if (kind === 'skills' && selected) await detail.refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
   return <Dialog open={kind !== null} onOpenChange={(open) => { if (!open) onClose() }}>
     <DialogContent className="flex h-[min(760px,calc(100dvh-2rem))] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-[960px]" onCloseAutoFocus={(event) => {
       // 菜单项会在选中后卸载，将焦点还给本面板的菜单按钮。
@@ -126,9 +140,9 @@ export function AgentResourcesDialog({ context, kind, onClose }: { context: Agen
       </DialogHeader>
       <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground" /><Input className="pl-9" aria-label={kind === 'mcp' ? '搜索 MCP' : '搜索 Skills'} placeholder={kind === 'mcp' ? '搜索 MCP…' : '搜索名称或简介…'} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-        <Button variant="outline" size="sm" disabled={inspection.isFetching} onClick={() => { void inspection.refetch(); if (kind === 'skills' && selected) void detail.refetch() }}><RefreshCw className={cn('size-3.5', inspection.isFetching && 'animate-spin')} />刷新</Button>
+        <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}><RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />刷新</Button>
       </div>
-      {inspection.isPending ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground" role="status"><Loader2 className="size-4 animate-spin" />正在读取…</div> : inspection.isError ? <div role="alert" className="flex-1 overflow-auto p-5 text-sm text-destructive">{errorText(inspection.error)}<p className="mt-2 text-muted-foreground">可关闭弹窗后重新打开，或点击刷新。</p></div> : <div className="grid min-h-0 flex-1 grid-rows-[minmax(80px,25%)_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)] md:grid-rows-1">
+      {inspection.isPending ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground" role="status"><Loader2 className="size-4 animate-spin" />正在读取…</div> : inspectionFailed ? <div role="alert" className="flex-1 overflow-auto p-5 text-sm text-destructive">{errorText(inspection.error)}<p className="mt-2 text-muted-foreground">可关闭弹窗后重新打开，或点击刷新。</p></div> : <div className="grid min-h-0 flex-1 grid-rows-[minmax(80px,25%)_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)] md:grid-rows-1">
         <nav aria-label={kind === 'mcp' ? 'MCP 列表' : 'Skills 列表'} className="overflow-y-auto border-b p-2 md:border-r md:border-b-0">
           <p className="px-3 py-2 text-xs text-muted-foreground">{filtered.length} / {items.length} 项</p>
           {!filtered.length ? <p className="px-3 py-4 text-xs leading-relaxed text-muted-foreground">{search ? '没有匹配的项目' : kind === 'mcp' ? '尚无 MCP 服务，请连接会话后刷新。' : '已知目录中未发现 SKILL.md 文件。'}</p> : <ul className="space-y-1">{filtered.map((item) => <li key={item.id}><button type="button" aria-pressed={selected?.id === item.id} aria-controls="agent-resource-detail" onClick={() => setSelectedId(item.id)} className={cn('w-full rounded-lg px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-ring', selected?.id === item.id ? 'bg-primary/10 text-primary' : 'hover:bg-muted')}>
@@ -136,12 +150,13 @@ export function AgentResourcesDialog({ context, kind, onClose }: { context: Agen
           </button></li>)}</ul>}
         </nav>
         <section id="agent-resource-detail" aria-label="资源详情" className="min-w-0 overflow-auto p-5">
-          {!selected ? <p className="text-sm text-muted-foreground">选择列表中的项目以查看详情。</p> : kind === 'mcp' ? <McpDetail item={selected as InspectedMcp} /> : detail.isPending ? <p role="status" className="text-sm text-muted-foreground">正在读取完整说明…</p> : detail.isError ? <p role="alert" className="text-sm text-destructive">{errorText(detail.error)}</p> : detail.data ? <SkillBody key={detail.data.id} skill={detail.data} context={context} /> : null}
+          {!selected ? <p className="text-sm text-muted-foreground">选择列表中的项目以查看详情。</p> : kind === 'mcp' ? <McpDetail item={selected as InspectedMcp} /> : detail.isPending ? <p role="status" className="text-sm text-muted-foreground">正在读取完整说明…</p> : detailFailed ? <p role="alert" className="text-sm text-destructive">{errorText(detail.error)}</p> : detail.data ? <>{detail.isError ? <p role="status" className="mb-3 text-xs text-destructive">刷新失败，显示上次读取的内容：{errorText(detail.error)}</p> : null}<SkillBody key={detail.data.id} skill={detail.data} context={context} /></> : null}
         </section>
       </div>}
       <div className="max-h-36 shrink-0 overflow-auto border-t bg-muted/20 px-5 py-3 text-[11px] leading-relaxed text-muted-foreground">
         <p>{kind === 'mcp' ? data?.mcpCoverage : data?.skillsCoverage}</p>
         <p className="mt-1 break-all">会话：{data?.sessionId ?? '尚未创建'}{data?.workspace ? ` · 工作区：${data.workspace}` : ''}</p>
+        {inspection.isError && data ? <p className="mt-1 text-destructive">刷新失败，显示上次结果：{errorText(inspection.error)}</p> : null}
         {kind === 'mcp' && data && <p className="mt-1">最近检查：{dateText(data.observedAt)}</p>}
         {!!data?.warnings.length && <details className="mt-1"><summary className="cursor-pointer">{data.warnings.length} 条读取提示</summary><ul className="mt-1 space-y-1">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details>}
       </div>

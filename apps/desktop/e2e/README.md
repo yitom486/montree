@@ -32,7 +32,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `app-smoke.spec.ts` | 启动、欢迎页、菜单；真实 IPC 拒绝未绑定窗口凭 workspaceId 访问远端 |
 | `agent-community.spec.ts` | 社区滚动跟随/上滑逃离、历史窗口与位置恢复回归 |
 | `agent-panel.spec.ts` | Agent 面板壳；mock ACP 的 320/390/480 输入栏布局、选区复制/引用与输入框粘贴/剪切（剪贴板边界桩）；Code mode 开关经真实 IPC 透传 `_meta.toolsMode=ptc` 到下一次新会话 |
-| `agent-resources.spec.ts` | 真实 mock Agent 经 stdio 发现工具后查看 MCP 健康/工具 schema；独立临时用户目录的 Skills 搜索、完整说明/原文、代码与示例复制、受控打开位置、Escape/焦点、深浅色及窄窗口截图；不调用真实模型 |
+| `agent-resources.spec.ts` | 真实 mock Agent 经 stdio 发现工具后查看 MCP 健康/工具 schema；独立临时用户目录的 Skills 搜索、完整说明/原文、代码与示例复制、受控打开位置、Escape/焦点、深浅色及窄窗口截图；建会话前也能打开 Skills/MCP 且不误报会话切换；不调用真实模型 |
 | `agent-wsl-opencode.spec.ts` | 可选真实 Windows→WSL OpenCode 连接验证（设置 E2E_WSL_OPENCODE_CWD）：加载 Ubuntu 用户登录 shell、独立认证、stdio 工具发现；不发送模型 prompt |
 | `agent-window-isolation.spec.ts` / `fixtures/mock-window-agent.cjs` | 模拟 ACP Agent 经真实子进程/SDK/IPC/stdio MCP 验证多窗口聊天、制卡指针、权限、取消、恢复、关闭和 iframe 原生快捷键隔离；同时验证独立聊天包的窗口存储分区、主窗口旧历史迁入及副窗口重载不继承主历史；不调用真实模型；HTTP 仅保留专用测试钩子兼容 |
 | `agent-tool-timeline.spec.ts` | 聊天展示层定向回归：种子时间线（单回合一条工作记录/失败摘要/图表独立入口紧凑态/长内容，浅色+深色截图与默认态高度测量）、10 调用收敛基线（一条记录+2 结果入口）、流式工作记录（运行收起·展开后落定保持，需 mock `worklog`/`worklog-done` 台本）、真实 mock 审批 Allow/Reject 全链路（唯一可见·幂等消失）、分隔线三档宽度（约 320/390/480）与 JSON 内部滚动；不调用真实模型 |

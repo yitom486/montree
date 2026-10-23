@@ -33,8 +33,19 @@ describe('Agent inspection IPC ownership', () => {
     mocks.trusted = false
     expect((await invoke(AGENT_INSPECTION_IPC.inspect, {})).error.code).toBe('FORBIDDEN')
     mocks.trusted = true
-    for (const sessionId of ['foreign', null]) expect((await invoke(AGENT_INSPECTION_IPC.inspect, { sessionId })).error.code).toBe('ACP_PROTOCOL_ERROR')
+    expect((await invoke(AGENT_INSPECTION_IPC.inspect, { sessionId: 'foreign' })).error.code).toBe('ACP_PROTOCOL_ERROR')
     expect(mocks.inspect).not.toHaveBeenCalled()
+  })
+
+  it('treats an explicit null session as no session instead of a stale-session error', async () => {
+    expect((await invoke(AGENT_INSPECTION_IPC.inspect, { sessionId: null })).ok).toBe(true)
+    expect(mocks.inspect).toHaveBeenLastCalledWith(null, 'codex-acp', 'trusted-workspace', false)
+
+    expect((await invoke(AGENT_INSPECTION_IPC.inspect, {})).ok).toBe(true)
+    expect(mocks.inspect).toHaveBeenLastCalledWith('owned', 'codex-acp', 'trusted-workspace', false)
+
+    expect((await invoke(AGENT_INSPECTION_IPC.skill, { sessionId: null, skillId: 'known-id' })).ok).toBe(true)
+    expect(mocks.skill).toHaveBeenLastCalledWith([{ directory: 'trusted-workspace', source: 'codex-acp' }], 'known-id')
   })
 
   it('derives runtime and workspace from the sender and drops results after a session switch', async () => {

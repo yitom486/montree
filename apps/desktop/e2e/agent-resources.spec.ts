@@ -28,6 +28,19 @@ test('会话菜单展示真实 MCP 发现状态与 Skills 完整说明，搜索�
     const panel = page.locator('aside[aria-label="Agent 聊天"]:visible').first()
     const more = panel.getByRole('button', { name: '更多面板操作' })
     const open = async (name: string) => { await more.click(); await page.getByRole('menuitem', { name, exact: true }).click(); return page.getByRole('dialog', { name, exact: true }) }
+
+    // 未建立会话时仍应能查看本地 Skills；不能因 UI sessionId 为 null 误报“会话已切换”。
+    const skillsBeforeConnect = await open('Skills 技能详情')
+    await expect(skillsBeforeConnect.getByRole('button', { name: /resource-test/ })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(skillsBeforeConnect).toBeHidden()
+
+    const mcpBeforeConnect = await open('MCP 连接详情')
+    await expect(mcpBeforeConnect.getByRole('heading', { name: 'MCP 连接详情' })).toBeVisible()
+    await expect(mcpBeforeConnect.getByRole('alert')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(mcpBeforeConnect).toBeHidden()
+
     const input = panel.locator('textarea')
     await input.fill('tools')
     await panel.getByRole('button', { name: '发送', exact: true }).click()

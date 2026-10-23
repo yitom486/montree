@@ -12,7 +12,8 @@ BeUI 来源为 `https://beui.dev/r/` 下 message-bubble、streaming-response、a
 |------|------|
 | `AgentPanel` | 右侧 Agent 主面板（壳 + 接线；配置项分类纯逻辑已出库 `lib/agent/acp-config-menu`，模型尾缀思考档只读徽标见 `lib/agent/acp-model-thinking`，fast 类 boolean 在输入栏给可见开关（`findFastToggle` 单列，不进 secondary），其余 boolean 仍在 secondary；运行时切换器全量读 `BUILTIN_ACP_RUNTIMES`，下游 8 项落地后零改动展示，非 codex 走中性认证提示；生成式 UI 提交经 `handleGenerativeSubmit` 做线程归属校验后沿 `sendPrompt` 回到同一会话；消息列表统一通过 `useAcpActiveMessages` 读取包权威 feed） |
 | `AgentHeaderOverflowMenu` | 聊天头部 ⋯ 溢出菜单（新对话/清空/模式切换）；仅当 Agent 在 initialize 声明 `_meta.toolsMode.values` 含 `ptc` 时显示「Code mode（PTC）」复选，按线程保存，只对下一次新建/恢复会话生效 |
-| `AgentResourcesDialog` | ⋯ 菜单的 MCP / Skills 双栏弹窗：搜索列表、实时连接观察、工具说明/参数、技能来源/路径/完整原文、复制示例和打开文件位置；窄屏上下排列，Escape 关闭后恢复菜单焦点；明确区分本地发现与 Agent 未上报的加载/使用状态 |
+| `AgentResourcesDialog` | ⋯ 菜单的 MCP / Skills 双栏弹窗：搜索列表、实时连接观察、工具说明/参数、技能来源/路径/完整原文、复制示例和打开文件位置；窄屏上下排列，Escape 关闭后恢复菜单焦点；明确区分本地发现与 Agent 未上报的加载/使用状态；轮询失败保留上次成功结果，只有首次加载失败才显示阻塞错误 |
+| `AgentResourcesDialog.test.ts` | 后台 MCP 轮询失败时不清空已展示数据；无成功结果时才显示首次加载错误 |
 | `FloatingAIHud` | 悬浮 AI 伴读浮窗与微型药丸胶囊（支持 docked / floating / capsule 三态切换、四大 Tab 与自由拖拽） |
 | `CompactConfigMenu` | 输入栏旁的紧凑配置下拉（primary 配置项） |
 | `AgentComposer` | BeUI Prompt Input 布局适配：可换行参数与独立 32px 发送/停止；受控发送/停止、草稿清空、附件可发送判定与焦点由包 `useChatComposerController` 共用；附件获取、ACP payload、右键编辑留宿主；社区 PromptInput 保持唯一 IME/Enter 入口 |

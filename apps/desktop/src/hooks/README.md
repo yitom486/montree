@@ -78,7 +78,7 @@
 
 ## agent/
 
-`useAgentInspection.ts`：按线程/会话/运行时隔离 TanStack Query；MCP 弹窗每 3 秒刷新健康记录，Skills 列表与正文按需加载，不在 MCP 轮询时扫描文件。
+`useAgentInspection.ts`：按线程/会话/运行时隔离 TanStack Query；MCP 弹窗每 3 秒刷新健康记录，Skills 列表与正文按需加载，不在 MCP 轮询时扫描文件；瞬时失败自动重试一次，后台轮询失败不清空上一次成功结果。
 
 | 文件 | 功能 |
 |------|------|
