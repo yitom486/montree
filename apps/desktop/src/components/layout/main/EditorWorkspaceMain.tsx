@@ -33,6 +33,7 @@ import type { TextDocument } from '@/lib/editor/text-document'
 import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { EditorView } from '@codemirror/view'
 import { findExcerptOffsets, findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
+import { rememberLocalAnchor } from '@/lib/workspace/resolve-local-link'
 
 function TextDataReaderContext({ filePath, content, kind, root }: { filePath: string; content: string; kind: string; root: () => HTMLElement | null }) {
   useDocumentReader({ filePath, root, text: () => content,
@@ -197,6 +198,10 @@ export const EditorWorkspaceMain = forwardRef<
   const showEditor = Boolean(filePath) && (viewMode === 'editor' || viewMode === 'split')
   const showPreview = Boolean(filePath) && (viewMode === 'preview' || viewMode === 'split')
   const showWelcome = !filePath
+  const openLocalFile = useCallback((path: string, anchor?: string) => {
+    rememberLocalAnchor(path, anchor)
+    onOpenRecentFile(path)
+  }, [onOpenRecentFile])
 
   const contentPanelIds = useMemo(() => {
     if (showEditor && showPreview) return ['editor', 'preview']
@@ -496,7 +501,7 @@ export const EditorWorkspaceMain = forwardRef<
           </Suspense>
         ) : documentKind === 'html' && filePath ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 HTML 视图…</div>}>
-            <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} />
+            <HtmlViewer filePath={filePath} content={content} onChange={onContentChange} onOpenLocalFile={openLocalFile} />
           </Suspense>
         ) : documentKind === 'docx' && filePath ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 DOCX 视图…</div>}>
@@ -573,11 +578,13 @@ export const EditorWorkspaceMain = forwardRef<
                     <PreviewPane
                       ref={previewRef}
                       html={previewHtml}
+                      filePath={filePath}
                       theme={theme}
                       onScroll={handlePreviewScroll}
                       onHeadingActivate={handlePreviewHeadingActivate}
                       onOpenWikilink={onOpenWikilink}
                       onOpenDeepLink={onOpenDeepLink}
+                      onOpenLocalFile={openLocalFile}
                     />
                   </PaneErrorBoundary>
                 </ResizablePanel>
@@ -590,11 +597,13 @@ export const EditorWorkspaceMain = forwardRef<
                   <PreviewPane
                     ref={previewRef}
                     html={previewHtml}
+                    filePath={filePath}
                     theme={theme}
                     onScroll={handlePreviewScroll}
                     onHeadingActivate={handlePreviewHeadingActivate}
                     onOpenWikilink={onOpenWikilink}
                     onOpenDeepLink={onOpenDeepLink}
+                    onOpenLocalFile={openLocalFile}
                   />
                 </PaneErrorBoundary>
               </ResizablePanel>

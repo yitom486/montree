@@ -38,6 +38,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { html } from '@codemirror/lang-html'
 import { buildThemeExtensions } from '@/lib/editor/codemirror-theme'
+import { resolveLocalLink, takeLocalAnchor } from '@/lib/workspace/resolve-local-link'
 
 export type HtmlViewMode = 'preview' | 'split' | 'source'
 export type HtmlPreviewTheme = 'auto' | 'light' | 'dark'
@@ -46,6 +47,8 @@ interface HtmlViewerProps {
   filePath: string
   content: string
   onChange?: (newContent: string) => void
+  /** 打开文档内的相对本地链接（由工作区统一处理未保存确认/文件切换） */
+  onOpenLocalFile?: (path: string, anchor?: string) => void
   readOnly?: boolean
   className?: string
 }
@@ -135,6 +138,7 @@ export const HtmlViewer = memo(function HtmlViewer({
   filePath,
   content,
   onChange,
+  onOpenLocalFile,
   readOnly = false,
   className,
 }: HtmlViewerProps) {
@@ -246,6 +250,15 @@ export const HtmlViewer = memo(function HtmlViewer({
       doc.body.style.zoom = `${zoom}%`
     }
 
+    const pendingAnchor = takeLocalAnchor(filePath)
+    if (pendingAnchor) {
+      try {
+        doc.getElementById(decodeURIComponent(pendingAnchor))?.scrollIntoView({ block: 'start' })
+      } catch {
+        // 目标文档没有该锚点时保持顶部
+      }
+    }
+
     doc.addEventListener(
       'click',
       (e) => {
@@ -255,6 +268,27 @@ export const HtmlViewer = memo(function HtmlViewer({
         if (!href) return
 
         if (href.startsWith('#')) return // 页面内锚点跳转
+
+        // srcdoc 的基地址是应用页面；不拦截相对链接会把应用自身加载进预览框（preload 缺失页）。
+        const localTarget = resolveLocalLink(filePath, href)
+        if (localTarget) {
+          e.preventDefault()
+          e.stopPropagation()
+          const rawHash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : ''
+          if (localTarget === filePath) {
+            if (rawHash) {
+              try {
+                doc.getElementById(decodeURIComponent(rawHash))?.scrollIntoView({ block: 'start' })
+              } catch {
+                // 非法锚点保持页面不动
+              }
+            }
+            return
+          }
+          if (onOpenLocalFile) onOpenLocalFile(localTarget, rawHash || undefined)
+          else toast.error('当前 HTML 视图无法打开该本地链接')
+          return
+        }
 
         if (
           href.startsWith('http://') ||
@@ -269,7 +303,7 @@ export const HtmlViewer = memo(function HtmlViewer({
       },
       { capture: true },
     )
-  }, [zoom])
+  }, [zoom, filePath, onOpenLocalFile])
 
   // 缩放变化时动态同步已加载的 iframe
   useEffect(() => {

@@ -88,6 +88,7 @@
 | `file-tree-ops` | 文件树路径、剪贴板、粘贴目标 |
 | `quick-open` | 全局快速切换（扁平化文件树、模糊匹配与评分排序） |
 | `resolve-wikilink` | 工作区双链目标解析（相对路径/文件名/同名推断与缺省笔记创建） |
+| `resolve-local-link` / `.test.ts` | HTML/Markdown 相对本地链接解析（`./`、`../`、编码、同文件 query/hash；外部协议不接管），并暂存/消费跨文件锚点 |
 | `dialog-default-path` | 打开/保存对话框默认目录 |
 | `workspace-session` | 启动时恢复上次文件 / 在线文档 |
 | `report-error` / `error-reporter` | AppError 与运行时错误上报 |

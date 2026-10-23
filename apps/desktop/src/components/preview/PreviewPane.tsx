@@ -5,6 +5,7 @@ import { useCodeBlockCopy } from '@/hooks/preview/useCodeBlockCopy'
 import { useHighlightTheme } from '@/hooks/preview/useHighlightTheme'
 import { applyScrollRatio, collectPreviewHeadingPositions, scrollRatio } from '@/lib/editor/markdown-headings'
 import type { AppTheme } from '@/stores/editor-ui-store'
+import { clearLocalAnchor, peekLocalAnchor, resolveLocalLink } from '@/lib/workspace/resolve-local-link'
 import '@/styles/markdown-preview.css'
 
 export interface PreviewPaneHandle {
@@ -17,16 +18,19 @@ export interface PreviewPaneHandle {
 
 interface PreviewPaneProps {
   html: string
+  filePath?: string
   theme?: AppTheme
   onScroll?: () => void
   onHeadingActivate?: (headingId: string) => void
   onOpenWikilink?: (target: string) => void
   onOpenDeepLink?: (url: string) => void
+  /** Markdown 内的相对文档链接（other.md / ../x.md） */
+  onOpenLocalFile?: (path: string, anchor?: string) => void
 }
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
   function PreviewPane(
-    { html, theme = 'dark', onScroll, onHeadingActivate, onOpenWikilink, onOpenDeepLink },
+    { html, filePath, theme = 'dark', onScroll, onHeadingActivate, onOpenWikilink, onOpenDeepLink, onOpenLocalFile },
     ref,
   ) {
     const previewRef = useRef<HTMLDivElement>(null)
@@ -34,6 +38,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     const onHeadingActivateRef = useRef(onHeadingActivate)
     const onOpenWikilinkRef = useRef(onOpenWikilink)
     const onOpenDeepLinkRef = useRef(onOpenDeepLink)
+    const onOpenLocalFileRef = useRef(onOpenLocalFile)
+    const filePathRef = useRef(filePath)
     const hasPreview = Boolean(html)
 
     useHighlightTheme(theme)
@@ -42,13 +48,15 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     onHeadingActivateRef.current = onHeadingActivate
     onOpenWikilinkRef.current = onOpenWikilink
     onOpenDeepLinkRef.current = onOpenDeepLink
+    onOpenLocalFileRef.current = onOpenLocalFile
+    filePathRef.current = filePath
 
-    const scrollToHeading = (id: string) => {
+    const scrollToHeadingIfPresent = (id: string) => {
       const container = previewRef.current
-      if (!container) return
+      if (!container) return false
 
       const heading = container.querySelector<HTMLElement>(`#${CSS.escape(id)}`)
-      if (!heading) return
+      if (!heading) return false
 
       const top =
         heading.getBoundingClientRect().top -
@@ -56,7 +64,27 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         container.scrollTop -
         16
       container.scrollTop = Math.max(0, top)
+      return true
     }
+
+    const scrollToHeading = (id: string) => {
+      scrollToHeadingIfPresent(id)
+    }
+
+    useEffect(() => {
+      if (!filePath || !hasPreview) return
+      const anchor = peekLocalAnchor(filePath)
+      if (!anchor) return
+      const frame = requestAnimationFrame(() => {
+        try {
+          // 预览内容有 debounce；旧内容先到时保留 pending，等目标 HTML 到达再消费。
+          if (scrollToHeadingIfPresent(decodeURIComponent(anchor))) clearLocalAnchor(filePath)
+        } catch {
+          // 非法锚点保持顶部
+        }
+      })
+      return () => cancelAnimationFrame(frame)
+    }, [filePath, hasPreview, html])
 
     useImperativeHandle(ref, () => ({
       scrollToHeading,
@@ -131,15 +159,37 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           return
         }
 
-        const anchor = target.closest<HTMLAnchorElement>('a[href^="#"]')
+        const anchor = target.closest<HTMLAnchorElement>('a[href]')
         if (anchor) {
           const rawHref = anchor.getAttribute('href')
           if (!rawHref || rawHref === '#') return
 
-          event.preventDefault()
-          const headingId = decodeURIComponent(rawHref.slice(1))
-          scrollToHeading(headingId)
-          onHeadingActivateRef.current?.(headingId)
+          if (rawHref.startsWith('#')) {
+            event.preventDefault()
+            const headingId = decodeURIComponent(rawHref.slice(1))
+            scrollToHeading(headingId)
+            onHeadingActivateRef.current?.(headingId)
+            return
+          }
+
+          const currentFile = filePathRef.current
+          const localTarget = currentFile ? resolveLocalLink(currentFile, rawHref) : null
+          if (localTarget) {
+            event.preventDefault()
+            if (localTarget === currentFile) {
+              const rawHash = rawHref.includes('#') ? rawHref.slice(rawHref.indexOf('#') + 1) : ''
+              if (rawHash) {
+                try {
+                  scrollToHeading(decodeURIComponent(rawHash))
+                } catch {
+                  // 非法锚点保持页面不动
+                }
+              }
+            } else {
+              const rawHash = rawHref.includes('#') ? rawHref.slice(rawHref.indexOf('#') + 1) : ''
+              onOpenLocalFileRef.current?.(localTarget, rawHash || undefined)
+            }
+          }
           return
         }
 
