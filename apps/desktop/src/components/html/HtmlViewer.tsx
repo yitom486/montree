@@ -367,68 +367,68 @@ export const HtmlViewer = memo(function HtmlViewer({
   return (
     <div className={cn('flex h-full min-h-0 flex-1 flex-col overflow-hidden', className)}>
       {/* 顶部工具栏 */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/80 bg-background/95 px-3 backdrop-blur-xs select-none">
-        {/* 左侧：文件信息与视图模式切换 */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+      <div data-testid="html-viewer-toolbar" className="@container flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border/80 bg-background/95 px-3 backdrop-blur-xs select-none">
+        {/* 左侧：文件信息与视图模式切换；窄面板隐藏重复文件名，避免与右侧控制重叠 */}
+        <div data-testid="html-viewer-toolbar-left" className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 @max-[38rem]:hidden">
             <Globe className="size-4 text-orange-500 shrink-0" />
             <span className="max-w-[240px] truncate text-xs font-medium text-foreground/90">
               {fileName}
             </span>
           </div>
 
-          <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5">
+          <div className="flex shrink-0 items-center rounded-md border border-border/60 bg-muted/40 p-0.5">
             <Button
               type="button"
               variant={viewMode === 'preview' ? 'secondary' : 'ghost'}
-              size="icon-xs"
+              size="xs"
               className={cn(
-                'h-6 gap-1 px-2 text-xs font-normal',
+                'font-normal',
                 viewMode === 'preview' && 'bg-background shadow-xs font-medium',
               )}
               onClick={() => setViewMode('preview')}
               title="仅预览模式"
             >
               <Eye className="size-3.5" />
-              <span>预览</span>
+              <span className="@max-[22rem]:hidden">预览</span>
             </Button>
             <Button
               type="button"
               variant={viewMode === 'split' ? 'secondary' : 'ghost'}
-              size="icon-xs"
+              size="xs"
               className={cn(
-                'h-6 gap-1 px-2 text-xs font-normal',
+                'font-normal',
                 viewMode === 'split' && 'bg-background shadow-xs font-medium',
               )}
               onClick={() => setViewMode('split')}
               title="分屏对照模式"
             >
               <Columns2 className="size-3.5" />
-              <span>分屏</span>
+              <span className="@max-[22rem]:hidden">分屏</span>
             </Button>
             <Button
               type="button"
               variant={viewMode === 'source' ? 'secondary' : 'ghost'}
-              size="icon-xs"
+              size="xs"
               className={cn(
-                'h-6 gap-1 px-2 text-xs font-normal',
+                'font-normal',
                 viewMode === 'source' && 'bg-background shadow-xs font-medium',
               )}
               onClick={() => setViewMode('source')}
               title="源代码模式"
             >
               <Code2 className="size-3.5" />
-              <span>源码</span>
+              <span className="@max-[22rem]:hidden">源码</span>
             </Button>
           </div>
         </div>
 
         {/* 右侧：预览控制、缩放、主题与操作按键 */}
-        <div className="flex items-center gap-1.5">
+        <div data-testid="html-viewer-toolbar-right" className="flex shrink-0 items-center gap-1.5">
           {viewMode !== 'source' && (
             <>
               {/* 预览主题切换 */}
-              <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5">
+              <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5 @max-[30rem]:hidden">
                 <Button
                   type="button"
                   variant={previewTheme === 'auto' ? 'secondary' : 'ghost'}
@@ -471,7 +471,7 @@ export const HtmlViewer = memo(function HtmlViewer({
               </div>
 
               {/* 页面缩放控制 */}
-              <div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-muted/40 p-0.5">
+              <div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-muted/40 p-0.5 @max-[34rem]:hidden">
                 <Button
                   type="button"
                   variant="ghost"

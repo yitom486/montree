@@ -17,6 +17,18 @@ async function open(page: Page, name: string) {
   await expect(dialog).toBeHidden()
 }
 
+async function measureToolbar(page: Page) {
+  return page.getByTestId('html-viewer-toolbar').evaluate((element) => {
+    const left = element.querySelector('[data-testid="html-viewer-toolbar-left"]')!.getBoundingClientRect()
+    const right = element.querySelector('[data-testid="html-viewer-toolbar-right"]')!.getBoundingClientRect()
+    return {
+      width: element.clientWidth,
+      overflow: element.scrollWidth > element.clientWidth + 1,
+      overlap: left.right > right.left + 1,
+    }
+  })
+}
+
 test('本地 HTML 通过阅读工具返回渲染后的纯文本而不是源码', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'montree-html-reader-'))
   await writeFile(join(workspace, 'page.html'), `<!doctype html>
@@ -49,6 +61,25 @@ test('本地 HTML 通过阅读工具返回渲染后的纯文本而不是源码',
     const toc = JSON.parse(await snapshot(app, 'toc.json'))
     expect(toc.entries[0]).toMatchObject({ label: 'HTML 架构总览', level: 1 })
     expect(await snapshot(app, 'chapter', { flatIndex: 0 })).toContain('HTML needle')
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0]
+      win.setMinimumSize(480, 500)
+      win.setContentSize(640, 720)
+    })
+    await page.waitForTimeout(300)
+    const layout = await measureToolbar(page)
+    expect(layout.width, 'HTML 工具栏应处于窄面板场景').toBeLessThan(520)
+    expect(layout.overflow, 'HTML 工具栏不应横向溢出').toBe(false)
+    expect(layout.overlap, '左右工具栏不应重叠').toBe(false)
+
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0].setContentSize(520, 720)
+    })
+    await page.waitForTimeout(300)
+    const narrowLayout = await measureToolbar(page)
+    expect(narrowLayout.overflow, '极窄 HTML 工具栏不应横向溢出').toBe(false)
+    expect(narrowLayout.overlap, '极窄 HTML 工具栏左右不应重叠').toBe(false)
   } finally {
     await app.close()
   }
