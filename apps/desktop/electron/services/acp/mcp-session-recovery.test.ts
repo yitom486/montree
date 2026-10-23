@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAcpContext, runInAcpContext, forgetAcpContext } from './acp-context'
 import { getAcpState } from './acp-state'
-import { bindSessionMcp, cancelMcpRecovery, ensureSessionMcp } from './mcp-session-recovery'
+import { bindSessionMcp, cancelMcpRecovery, ensureSessionMcp, getSessionMcpBinding } from './mcp-session-recovery'
 import { McpConnectionHealth } from './mcp/connection-health'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
 
@@ -42,6 +42,12 @@ afterEach(() => {
 })
 
 describe('MCP recovery before prompt', () => {
+  it('exposes inspection bindings only in the owning window and current connection generation', () => {
+    expect(inWindow(() => getSessionMcpBinding(sessionId))?.handle).toBe(handle)
+    expect(getSessionMcpBinding(sessionId)).toBeUndefined()
+    getAcpState(owner).connectGeneration++
+    expect(inWindow(() => getSessionMcpBinding(sessionId))).toBeUndefined()
+  })
   it('after idle discovery timeouts, restarts once and sends only on the new connection', async () => {
     const state = getAcpState(owner)
     state.runtimeId = 'opencode'

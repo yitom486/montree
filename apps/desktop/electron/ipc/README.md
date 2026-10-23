@@ -5,6 +5,7 @@
 | 文件 | 功能 |
 |------|------|
 | `register-handlers.ts` | 注册全部 IPC（文件内按域分段注释）：文件/工作区、导出、阅读标记、错误日志、ACP、OCR |
+| `agent-inspection-handlers.ts` / `.test.ts` | MCP/Skills 详情与已发现技能的文件位置；可信主 frame、窗口/会话归属和异步切换校验；仅接收技能 ID，不接受任意文件路径 |
 | `terminal-handlers.ts` | 主 frame 校验、可信窗口/工作区选择、终端会话归属；刷新、崩溃与窗口销毁时清理 |
 | `acp-window-handlers.ts` / `acp-window-handlers.test.ts` | 以可信 IPC sender 隔离 Agent 连接、事件、权限和文档快照；校验会话归属、恢复占用；窗口销毁时同步摘除 SDK 流桥后再终止所属子进程，覆盖迟到写入与跨窗隔离回归 |
 

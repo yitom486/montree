@@ -1,4 +1,4 @@
-import { Code2, Columns2, Ellipsis, ExternalLink, Minimize2, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, Code2, Columns2, Ellipsis, ExternalLink, Minimize2, Plus, Plug, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,6 +28,8 @@ export interface AgentHeaderOverflowMenuProps {
   onMinimizeToCapsule?: () => void
   onDockPanel?: () => void
   onFloatPanel?: () => void
+  onInspectMcp?: () => void
+  onInspectSkills?: () => void
 }
 
 export function AgentHeaderOverflowMenu({
@@ -41,6 +43,8 @@ export function AgentHeaderOverflowMenu({
   onMinimizeToCapsule,
   onDockPanel,
   onFloatPanel,
+  onInspectMcp,
+  onInspectSkills,
 }: AgentHeaderOverflowMenuProps) {
   return (
     <DropdownMenu>
@@ -65,6 +69,8 @@ export function AgentHeaderOverflowMenu({
           <Trash2 className="size-4" />
           清空当前对话
         </DropdownMenuItem>
+        {onInspectMcp ? <DropdownMenuItem onSelect={onInspectMcp}><Plug className="size-4" />MCP 连接详情</DropdownMenuItem> : null}
+        {onInspectSkills ? <DropdownMenuItem onSelect={onInspectSkills}><BookOpen className="size-4" />Skills 技能详情</DropdownMenuItem> : null}
         {codeModeSupported ? (
           <DropdownMenuCheckboxItem
             checked={codeMode}

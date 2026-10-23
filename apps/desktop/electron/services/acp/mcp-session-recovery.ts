@@ -28,6 +28,10 @@ interface Binding {
   recovery?: { controller: AbortController; promise: Promise<void> }
 }
 const bindings = new WeakMap<AcpContext, Map<string, Binding>>()
+export function getSessionMcpBinding(sessionId: string) {
+  const binding = bindings.get(currentAcpContext())?.get(sessionId)
+  return binding?.generation === acpState.connectGeneration ? binding : undefined
+}
 class RecoveryInvariantError extends Error {}
 export class McpRecoveryCancelledError extends Error {}
 

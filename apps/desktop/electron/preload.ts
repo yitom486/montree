@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
 import { INLINE_COMPLETION_IPC, type InlineCompletionAPI } from '../contracts/inline-completion'
 import {
@@ -449,3 +450,9 @@ const inlineCompletionAPI: InlineCompletionAPI = {
   listProviderModels: (payload) => ipcRenderer.invoke(INLINE_COMPLETION_MODEL_IPC.list, payload),
 }
 contextBridge.exposeInMainWorld('montreeInlineCompletion', inlineCompletionAPI)
+const agentInspectionAPI: AgentInspectionAPI = {
+  inspect: (request) => ipcRenderer.invoke(AGENT_INSPECTION_IPC.inspect, request),
+  skill: (request) => ipcRenderer.invoke(AGENT_INSPECTION_IPC.skill, request),
+  reveal: (request) => ipcRenderer.invoke(AGENT_INSPECTION_IPC.reveal, request),
+}
+contextBridge.exposeInMainWorld('montreeAgentInspection', agentInspectionAPI)

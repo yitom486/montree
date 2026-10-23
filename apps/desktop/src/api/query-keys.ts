@@ -9,6 +9,10 @@ import type { DocumentRef } from '@yitom/contracts'
  * - 既有单参调用方无需改动（workspaceId 缺省），有身份处显式传入。
  */
 export const queryKeys = {
+  agentInspection: (threadId: string, sessionId: string | null, runtimeId: string, kind: string | null) =>
+    ['agent-inspection', threadId, sessionId, runtimeId, kind] as const,
+  agentSkill: (threadId: string, sessionId: string | null, runtimeId: string, skillId: string | null) =>
+    ['agent-skill', threadId, sessionId, runtimeId, skillId] as const,
   appMeta: ['app', 'meta'] as const,
   /** 历史本机槽（单窗口单工作区时代）；A1 起写入侧改走 workspaceOf。 */
   workspace: ['workspace'] as const,

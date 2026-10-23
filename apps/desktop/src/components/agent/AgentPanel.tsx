@@ -17,6 +17,7 @@ import { AgentBunInstallBanner } from '@/components/agent/AgentBunInstallBanner'
 import { AgentAgyInstallBanner } from '@/components/agent/AgentAgyInstallBanner'
 import { AgentHistoryMenu } from '@/components/agent/AgentHistoryMenu'
 import { AgentHeaderOverflowMenu } from '@/components/agent/AgentHeaderOverflowMenu'
+import { AgentResourcesDialog } from '@/components/agent/AgentResourcesDialog'
 import { CompactConfigMenu } from '@/components/agent/CompactConfigMenu'
 import { AgentMessageList } from '@/components/agent/chat/AgentMessageList'
 import type { ChapterMarkPlanSelectPayload } from '@yitom/chat-ui'
@@ -89,6 +90,8 @@ export const AgentPanel = memo(function AgentPanel({
 }: AgentPanelProps) {
   useRenderProbe(floating ? 'agent-panel-floating' : 'agent-panel')
   const view = useAcpChatShell()
+  const inspectionThreadId = useAcpUiStore((s) => s.activeThreadId)
+  const inspectionSessionId = useAcpUiStore((s) => s.sessionId)
   const setSelectedRuntimeId = useAcpUiStore((s) => s.setSelectedRuntimeId)
   const setPanelOpen = useAcpUiStore((s) => s.setPanelOpen)
   const setHudDisplayMode = useAcpUiStore((s) => s.setHudDisplayMode)
@@ -115,6 +118,7 @@ export const AgentPanel = memo(function AgentPanel({
     cancelAuth,
   } = useAcpSession(workspaceRoot)
   const [draft, setDraft] = useState('')
+  const [resourceKind, setResourceKind] = useState<'mcp' | 'skills' | null>(null)
   const [authHint, setAuthHint] = useState<string | null>(null)
   const composerInsertNonce = useAcpUiStore((s) => s.composerInsertNonce)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -395,6 +399,12 @@ export const AgentPanel = memo(function AgentPanel({
       data-testid="agent-panel"
       data-keep-reader-selection
     >
+      <AgentResourcesDialog
+        key={`${inspectionThreadId}:${inspectionSessionId}:${resourceKind}`}
+        context={{ threadId: inspectionThreadId, sessionId: inspectionSessionId, runtimeId: view.selectedRuntimeId }}
+        kind={resourceKind}
+        onClose={() => setResourceKind(null)}
+      />
       {/* 内嵌子卡：侧栏是工作区内框的孩子，不再顶天立地贴边 */}
       <div className="m-2 ml-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-sidebar/95 shadow-sm backdrop-blur-sm">
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 px-3">
@@ -529,6 +539,8 @@ export const AgentPanel = memo(function AgentPanel({
           />
           <AgentHeaderOverflowMenu
             floating={floating}
+            onInspectMcp={() => setResourceKind('mcp')}
+            onInspectSkills={() => setResourceKind('skills')}
             actionDisabled={view.prompting}
             codeModeSupported={codeModeSupported}
             codeMode={codeMode}

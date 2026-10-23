@@ -2,6 +2,7 @@ import { registerTypstHandlers } from './typst-handlers'
 import { registerTerminalHandlers } from './terminal-handlers'
 import { registerInlineCompletionHandlers } from './inline-completion-handlers'
 import { registerAcpWindowHandlers, withAcpWindow } from './acp-window-handlers'
+import { registerAgentInspectionHandlers } from './agent-inspection-handlers'
 import { compileReactArtifact } from '../services/react-artifact-service'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC, ok, err } from '@yitom/contracts'
@@ -535,6 +536,7 @@ export function registerIpcHandlers(): void {
   // P1：wsl/ssh 描述符分发到远端会话表；无会话时显式 unavailable（不回落）
   setRemoteHostResolver((workspaceId: string) => getRemoteHost(workspaceId))
   registerAcpWindowHandlers()
+  registerAgentInspectionHandlers()
   registerTypstHandlers()
   registerTerminalHandlers()
   registerInlineCompletionHandlers()

@@ -107,4 +107,13 @@ describe('AgentHeaderOverflowMenu', () => {
     expect(byName('新对话').getAttribute('aria-disabled')).toBe('true')
     expect(byName('清空当前对话').getAttribute('aria-disabled')).toBe('true')
   })
+
+  it('生成回复时仍可查看只读 MCP 和 Skills 详情', async () => {
+    const onInspectMcp = vi.fn(), onInspectSkills = vi.fn()
+    await renderMenu({ ...handlers(), floating: false, actionDisabled: true, onInspectMcp, onInspectSkills })
+    await clickItem('MCP 连接详情')
+    expect(onInspectMcp).toHaveBeenCalledOnce()
+    await clickItem('Skills 技能详情')
+    expect(onInspectSkills).toHaveBeenCalledOnce()
+  })
 })

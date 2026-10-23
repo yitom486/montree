@@ -78,6 +78,8 @@
 
 ## agent/
 
+`useAgentInspection.ts`：按线程/会话/运行时隔离 TanStack Query；MCP 弹窗每 3 秒刷新健康记录，Skills 列表与正文按需加载，不在 MCP 轮询时扫描文件。
+
 | 文件 | 功能 |
 |------|------|
 | `useAcpSession` / `.test.ts` | ACP 连接/认证/产品提示与配置；发送/取消通过包 `createChatTurnController` 编排，窗口内实例共享单 flight，并按线程/运行时/会话代际丢弃迟到结果；含并发、失败重试与切换竞态回归 |

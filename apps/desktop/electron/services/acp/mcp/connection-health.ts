@@ -6,10 +6,13 @@ export class McpConnectionHealth {
   private listeners = new Set<() => void>()
   discoveries = 0
   disconnects = 0
+  lastDiscoveredAt: string | null = null
+  get activeClients(): number { return this.clients.size }
 
   discovered(client: object): void {
     this.clients.add(client)
     ++this.discoveries
+    this.lastDiscoveredAt = new Date().toISOString()
     for (const listener of this.listeners) listener()
   }
 
