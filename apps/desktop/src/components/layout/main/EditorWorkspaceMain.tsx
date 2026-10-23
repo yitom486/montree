@@ -34,6 +34,25 @@ import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { EditorView } from '@codemirror/view'
 import { findExcerptOffsets, findTextRangeInRoot } from '@/lib/reader/marks/excerpt-text-match'
 import { rememberLocalAnchor } from '@/lib/workspace/resolve-local-link'
+import { readHtmlReaderContent } from '@/lib/html/reader-content'
+
+function HtmlReaderFallbackContext({ filePath, content }: { filePath: string; content: string }) {
+  const fallback = useMemo(() => {
+    const doc = new DOMParser().parseFromString(content, 'text/html')
+    doc.querySelectorAll('script, style, template').forEach((element) => element.remove())
+    return readHtmlReaderContent(doc.body)
+  }, [content])
+  // HtmlViewer 懒加载期间先提供源码解析出的纯文本，避免刚打开文件时 MCP 读到“没有文档”。
+  // iframe 挂载后会注册同一路径的渲染正文 provider，后者覆盖此后备。
+  useDocumentReader({
+    filePath,
+    root: () => null,
+    text: () => fallback.text,
+    units: () => fallback.units,
+    viewportText: () => fallback.text,
+  })
+  return null
+}
 
 function TextDataReaderContext({ filePath, content, kind, root }: { filePath: string; content: string; kind: string; root: () => HTMLElement | null }) {
   useDocumentReader({ filePath, root, text: () => content,
@@ -419,8 +438,7 @@ export const EditorWorkspaceMain = forwardRef<
     documentKind === 'log' ||
     documentKind === 'docx' ||
     documentKind === 'xlsx' ||
-    documentKind === 'pptx' ||
-    documentKind === 'html'
+    documentKind === 'pptx'
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -483,6 +501,7 @@ export const EditorWorkspaceMain = forwardRef<
 
       <main ref={dataRoot} data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
         {isTextData && filePath && <TextDataReaderContext filePath={filePath} content={content} kind={documentKind} root={() => dataRoot.current} />}
+        {documentKind === 'html' && filePath && <HtmlReaderFallbackContext filePath={filePath} content={content} />}
         {showWelcome ? (
           <WelcomePage
             recentFiles={recentFiles}

@@ -160,7 +160,7 @@ export function collectTocTopLevelForDocument(
   doc: MontreeActiveDocument | null,
 ): string[] | undefined {
   if (!doc) return undefined
-  if (doc.kind === 'pptx') {
+  if (doc.kind === 'pptx' || doc.kind === 'html') {
     const provider = getReaderContentProvider()
     return provider?.filePath === doc.path ? collectTocTopLevel(provider.getUnits?.() ?? []) : undefined
   }

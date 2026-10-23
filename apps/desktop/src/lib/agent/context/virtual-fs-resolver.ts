@@ -210,6 +210,9 @@ export async function resolveMontreeSnapshot(
     case 'slide-read':
     case 'slide-edit': {
       const values = (args ?? {}) as Record<string, unknown>
+      if (resource === 'text-read' && !getDocumentTools() && collectActiveDocument()?.kind === 'html') {
+        throw new Error('本地 HTML 请使用 montree_read 读取渲染后的纯文本；montree_text_read 仅用于 Markdown/TXT/Typst 源码')
+      }
       const acpToolCallId = takeAcpToolCallId(values)
       const provider = requireDocumentTools(resource.startsWith('text') ? 'text' : resource.startsWith('table') ? 'table' : 'slide', values)
       const result = resource.endsWith('read') ? provider.read(values)

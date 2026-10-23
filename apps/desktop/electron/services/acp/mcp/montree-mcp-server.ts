@@ -184,6 +184,7 @@ export function adaptMontreeTools(
         description: isSimpleMock
           ? '使用 montree_read 读取正文，另见 montree_get_selection。'
           : '读取当前打开文档的内容（支持视口文本、全章/特定章节、目录或关键词检索）。' +
+            '本地 HTML 返回脚本执行后的可见纯文本和标题目录，不返回 HTML 源码或标签；请勿用原生文件读取或 montree_text_read 解析已打开的 HTML。' +
             '单次返回上限默认 20,000 字（视口默认 20,000 字，章节默认 35,000 字）。' +
             '若文本过长发生截断，可通过指定 offset 参数（如 offset=20000）继续无缝读取后续内容。' +
             '在线文档与本地书籍使用同一接口：先 scope=toc 取得 index/label/href，再用 scope=chapter 与 flatIndex 或 title 后台读取目标文章，无需用户跳转或手动提供 URL。网页锚点返回对应小节；读取失败明确返回目标 URL 与原因，不是正文。只有当前实际工具列表提供 Web Fetch/Search 时才可用其降级，不能编造未读取的原文。',

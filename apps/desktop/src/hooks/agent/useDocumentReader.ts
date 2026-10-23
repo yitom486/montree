@@ -32,7 +32,7 @@ export function useDocumentReader(options: DocumentReaderOptions): void {
     const disposeContent = registerReaderContent({
       filePath: options.filePath,
       getCurrentText: text,
-      getUnits: () => units().map(({ label }) => ({ label })),
+      getUnits: () => units().map(({ label, level, href }) => ({ label, ...(level !== undefined ? { level } : {}), ...(href ? { href } : {}) })),
       getCurrentUnitIndex: () => latest.current.currentIndex?.() ?? 0,
       getUnitByIndex: (index) => units()[index] ?? null,
       iterateUnits: async function* () {

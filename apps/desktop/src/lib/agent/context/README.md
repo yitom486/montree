@@ -14,7 +14,7 @@ MCP 工具表与传输纯逻辑已独立至 `@yitom/acp-client`；快照/虚拟�
 
 `reader-marks-registry.ts` 的章节导航返回 `Promise<boolean>`，仅在实际加载/定位完成时成功；等待期间 provider 被替换则拒绝旧结果。Foliate 目录与 ready 同步到导航 store，分片导航按宿主视口验位；未提供导航的格式明确引导手动打开，不广播伪定位成功。
 
-`document-tool-registry.ts` 连接当前 Markdown/TXT/Typst 文本、表格/PPT 内存模型和 MCP 读写，同时供文件操作读取 dirty 状态、撤销和保存。坐标选区契约见 `node_modules/@yitom/contracts/dist/agent/document-tools.js`；空白单元格同样有效。`useDocumentReader` 将 HTML、JSON、LOG、DOCX、表格和 PPT 接入正文/搜索/目录工具；Typst 编辑器注册同一套文本工具，`montree_text_read` 返回 `format=typst` 并按行分段。
+`document-tool-registry.ts` 连接当前 Markdown/TXT/Typst 文本、表格/PPT 内存模型和 MCP 读写，同时供文件操作读取 dirty 状态、撤销和保存。坐标选区契约见 `node_modules/@yitom/contracts/dist/agent/document-tools.js`；空白单元格同样有效。`useDocumentReader` 将 JSON/LOG/DOCX/表格/PPT 接入正文/搜索/目录工具；本地 HTML 由 `HtmlViewer` 注册 iframe 渲染后的可见纯文本与标题单元（不再把源码当正文）；Typst 编辑器注册同一套文本工具，`montree_text_read` 返回 `format=typst` 并按行分段。
 
 PPT 的 `montree_ppt_edit_text` 使用读取结果中的段落/片段编号及 UTF-16 范围进行局部修改；替换文字必须核对 expectedText，整批核对 expectedCount 和 revision。读取结果的 context 分别返回可见页、导航页及选区页，不以滚动位置猜测选中目标。
 

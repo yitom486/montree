@@ -39,6 +39,7 @@ import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language
 import { html } from '@codemirror/lang-html'
 import { buildThemeExtensions } from '@/lib/editor/codemirror-theme'
 import { resolveLocalLink, takeLocalAnchor } from '@/lib/workspace/resolve-local-link'
+import { readHtmlReaderContent } from '@/lib/html/reader-content'
 
 export type HtmlViewMode = 'preview' | 'split' | 'source'
 export type HtmlPreviewTheme = 'auto' | 'light' | 'dark'
@@ -238,7 +239,18 @@ export const HtmlViewer = memo(function HtmlViewer({
     doc.querySelectorAll('script, style, template').forEach((element) => element.remove())
     return doc.body
   }, [content])
-  useDocumentReader({ filePath, root: () => iframeRef.current?.contentDocument?.body ?? sourceBody })
+  // 阅读 MCP 以已渲染 DOM 为准；源码树只作为 iframe 尚未就绪/源码模式的后备。
+  const readHtmlContent = useCallback(() => {
+    const body = iframeRef.current?.contentDocument?.body
+    const root = body && body.childNodes.length > 0 ? body : sourceBody
+    return readHtmlReaderContent(root)
+  }, [sourceBody])
+  useDocumentReader({
+    filePath,
+    root: () => iframeRef.current?.contentDocument?.body ?? sourceBody,
+    text: () => readHtmlContent().text,
+    units: () => readHtmlContent().units,
+  })
 
   // 应用缩放并拦截外部链接安全跳转
   const handleIframeLoad = useCallback(() => {

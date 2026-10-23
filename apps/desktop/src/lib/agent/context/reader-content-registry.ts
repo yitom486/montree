@@ -17,6 +17,8 @@ export interface ReaderUnitText {
   /** 人类可读定位：章节标题或「第 N 页」 */
   label: string
   text: string
+  /** 标题层级；HTML/Markdown 标题可用于目录折叠与顶层摘要。 */
+  level?: number
   /** Original chapter link, when available. */
   href?: string
 }

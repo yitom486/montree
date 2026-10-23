@@ -116,6 +116,8 @@ describe('MONTREE_STATIC_SKILL', () => {
     expect(MONTREE_STATIC_SKILL).toContain('No user workspace folder')
     expect(MONTREE_STATIC_SKILL).toContain('Do **not** call tools only to "prove"')
     expect(MONTREE_STATIC_SKILL).toContain('montree_read')
+    expect(MONTREE_STATIC_SKILL).toContain('local `.html`')
+    expect(MONTREE_STATIC_SKILL).toContain('do not read the `.html` source with native file tools')
     expect(MONTREE_STATIC_SKILL).toContain('montree_list_marks')
     expect(MONTREE_STATIC_SKILL).toContain('montree_suggest_chapters')
     expect(MONTREE_STATIC_SKILL).toContain('Chapter-level highlighting')

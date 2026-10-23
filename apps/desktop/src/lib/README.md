@@ -13,6 +13,7 @@
 |------|--------|
 | `editor/` | Markdown 解析/编辑/导出、CodeMirror、草稿、换行规范化 |
 | `preview/` | 预览 DOM：代码块复制、消毒、Mermaid hydrate |
+| `html/` | 本地 HTML 阅读正文抽取：可见纯文本、标题单元与目录 |
 | `reader/` | EPUB / PDF / MOBI / **在线文档 HTML** 渲染端专属逻辑，按域分子目录（`adapter/` `pdf/` `pdf-ocr/` `rosetta/` `marks/` `web-doc/` `tts/`，详见该目录 README） |
 | `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@montree/contracts`） |
 | `workspace/` | 文件树、对话框路径、全局错误上报 |
