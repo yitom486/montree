@@ -13,7 +13,7 @@ import { registerAcpClientHandlers } from './client-handlers'
 import { restoreOrCreateAcpSession } from './session-open'
 import { disconnectAcp } from './acp-connection'
 import { promptAcp } from './acp-session-ops'
-import { AcpTerminalManager } from './acp-terminal'
+import { AcpTerminalManager } from '@yitom/acp-client'
 
 const liveConnections: Array<{ close: () => void }> = []
 

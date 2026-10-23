@@ -6,14 +6,14 @@ import {
   buildCustomProviderSpawnEnv,
 } from "@yitom/acp-client"
 import { mergeCodexConfigToml } from '../../native-binding'
-import { probeCodexAuth } from './codex-auth-preflight'
+import { probeCodexAuth } from '@yitom/acp-client'
 import {
   getAcpProviderCodexHome,
   readStoredAcpProvider,
   type StoredAcpProvider,
 } from './codex-provider'
 
-export * from './codex-auth-preflight'
+export { emptyAcpAuthPreflight, isCodexPreflightRuntime, probeCodexAuth, resolveCodexHome } from '@yitom/acp-client'
 export * from './codex-provider'
 
 export async function provisionCustomProviderCodexHome(

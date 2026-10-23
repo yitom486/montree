@@ -49,9 +49,4 @@ export {
 } from './deepseek'
 
 export * from './codex'
-export * from './claude'
-export * from './gemini'
-export * from './copilot'
-export * from './opencode'
-export * from './cursor'
 export * from './agy'

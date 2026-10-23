@@ -224,7 +224,7 @@ import {
   emptyAcpAuthPreflight,
   isCodexPreflightRuntime,
   probeCodexAuth,
-} from '../services/acp/codex-auth-preflight'
+} from '@yitom/acp-client'
 import { installAgyCli, probeAgyCli } from '../services/acp/runtimes/agy'
 import {
   clearAcpProvider,

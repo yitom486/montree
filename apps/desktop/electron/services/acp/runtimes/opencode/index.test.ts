@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   probeOpencodeAuth,
   resolveOpencodeAuthCandidates,
-} from './index'
+} from '@yitom/acp-client'
 
 const saved = {
   XDG_DATA_HOME: process.env.XDG_DATA_HOME,

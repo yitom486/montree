@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { probeCodexAuth } from './codex-auth-preflight'
+import { probeCodexAuth } from '@yitom/acp-client'
 
 const saved = {
   CODEX_HOME: process.env.CODEX_HOME,

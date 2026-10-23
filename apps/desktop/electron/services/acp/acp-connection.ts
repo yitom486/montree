@@ -51,7 +51,7 @@ import {
   resolvePromptMode,
   type PreparedNativeBinding,
 } from './native-binding'
-import { buildCursorMissingCliMessage, getCursorCatalogIds } from './runtimes/cursor'
+import { buildCursorMissingCliMessage, getCursorCatalogIds } from '@yitom/acp-client'
 import { buildAgyMissingCliMessage } from './runtimes/agy'
 import { acpState, claimAcpSession, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
 import {

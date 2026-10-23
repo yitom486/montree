@@ -7,7 +7,7 @@ import {
 } from '@yitom/contracts'
 import { methods, RequestError, type ClientApp, type RequestPermissionRequest, type SessionNotification } from '@agentclientprotocol/sdk'
 import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
-import type { AcpTerminalManager } from './acp-terminal'
+import type { AcpTerminalManager } from '@yitom/acp-client'
 import type { TerminalApprovalPolicy } from './terminal-approval'
 import { bindAcpContext } from './acp-context'
 

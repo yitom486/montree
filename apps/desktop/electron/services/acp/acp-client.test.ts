@@ -6,7 +6,7 @@ import type {
   RequestPermissionResponse,
 } from '@agentclientprotocol/sdk'
 import { registerAcpClientHandlers, pickAllowOptionId } from './client-handlers'
-import { AcpTerminalManager } from './acp-terminal'
+import { AcpTerminalManager } from '@yitom/acp-client'
 import { resolveAcpPromptCapabilities } from './acp-connection'
 import type { AcpPermissionOutcome } from '@yitom/contracts'
 import type { MontreeVirtualResource } from '@yitom/contracts'

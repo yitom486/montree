@@ -13,7 +13,7 @@ import {
   probeCursorAuth,
   resolveCursorAuthCandidates,
   resolveCursorSpawnCommand,
-} from './index'
+} from '@yitom/acp-client'
 
 describe('cursor resolveSpawnCommand（未安装预检）', () => {
   it('未安装返回 null：直接路径与 PATH 皆无', () => {

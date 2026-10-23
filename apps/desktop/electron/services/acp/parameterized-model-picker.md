@@ -105,7 +105,7 @@ display 顺序固定为 mode0/model1/thought2/context3（`splitConfigOptions` �
   `fast=true` 版、无 `fast=false` 版，改写方括号串被 `Invalid params` 拒收；
   但 `agent models` 证明 `grok-4.7` 有非 fast 版，只是名字是横杠式。
   另 `--help` 证实启动 `--model` 接受方括号覆盖。
-- **目录来源**：主进程 `runtimes/cursor/index.ts` 的 `getCursorCatalogIds`
+- **目录来源**：主进程 `@yitom/acp-client` 的 `getCursorCatalogIds`
   复用已解析的 agent 命令（`resolveCursorSpawnCommand`，无则 null）以
   `--list-models` 经 `spawnSync` 拉取（超时 6s，逐行首 token 为 id，
   `auto` 保留原样，空输出/超时/非零退出一律 null），进程级内存缓存一次

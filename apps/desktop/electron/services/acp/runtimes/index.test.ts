@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BUILTIN_ACP_RUNTIMES, DEFAULT_ACP_RUNTIME_ID } from '@yitom/contracts'
 import { getAcpRuntimeAdapter } from './index'
-import { resolveCursorCommand } from './cursor'
+import { resolveCursorCommand } from '@yitom/acp-client'
 
 describe('runtimes/index', () => {
   it('Antigravity 已淘汰：走未知运行时回落，不再派发专属适配器', () => {

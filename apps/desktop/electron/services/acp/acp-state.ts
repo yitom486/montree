@@ -15,7 +15,7 @@ import {
 import type { SdkStreamHandle } from './sdk-client'
 import type { SpawnedAcpProcess } from './process-manager'
 import type { MontreeMcpServerHandle } from './mcp/montree-mcp-server'
-import { AcpTerminalManager } from './acp-terminal'
+import { AcpTerminalManager } from '@yitom/acp-client'
 import { bindAcpContext, currentAcpContext, type AcpContext } from './acp-context'
 
 /** 协议版本（与 Agent initialize 握手协商一致，单点定义供 connection 读写） */
