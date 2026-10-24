@@ -205,6 +205,12 @@ export const createChatSlice: StateCreator<
   beginAgentReply: () => {
     set((s) => {
       const patched = patchActiveThread(s, (t) => {
+        // 新回合边界先冻结上一回合可能漏掉的 streaming 残留，避免它让后续
+        // 工作记录一直显示「工作中」；只处理最新 user 之前的消息，绝不误冻当前回合。
+        const lastUserIndex = t.messages.findLastIndex((message) => message.role === 'user')
+        if (lastUserIndex >= 0 && t.messages.some((message, index) => index < lastUserIndex && message.streaming)) {
+          dispatchOwnedChatEvent(t, { type: 'freeze-light' })
+        }
         const feed = dispatchOwnedChatEvent(t, { type: 'begin-reply' })
         if (feed.messages === t.messages) return t
         return { ...t, messages: feed.messages, updatedAt: Date.now() }

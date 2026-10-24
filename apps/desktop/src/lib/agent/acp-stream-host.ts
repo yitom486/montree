@@ -1,4 +1,5 @@
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
+import { MONTREE_PROMPT_COMPLETE_KIND } from '../../../contracts/acp'
 import { acpApi } from '@/api/acp-api'
 import { STREAM_FLUSH_MS, StreamCoalescer, isCoalescableAgentChunk } from '@/lib/agent/stream-coalescer'
 import { useAcpUiStore, selectActiveThreadAgentSessionId } from '@/stores/acp-ui-store'
@@ -95,6 +96,19 @@ export function startAcpStreamHost(): () => void {
     // 再冻结；不进批注/副会话分流，不碰 prompting
     const updateKind =
       typeof event.update?.sessionUpdate === 'string' ? event.update.sessionUpdate : ''
+    if (updateKind === MONTREE_PROMPT_COMPLETE_KIND) {
+      // prompt 结果的 IPC 响应可能因路由/会话代际检查被丢弃；主进程的终止标记
+      // 只负责当前主会话收尾，避免「工作中」和停止按钮一直悬挂。
+      const ann = useAnnotationAgentStore.getState()
+      if (annotationOwnsSessionId(ann, event.sessionId)) return
+      if (subsessionOwnsSessionId(event.sessionId)) return
+      const mainStore = useAcpUiStore.getState()
+      const activeMainSid = selectActiveThreadAgentSessionId(mainStore) ?? mainStore.sessionId
+      if (!event.sessionId || event.sessionId !== activeMainSid) return
+      flushAcpStreamBuffer()
+      useAcpUiStore.getState().finishStreaming()
+      return
+    }
     if (updateKind === MONTREE_SETTLE_COMPLETE_KIND) {
       // C2b1：定居早退同样受会话归属保护——过期会话的迟到标记直接丢弃，
       // 否则冲刷会把旧会话尾巴写进新线程、冻结也会落在错误的线程。

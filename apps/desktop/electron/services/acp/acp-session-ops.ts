@@ -22,10 +22,12 @@ import { sdkRequest } from './sdk-client'
 import { disposeAllAcpProcesses } from './process-manager'
 import { acpState, claimAcpSession, disarmSuppressSettle, setStatus } from './acp-state'
 import {
+  emitSessionUpdate,
   handleSnapshotRequest,
   requireAgent,
   toProtocolError,
 } from './acp-bridges'
+import { MONTREE_PROMPT_COMPLETE_KIND } from '../../../contracts/acp'
 import { detachSdkStreamNow, disconnectAcp, restartAcpForMcp } from './acp-connection'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
@@ -234,9 +236,24 @@ export async function promptAcp(payload: {
     )
     const stopReason = typeof result.stopReason === 'string' ? result.stopReason : 'end_turn'
     logAcpDiagnostic('acp.prompt.completed', { sessionId: payload.sessionId })
+    // 兜底收尾：渲染端可能因路由/会话代际检查丢弃 prompt IPC 响应；
+    // 这个合成更新保证当前回合仍能解除「工作中」和停止按钮。
+    emitSessionUpdate({
+      sessionId: payload.sessionId,
+      update: { sessionUpdate: MONTREE_PROMPT_COMPLETE_KIND, stopReason },
+    })
     return ok({ stopReason })
   } catch (error) {
     logAcpDiagnostic('acp.prompt.failed', { sessionId: payload.sessionId })
+    if (sent) {
+      emitSessionUpdate({
+        sessionId: payload.sessionId,
+        update: {
+          sessionUpdate: MONTREE_PROMPT_COMPLETE_KIND,
+          stopReason: error instanceof McpRecoveryCancelledError ? 'cancelled' : 'error',
+        },
+      })
+    }
     try {
       if (sent) void agent.notify(methods.agent.session.cancel, { sessionId: payload.sessionId })
     } catch {

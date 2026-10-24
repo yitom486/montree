@@ -26,6 +26,7 @@ import { acpApi } from '@/api/acp-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
+import { MONTREE_PROMPT_COMPLETE_KIND } from '../../../contracts/acp'
 import { getOwnedChatSessionStore, resetOwnedChatSessionStoreForTests } from './chat-session-owner'
 import {
   flushAcpStreamBuffer,
@@ -122,6 +123,31 @@ describe('acp-stream-host（应用级单例订阅）', () => {
     const role = kind === 'agent_thought_chunk' ? 'thought' : 'agent'
     expect(messages.filter(m => m.role === role).map(m => m.text).join('')).toBe('首个增量')
     stop()
+  })
+
+  it('主进程 prompt 完成标记可在 IPC 响应丢失时释放当前回合', () => {
+    const stop = startAcpStreamHost()
+    try {
+      const host = useAcpUiStore.getState()
+      host.createThread()
+      host.setSession('sid-main')
+      host.appendUserMessage('问题')
+      host.setPrompting(true)
+      host.beginAgentReply()
+      for (const listener of listeners.update) {
+        listener({ sessionId: 'sid-main', update: { sessionUpdate: 'agent_message_chunk', content: [{ type: 'text', text: '答案' }] } })
+      }
+      for (const listener of listeners.update) {
+        listener({ sessionId: 'sid-main', update: { sessionUpdate: MONTREE_PROMPT_COMPLETE_KIND } })
+      }
+      const state = useAcpUiStore.getState()
+      const thread = state.threads.find((t) => t.id === state.activeThreadId)!
+      expect(state.prompting).toBe(false)
+      expect(thread.messages.every((message) => !message.streaming)).toBe(true)
+      expect(thread.messages.findLast((m) => m.role === 'agent')?.streaming).toBe(false)
+    } finally {
+      stop()
+    }
   })
 
   it('恢复定居只冻结一次，不终结包回合，后续合法消息继续流式更新', async () => {

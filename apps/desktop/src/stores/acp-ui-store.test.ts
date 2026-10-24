@@ -27,6 +27,21 @@ describe('acp-ui-store history + plan', () => {
       .toMatchObject({ title: '绘制时序图', targetSummary: '登录过程', state: 'completed' })
   })
 
+  it('新回合开始会冻结上一回合遗漏的流式残留', () => {
+    const store = useAcpUiStore.getState()
+    store.appendUserMessage('旧回合')
+    store.beginAgentReply()
+    store.applySessionUpdate({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: '残留思考' } })
+    const threadId = useAcpUiStore.getState().activeThreadId
+    const before = useAcpUiStore.getState().threads.find((t) => t.id === threadId)!.messages
+    expect(before.find((m) => m.role === 'thought')?.streaming).toBe(true)
+
+    store.appendUserMessage('新回合')
+    store.beginAgentReply()
+    const after = useAcpUiStore.getState().threads.find((t) => t.id === threadId)!.messages
+    expect(after.filter((m) => m.role === 'thought').every((m) => !m.streaming)).toBe(true)
+  })
+
   it('审批入口也保留工具名与参数摘要', () => {
     const store = useAcpUiStore.getState()
     store.ingestPermissionRequest({ requestId: 56, summary: '允许绘图', options: [], toolCallId: 'agy-permission',

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent, client, methods } from '@agentclientprotocol/sdk'
 import { MONTREE_SETTLE_COMPLETE_KIND, type AcpSessionUpdateEvent } from '@yitom/contracts'
+import { MONTREE_PROMPT_COMPLETE_KIND } from '../../../contracts/acp'
 import {
   acpState,
   armSuppressSettle,
@@ -340,8 +341,9 @@ describe('load 秒回 + 延迟重放（SDK 内存对接，沿 openSessionAfterAu
       expect(result.ok).toBe(true)
       expect(acpState.suppressSettleUntil).toBe(0)
 
+      expect(seen.map(settleKindOf)).toEqual([MONTREE_PROMPT_COMPLETE_KIND])
       emitSessionUpdate(replayParams('real answer'))
-      expect(seen).toHaveLength(1)
+      expect(seen.map(settleKindOf)).toEqual([MONTREE_PROMPT_COMPLETE_KIND, 'agent_message_chunk'])
     } finally {
       unsub()
     }
