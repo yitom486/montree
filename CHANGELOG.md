@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.24] - 2026-10-24
+
 - **安全：HTML 预览改为独立源隔离**：本地 HTML 通过 `montree-html://` 独立源加载，阻断预览页经 `window.parent` 访问应用 preload、终端与文件接口；相对资源只读工作区/HTML 所在目录，缩放、锚点、链接与阅读快照改走受限桥接。`localStorage` 与相对 CSS/JS 保持可用，并补充隔离 E2E。
 
 - **修复：多次会话切换后 Agent 一直显示「工作中」**：主进程在 `session/prompt` 终止时补发回合完成标记，即使渲染端因路由/会话代际检查丢弃 IPC 返回值也能收尾；新回合开始会清理上一回合遗留的流式状态，避免停止按钮与工作记录长期悬挂。
@@ -675,7 +679,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.23...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.24...HEAD
+[0.4.24]: https://github.com/yitom486/montree/compare/v0.4.23...v0.4.24
 [0.4.23]: https://github.com/yitom486/montree/compare/v0.4.22...v0.4.23
 [0.4.22]: https://github.com/yitom486/montree/compare/v0.4.21...v0.4.22
 [0.4.21]: https://github.com/yitom486/montree/compare/v0.4.20...v0.4.21
