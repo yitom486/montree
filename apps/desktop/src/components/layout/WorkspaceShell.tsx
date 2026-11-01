@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
@@ -30,6 +30,9 @@ import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
 
 import type { AppTheme } from '@/stores/editor-ui-store'
 const TerminalPanel = lazy(() => import('./TerminalPanel'))
+
+/** 右侧文档目录宽度：不参与外层 ResizablePanel 布局，避免切换文档类型时挤动 Agent 面板 */
+const DOCUMENT_OUTLINE_WIDTH = 'clamp(200px, 18%, 320px)'
 
 export interface WorkspaceShellProps {
   workspaceRoot?: string
@@ -147,16 +150,9 @@ export function WorkspaceShell({
   const sidebarPanelRef = useCollapsiblePanelSync(isSidebarVisible)
   const agentPanelRef = useCollapsiblePanelSync(isDockedPanelVisible)
 
-  const shellPanelIds = useMemo(
-    () =>
-      showOutline
-        ? ['sidebar', 'main', 'outline', 'agent']
-        : ['sidebar', 'main', 'agent'],
-    [showOutline],
-  )
   const shellLayout = useDefaultLayout({
     id: 'workspace-shell',
-    panelIds: shellPanelIds,
+    panelIds: ['sidebar', 'main', 'agent'],
   })
 
   const handleToggleSidebar = () => {
@@ -283,11 +279,29 @@ export function WorkspaceShell({
 
           {isSidebarVisible ? <ResizableHandle withHandle /> : null}
 
-          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? (showOutline ? '44%' : '57%') : (showOutline ? '62%' : '75%')} minSize="30%" className="min-w-0">
+          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
             <ResizablePanelGroup orientation="vertical">
               <ResizablePanel id="document" defaultSize="70%" minSize="20%">
                 {/* 文档区隔离：内容（工具栏、滚动条、异步渲染）的尺寸变化不外溢到外壳布局 */}
-                <div className="h-full w-full overflow-hidden" style={{ contain: 'strict' }} data-testid="workspace-document-frame">{children}</div>
+                <div className="relative h-full w-full overflow-hidden" style={{ contain: 'strict' }} data-testid="workspace-document-frame">
+                  <div className="h-full w-full" style={{ paddingRight: showOutline ? DOCUMENT_OUTLINE_WIDTH : undefined }}>
+                    {children}
+                  </div>
+                  {showOutline ? (
+                    <aside
+                      className="absolute inset-y-0 right-0 z-10 border-l border-border/60 bg-sidebar shadow-lg"
+                      style={{ width: DOCUMENT_OUTLINE_WIDTH }}
+                      aria-label="文档目录面板"
+                    >
+                      <DocumentOutline
+                        headings={headings}
+                        activeHeadingId={activeHeadingId}
+                        onSelectHeading={onSelectHeading ?? (() => undefined)}
+                        onHide={() => preserveScrollAnchor(() => setOutlineVisible(false))}
+                      />
+                    </aside>
+                  ) : null}
+                </div>
               </ResizablePanel>
               {terminalVisible && <ResizableHandle withHandle />}
               {terminalMounted && <ResizablePanel id="terminal" defaultSize="30%" minSize={terminalVisible ? '15%' : 0} maxSize={terminalVisible ? '75%' : 0} style={{ display: terminalVisible ? undefined : 'none' }}>
@@ -295,28 +309,6 @@ export function WorkspaceShell({
               </ResizablePanel>}
             </ResizablePanelGroup>
           </ResizablePanel>
-
-          {showOutline ? (
-            <>
-              <ResizableHandle withHandle />
-              <ResizablePanel
-                id="outline"
-                collapsible
-                collapsedSize={0}
-                defaultSize="16%"
-                minSize="12%"
-                maxSize="30%"
-                className="min-w-0"
-              >
-                <DocumentOutline
-                  headings={headings}
-                  activeHeadingId={activeHeadingId}
-                  onSelectHeading={onSelectHeading ?? (() => undefined)}
-                  onHide={() => preserveScrollAnchor(() => setOutlineVisible(false))}
-                />
-              </ResizablePanel>
-            </>
-          ) : null}
 
           {isDockedPanelVisible ? <ResizableHandle withHandle /> : null}
 
