@@ -62,11 +62,17 @@ test('在线 Markdown：Pele 图表、源码复制、公式字体与亮暗主题
     }), '上下标应小于公式正文字号').toBe(true)
     await expect(reader.locator('code.language-python')).toContainText('$$x^2$$')
     await expectLocalMathFonts(page)
+    const htmlClass = async () => (await page.locator('html').getAttribute('class')) ?? ''
+    const waitThemeSettled = async () => {
+      await expect.poll(async () => (await htmlClass()).split(' ').includes('theme-transitioning')).toBe(false)
+    }
     for (const theme of ['light', 'dark']) {
-      for (let i = 0; i < 3 && !(await page.locator('html').getAttribute('class'))?.split(' ').includes(theme); i++) {
-        const before = await page.locator('html').getAttribute('class')
+      for (let i = 0; i < 3 && !(await htmlClass()).split(' ').includes(theme); i++) {
+        await waitThemeSettled()
+        const before = await htmlClass()
         await page.getByRole('button', { name: '切换主题', exact: true }).click()
-        await expect.poll(() => page.locator('html').getAttribute('class')).not.toBe(before)
+        await expect.poll(htmlClass).not.toBe(before)
+        await waitThemeSettled()
       }
       await expect(page.locator('html')).toHaveClass(new RegExp(`(?:^| )${theme}(?: |$)`))
       const svg = reader.locator('.web-doc-mermaid svg[data-montree-renderer="pele"]').first()

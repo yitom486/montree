@@ -71,8 +71,8 @@ export function DocumentOutline({
             type="button"
             className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={onHide}
-            title="收起文档目录"
-            aria-label="收起文档目录"
+            title="收起文档大纲"
+            aria-label="收起文档大纲"
           >
             <PanelRightClose className="size-3.5" />
           </button>

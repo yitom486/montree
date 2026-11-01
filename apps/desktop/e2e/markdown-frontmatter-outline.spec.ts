@@ -70,7 +70,7 @@ test('Frontmatter 预览省略、所见即所得卡片、右侧目录与图片�
     await expect(firstHeading).toBeVisible()
     await secondHeading.click()
     await expect(secondHeading).toHaveAttribute('aria-current', 'location')
-    await outline.getByRole('button', { name: '收起文档目录' }).click()
+    await outline.getByRole('button', { name: '收起文档大纲' }).click()
     await expect(outline).toBeHidden()
     await page.getByRole('button', { name: '展开文档目录' }).click()
     await expect(outline).toBeVisible()
