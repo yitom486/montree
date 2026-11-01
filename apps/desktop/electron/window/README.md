@@ -5,6 +5,7 @@
 | 文件 | 功能 |
 |------|------|
 | `create-window.ts` | 创建 `BrowserWindow`、preload、图标、会话登记；`before-input` 全局快捷键 |
+| `html-preview-navigation-guard.ts` / `.test.ts` | 本地 HTML 预览按不可变 frame ID 限制自导航与后代 frame，仅宿主可加载登记的文档 URL；改名、跳往其他路径或重定向均受限 |
 | `artifact-navigation-guard.ts` / `artifact-navigation-guard.test.ts` | Artifact 预览子 frame 导航守卫：`frame-created` 登记不可变 `frameTreeNodeId`，`will-frame-navigate` 按身份阻止自导航（改名不解除）；阅读器帧不受影响 |
 | `navigation-policy.ts` / `navigation-policy.test.ts` | 主框架导航与 `window.open` 白名单：仅应用入口页、开发服务器、devtools 放行；http(s)/mailto 交系统浏览器；其余拦截并记日志 |
 | `window-shortcuts.ts` / `window-shortcuts.test.ts` | 原生快捷键映射：新建窗口、设置、打开/保存、搜索；网页 iframe 获得焦点时仍可用 |

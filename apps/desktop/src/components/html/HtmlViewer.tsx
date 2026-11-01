@@ -14,18 +14,16 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { useDocumentReader } from '@/hooks/agent/useDocumentReader'
 import { appApi } from '@/api/app-api'
-import { fileApi } from '@/api/file-api'
-import { isOk } from '@yitom/contracts'
 import { toast } from 'sonner'
 import { useEditorUiStore, type AppTheme } from '@/stores/editor-ui-store'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import {
-  extractLocalImageRefsFromHtml,
-  replaceImageSrcInHtml,
-} from '@/lib/editor/markdown-images'
 import { EditorState } from '@codemirror/state'
 import {
   EditorView,
@@ -38,7 +36,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { html } from '@codemirror/lang-html'
 import { buildThemeExtensions } from '@/lib/editor/codemirror-theme'
-import { resolveLocalLink, takeLocalAnchor } from '@/lib/workspace/resolve-local-link'
+import { takeLocalAnchor } from '@/lib/workspace/resolve-local-link'
 import { readHtmlReaderContent } from '@/lib/html/reader-content'
 import {
   clearReaderSelection,
@@ -48,6 +46,8 @@ import {
 import { htmlPreviewApi } from '@/api/html-preview-api'
 import {
   HTML_PREVIEW_BRIDGE_CHANNEL,
+  HTML_PREVIEW_FRAME_NAME_PREFIX,
+  HTML_PREVIEW_SCHEME,
   type HtmlPreviewFrameMessage,
   type HtmlPreviewHostMessage,
   type HtmlPreviewRegistration,
@@ -192,51 +192,12 @@ export const HtmlViewer = memo(function HtmlViewer({
   }, [content, filePath, debounced.filePath])
   const debouncedContent = debounced.content
 
-  // 本地图片解析与 Base64 缓存映射
-  const imageRefs = useMemo(() => {
-    return extractLocalImageRefsFromHtml(debouncedContent, filePath)
-  }, [debouncedContent, filePath])
-
-  const imageDataCacheRef = useRef<Map<string, string>>(new Map())
-  const [, setImageCacheTick] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    async function resolveLocalImages() {
-      let updated = false
-      for (const ref of imageRefs) {
-        if (!imageDataCacheRef.current.has(ref.absolutePath)) {
-          const res = await fileApi.readImage(ref.absolutePath)
-          if (cancelled) return
-          if (isOk(res)) {
-            imageDataCacheRef.current.set(ref.absolutePath, res.value.dataUrl)
-            updated = true
-          }
-        }
-      }
-      if (updated && !cancelled) {
-        setImageCacheTick((v) => v + 1)
-      }
-    }
-    void resolveLocalImages()
-    return () => {
-      cancelled = true
-    }
-  }, [imageRefs])
-
-  // 将相对图片替换为 DataUrl，并注入可选的主题覆盖 CSS
+  // 图片、CSS、JS 统一由协议检查授权范围，宿主不再代读并嵌入 Base64。
   const renderedDoc = useMemo(() => {
-    const replacements: Record<string, string> = {}
-    for (const ref of imageRefs) {
-      const dataUrl = imageDataCacheRef.current.get(ref.absolutePath)
-      if (dataUrl) {
-        replacements[ref.src] = dataUrl
-      }
-    }
-    const htmlWithImages = replaceImageSrcInHtml(debouncedContent, replacements)
+    const htmlSource = debouncedContent
 
     if (previewTheme === 'auto') {
-      return htmlWithImages
+      return htmlSource
     }
 
     const themeStyle =
@@ -260,11 +221,11 @@ export const HtmlViewer = memo(function HtmlViewer({
   a { color: #2563eb !important; }
 </style>`
 
-    if (htmlWithImages.includes('</head>')) {
-      return htmlWithImages.replace('</head>', `${themeStyle}\n</head>`)
+    if (htmlSource.includes('</head>')) {
+      return htmlSource.replace('</head>', `${themeStyle}\n</head>`)
     }
-    return `${themeStyle}\n${htmlWithImages}`
-  }, [debouncedContent, imageRefs, previewTheme])
+    return `${themeStyle}\n${htmlSource}`
+  }, [debouncedContent, previewTheme])
 
   // 预览页在 montree-html:// 独立源中运行，宿主拿不到它的 DOM：缩放/锚点/链接/阅读正文全部经桥接 postMessage。
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -306,11 +267,15 @@ export const HtmlViewer = memo(function HtmlViewer({
   }, [filePath])
 
   // 每个文件一个预览会话；主文档由下方推送当前文本（含未保存修改），iframe 以版本号重新加载
-  const [preview, setPreview] = useState<HtmlPreviewRegistration | null>(null)
+  const [preview, setPreview] = useState<(HtmlPreviewRegistration & { filePath: string }) | null>(null)
+  const previewRef = useRef(preview)
+  previewRef.current = preview?.filePath === filePath ? preview : null
+  const [pendingExternal, setPendingExternal] = useState<{ token: string; url: string } | null>(null)
   useEffect(() => {
     let disposed = false
     let token: string | null = null
     setPreview(null)
+    setPendingExternal(null)
     snapshotRef.current = null
     htmlPreviewApi
       .register(filePath)
@@ -320,7 +285,7 @@ export const HtmlViewer = memo(function HtmlViewer({
           return
         }
         token = registration.token
-        setPreview(registration)
+        setPreview({ ...registration, filePath })
       })
       .catch((error: unknown) => toast.error(error instanceof Error ? error.message : 'HTML 预览初始化失败'))
     return () => {
@@ -329,10 +294,10 @@ export const HtmlViewer = memo(function HtmlViewer({
     }
   }, [filePath])
 
-  const [frameSrc, setFrameSrc] = useState<string | null>(null)
+  const [frameSrc, setFrameSrc] = useState<{ filePath: string; url: string } | null>(null)
   const frameVersionRef = useRef(0)
   useEffect(() => {
-    if (!preview) {
+    if (!preview || preview.filePath !== filePath) {
       setFrameSrc(null)
       return
     }
@@ -341,7 +306,7 @@ export const HtmlViewer = memo(function HtmlViewer({
     htmlPreviewApi
       .update(preview.token, renderedDoc)
       .then(() => {
-        if (!cancelled) setFrameSrc(`${preview.url}&v=${++frameVersionRef.current}`)
+        if (!cancelled) setFrameSrc({ filePath, url: `${preview.url}&v=${++frameVersionRef.current}` })
       })
       .catch((error: unknown) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : 'HTML 预览刷新失败')
@@ -351,41 +316,38 @@ export const HtmlViewer = memo(function HtmlViewer({
     }
   }, [preview, renderedDoc, reloadKey, debounced.filePath, filePath])
 
+  const previewOrigin = preview && preview.filePath === filePath ? HTML_PREVIEW_SCHEME + '://' + new URL(preview.url).host : null
   const postToFrame = useCallback((message: HtmlPreviewHostMessage) => {
-    iframeRef.current?.contentWindow?.postMessage(message, '*')
-  }, [])
+    if (previewOrigin) iframeRef.current?.contentWindow?.postMessage(message, previewOrigin)
+  }, [previewOrigin])
 
-  // 链接请求来自不可信页面：只放行用户刚点击过（父窗口带瞬时激活）的跳转，且只做受限动作
-  const openLink = useCallback(
-    (href: string) => {
-      if (navigator.userActivation && !navigator.userActivation.isActive) return
-      // 相对链接按当前文件解析；不在预览框内自行导航，跨文件交给工作区统一打开。
-      const localTarget = resolveLocalLink(filePath, href)
-      if (localTarget) {
-        const rawHash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : ''
-        if (localTarget === filePath) {
-          if (rawHash) postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'anchor', id: safeDecode(rawHash) })
-          return
-        }
-        if (onOpenLocalFile) onOpenLocalFile(localTarget, rawHash || undefined)
-        else toast.error('当前 HTML 视图无法打开该本地链接')
-        return
-      }
-      const external = href.startsWith('//') ? `https:${href}` : href
-      if (/^(?:https?|mailto|tel):/i.test(external)) void appApi.openExternal(external)
-    },
-    [filePath, onOpenLocalFile, postToFrame],
-  )
+  const openLink = useCallback(async (href: string) => {
+    const current = previewRef.current
+    if (!current || (navigator.userActivation && !navigator.userActivation.isActive)) return
+    try {
+      const link = await htmlPreviewApi.resolveLink(current.token, href)
+      if (previewRef.current?.token !== current.token) return
+      if (link.type === 'external') {
+        // 网页可以伪造消息；只有宿主确认按钮可以打开外部应用。
+        setPendingExternal(previous => previous ?? { token: current.token, url: link.url })
+      } else if (link.filePath === filePath) {
+        if (link.anchor) postToFrame({ channel: HTML_PREVIEW_BRIDGE_CHANNEL, type: 'anchor', id: link.anchor })
+      } else if (onOpenLocalFile) onOpenLocalFile(link.filePath, link.anchor)
+      else toast.error('当前 HTML 视图无法打开该本地链接')
+    } catch (error) {
+      if (previewRef.current?.token === current.token) toast.error(error instanceof Error ? error.message : '无法打开链接')
+    }
+  }, [filePath, onOpenLocalFile, postToFrame])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const frame = iframeRef.current?.contentWindow
-      if (!frame || event.source !== frame) return
+      if (!frame || event.source !== frame || !previewOrigin || event.origin !== previewOrigin) return
       const data = event.data as Partial<HtmlPreviewFrameMessage> | null
       if (!data || data.channel !== HTML_PREVIEW_BRIDGE_CHANNEL) return
       if (data.type === 'link' && typeof data.href === 'string') {
-        openLink(data.href)
-      } else if (data.type === 'snapshot' && typeof data.html === 'string') {
+        if (data.href.length <= 8192) void openLink(data.href)
+      } else if (data.type === 'snapshot' && typeof data.html === 'string' && data.html.length <= 4 * 1024 * 1024) {
         snapshotRef.current = {
           body: parseInertBody(data.html),
           viewport: typeof data.viewport === 'string' ? data.viewport : '',
@@ -399,7 +361,7 @@ export const HtmlViewer = memo(function HtmlViewer({
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [filePath, openLink])
+  }, [filePath, openLink, previewOrigin])
 
   // 先同步缩放再滚到跨文件跳转带来的锚点，顺序与桥接处理顺序一致
   const handleIframeLoad = useCallback(() => {
@@ -442,13 +404,14 @@ export const HtmlViewer = memo(function HtmlViewer({
 
   const renderIframe = () => (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      {frameSrc ? (
+      {frameSrc?.filePath === filePath && preview?.filePath === filePath ? (
         // allow-same-origin 保留的是预览页自己的 montree-html:// 源（存储、相对资源照常可用），与应用窗口天然跨源
         <iframe
           ref={iframeRef}
+          name={HTML_PREVIEW_FRAME_NAME_PREFIX + preview.token}
           title="HTML Preview"
-          src={frameSrc}
-          sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups"
+          src={frameSrc.url}
+          sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
           className="h-full w-full border-0 bg-transparent"
           onLoad={handleIframeLoad}
         />
@@ -664,6 +627,21 @@ export const HtmlViewer = memo(function HtmlViewer({
           </ResizablePanelGroup>
         )}
       </div>
+      <AlertDialog open={Boolean(pendingExternal)} onOpenChange={open => { if (!open) setPendingExternal(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>打开文档中的外部链接？</AlertDialogTitle>
+            <AlertDialogDescription className="break-all">{pendingExternal?.url}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingExternal && pendingExternal.token === previewRef.current?.token) void appApi.openExternal(pendingExternal.url)
+              setPendingExternal(null)
+            }}>打开链接</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 })

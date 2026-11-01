@@ -458,6 +458,7 @@ const agentInspectionAPI: AgentInspectionAPI = {
 }
 contextBridge.exposeInMainWorld('montreeAgentInspection', agentInspectionAPI)
 const htmlPreviewAPI: HtmlPreviewAPI = {
+  resolveLink: (token, href) => ipcRenderer.invoke(HTML_PREVIEW_IPC.resolveLink, token, href),
   register: (filePath) => ipcRenderer.invoke(HTML_PREVIEW_IPC.register, filePath),
   update: (token, html) => ipcRenderer.invoke(HTML_PREVIEW_IPC.update, token, html),
   release: (token) => ipcRenderer.invoke(HTML_PREVIEW_IPC.release, token),

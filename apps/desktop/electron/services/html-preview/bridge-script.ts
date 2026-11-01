@@ -114,6 +114,7 @@ export const HTML_PREVIEW_BRIDGE_SCRIPT = `(function () {
     if (!href || href.charAt(0) === '#' || /^javascript:/i.test(href)) return;
     event.preventDefault();
     event.stopPropagation();
+    if (!event.isTrusted) return;
     post({ type: 'link', href: href });
   }, true);
   window.addEventListener('mouseup', function () {

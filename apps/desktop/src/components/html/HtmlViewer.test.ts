@@ -3,6 +3,9 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HtmlViewer } from './HtmlViewer'
+import { appApi } from '@/api/app-api'
+import { fileApi } from '@/api/file-api'
+import type { HtmlPreviewLink } from '../../../contracts/html-preview'
 
 ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -13,9 +16,10 @@ vi.mock('@/api/app-api', () => ({
 }))
 
 const htmlPreview = vi.hoisted(() => ({
-  register: vi.fn(async () => ({ token: 'token-1', url: 'about:blank?t=token-1' })),
+  register: vi.fn(async () => ({ token: 'token-1', url: 'montree-html://preview/page.html?t=token-1' })),
   update: vi.fn(async (_token: string, _html: string) => undefined),
   release: vi.fn(async () => undefined),
+  resolveLink: vi.fn(async (_token: string, _href: string): Promise<HtmlPreviewLink> => ({ type: 'local', filePath: 'D:/workspace/next.html' })),
 }))
 
 vi.mock('@/api/html-preview-api', () => ({ htmlPreviewApi: htmlPreview }))
@@ -31,6 +35,11 @@ describe('HtmlViewer', () => {
   let root: Root
 
   beforeEach(() => {
+    vi.clearAllMocks()
+    // happy-dom 不实现自定义协议，保留 src 属性供断言，实际 frame 使用空白页。
+    vi.spyOn(HTMLIFrameElement.prototype, 'src', 'get').mockReturnValue('about:blank')
+    vi.spyOn(HTMLIFrameElement.prototype, 'contentWindow', 'get').mockReturnValue(window)
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -41,6 +50,7 @@ describe('HtmlViewer', () => {
       root.unmount()
     })
     container.remove()
+    vi.restoreAllMocks()
   })
 
   it('渲染 HTML 预览面板与顶部工具栏', async () => {
@@ -60,7 +70,7 @@ describe('HtmlViewer', () => {
     expect(iframe).not.toBeNull()
     // 预览改由独立源协议加载：文本推送到主进程，iframe 只拿版本化地址，不再内联 srcdoc
     expect(iframe?.hasAttribute('srcdoc')).toBe(false)
-    expect(iframe?.getAttribute('src')).toMatch(/^about:blank\?t=token-1&v=\d+$/)
+    expect(iframe?.getAttribute('src')).toMatch(/^montree-html:\/\/preview\/page.html\?t=token-1&v=\d+$/)
     expect(htmlPreview.register).toHaveBeenCalledWith(filePath)
     expect(htmlPreview.update).toHaveBeenLastCalledWith('token-1', expect.stringContaining('Hello Montree HTML'))
   })
@@ -107,4 +117,44 @@ describe('HtmlViewer', () => {
       expect(srcDoc).toContain('分布式工作负载监控')
     }
   })
+  function sendLink(href: string, origin = 'montree-html://preview') {
+    const frame = container.querySelector('iframe')!
+    window.dispatchEvent(new MessageEvent('message', {
+      source: frame.contentWindow!, origin, data: { channel: 'montree-html-bridge', type: 'link', href },
+    }))
+  }
+
+  it('不再代读越界图片，预览保留资源地址并禁止弹窗', async () => {
+    const content = '<img src="../outside/private.svg">'
+    await act(async () => { root.render(createElement(HtmlViewer, { filePath: 'D:/workspace/page.html', content })) })
+    expect(fileApi.readImage).not.toHaveBeenCalled()
+    expect(htmlPreview.update).toHaveBeenLastCalledWith('token-1', content)
+    expect(container.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-popups')
+  })
+
+  it('忽略其他来源的消息，合法本地链接先经主进程授权', async () => {
+    const onOpenLocalFile = vi.fn()
+    await act(async () => { root.render(createElement(HtmlViewer, { filePath: 'D:/workspace/page.html', content: '<p>Page</p>', onOpenLocalFile })) })
+    await act(async () => { sendLink('next.html', 'https://untrusted.example') })
+    expect(htmlPreview.resolveLink).not.toHaveBeenCalled()
+    await act(async () => { sendLink('next.html') })
+    expect(htmlPreview.resolveLink).toHaveBeenCalledWith('token-1', 'next.html')
+    expect(onOpenLocalFile).toHaveBeenCalledWith('D:/workspace/next.html', undefined)
+  })
+
+  it('伪造外链消息不能直接打开系统浏览器，宿主确认后才打开', async () => {
+    htmlPreview.resolveLink.mockResolvedValueOnce({ type: 'external', url: 'https://example.com/' })
+      .mockResolvedValueOnce({ type: 'external', url: 'https://example.com/replaced' })
+    await act(async () => { root.render(createElement(HtmlViewer, { filePath: 'D:/workspace/page.html', content: '<p>Page</p>' })) })
+    await act(async () => { sendLink('https://example.com/') })
+    expect(appApi.openExternal).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('https://example.com/')
+    await act(async () => { sendLink('https://example.com/replaced') })
+    expect(document.body.textContent).not.toContain('https://example.com/replaced')
+    const confirm = Array.from(document.body.querySelectorAll('button')).find(button => button.textContent === '打开链接')
+    expect(confirm).toBeDefined()
+    await act(async () => { confirm!.click() })
+    expect(appApi.openExternal).toHaveBeenCalledExactlyOnceWith('https://example.com/')
+  })
+
 })

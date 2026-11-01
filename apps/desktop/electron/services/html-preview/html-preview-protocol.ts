@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
-import { dirname, extname, isAbsolute, join, relative } from 'node:path'
-import { HTML_PREVIEW_SCHEME, type HtmlPreviewRegistration } from '../../../contracts/html-preview'
+import { readFile, realpath } from 'node:fs/promises'
+import { dirname, extname, isAbsolute, join, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { HTML_PREVIEW_SCHEME, type HtmlPreviewLink, type HtmlPreviewRegistration } from '../../../contracts/html-preview'
 import { injectHtmlPreviewBridge } from './bridge-script'
 
 /**
@@ -58,7 +59,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 
 function isInside(baseDir: string, target: string): boolean {
   const rel = relative(baseDir, target)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+  return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)
 }
 
 /** 工作区内的文件以工作区根为基准（`../assets` 之类可解析）；否则只开放文件所在目录。 */
@@ -105,7 +106,56 @@ export function releaseHtmlPreviewsFor(ownerId: number): void {
   }
 }
 
-/** URL 路径 → 基准目录内的磁盘路径；任何越界、盘符、备用数据流或编码异常一律拒绝。 */
+/** 宿主只可把预览 frame 导航至该窗口登记的原文档。 */
+export function isRegisteredHtmlPreviewUrl(ownerId: number, token: string, target: string): boolean {
+  const entry = entries.get(token)
+  if (!entry || entry.ownerId !== ownerId) return false
+  try {
+    const url = new URL(target)
+    return url.protocol === HTML_PREVIEW_SCHEME + ':' && url.host === entry.host
+      && url.pathname === '/' + encodeRelativePath(entry.baseDir, entry.filePath)
+      && url.searchParams.get('t') === token
+  } catch { return false }
+}
+
+interface PreviewFileAccess {
+  read: (path: string) => Promise<Buffer>
+  realpath: (path: string) => Promise<string>
+}
+
+const diskAccess: PreviewFileAccess = { read: readFile, realpath }
+
+async function authorizedRealPath(baseDir: string, target: string, canonicalize: PreviewFileAccess['realpath']): Promise<string | null> {
+  if (!isInside(baseDir, target)) return null
+  const [base, file] = await Promise.all([canonicalize(baseDir), canonicalize(target)])
+  return isInside(base, file) ? file : null
+}
+
+/** 页面链接必须留在当前预览授权目录；外链只返回地址，由宿主确认。 */
+export async function resolveHtmlPreviewLink(
+  ownerId: number, token: string, href: string, canonicalize: PreviewFileAccess['realpath'] = realpath,
+): Promise<HtmlPreviewLink | null> {
+  const entry = entries.get(token)
+  if (!entry || entry.ownerId !== ownerId || href.length > 8192) return null
+  try {
+    const base = HTML_PREVIEW_SCHEME + '://' + entry.host + '/' + encodeRelativePath(entry.baseDir, entry.filePath)
+    const url = new URL(href, base)
+    if (['https:', 'http:', 'mailto:', 'tel:'].includes(url.protocol)) return { type: 'external', url: url.href }
+    let target: string | null = null
+    if (url.protocol === HTML_PREVIEW_SCHEME + ':' && url.host === entry.host) {
+      target = resolvePreviewResource(entry.baseDir, url.pathname)
+    } else if (url.protocol === 'file:') {
+      target = fileURLToPath(url)
+    }
+    if (!target || !isInside(entry.baseDir, target)) return null
+    // 当前正文可能尚未保存，同文件锚点不需要读盘。
+    const sameFile = relative(entry.filePath, target) === ''
+    if (!sameFile && !await authorizedRealPath(entry.baseDir, target, canonicalize)) return null
+    return { type: 'local', filePath: sameFile ? entry.filePath : target, anchor: url.hash ? decodeURIComponent(url.hash.slice(1)) : undefined }
+  } catch { return null }
+}
+
+/** URL 路径 → 授权目录内的路径；读盘前仍须验证 realpath。 */
 export function resolvePreviewResource(baseDir: string, pathname: string): string | null {
   const parts: string[] = []
   for (const raw of pathname.split('/')) {
@@ -133,7 +183,7 @@ function previewHeaders(contentType: string): Record<string, string> {
 
 export async function handleHtmlPreviewRequest(
   request: Request,
-  read: (path: string) => Promise<Buffer> = readFile,
+  access: PreviewFileAccess = diskAccess,
 ): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return textResponse(405, 'Method Not Allowed')
   let url: URL
@@ -146,7 +196,7 @@ export async function handleHtmlPreviewRequest(
 
   const token = url.searchParams.get('t')
   const document = token ? entries.get(token) : undefined
-  if (document && document.host === host && document.html !== null) {
+  if (document && isRegisteredHtmlPreviewUrl(document.ownerId, document.token, request.url) && document.html !== null) {
     return new Response(injectHtmlPreviewBridge(document.html), { headers: previewHeaders(MIME_BY_EXTENSION['.html']) })
   }
 
@@ -157,7 +207,9 @@ export async function handleHtmlPreviewRequest(
   if (!target) return textResponse(403, 'Forbidden')
   let data: Buffer
   try {
-    data = await read(target)
+    const canonicalTarget = await authorizedRealPath(owner.baseDir, target, access.realpath)
+    if (!canonicalTarget) return textResponse(403, 'Forbidden')
+    data = await access.read(canonicalTarget)
   } catch {
     return textResponse(404, 'Not Found')
   }

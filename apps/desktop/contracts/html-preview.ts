@@ -2,11 +2,13 @@ import type { AppError, Result } from '@yitom/contracts'
 
 /** 本地 HTML 预览专用协议：页面在独立源中运行，拿不到应用窗口的 preload 接口。 */
 export const HTML_PREVIEW_SCHEME = 'montree-html'
+export const HTML_PREVIEW_FRAME_NAME_PREFIX = 'montree-html-preview-'
 
 export const HTML_PREVIEW_IPC = {
   register: 'html-preview:register',
   update: 'html-preview:update',
   release: 'html-preview:release',
+  resolveLink: 'html-preview:resolve-link',
 } as const
 
 /** 预览页与宿主之间 postMessage 的信道标记，双方都只处理带此标记的消息。 */
@@ -24,6 +26,7 @@ export interface HtmlPreviewAPI {
   /** 推送当前（可能未保存的）HTML 文本，iframe 随后以新版本号重新加载 */
   update: (token: string, html: string) => Promise<Result<void, AppError>>
   release: (token: string) => Promise<Result<void, AppError>>
+  resolveLink: (token: string, href: string) => Promise<Result<HtmlPreviewLink, AppError>>
 }
 
 /** 宿主 → 预览页 */
@@ -37,3 +40,7 @@ export type HtmlPreviewFrameMessage =
   | { channel: typeof HTML_PREVIEW_BRIDGE_CHANNEL; type: 'snapshot'; html: string; viewport: string }
   | { channel: typeof HTML_PREVIEW_BRIDGE_CHANNEL; type: 'viewport'; viewport: string }
   | { channel: typeof HTML_PREVIEW_BRIDGE_CHANNEL; type: 'selection'; text: string; commit: boolean }
+
+export type HtmlPreviewLink =
+  | { type: 'local'; filePath: string; anchor?: string }
+  | { type: 'external'; url: string }

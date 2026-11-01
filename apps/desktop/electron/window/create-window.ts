@@ -10,6 +10,8 @@ import { resolveAppIconPath } from '../services/app-paths'
 import { shouldLogRendererConsole } from '../services/runtime-state'
 import { createWindowCloseController } from './window-close'
 import { createArtifactFrameGuard } from './artifact-navigation-guard'
+import { createHtmlPreviewFrameGuard, type HtmlPreviewFrame } from './html-preview-navigation-guard'
+import { isRegisteredHtmlPreviewUrl } from '../services/html-preview/html-preview-protocol'
 import { resolveWindowShortcut } from './window-shortcuts'
 import { withAcpWindow } from '../ipc/acp-window-handlers'
 import {
@@ -232,7 +234,20 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
       }
     },
   })
+  const htmlPreviewGuard = createHtmlPreviewFrameGuard({
+    mainFrameId: window.webContents.mainFrame.frameTreeNodeId,
+    isRegisteredUrl: (token, url) => isRegisteredHtmlPreviewUrl(window.webContents.id, token, url),
+    listLiveFrameIds: () => window.webContents.mainFrame.framesInSubtree.map(frame => frame.frameTreeNodeId),
+  })
+  function previewFrame(frame: Electron.WebFrameMain | null): HtmlPreviewFrame | null {
+    if (!frame || frame.detached) return null
+    const ancestorIds: number[] = []
+    for (let parent = frame.parent; parent; parent = parent.parent) ancestorIds.push(parent.frameTreeNodeId)
+    return { frameTreeNodeId: frame.frameTreeNodeId, name: frame.name, detached: frame.detached, ancestorIds }
+  }
   window.webContents.on('frame-created', (_event, { frame }) => {
+    const snapshot = previewFrame(frame)
+    if (snapshot) htmlPreviewGuard.handleFrameCreated(snapshot)
     try {
       if (!frame) return
       artifactGuard.handleFrameCreated({
@@ -247,6 +262,10 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
   })
   window.webContents.on('will-frame-navigate', (details) => {
     if (details.isMainFrame) return
+    if (htmlPreviewGuard.shouldBlockNavigation(previewFrame(details.frame), details.url, details.initiator?.frameTreeNodeId ?? null)) {
+      details.preventDefault()
+      return
+    }
     const navigated = details.frame
     try {
       if (
@@ -267,6 +286,9 @@ export function createWindow(options: { fresh?: boolean } = {}): void {
     } catch {
       // 判定异常时 fail-open，避免误伤阅读器正常导航
     }
+  })
+  window.webContents.on('will-redirect', details => {
+    if (!details.isMainFrame && htmlPreviewGuard.isPreviewFrame(previewFrame(details.frame))) details.preventDefault()
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (decideNavigation(url, appEntryUrl, process.env['ELECTRON_RENDERER_URL']) === 'external') openExternalSafely(url)

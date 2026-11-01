@@ -1,9 +1,12 @@
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { pathToFileURL } from 'node:url'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { injectHtmlPreviewBridge } from './bridge-script'
 import {
   handleHtmlPreviewRequest,
   previewHostFor,
+  isRegisteredHtmlPreviewUrl,
+  resolveHtmlPreviewLink,
   registerHtmlPreview,
   releaseHtmlPreview,
   releaseHtmlPreviewsFor,
@@ -17,11 +20,11 @@ const workspace = join(process.cwd(), 'fixture-workspace')
 const pagePath = join(workspace, 'docs', 'page one.html')
 
 function readFrom(files: Record<string, string>) {
-  return async (path: string) => {
+  return { realpath: async (path: string) => path, read: async (path: string) => {
     const content = files[path]
     if (content === undefined) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
     return Buffer.from(content)
-  }
+  } }
 }
 
 afterEach(() => resetHtmlPreviewsForTest())
@@ -101,4 +104,59 @@ describe('html-preview-protocol', () => {
     expect(injectHtmlPreviewBridge('<header>不是 head</header>')).toMatch(/^<script data-montree-bridge>/)
     expect(injectHtmlPreviewBridge('<p>x</p>')).not.toContain('</script></script>')
   })
+  it('拒绝工作区内链接解析到目录外，不调用读取函数', async () => {
+    const { url } = registerHtmlPreview({ ownerId: 1, filePath: pagePath, workspaceRoot: workspace })
+    const target = join(workspace, 'linked', 'secret.txt')
+    const read = vi.fn(async () => Buffer.from('OUTSIDE'))
+    const response = await handleHtmlPreviewRequest(new Request(new URL('/linked/secret.txt', url)), {
+      read,
+      realpath: async path => path === target ? join(process.cwd(), 'outside', 'secret.txt') : path,
+    })
+    expect(response.status).toBe(403)
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it('对根目录和目标都做规范化，读取规范化后仍在范围内的实际文件', async () => {
+    const { url } = registerHtmlPreview({ ownerId: 1, filePath: pagePath, workspaceRoot: workspace })
+    const canonical = join(process.cwd(), 'real-workspace')
+    const read = vi.fn(async () => Buffer.from('SAFE'))
+    const response = await handleHtmlPreviewRequest(new Request(new URL('/safe.txt', url)), {
+      read, realpath: async path => path.replace(workspace, canonical),
+    })
+    expect(await response.text()).toBe('SAFE')
+    expect(read).toHaveBeenCalledWith(join(canonical, 'safe.txt'))
+  })
+
+  it('本地链接按预览 URL 解析，拒绝范围外路径、外部源和失效或其他窗口的 token', async () => {
+    const { token } = registerHtmlPreview({ ownerId: 1, filePath: pagePath, workspaceRoot: workspace })
+    const canonicalize = async (path: string) => path
+    expect(await resolveHtmlPreviewLink(1, token, '../next.html#part%20one', canonicalize)).toEqual({
+      type: 'local', filePath: join(workspace, 'next.html'), anchor: 'part one',
+    })
+    expect(await resolveHtmlPreviewLink(1, token, '/assets/page.html', canonicalize)).toMatchObject({ filePath: join(workspace, 'assets', 'page.html') })
+    expect(await resolveHtmlPreviewLink(1, token, pathToFileURL(join(process.cwd(), 'outside', 'secret.html')).href, canonicalize)).toBeNull()
+    expect(await resolveHtmlPreviewLink(1, token, 'montree-html://another-workspace/secret.html', canonicalize)).toBeNull()
+    expect(await resolveHtmlPreviewLink(1, token, 'javascript:alert(1)', canonicalize)).toBeNull()
+    expect(await resolveHtmlPreviewLink(2, token, 'next.html', canonicalize)).toBeNull()
+    expect(await resolveHtmlPreviewLink(1, token, 'next.html', async path => path === workspace ? path : join(process.cwd(), 'outside', 'secret.html'))).toBeNull()
+    expect(await resolveHtmlPreviewLink(1, token, 'https://example.com/', canonicalize)).toEqual({ type: 'external', url: 'https://example.com/' })
+    releaseHtmlPreview(1, token)
+    expect(await resolveHtmlPreviewLink(1, token, 'https://example.com/', canonicalize)).toBeNull()
+  })
+
+  it('导航只允许原窗口登记的文档 URL，token 不能用于替换其他路径', () => {
+    const { token, url } = registerHtmlPreview({ ownerId: 1, filePath: pagePath, workspaceRoot: workspace })
+    expect(isRegisteredHtmlPreviewUrl(1, token, url + '&v=2')).toBe(true)
+    expect(isRegisteredHtmlPreviewUrl(2, token, url)).toBe(false)
+    expect(isRegisteredHtmlPreviewUrl(1, token, url.replace('/docs/page%20one.html', '/another.html'))).toBe(false)
+    expect(isRegisteredHtmlPreviewUrl(1, token, 'about:blank')).toBe(false)
+  })
+
+  it('同文件锚点保留宿主路径格式，未保存文档不要求磁盘文件存在', async () => {
+    const filePath = pagePath.replace(/\\/g, '/')
+    const { token } = registerHtmlPreview({ ownerId: 1, filePath, workspaceRoot: workspace })
+    const link = await resolveHtmlPreviewLink(1, token, '?view=1#target', async () => { throw new Error('must not read disk') })
+    expect(link).toEqual({ type: 'local', filePath, anchor: 'target' })
+  })
+
 })

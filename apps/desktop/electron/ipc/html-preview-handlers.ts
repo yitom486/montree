@@ -5,6 +5,7 @@ import { getWindowWorkspaceDescriptor } from '../services/workspace-bindings'
 import {
   handleHtmlPreviewRequest,
   registerHtmlPreview,
+  resolveHtmlPreviewLink,
   releaseHtmlPreview,
   releaseHtmlPreviewsFor,
   updateHtmlPreview,
@@ -62,4 +63,11 @@ export function registerHtmlPreviewHandlers(): void {
     if (typeof token === 'string') releaseHtmlPreview(event.sender.id, token)
     return ok(undefined)
   })
+  ipcMain.handle(HTML_PREVIEW_IPC.resolveLink, async (event, token: unknown, href: unknown) => {
+    if (!fromMainFrame(event)) return forbidden()
+    if (typeof token !== 'string' || typeof href !== 'string') return err({ code: 'INVALID_ARGUMENT', message: '无效的预览链接' })
+    const link = await resolveHtmlPreviewLink(event.sender.id, token, href)
+    return link ? ok(link) : err({ code: 'FORBIDDEN', message: '链接超出预览授权范围或无法访问' })
+  })
+
 }
