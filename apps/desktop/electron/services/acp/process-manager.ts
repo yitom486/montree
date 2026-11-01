@@ -197,6 +197,15 @@ export function spawnAcpProcess(options: SpawnAcpOptions): SpawnedAcpProcess {
   child.stdin.on('error', onStdioError('stdin'))
   child.stdout.on('error', onStdioError('stdout'))
   child.stderr.on('error', onStdioError('stderr'))
+  // Windows 的匿名管道在子进程关闭读端后不一定立即抛 EPIPE：写入可能静默排队，
+  // 直到流被销毁才以回调/close 形式落定。补一条 close 诊断，保证跨平台都能在
+  // stderr 尾部留下“stdin 已断开”，同时避免把父进程主动 kill 的收尾误报为异常。
+  child.stdin.on('close', bindAcpContext(() => {
+    if (streamErrorReported || child.killed) return
+    streamErrorReported = true
+    logAcpDiagnostic('agent.stdio_close', { runtime: options.runtime.id, stream: 'stdin' })
+    pushStderrTailLine('[montree] Agent stdin 已断开（stream closed），进程可能已退出')
+  }))
 
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', bindAcpContext((chunk: string) => {
