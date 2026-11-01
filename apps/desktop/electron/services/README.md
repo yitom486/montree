@@ -6,10 +6,11 @@
 
 | 文件 | 功能 |
 |------|------|
-| `file-service.ts` | 打开/保存对话框、读文本/二进制/图片、粘贴图、导出入口 |
+| `file-service.ts` | 打开/保存对话框、读文本/二进制/图片、粘贴图、导出入口；图片扩展名含 PNG/JPG/WebP/AVIF/GIF/SVG/BMP/ICO/TIFF |
+| `image-formats.ts` | 主进程图片扩展名与 MIME 映射（与渲染端 `apps/desktop/src/lib/workspace/image-types.ts` 同步），供工作区扫描、对话框与图片读取共用 |
 | `terminal-service.ts` / `.test.ts` | 用户交互式 node-pty 会话管理、原生 Shell / WSL、输入/resize/输出游标、窗口隔离与进程清理；独立于 Agent 原生工具 |
 | `terminal-runtime.ts` | 终端服务实例，将输出事件送往所属窗口；退出应用统一释放 |
-| `workspace.ts` | 扫描工作区树（深度限制、忽略目录、无权限/受限目录容错、去掉空文件夹） |
+| `workspace.ts` | 扫描工作区树（深度限制、忽略目录、无权限/受限目录容错、去掉空文件夹；文档与常见图片一并入树） |
 | `workspace-fs.ts` | 工作区内新建/重命名/移动/复制/删除 |
 | `workspace-md-search.ts` | 工作区 Markdown 字面检索（只读：根内断言 + symlink 跳过，仅 .md，200 文件/256KB/100 命中上限，仅 inspect 链调用；B3 分页 offset/limit/nextOffset） |
 | `workspace-watcher.ts` | 监听工作区变更并通知渲染进程（事件带 workspaceId/代际/变化目录，旧事件不污染新状态；B3 忽略 node_modules/构建产物/Git 内部噪声，合并窗口截断回落全量） |
@@ -115,8 +116,8 @@
 
 ## Typst
 
-- `html-preview/html-preview-protocol.ts` / `.test.ts`：`montree-html://<工作区哈希>/<相对路径>` 独立源协议。主文档取渲染端推送的内存文本（`?t=` 定位，含未保存修改），子资源只读基准目录（工作区根或文件目录）内的磁盘文件，越界/盘符/备用数据流路径拒绝；HTML 响应注入桥接脚本。
-- `html-preview/bridge-script.ts`：注入预览页的桥接脚本与插入位置（head 开头，不破坏 doctype）；经 postMessage 处理缩放、锚点、链接拦截、渲染正文快照（隐藏节点标 hidden）、视口文本与选区。
+- `html-preview/html-preview-protocol.ts` / `.test.ts`：`montree-html://<工作区哈希>/<相对路径>` 独立源协议。主文档取渲染端推送的内存文本（`?t=` 定位，含未保存修改），子资源只读基准目录（工作区根或文件目录）内的磁盘文件，越界/盘符/备用数据流路径拒绝；读盘前校验根目录与目标真实路径，阻止符号链接/junction 越界；链接解析按预览授权范围与 owner/token 校验；HTML 响应注入桥接脚本。
+- `html-preview/bridge-script.ts`：注入预览页的桥接脚本与插入位置（head 开头，不破坏 doctype）；忽略合成点击，经 postMessage 处理缩放、锚点、链接拦截、渲染正文快照（隐藏节点标 hidden）、视口文本与选区。
 - `typst/typst-service.ts`：Tinymist 0.15.8 校验、窗口/项目语言进程、未保存文本同步、隔离预览与内存 PDF 导出；配置及包缓存位于 userData/typst。
 - `typst/tinymist-assets.ts`：固定版本 Tinymist 各平台归档名与 SHA-256（prepare-typst、打包校验与按需下载共用）。
 - `typst/tinymist-download.ts` / `.test.ts`：安装包不带 Tinymist，首次使用时按固定版本下载，流式 SHA-256 校验，`tar` 解压到临时目录后原子就位（userData/typst/runtime），带进度，并发共享一次下载，失败不留半成品。

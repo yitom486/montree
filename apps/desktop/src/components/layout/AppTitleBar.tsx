@@ -3,6 +3,8 @@ import {
   BookOpen,
   Coffee,
   FileText,
+  Image as ImageIcon,
+  ListTree,
   Moon,
   PanelLeft,
   Search,
@@ -13,6 +15,7 @@ import {
 import { appApi } from '@/api/app-api'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { isImagePath } from '@/lib/workspace/image-types'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { cn } from '@/lib/utils'
@@ -25,6 +28,9 @@ interface AppTitleBarProps {
   onQuickOpen?: () => void
   onToggleAgentPanel?: () => void
   agentPanelOpen?: boolean
+  outlineAvailable?: boolean
+  outlineVisible?: boolean
+  onToggleOutline?: () => void
   theme?: AppTheme
   onCycleTheme?: () => void
   onOpenSettings?: () => void
@@ -37,15 +43,18 @@ function getDisplayFileInfo(filePath?: string) {
       name: 'Montree',
       sub: '快速打开 (Ctrl+P)',
       isBook: false,
+      isImage: false,
     }
   }
   const parts = filePath.split(/[/\\]/).filter(Boolean)
   const fullName = parts[parts.length - 1] ?? '未命名文档'
   const isBook = /\.(epub|mobi|azw3|pdf)$/i.test(fullName)
+  const isImage = isImagePath(fullName)
   return {
     name: fullName,
-    sub: isBook ? '阅读模式' : '编辑模式',
+    sub: isBook ? '阅读模式' : isImage ? '图片预览' : '编辑模式',
     isBook,
+    isImage,
   }
 }
 
@@ -57,6 +66,9 @@ export function AppTitleBar({
   onQuickOpen,
   onToggleAgentPanel,
   agentPanelOpen = false,
+  outlineAvailable = false,
+  outlineVisible = false,
+  onToggleOutline,
   theme = 'dark',
   onCycleTheme,
   onOpenSettings,
@@ -135,6 +147,8 @@ export function AppTitleBar({
           <div className="flex items-center gap-1.5 truncate min-w-0">
             {fileInfo.isBook ? (
               <BookOpen className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+            ) : fileInfo.isImage ? (
+              <ImageIcon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
             ) : (
               <FileText className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
             )}
@@ -158,6 +172,28 @@ export function AppTitleBar({
       >
         {/* 全局操作工具组 */}
         <div className="flex items-center gap-0.5 pr-1">
+          {outlineAvailable && onToggleOutline && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onToggleOutline}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors',
+                    outlineVisible && 'bg-primary/10 text-primary',
+                  )}
+                  aria-label={outlineVisible ? '收起文档目录' : '展开文档目录'}
+                  aria-pressed={outlineVisible}
+                >
+                  <ListTree className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {outlineVisible ? '收起文档目录' : '展开文档目录'}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {onToggleAgentPanel && (
             <Tooltip>
               <TooltipTrigger asChild>

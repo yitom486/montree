@@ -34,7 +34,8 @@
 |------|------|
 | `markdown` | markdown-it 解析器（预览与导出同源）；沿用社区脚注插件，补充原始定义范围供实时预览编辑 |
 | `markdown-parts` | 把 Markdown 拆成普通段 / Mermaid 块 |
-| `markdown-headings` | 标题大纲、滚动比例 |
+| `markdown-headings` | 标题大纲、滚动比例；解析前以等量空行忽略 frontmatter，保持标题行号 |
+| `markdown-frontmatter` / `.test.ts` | 文档首部 YAML frontmatter 识别、属性提取与等行数剥离；预览整段省略，所见即所得渲染为属性卡片 |
 | `markdown-images` | 本地图片路径 ↔ data URL |
 | `markdown-editing` / `markdown-editor-commands` | 编辑器格式化与快捷键 |
 | `code-highlight` / `code-block-lines` | 代码高亮与行号 |
@@ -87,6 +88,7 @@
 | 文件 | 功能 |
 |------|------|
 | `file-tree-ops` | 文件树路径、剪贴板、粘贴目标 |
+| `image-types` / `.test.ts` | 图片扩展名识别与 MIME/标签映射（PNG/JPG/WebP/AVIF/GIF/SVG/BMP/ICO/TIFF），供文件树图标与图片阅读器分流 |
 | `quick-open` | 全局快速切换（扁平化文件树、模糊匹配与评分排序） |
 | `resolve-wikilink` | 工作区双链目标解析（相对路径/文件名/同名推断与缺省笔记创建） |
 | `resolve-local-link` / `.test.ts` | HTML/Markdown 相对本地链接解析（`./`、`../`、编码、同文件 query/hash；外部协议不接管），并暂存/消费跨文件锚点 |

@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it'
+import { stripFrontmatter } from './markdown-frontmatter'
 
 const outlineParser = new MarkdownIt({ html: true })
 
@@ -41,7 +42,8 @@ export function assignHeadingIds(texts: string[]): string[] {
 }
 
 export function parseMarkdownHeadings(content: string): MarkdownHeading[] {
-  const tokens = outlineParser.parse(content, {})
+  // 等量空行替换 frontmatter，既忽略属性区，也不改变正文标题的 0-based 行号。
+  const tokens = outlineParser.parse(stripFrontmatter(content), {})
   const raw: { level: number; text: string; line: number }[] = []
 
   for (let i = 0; i < tokens.length; i++) {

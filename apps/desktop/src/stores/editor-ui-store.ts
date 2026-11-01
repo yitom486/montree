@@ -35,7 +35,7 @@ function resolveFileKey(filePath?: string, workspaceId?: string): string {
 
 interface EditorUiStore {
   theme: AppTheme
-  outlineExpanded: boolean
+  outlineVisible: boolean
   webDocExpanded: boolean
   fileTreeExpanded: boolean
   sidebarVisible: boolean
@@ -45,7 +45,8 @@ interface EditorUiStore {
   setTheme: (theme: AppTheme) => void
   toggleTheme: () => void
   cycleTheme: () => void
-  setOutlineExpanded: (expanded: boolean) => void
+  setOutlineVisible: (visible: boolean) => void
+  toggleOutlineVisible: () => void
   setWebDocExpanded: (expanded: boolean) => void
   setFileTreeExpanded: (expanded: boolean) => void
   setSidebarVisible: (visible: boolean) => void
@@ -64,7 +65,7 @@ export const useEditorUiStore = create<EditorUiStore>()(
   persist(
     (set, get) => ({
       theme: 'light',
-      outlineExpanded: false,
+      outlineVisible: true,
       webDocExpanded: true,
       fileTreeExpanded: true,
       sidebarVisible: true,
@@ -94,7 +95,8 @@ export const useEditorUiStore = create<EditorUiStore>()(
         })
       },
 
-      setOutlineExpanded: (expanded) => set({ outlineExpanded: expanded }),
+      setOutlineVisible: (visible) => set({ outlineVisible: visible }),
+      toggleOutlineVisible: () => set((state) => ({ outlineVisible: !state.outlineVisible })),
       setWebDocExpanded: (expanded) => set({ webDocExpanded: expanded }),
       setFileTreeExpanded: (expanded) => set({ fileTreeExpanded: expanded }),
 
@@ -153,7 +155,7 @@ export const useEditorUiStore = create<EditorUiStore>()(
       name: 'markdown-editor-ui',
       partialize: (state) => ({
         theme: state.theme,
-        outlineExpanded: state.outlineExpanded,
+        outlineVisible: state.outlineVisible,
         webDocExpanded: state.webDocExpanded,
         fileTreeExpanded: state.fileTreeExpanded,
         sidebarVisible: state.sidebarVisible,

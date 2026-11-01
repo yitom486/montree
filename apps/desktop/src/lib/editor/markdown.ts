@@ -19,6 +19,32 @@ import { markdownItWikilinks } from '@/lib/editor/markdown-it-wikilinks'
 import { markdownItPageMarker } from '@/lib/editor/markdown-it-page-marker'
 import { markdownItAlerts } from '@/lib/editor/markdown-it-alerts'
 import { markdownItArtifacts, markdownArtifactPlaceholder, MARKDOWN_ARTIFACT_KINDS } from './markdown-it-artifacts'
+import { readFrontmatter } from './markdown-frontmatter'
+
+/**
+ * 文档首部 YAML frontmatter：在 Markdown 解析层整段吞掉，避免阅读预览出现
+ * 原文 `---` 分隔线与 `key: value` 噪声，同时保留 token.map 供源码映射。
+ */
+export function markdownItFrontmatter(parser: InstanceType<typeof MarkdownIt>): void {
+  parser.block.ruler.before(
+    'hr',
+    'frontmatter',
+    (state, startLine, endLine, silent) => {
+      if (startLine !== 0 || state.blkIndent !== 0 || state.parentType !== 'root') return false
+      const frontmatter = readFrontmatter(state.src)
+      if (!frontmatter || frontmatter.lineCount > endLine) return false
+      if (silent) return true
+      const token = state.push('frontmatter', '', 0)
+      token.map = [0, frontmatter.lineCount]
+      token.content = frontmatter.raw
+      token.meta = { entries: frontmatter.entries }
+      state.line = frontmatter.lineCount
+      return true
+    },
+    { alt: ['paragraph', 'reference', 'blockquote', 'list'] },
+  )
+  parser.renderer.rules.frontmatter = () => ''
+}
 
 // CJS 包在 Vite ESM 下可能导出为 { default: fn }，需兼容处理
 function resolvePlugin(imported: unknown) {
@@ -95,6 +121,7 @@ function createConfiguredParser(options: { html: boolean }): InstanceType<typeof
     .use(pluginMark)
     .use(footnotesWithSourceMaps)
     .use(markdownItArtifacts)
+    .use(markdownItFrontmatter)
 
   // Explicit compatibility: only paired, consistently space-indented fences override indented code.
   parser.block.ruler.before('code', 'indented_fence', (state, start, end, silent) => {

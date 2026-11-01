@@ -21,6 +21,8 @@ export interface PreviewBlock {
   env?: PreviewRenderEnv; referenceKey?: string; renderedHtml?: string; footnoteTargets?: string[]
 }
 export const showBlockPreview = StateEffect.define<number>()
+/** frontmatter 等首屏块：显式进入源码编辑，不跟随光标自动展开 */
+export const showBlockSource = StateEffect.define<number>()
 
 function blockEnd(tokens: Token[], index: number): number {
   let depth = tokens[index].nesting
@@ -105,7 +107,7 @@ export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
       const children = tokens[index + 1]?.children ?? []
       if (!refs.length && !children.some((child) => ['image', 'html_inline', 'math_inline', 'math_inline_double'].includes(child.type))) continue
       kind = 'rich-paragraph'
-    } else if (!refs.length && !codeList && !['table_open', 'fence', 'code_block', 'html_block', 'montree_artifact', 'math_block', 'blockquote_open', 'alert_open'].includes(kind)) continue
+    } else if (!refs.length && !codeList && !['table_open', 'fence', 'code_block', 'html_block', 'montree_artifact', 'math_block', 'blockquote_open', 'alert_open', 'frontmatter'].includes(kind)) continue
     let [start, end] = token.map
     // The plugin maps alert_open to its body; alert_title maps the marker line.
     if (kind === 'alert_open') start = tokens[index + 1]?.map?.[0] ?? start
@@ -200,14 +202,24 @@ class PreviewBlockWidget extends WidgetType {
       if (!this.alive) return
       const base = currentFrom()
       const range = relative ? { from: base + relative.from - this.block.from, to: base + relative.to - this.block.from } : { from: base, to: base }
+      if (this.block.kind === 'frontmatter') {
+        // 首屏属性块不因初始光标落在 0 号位置就铺开 YAML；只有显式点击才进入源码。
+        view.dispatch({
+          selection: { anchor: this.block.from, head: this.block.to },
+          effects: [showBlockSource.of(this.block.from), EditorView.scrollIntoView(this.block.from, { y: 'nearest' })],
+        })
+        view.focus()
+        return
+      }
       view.dispatch({ selection: { anchor: range.from, head: range.to }, effects: EditorView.scrollIntoView(range.from, { y: 'nearest' }) })
       view.focus()
     }
     this.root = createRoot(dom)
     this.root.render(createElement(LivePreviewBlock, {
       source: this.block.source, filePath: this.filePath, env: this.block.env,
+      kind: this.block.kind,
       renderedHtml: this.block.renderedHtml,
-      editLabel: this.block.kind === 'reference-definition' ? '编辑引用定义' : this.block.kind === 'footnote-definition' ? '编辑脚注' : '编辑源码',
+      editLabel: this.block.kind === 'reference-definition' ? '编辑引用定义' : this.block.kind === 'footnote-definition' ? '编辑脚注' : this.block.kind === 'frontmatter' ? '编辑属性源码' : '编辑源码',
       onFootnoteJump: (id) => {
         const target = view.state.field(livePreviewBlocks).blocks.find((block) => block.footnoteTargets?.includes(id))
         if (!target) return
@@ -263,11 +275,13 @@ class SourceToolbarWidget extends WidgetType {
   destroy(): void { const root = this.root; this.root = undefined; queueMicrotask(() => root?.unmount()) }
 }
 
-function decorations(state: EditorState, blocks: PreviewBlock[], previewAt?: number): DecorationSet {
+function decorations(state: EditorState, blocks: PreviewBlock[], previewAt?: number, sourceAt?: number): DecorationSet {
   const config = state.facet(livePreviewConfig)
   return Decoration.set(blocks.flatMap((block) => {
-    const active = state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from)
-    if (active && block.from !== previewAt) {
+    const active = block.kind === 'frontmatter'
+      ? sourceAt === block.from
+      : state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from) && block.from !== previewAt
+    if (active) {
       const lines = [Decoration.widget({ block: true, side: -1, widget: new SourceToolbarWidget(block.from) }).range(block.from)]
       for (let line = state.doc.lineAt(block.from).number; line <= state.doc.lineAt(block.to).number; line++) {
         lines.push(Decoration.line({ class: 'cm-live-source-block' }).range(state.doc.line(line).from))
@@ -279,7 +293,7 @@ function decorations(state: EditorState, blocks: PreviewBlock[], previewAt?: num
 }
 
 /** Direct state decorations are required for replacements spanning line breaks (CM6 API). */
-export const livePreviewBlocks = StateField.define<{ blocks: PreviewBlock[]; decorations: DecorationSet; previewAt?: number }>({
+export const livePreviewBlocks = StateField.define<{ blocks: PreviewBlock[]; decorations: DecorationSet; previewAt?: number; sourceAt?: number }>({
   create(state) {
     const blocks = parsePreviewBlocks(state)
     return { blocks, decorations: decorations(state, blocks) }
@@ -287,8 +301,27 @@ export const livePreviewBlocks = StateField.define<{ blocks: PreviewBlock[]; dec
   update(value, transaction) {
     const blocks = transaction.docChanged ? parsePreviewBlocks(transaction.state) : value.blocks
     let previewAt = transaction.docChanged || transaction.selection ? undefined : value.previewAt
-    for (const effect of transaction.effects) if (effect.is(showBlockPreview)) previewAt = effect.value
-    if (transaction.docChanged || transaction.selection || transaction.reconfigured || previewAt !== value.previewAt) return { blocks, decorations: decorations(transaction.state, blocks, previewAt), previewAt }
+    let sourceAt = value.sourceAt
+    for (const effect of transaction.effects) {
+      if (effect.is(showBlockPreview)) {
+        previewAt = effect.value
+        sourceAt = undefined
+      }
+      if (effect.is(showBlockSource)) {
+        sourceAt = effect.value
+        previewAt = undefined
+      }
+    }
+    // 光标离开属性块时回到卡片；在块内打字时保留源码编辑。
+    if (sourceAt !== undefined && transaction.selection) {
+      const sourceBlock = blocks.find((block) => block.kind === 'frontmatter' && block.from === sourceAt)
+      if (sourceBlock && !transaction.state.selection.ranges.some((range) => range.from <= sourceBlock.to && range.to >= sourceBlock.from)) {
+        sourceAt = undefined
+      }
+    }
+    if (transaction.docChanged || transaction.selection || transaction.reconfigured || previewAt !== value.previewAt || sourceAt !== value.sourceAt) {
+      return { blocks, decorations: decorations(transaction.state, blocks, previewAt, sourceAt), previewAt, sourceAt }
+    }
     return value
   },
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),

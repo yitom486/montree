@@ -12,6 +12,7 @@ import {
   Folder,
   FolderOpen,
   Globe,
+  Image as ImageIcon,
   PanelLeftClose,
   Presentation,
   ScrollText,
@@ -24,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { writeWorkspacePathsToDataTransfer } from '@/lib/agent/acp-composer'
 import { getParentDir, isAncestorOrSelf, isAncestorPath, isMarkdownPath } from '@/lib/workspace/file-tree-ops'
+import { isImagePath } from '@/lib/workspace/image-types'
 import { cn } from '@/lib/utils'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
 import type { useFileTreeActions } from '@/hooks/workspace/useFileTreeActions'
@@ -90,7 +92,10 @@ type InlineEdit =
   | { mode: 'new-file' | 'new-folder'; parentDir: string; initial: string }
   | null
 
-const FileIcon = memo(function FileIcon({ documentKind }: { documentKind?: FileTreeNode['documentKind'] }) {
+const FileIcon = memo(function FileIcon({ documentKind, fileName }: { documentKind?: FileTreeNode['documentKind']; fileName: string }) {
+  if (isImagePath(fileName)) {
+    return <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
+  }
   switch (documentKind) {
     case 'pdf':
       return <FileType className="size-3.5 shrink-0 text-red-500/90" />
@@ -369,7 +374,7 @@ const TreeNode = memo(function TreeNode({
       }}
       onContextMenu={(e) => onContextMenu(e, node)}
     >
-      <FileIcon documentKind={node.documentKind} />
+      <FileIcon documentKind={node.documentKind} fileName={node.name} />
       {renaming ? (
         <InlineEditInput
           initialValue={renameInitial}
@@ -702,6 +707,8 @@ export function FileExplorer({
                 <br />
                 <span className="text-[11px] opacity-80">
                   支持：{SUPPORTED_WORKSPACE_EXTENSION_LABEL}
+                  <br />
+                  图片：PNG / JPG / WebP / AVIF / GIF / SVG / BMP / ICO
                 </span>
               </p>
             ) : (

@@ -181,7 +181,7 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await editor.getByRole('button', { name: '完成编辑并预览' }).click()
     await expect(details.locator('.code-block')).toBeHidden()
     const unsafe = editor.locator('.cm-live-block').filter({ hasText: '危险链接' })
-    await unsafe.scrollIntoViewIfNeeded()
+    await reveal(unsafe)
     await expect(unsafe.locator('script, [onclick], [onerror], a[href^="javascript:"]')).toHaveCount(0)
     expect(await page.evaluate(() => (window as unknown as { __liveXss?: number }).__liveXss)).toBeUndefined()
     const documentDiagram = editor.getByTestId('html-artifact-card').filter({ hasText: '文档交互流程' })

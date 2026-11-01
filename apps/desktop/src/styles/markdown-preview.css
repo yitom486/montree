@@ -758,4 +758,137 @@
   bottom: -0.25em;
 }
 
+/*
+ * 阅读预览的版面章法：正文限制舒适行宽，标题以细分隔线建立层级，
+ * 段落/列表/表格使用统一的垂直节奏。仅作用于阅读预览，不改变 Agent 气泡。
+ */
+.markdown-preview.markdown-reading > div {
+  width: 100%;
+  max-width: 78ch;
+  margin-inline: auto;
+}
+
+.markdown-preview.markdown-reading h1,
+.markdown-preview.markdown-reading h2,
+.markdown-preview.markdown-reading h3 {
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+.markdown-preview.markdown-reading h1 {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.02em;
+}
+
+.markdown-preview.markdown-reading h2 {
+  margin-top: 2rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 65%, transparent);
+  letter-spacing: -0.012em;
+}
+
+.markdown-preview.markdown-reading h3 {
+  margin-top: 1.6rem;
+}
+
+.markdown-preview.markdown-reading h4,
+.markdown-preview.markdown-reading h5,
+.markdown-preview.markdown-reading h6 {
+  margin-top: 1.25rem;
+  color: var(--foreground);
+}
+
+.markdown-preview.markdown-reading > div > :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview.markdown-reading > div > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview.markdown-reading p {
+  color: color-mix(in oklch, var(--foreground) 92%, var(--muted-foreground));
+  text-wrap: pretty;
+}
+
+.markdown-preview.markdown-reading :is(ul, ol) > li + li {
+  margin-top: 0.28rem;
+}
+
+.markdown-preview.markdown-reading :is(ul, ol) :is(ul, ol) {
+  margin-block: 0.25rem;
+}
+
+.markdown-preview.markdown-reading li::marker {
+  color: color-mix(in oklch, var(--primary) 65%, var(--muted-foreground));
+}
+
+.markdown-preview.markdown-reading blockquote {
+  padding: 0.7rem 1.1rem;
+  border-left-width: 3px;
+  color: color-mix(in oklch, var(--muted-foreground) 88%, var(--foreground));
+}
+
+.markdown-preview.markdown-reading blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview.markdown-reading blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview.markdown-reading table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.markdown-preview.markdown-reading :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.markdown-preview.markdown-reading tr > :last-child {
+  border-right: 0;
+}
+
+.markdown-preview.markdown-reading tbody tr:last-child > td {
+  border-bottom: 0;
+}
+
+.markdown-preview.markdown-reading img {
+  max-height: 70vh;
+  margin-inline: auto;
+  object-fit: contain;
+  box-shadow: 0 8px 24px -18px color-mix(in oklch, var(--foreground) 45%, transparent);
+}
+
+.markdown-preview.markdown-reading hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in oklch, var(--border) 85%, transparent),
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-preview *,
+  .markdown-preview *::before,
+  .markdown-preview *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
 

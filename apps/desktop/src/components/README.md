@@ -8,7 +8,7 @@ React UI。按产品域分子目录；shadcn 落在 `ui/`。
 | [`layout/`](./layout/) | 窗口壳、侧栏、编辑/阅读主工作区 |
 | [`editor/`](./editor/) | CodeMirror Markdown 编辑器 |
 | [`typst/`](./typst/) | Typst 源码编辑、Tinymist 智能提示、实时预览、字体/入口配置与 PDF 导出 |
-| [`preview/`](./preview/) | Markdown 预览面板 |
+| [`preview/`](./preview/) | Markdown 预览面板与图片阅读器 |
 | [`markdown/`](./markdown/) | 可复用的 Markdown/Mermaid 渲染块 |
 | [`reader/`](./reader/) | EPUB / PDF / MOBI 阅读器与批注 UI |
 | [`quiz/`](./quiz/) | AI 伴读考官出题、作答批卷与成绩回放 UI |

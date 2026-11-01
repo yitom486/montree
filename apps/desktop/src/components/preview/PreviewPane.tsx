@@ -220,7 +220,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       <div
         ref={previewRef}
         data-theme={theme}
-        className="markdown-preview h-full overflow-auto bg-preview p-6"
+        className="markdown-preview markdown-reading h-full overflow-auto bg-preview p-6"
       >
         <MarkdownContent html={html} />
       </div>

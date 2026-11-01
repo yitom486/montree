@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Minimize2 } from 'lucide-react'
 import { useDefaultLayout } from 'react-resizable-panels'
 import { ActivityBar } from '@/components/layout/ActivityBar'
 import { AppTitleBar } from '@/components/layout/AppTitleBar'
 import { StatusBar } from '@/components/layout/StatusBar'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { DocumentOutline } from '@/components/layout/panels/DocumentOutline'
 import { RemoteConnectModal } from '@/components/layout/RemoteConnectModal'
 import { AgentPanel, useIsDockedAgentVisible } from '@/components/agent/AgentPanel'
 import { FloatingAIHud } from '@/components/agent/FloatingAIHud'
@@ -116,8 +117,8 @@ export function WorkspaceShell({
   const sidebarVisible = useEditorUiStore((state) => state.sidebarVisible)
   const setSidebarVisible = useEditorUiStore((state) => state.setSidebarVisible)
   const toggleSidebar = useEditorUiStore((state) => state.toggleSidebar)
-  const outlineExpanded = useEditorUiStore((state) => state.outlineExpanded)
-  const setOutlineExpanded = useEditorUiStore((state) => state.setOutlineExpanded)
+  const outlineVisible = useEditorUiStore((state) => state.outlineVisible)
+  const setOutlineVisible = useEditorUiStore((state) => state.setOutlineVisible)
   const fileTreeExpanded = useEditorUiStore((state) => state.fileTreeExpanded)
   const setFileTreeExpanded = useEditorUiStore((state) => state.setFileTreeExpanded)
   const webDocExpanded = useEditorUiStore((state) => state.webDocExpanded)
@@ -138,15 +139,24 @@ export function WorkspaceShell({
   const toggleZenMode = useReaderHudUiStore((state) => state.toggleZenMode)
 
   const isSidebarVisible = !zenMode && sidebarVisible
+  const outlineAvailable = !zenMode && headings.length > 0 && Boolean(onSelectHeading)
+  const showOutline = outlineAvailable && outlineVisible
 
   const { marks, deleteMark } = useReadingMarks(activeFilePath || '')
 
   const sidebarPanelRef = useCollapsiblePanelSync(isSidebarVisible)
   const agentPanelRef = useCollapsiblePanelSync(isDockedPanelVisible)
 
+  const shellPanelIds = useMemo(
+    () =>
+      showOutline
+        ? ['sidebar', 'main', 'outline', 'agent']
+        : ['sidebar', 'main', 'agent'],
+    [showOutline],
+  )
   const shellLayout = useDefaultLayout({
     id: 'workspace-shell',
-    panelIds: ['sidebar', 'main', 'agent'],
+    panelIds: shellPanelIds,
   })
 
   const handleToggleSidebar = () => {
@@ -199,6 +209,9 @@ export function WorkspaceShell({
           onQuickOpen={onQuickOpen}
           onToggleAgentPanel={handleToggleAgentPanel}
           agentPanelOpen={agentPanelOpen}
+          outlineAvailable={outlineAvailable}
+          outlineVisible={showOutline}
+          onToggleOutline={() => preserveScrollAnchor(() => setOutlineVisible(!outlineVisible))}
           theme={theme}
           onCycleTheme={cycleTheme}
           onOpenSettings={onOpenSettings}
@@ -239,10 +252,6 @@ export function WorkspaceShell({
               activeFilePath={activeFilePath}
               webPageUrl={webPageUrl}
               recentWebUrls={recentWebUrls}
-              headings={headings}
-              activeHeadingId={activeHeadingId}
-              outlineExpanded={outlineExpanded && headings.length > 0}
-              onOutlineToggle={() => setOutlineExpanded(!outlineExpanded)}
               fileTreeExpanded={fileTreeExpanded}
               onFileTreeToggle={() => setFileTreeExpanded(!fileTreeExpanded)}
               webDocExpanded={webDocExpanded}
@@ -254,7 +263,6 @@ export function WorkspaceShell({
               onRescanWorkspace={onRescanWorkspace}
               isRescanningWorkspace={isRescanningWorkspace}
               onSelectFile={onSelectFile}
-              onSelectHeading={onSelectHeading ?? (() => undefined)}
               onHideSidebar={() => handleSetSidebarVisible(false)}
               treeActions={treeActions}
               readOnly={readOnly}
@@ -275,7 +283,7 @@ export function WorkspaceShell({
 
           {isSidebarVisible ? <ResizableHandle withHandle /> : null}
 
-          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
+          <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? (showOutline ? '44%' : '57%') : (showOutline ? '62%' : '75%')} minSize="30%" className="min-w-0">
             <ResizablePanelGroup orientation="vertical">
               <ResizablePanel id="document" defaultSize="70%" minSize="20%">
                 {/* 文档区隔离：内容（工具栏、滚动条、异步渲染）的尺寸变化不外溢到外壳布局 */}
@@ -287,6 +295,28 @@ export function WorkspaceShell({
               </ResizablePanel>}
             </ResizablePanelGroup>
           </ResizablePanel>
+
+          {showOutline ? (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel
+                id="outline"
+                collapsible
+                collapsedSize={0}
+                defaultSize="16%"
+                minSize="12%"
+                maxSize="30%"
+                className="min-w-0"
+              >
+                <DocumentOutline
+                  headings={headings}
+                  activeHeadingId={activeHeadingId}
+                  onSelectHeading={onSelectHeading ?? (() => undefined)}
+                  onHide={() => preserveScrollAnchor(() => setOutlineVisible(false))}
+                />
+              </ResizablePanel>
+            </>
+          ) : null}
 
           {isDockedPanelVisible ? <ResizableHandle withHandle /> : null}
 

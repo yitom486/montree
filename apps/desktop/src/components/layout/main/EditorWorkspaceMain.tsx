@@ -78,6 +78,7 @@ import {
 import { useEditorUiStore, useFileUiState, type EditorViewMode } from '@/stores/editor-ui-store'
 import { useAppSettingsStore } from '@/stores/app-settings-store'
 import { getDocumentKind, getFileExtension, type FileTreeNode } from '@yitom/contracts'
+import { isImagePath } from '@/lib/workspace/image-types'
 import { flattenFileTree } from '@/lib/workspace/quick-open'
 import { ProposalReviewLayout } from '@/components/editor/ai-proposals/ProposalReviewBar'
 import type { WikilinkCandidate } from '@/lib/editor/wikilink-completion'
@@ -98,6 +99,9 @@ const PptxViewer = lazy(() =>
 )
 const HtmlViewer = lazy(() =>
   import('@/components/html/HtmlViewer').then((m) => ({ default: m.HtmlViewer })),
+)
+const ImageViewer = lazy(() =>
+  import('@/components/preview/ImageViewer').then((m) => ({ default: m.ImageViewer })),
 )
 const TypstWorkspace = lazy(() =>
   import('@/components/typst/TypstWorkspace').then((m) => ({ default: m.TypstWorkspace })),
@@ -371,6 +375,7 @@ export const EditorWorkspaceMain = forwardRef<
   }, [headings, updateActiveHeading, viewMode])
 
   const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
+  const isImageDocument = Boolean(filePath && isImagePath(filePath))
   // TXT shares Markdown's file routing, but should not receive Markdown preview decorations.
   const isMarkdown = documentKind === 'markdown' && (!filePath || getFileExtension(filePath) !== '.txt')
   const dataRoot = useRef<HTMLElement>(null)
@@ -432,6 +437,7 @@ export const EditorWorkspaceMain = forwardRef<
 
   const isTextData = documentKind === 'json' || documentKind === 'log'
   const isDataOrOfficeDoc =
+    isImageDocument ||
     documentKind === 'csv' ||
     documentKind === 'tsv' ||
     documentKind === 'json' ||
@@ -517,6 +523,10 @@ export const EditorWorkspaceMain = forwardRef<
             <TypstWorkspace filePath={filePath} textDocument={textDocument} content={content}
               onContentChange={onContentChange} workspaceRoot={workspaceRoot} viewMode={viewMode}
               onOpenFile={onOpenTypstFile} />
+          </Suspense>
+        ) : isImageDocument && filePath ? (
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载图片视图…</div>}>
+            <ImageViewer filePath={filePath} />
           </Suspense>
         ) : documentKind === 'html' && filePath ? (
           <Suspense fallback={<div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />正在加载 HTML 视图…</div>}>

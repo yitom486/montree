@@ -13,6 +13,8 @@ describe('scanWorkspace', () => {
     await writeFile(join(root, 'book.pdf'), '%PDF')
     await writeFile(join(root, 'novel.epub'), 'PK')
     await writeFile(join(root, 'ignored.mobi'), 'MOBI')
+    await writeFile(join(root, 'cover.svg'), '<svg />')
+    await writeFile(join(root, 'photo.avif'), 'avif')
 
     const nested = join(root, 'nested')
     await mkdir(nested)
@@ -30,6 +32,8 @@ describe('scanWorkspace', () => {
     expect(fileNames).toContain('novel.epub')
     expect(fileNames).toContain('chapter.txt')
     expect(fileNames).toContain('ignored.mobi')
+    expect(fileNames).toContain('cover.svg')
+    expect(fileNames).toContain('photo.avif')
   })
 
   it('遇到无权限或不存在的目录时静默容错跳过，不抛出异常', async () => {

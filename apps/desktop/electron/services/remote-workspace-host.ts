@@ -52,12 +52,12 @@ import type {
 import {
   CROSS_WORKSPACE_MOVE_MESSAGE,
   DEFAULT_WORKSPACE_LIMITS,
-  IMAGE_MIME_BY_EXTENSION,
   assertSameWorkspaceId,
   err,
   getDocumentKind,
   ok,
 } from '@yitom/contracts'
+import { getImageMimeType } from './image-formats'
 import type {
   HostTextRead,
   HostWriteTextInput,
@@ -621,9 +621,7 @@ export class RemoteWorkspaceHost implements WorkspaceHost {
     } catch (error) {
       return err(error as AppError)
     }
-    const dot = rel.lastIndexOf('.')
-    const mime =
-      dot >= 0 ? IMAGE_MIME_BY_EXTENSION[rel.slice(dot).toLowerCase()] : undefined
+    const mime = getImageMimeType(rel)
     if (!mime) {
       return err({ code: 'FILE_READ_ERROR', message: '不支持的图片格式' })
     }

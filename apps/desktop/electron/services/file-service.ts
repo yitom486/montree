@@ -13,7 +13,7 @@ import {
   isTextDocumentKind,
   isOfficeDocumentKind,
 } from '@yitom/contracts'
-import { IMAGE_EXTENSION_BY_MIME, IMAGE_MIME_BY_EXTENSION } from '@yitom/contracts'
+import { IMAGE_EXTENSION_BY_MIME } from '@yitom/contracts'
 import { toAppError, type AppError } from '@yitom/contracts'
 import { err, ok, type Result } from '@yitom/contracts'
 import type {
@@ -34,6 +34,13 @@ import type {
 import { scanWorkspace } from './workspace'
 import { resolveExportSavePath } from './export-save-path'
 import { documentHash } from './binary-document-service'
+import {
+  DOCUMENT_IMAGE_EXTENSIONS,
+  getImageMimeType,
+  isImageFileExtension,
+} from './image-formats'
+
+const ALL_OPEN_EXTENSIONS = [...ALL_DOCUMENT_EXTENSIONS, ...DOCUMENT_IMAGE_EXTENSIONS]
 
 /** Electron 文件对话框过滤器 */
 export const MARKDOWN_DIALOG_FILTERS = [
@@ -41,9 +48,9 @@ export const MARKDOWN_DIALOG_FILTERS = [
   { name: 'All Files', extensions: ['*'] },
 ]
 
-/** 打开文件对话框：Markdown + 电子书 + 数据表格 + Office */
+/** 打开文件对话框：Markdown + 电子书 + 数据表格 + Office + 图片 */
 export const DOCUMENT_DIALOG_FILTERS = [
-  { name: '所有支持格式', extensions: [...ALL_DOCUMENT_EXTENSIONS] },
+  { name: '所有支持格式', extensions: ALL_OPEN_EXTENSIONS },
   { name: 'Markdown', extensions: [...MARKDOWN_EXTENSIONS] },
   { name: 'HTML 网页', extensions: [...HTML_EXTENSIONS] },
   { name: 'Typst', extensions: [...TYPST_EXTENSIONS] },
@@ -52,6 +59,7 @@ export const DOCUMENT_DIALOG_FILTERS = [
   { name: 'MOBI / Kindle', extensions: ['mobi', 'azw3', 'azw'] },
   { name: '数据表格与日志', extensions: [...DATA_EXTENSIONS] },
   { name: 'Office 文档', extensions: [...OFFICE_EXTENSIONS] },
+  { name: '图片', extensions: [...DOCUMENT_IMAGE_EXTENSIONS] },
   { name: 'All Files', extensions: ['*'] },
 ]
 
@@ -89,6 +97,11 @@ export async function openDocumentDialog(
 
     if (kind === 'pdf' || kind === 'epub' || kind === 'mobi' || isOfficeDocumentKind(kind)) {
       return ok({ filePath, kind })
+    }
+
+    if (isImageFileExtension(extname(filePath).toLowerCase())) {
+      // DocumentKind 暂不含图片；渲染端按扩展名分流到 ImageViewer，仅借道“无正文”分支。
+      return ok({ filePath, kind: 'image' } as unknown as OpenDocumentResult)
     }
 
     return err({
@@ -195,7 +208,7 @@ export async function readImageAsDataUrl(
   filePath: string,
 ): Promise<Result<ReadImageResult, AppError>> {
   try {
-    const mime = IMAGE_MIME_BY_EXTENSION[extname(filePath).toLowerCase()]
+    const mime = getImageMimeType(filePath)
     if (!mime) {
       return err({
         code: 'FILE_READ_ERROR',

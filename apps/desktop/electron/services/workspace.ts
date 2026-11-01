@@ -3,6 +3,7 @@ import type { Dirent } from 'node:fs'
 import { join, extname } from 'node:path'
 import { getDocumentKind, isWorkspaceFileExtension } from '@yitom/contracts'
 import type { FileTreeNode } from '@yitom/contracts'
+import { isImageFileExtension } from './image-formats'
 
 /** 工作区目录树最大递归深度 */
 export const WORKSPACE_MAX_DEPTH = 6
@@ -62,16 +63,17 @@ export async function scanWorkspace(
     if (!entry.isFile()) continue
 
     const extension = extname(entry.name).toLowerCase()
-    if (!isWorkspaceFileExtension(extension)) continue
+    const isImage = isImageFileExtension(extension)
+    if (!isWorkspaceFileExtension(extension) && !isImage) continue
 
     const documentKind = getDocumentKind(fullPath)
-    if (documentKind === 'unknown') continue
+    if (documentKind === 'unknown' && !isImage) continue
 
     nodes.push({
       name: entry.name,
       path: fullPath,
       type: 'file',
-      documentKind,
+      ...(documentKind !== 'unknown' ? { documentKind } : {}),
     })
   }
 

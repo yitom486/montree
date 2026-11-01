@@ -49,7 +49,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `quick-open.spec.ts` | 打开文件夹（`E2E_AUTO_OPEN_PATH` 跳过原生对话框）→ Ctrl+P 搜索打开；路径栏定位/窄栏/未保存提示；右键菜单、Shift+F10、禁用项、Escape 与复制路径参数（剪贴板边界桩） |
 | `document-tools.spec.ts` | JSON/LOG/HTML/DOCX 通用读取、CSV选区/筛选编辑、XLSX公式保存/外部冲突、PPT元素查询/删改/撤销与保存及原稿段落样式回归（`E2E_DOCUMENT_TOOLS`） |
 | `internal-document-links.spec.ts` | HTML 侧栏相对链接、跨文件/同页锚点与 Markdown 相对内链在应用内切换文档；断言不会把应用入口载入 HTML iframe（preload 缺失页） |
-| `html-preview-isolation.spec.ts` | 本地 HTML 预览独立源：页面访问不到 `parent.electronAPI`/终端接口，localStorage、相对 CSS/JS 正常，工具栏缩放经桥接生效 |
+| `html-preview-isolation.spec.ts` | 本地 HTML 预览独立源：页面访问不到 `parent.electronAPI`/终端接口，localStorage、相对 CSS/JS 正常，工具栏缩放经桥接生效；越界图片不代读、拒绝越界链接、阻止页面改名后自导航/弹窗、外链经宿主确认且目标不可被脚本替换 |
 | `html-reader-content.spec.ts` | 本地 HTML 阅读 MCP：脚本执行后的可见纯文本、隐藏节点过滤、标题 TOC 与搜索回归，确保返回渲染正文而非 HTML 源码 |
 | `text-tools-integration.spec.ts` | mock 模型输出 → 真实 HTTP MCP → IPC → Markdown/TXT/**Typst** 缓冲区；精确选区、重复原文、批量拒绝原子性、全部视图/共享撤销、未保存手动输入、CRLF 保存重开、跨文档及外部冲突校验；Typst 验证 `format=typst`、行分段、选区和保存/撤销 |
 | `ppt-tools-integration.spec.ts` | mock 模型工具调用输出 → 真实 HTTP MCP → IPC → PPT 模型/预览/磁盘保存与重开；局部样式保留、拒绝原子性、外部冲突、可见页/选区页和按需检查器，附前后截图与工具记录 |
@@ -60,6 +60,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `reader-footer-nav.spec.ts` | 底栏翻页：收进正文列（不横跨卡片轨）+ 上下单元与正文同步（真实多章节 EPUB） |
 | `reader-smoke.spec.ts` | Markdown 预览（Mermaid/公式/高亮）+ PDF 画布文字层（自研最小 fixture） |
 | `markdown-live-preview.spec.ts` | 实时预览真实 Electron 回归：表格对齐与精确源单元格、HTML/Markdown 本地图片、KaTeX、Mermaid、代码复制、嵌套引用/提示块、跨空行 details 和内嵌 Mermaid 展开/收起（含独立预览）、XSS 清理、自动链接/引用定义、脚注编号与跨视口回链/长脚注编辑、暗色对比度、源码切换/撤销及新文档默认/TXT 保留原文；附截图 |
+| `markdown-frontmatter-outline.spec.ts` | YAML frontmatter 阅读预览省略、所见即所得属性卡片与源码往返；右侧文档目录高亮/跳转/折叠；SVG 图片阅读器 |
 | `reader-pdf-structure.spec.ts` | PDF 结构化 WASM：生产包真加载（非回退）+ Agent 正文走结构化（`E2E_PDF_STRUCTURE` 门控测试钩子） |
 | `reader-pdf-ocr.spec.ts` | 扫描版 PDF 单页 OCR：「更多工具 → 识别本页」落缓存 + 文字层可读（当前页无文字层会自动识别；`apps/desktop/e2e/fixtures/ocr/scanned-hello.pdf`） |
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |

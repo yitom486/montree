@@ -27,6 +27,7 @@ import { getOpenDialogDefaultPath } from '@/lib/workspace/dialog-default-path'
 import { normalizeNewlines } from '@/lib/editor/text-normalize'
 import type { DocumentDraft } from '@/lib/editor/draft-utils'
 import { useTextDocumentTools } from '@/hooks/editor/useTextDocumentTools'
+import { isImagePath } from '@/lib/workspace/image-types'
 
 function getFileName(filePath?: string): string {
   if (!filePath) return '未命名'
@@ -209,6 +210,8 @@ export function useFileOperations(onError?: (error: AppError) => void) {
   const openPathMutation = useMutation({
     mutationFn: async (path: string): Promise<Result<OpenDocumentResult & { revision?: string }, AppError>> => {
       const kind = getDocumentKind(path)
+      // 图片不在 DocumentKind 中：借道“无正文”结果，Electron 返回的 kind 仅作占位。
+      if (isImagePath(path)) return ok({ filePath: path, kind: 'image' } as unknown as OpenDocumentResult)
       if (isTextDocumentKind(kind)) {
         // B2：经宿主读（带 revision；旧构建缺新 IPC 时回落 fileApi，revision 置空）。
         // P1：远端绑定下裸相对路径转 workspaceId + relativePath，直达远端会话。
@@ -254,6 +257,9 @@ export function useFileOperations(onError?: (error: AppError) => void) {
       if (isReaderDocumentKind(result.value.kind) || isOfficeDocumentKind(result.value.kind)) {
         loadReader(result.value.filePath)
         return
+      }
+      if (isImagePath(result.value.filePath)) {
+        loadReader(result.value.filePath)
       }
     },
   })
