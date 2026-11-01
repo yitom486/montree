@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.26] - 2026-11-02
+
 - **修复：右侧目录挤动 Agent 面板**：文档目录改为文档区内的右侧浮层，切换 Markdown / PDF / 在线文档时不再改变外壳面板尺寸与聊天面板宽度，外层布局保持零位移。
 
 ---
@@ -695,7 +699,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.25...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.26...HEAD
+[0.4.26]: https://github.com/yitom486/montree/compare/v0.4.25...v0.4.26
 [0.4.25]: https://github.com/yitom486/montree/compare/v0.4.24...v0.4.25
 [0.4.24]: https://github.com/yitom486/montree/compare/v0.4.23...v0.4.24
 [0.4.23]: https://github.com/yitom486/montree/compare/v0.4.22...v0.4.23
