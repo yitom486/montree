@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.25] - 2026-11-02
+
 - **Markdown 排版与 Frontmatter**：阅读预览省略文档首部 YAML frontmatter，所见即所得改为可展开的文档属性卡片并提供源码编辑；阅读正文限制行宽，统一标题分隔线、表格、引用、列表与图片的垂直节奏。
 
 - **右侧文档目录**：Markdown 与在线文档目录从左侧栏移到右侧独立面板，仅在有标题时出现；目录独立滚动，当前标题加粗高亮并自动跟随正文，点击目录可双向跳转，支持折叠与从标题栏重新展开。
@@ -689,7 +693,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.24...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.25...HEAD
+[0.4.25]: https://github.com/yitom486/montree/compare/v0.4.24...v0.4.25
 [0.4.24]: https://github.com/yitom486/montree/compare/v0.4.23...v0.4.24
 [0.4.23]: https://github.com/yitom486/montree/compare/v0.4.22...v0.4.23
 [0.4.22]: https://github.com/yitom486/montree/compare/v0.4.21...v0.4.22
