@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.27] - 2026-11-02
+
 - **修复：目录按钮重名与主题切换回归抖动**：右侧目录收起按钮不再与在线文档「目录」按钮重名；主题相关 E2E 等待过渡结束后再断言，提升 CI 稳定性。
 
 ---
@@ -701,7 +705,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.26...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.27...HEAD
+[0.4.27]: https://github.com/yitom486/montree/compare/v0.4.26...v0.4.27
 [0.4.26]: https://github.com/yitom486/montree/compare/v0.4.25...v0.4.26
 [0.4.25]: https://github.com/yitom486/montree/compare/v0.4.24...v0.4.25
 [0.4.24]: https://github.com/yitom486/montree/compare/v0.4.23...v0.4.24
