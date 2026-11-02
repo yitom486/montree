@@ -1,3 +1,4 @@
+import { WorkspaceDocumentArea } from '@/components/layout/WorkspaceDocumentArea'
 import { Suspense, forwardRef, lazy, useImperativeHandle, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { WebDocViewerHandle } from '@/components/reader/WebDocViewer'
@@ -48,7 +49,7 @@ export const WebDocWorkspaceMain = forwardRef<WebDocWorkspaceMainHandle, WebDocW
           <span className="shrink-0 text-xs text-muted-foreground">在线文档</span>
           <WebDocAddressBar pageUrl={pageUrl} recentUrls={recentUrls} onNavigate={onNavigateUrl} />
         </div>
-        <main className="min-h-0 flex-1 bg-editor">
+        <WorkspaceDocumentArea>
           <Suspense
             fallback={
               <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -65,7 +66,7 @@ export const WebDocWorkspaceMain = forwardRef<WebDocWorkspaceMainHandle, WebDocW
               workspaceRoot={workspaceRoot}
             />
           </Suspense>
-        </main>
+        </WorkspaceDocumentArea>
       </div>
     )
   },

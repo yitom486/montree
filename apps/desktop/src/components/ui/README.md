@@ -9,6 +9,7 @@
 | `button` / `dialog` / `alert-dialog` / `input` / `textarea` / `input-group` | 按钮与表单对话框 |
 | `dropdown-menu` / `menubar` | 菜单 |
 | `breadcrumb` / `separator` / `scroll-area` / `progress` | 导航、进度与布局装饰 |
+| `tabs` | 辅助区页签（shadcn 官方 new-york-v4 Radix registry，经 CLI 安装） |
 | `resizable` | `react-resizable-panels` 封装 |
 | `sonner` | Toast |
 | `tooltip` / `hover-card` | 悬停提示与附件预览 |

@@ -4,6 +4,7 @@ import type { AcpHudDisplayMode, AcpUiStore } from './acp-types'
 import { ensureThreadList, openPanelPreservingThread } from './chat-helpers'
 import { reconcileOwnedChatThreadMetadata } from '@/lib/agent/chat-session-authority'
 import { getOwnedChatSessionStore } from '@/lib/agent/chat-session-owner'
+import { useReaderHudUiStore } from './reader-hud-store'
 
 export interface HudSlice {
   panelOpen: boolean
@@ -30,9 +31,13 @@ export const createHudSlice: StateCreator<
   composerFocusNonce: 0,
   composerInsertNonce: 0,
 
-  setHudDisplayMode: (mode) => set({ hudDisplayMode: mode }),
+  setHudDisplayMode: (mode) => {
+    if (mode === 'docked') useReaderHudUiStore.setState({ workspacePanelTab: 'chat' })
+    set({ hudDisplayMode: mode })
+  },
 
   setPanelOpen: (open) => {
+    if (open) useReaderHudUiStore.setState({ workspacePanelTab: 'chat' })
     set((s) => {
       if (!open) {
         const workspaceRoot = s.threads.find(
@@ -69,6 +74,7 @@ export const createHudSlice: StateCreator<
   },
 
   openPanelAndFocusComposer: () => {
+    useReaderHudUiStore.setState({ workspacePanelTab: 'chat' })
     set((s) => ({
       ...(s.panelOpen
         ? { panelOpen: true }
@@ -80,6 +86,7 @@ export const createHudSlice: StateCreator<
   },
 
   insertComposerSelectionMarker: () => {
+    useReaderHudUiStore.setState({ workspacePanelTab: 'chat' })
     set((s) => ({
       ...(s.panelOpen
         ? { panelOpen: true }

@@ -109,8 +109,8 @@ test.describe('foliate 标注链路', () => {
       await expect(preview).toBeHidden()
 
       // 面板列出该标记（正文在 closed shadow 内，light DOM 唯一匹配即面板项）
-      // 工具栏按钮已改名「批注簿」（旧名「书签与批注」是阶段 9 前的叫法）
-      await window.getByRole('button', { name: '批注簿' }).click()
+      // 标记统一在共享辅助区的卡片流查看。
+      await window.getByRole('button', { name: '卡片流', exact: true }).click()
       await expect(window.getByText('Montree E2E minimal EPUB paragraph.').first()).toBeVisible({
         timeout: 10_000,
       })
@@ -195,15 +195,16 @@ test.describe('foliate 标注链路', () => {
         timeout: 20_000,
       })
 
-      // 工具栏按钮已改名「加书签」（旧名「添加书签」是阶段 9 前的叫法）
-      await window.getByRole('button', { name: '加书签' }).click()
+      // 低频书签入口收进更多工具，保存后自动打开卡片流。
+      await window.getByRole('button', { name: '更多工具', exact: true }).click()
+      await window.getByRole('menuitem', { name: '添加书签', exact: true }).click()
       await expect(window.getByText('已添加书签')).toBeVisible({ timeout: 10_000 })
 
       const marks = await e2eListMarks(window)
       expect(marks).toHaveLength(1)
       expect(marks[0]?.kind).toBe('bookmark')
 
-      await window.getByRole('button', { name: '批注簿' }).click()
+      await window.getByRole('button', { name: '卡片流', exact: true }).click()
       await expect(window.getByText('第 1 节').first()).toBeVisible({ timeout: 10_000 })
     } finally {
       await app.close()

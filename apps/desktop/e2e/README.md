@@ -23,6 +23,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-epipe.spec.ts` | 回合中杀掉 Agent 进程后再写 stdin（EPIPE）：主进程无未捕获异常/错误框，可重连 |
 | `ime-composition.spec.ts` | CDP 真实输入法组合（`Input.imeSetComposition`）：编辑器实时预览行与聊天输入框，组合中 Enter 不发送 |
 | `window-width-stability.spec.ts` | 奇数窗口宽度、滚动条临界内容、拖动分隔条后外框宽度静置不抖动；`E2E_DEVICE_SCALE_FACTOR` 模拟 125%/150% |
+| `workspace-companion-panel.spec.ts` | AI / 卡片流共享辅助区、键盘切换与制卡返回、草稿保留、正文宽度稳定、窄窗工具栏无重叠及关闭释放空间，附截图 |
 | `workspace-render-isolation.spec.ts` | md→PDF→在线文档→本地 md 切换与 Mermaid 渲染时，聊天面板零重渲染（渲染计数探针）、聊天/工作区外框零位移 |
 | `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
 | `react-dev-sandbox.spec.ts` / `fixtures/react-dev-sandbox.html` | 独立 Vite 开发服务 + Electron：React 开发版收到沙盒 iframe 的 Window/DOM 属性后，初次挂载、切换、点击和输入仍可用，无渲染异常 |

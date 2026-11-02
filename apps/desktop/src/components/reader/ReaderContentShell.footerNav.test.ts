@@ -22,11 +22,9 @@ describe('ReaderContentShell footerNav', () => {
 
   function shellProps(extra: Record<string, unknown>): ShellProps {
     return {
-      marksOpen: false,
       marks: [],
       onSelectMark: vi.fn(),
       onDeleteMark: vi.fn(),
-      onCloseMarks: vi.fn(),
       tocOpen: false,
       units: [],
       onCloseToc: vi.fn(),

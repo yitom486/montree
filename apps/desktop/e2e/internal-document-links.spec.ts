@@ -42,7 +42,7 @@ test('HTML 侧栏与 Markdown 内链在应用内切换文档，不把应用自�
     await expect(page.getByText(/preload 未成功注入/)).toHaveCount(0)
 
     await quickOpen(page, 'doc.md')
-    await page.getByRole('button', { name: '独立预览', exact: true }).click()
+    await page.keyboard.press('Control+3')
     await page.locator('.markdown-preview').getByRole('link', { name: 'Other document' }).click()
     await expect(page.locator('.cm-content')).toContainText('OTHER-DOCUMENT-CONTENT')
   } finally {

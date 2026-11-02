@@ -45,7 +45,7 @@
 | `useReadingMarks` | 当前文档书签 / 高亮 / 批注的 list + create/update/delete |
 | `useDeferredReaderLayout` | 等待 iframe 排版稳定后合并执行标记几何重算 |
 | `useReadingMarkInspector` | 点击高亮后的浮层：命中栈、当前标记、位置 |
-| `useReaderSidePanels` | 目录侧栏与标记侧栏互斥开关 |
+| `useReaderSidePanels` | 正文目录侧栏开关（标记统一进入外壳卡片区） |
 | `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/加入对话/问 Agent |
 | `useReaderExportMenu` | 三阅读器笔记与 Anki 导出菜单共享外壳（toc/当前章由各家传入） |
 | `usePdfPageOcr` | PDF 单页 OCR 域：页缓存/识别去重/统一正文读取/当前页识别 |

@@ -25,7 +25,6 @@ import type { OcrTocNotice } from '@/lib/reader/pdf-ocr/ocr-toc-notice'
 import { PdfOcrBanner } from '@/components/reader/PdfOcrBanner'
 import { PdfOcrTocEditor } from '@/components/reader/PdfOcrTocEditor'
 import { PdfBookSearch } from '@/components/reader/PdfBookSearch'
-import { PdfToolbarMoreMenu } from '@/components/reader/PdfToolbarMoreMenu'
 import { PdfZoomControls } from '@/components/reader/PdfZoomControls'
 import { BodyWatermarkPreviewDialog } from '@/components/reader/BodyWatermarkPreviewDialog'
 import { TocAiPolishControl } from '@/components/reader/TocAiPolishControl'
@@ -67,7 +66,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
 
   const [ocrTocNotice, setOcrTocNotice] = useState<OcrTocNotice | null>(null)
   const [tocOpen, setTocOpen] = useState(false)
-  const [marksOpen, setMarksOpen] = useState(false)
 
   // 1. PDF 页面级 OCR
   const pdfDocHolderRef = useRef<any>(null)
@@ -417,16 +415,11 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
       <ReaderToolbarShell
         ready={session.ready}
         tocDisabled={!session.hasChapterToc}
-        cardCount={marks.length}
+        menuItems={rosetta.moreMenuItems}
         readAloudDisabled={session.isScannedPdf}
         readAloudDisabledReason="当前文档为图片扫描件，暂不支持语音朗读"
         onTocToggle={() => {
-          setMarksOpen(false)
           setTocOpen((value) => !value)
-        }}
-        onMarksToggle={() => {
-          setTocOpen(false)
-          setMarksOpen((value) => !value)
         }}
         onAddBookmark={() => void addPageBookmark()}
         center={
@@ -479,7 +472,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
                 onJumpToPage={(page) => session.jumpToPage(page)}
               />
             ) : null}
-            <PdfToolbarMoreMenu items={rosetta.moreMenuItems} />
             {isLoading ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             ) : session.isScannedPdf ? (
@@ -507,11 +499,9 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
               onNext={() => nav.nextIndex >= 0 && session.goToFlatIndex(nav.nextIndex)}
             />
           }
-          marksOpen={marksOpen}
           marks={marks}
           onSelectMark={handleSelectMark}
           onDeleteMark={(mark) => void handleDeleteMark(mark)}
-          onCloseMarks={() => setMarksOpen(false)}
           onExportNotes={handleExportNotes}
           onExportAnkiCards={handleExportAnkiCards}
           marksToc={session.marksToc}

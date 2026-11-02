@@ -52,7 +52,7 @@ export function FoliateReaderViewer({
   workspaceRoot,
 }: FoliateReaderViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { tocOpen, marksOpen, toggleToc, toggleMarks, closeToc, closeMarks } = useReaderSidePanels()
+  const { tocOpen, toggleToc, closeToc } = useReaderSidePanels()
   const nav = useReaderNavigationStore((state) => state.nav)
   const readerFontSize = useAppSettingsStore((state) => state.readerFontSize)
   const readerLineHeight = useAppSettingsStore((state) => state.readerLineHeight)
@@ -189,9 +189,7 @@ export function FoliateReaderViewer({
       <ReaderToolbarShell
         ready={session.ready}
         tocDisabled={!session.ready || session.chapters.length === 0}
-        cardCount={marks.length}
         onTocToggle={toggleToc}
-        onMarksToggle={toggleMarks}
         onAddBookmark={() => void interactions.addBookmarkAtCurrent()}
         trailing={
           <>
@@ -212,15 +210,13 @@ export function FoliateReaderViewer({
         }
       />
 
-      {/* 内框行：正文（含卡轨）与 AI 侧栏并列，同属左大块；底导航收进正文列 */}
+      {/* 内框行：正文与目录留在工作区，卡片统一展示在外壳辅助区 */}
       <div className="flex min-h-0 flex-1">
         <ReaderContentShell
           filePath={filePath}
-          marksOpen={marksOpen}
           marks={marks}
           onSelectMark={session.handleSelectMark}
           onDeleteMark={(mark) => void interactions.handleDeleteMark(mark)}
-          onCloseMarks={closeMarks}
           onExportNotes={handleExportNotes}
           onExportAnkiCards={handleExportAnkiCards}
           marksToc={tocFromEpubUnits(session.chapters)}

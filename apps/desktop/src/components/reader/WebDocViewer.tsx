@@ -5,9 +5,8 @@ import {
   useMemo,
   useRef,
 } from 'react'
-import { ExternalLink, FileDown, Loader2, RefreshCw } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
 import { AnnotationNoteDialog } from '@/components/reader/AnnotationNoteDialog'
 import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
@@ -185,7 +184,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
     syncWebMarkOverlaysRef.current = session.syncWebMarkOverlays
 
     const { ready, readerDocument, handleSelectMark } = session
-    const { tocOpen, marksOpen, toggleToc, toggleMarks, closeToc, closeMarks } = useReaderSidePanels()
+    const { tocOpen, toggleToc, closeToc } = useReaderSidePanels()
 
     useEffect(() => {
       if (error) {
@@ -280,36 +279,18 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         <ReaderToolbarShell
           ready={ready}
           tocDisabled={units.length === 0}
-          cardCount={marks.length}
           readAloudDisabled={true}
           readAloudDisabledReason="网页版语音朗读优化中，暂未开放"
           onTocToggle={toggleToc}
-          onMarksToggle={toggleMarks}
           onAddBookmark={() => void addPageBookmark()}
+          menuItems={[
+            { key: 'reload', label: '重新加载', disabled: isLoading || isFetching, onSelect: handleReload },
+            { key: 'open-browser', label: '在浏览器中打开', onSelect: handleOpenInBrowser },
+            { key: 'export-markdown', label: '导出为 Markdown', disabled: !ready || !data, onSelect: () => void handleExportMarkdown() },
+          ]}
           trailing={
             <>
               <ReaderTypographyControls disabled={!ready} />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={isLoading || isFetching}
-                onClick={handleReload}
-                title="重新加载"
-              >
-                <RefreshCw className={cn('size-4', isFetching && 'animate-spin')} />
-              </Button>
-              <Button variant="ghost" size="icon-sm" onClick={handleOpenInBrowser} title="在浏览器中打开">
-                <ExternalLink className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!ready || !data}
-                onClick={() => void handleExportMarkdown()}
-                title="一键导出为 Markdown"
-              >
-                <FileDown className="size-4" />
-              </Button>
               {(isLoading || isFetching) && !data ? (
                 <Loader2 className="size-4 animate-spin text-muted-foreground" />
               ) : null}
@@ -317,18 +298,16 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           }
         />
 
-        {/* 内框行：正文（含卡轨）与 AI 侧栏并列，同属左大块；底导航收进正文列 */}
+        {/* 内框行：正文与目录留在工作区，卡片统一展示在外壳辅助区 */}
         <div className="flex min-h-0 flex-1">
           <ReaderContentShell
             bookTitle={displayTitle}
             footerNav={
               <ReaderFooterNav ready={ready && units.length > 0} onPrevious={goPrevious} onNext={goNext} />
             }
-            marksOpen={marksOpen}
             marks={marks}
             onSelectMark={handleSelectMark}
             onDeleteMark={(mark) => void handleDeleteMark(mark)}
-            onCloseMarks={closeMarks}
             onExportNotes={handleExportNotes}
             onExportAnkiCards={handleExportAnkiCards}
             marksToc={tocFromWebUnits(units)}

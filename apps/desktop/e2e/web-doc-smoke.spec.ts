@@ -43,7 +43,7 @@ test.describe('在线文档阅读', () => {
       await expect(window.getByText('已保存批注', { exact: true })).toBeVisible()
       await window.reload()
       await expect(webDocFrame(window).getByRole('heading', { name: 'Primitives', exact: true })).toBeVisible()
-      await mainPanel(window).getByRole('button', { name: '批注簿', exact: true }).click()
+      await window.getByRole('button', { name: '卡片流', exact: true }).click()
       await expect(window.getByText('网页批注持久化验证', { exact: true }).first()).toBeVisible()
     } finally { await app.close() }
   })

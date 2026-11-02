@@ -24,6 +24,7 @@ export interface ReaderHudUiState {
   hudActiveTab: HudActiveTab
   /** 右侧 Marginalia 知识卡轨是否展开 */
   isCardRailOpen: boolean
+  workspacePanelTab: 'chat' | 'cards'
   /** 全书札记中心抽屉是否开启 */
   isNotesDrawerOpen: boolean
   /** 书库与在线文档抽屉是否开启 */
@@ -96,7 +97,8 @@ export const useReaderHudUiStore = create<ReaderHudUiState>()(
       dockedAgentWidth: 340,
       isDragging: false,
       hudActiveTab: 'chat',
-      isCardRailOpen: true,
+      isCardRailOpen: false,
+      workspacePanelTab: 'chat',
       isNotesDrawerOpen: false,
       isLibraryOpen: false,
       isQuizOpen: false,
@@ -127,13 +129,12 @@ export const useReaderHudUiStore = create<ReaderHudUiState>()(
       setIsDragging: (dragging) => set({ isDragging: dragging }),
       setHudActiveTab: (tab) => set({ hudActiveTab: tab }),
       setIsCardRailOpen: (open) =>
-        set((s) => ({
-          isCardRailOpen: open !== undefined ? open : !s.isCardRailOpen,
-        })),
+        set({ isCardRailOpen: open, workspacePanelTab: open ? 'cards' : 'chat' }),
       toggleCardRail: (open) =>
-        set((s) => ({
-          isCardRailOpen: open !== undefined ? open : !s.isCardRailOpen,
-        })),
+        set((s) => {
+          const nextOpen = open ?? !(s.isCardRailOpen && s.workspacePanelTab === 'cards')
+          return { isCardRailOpen: nextOpen, workspacePanelTab: nextOpen ? 'cards' : 'chat' }
+        }),
       setIsNotesDrawerOpen: (open) => set({ isNotesDrawerOpen: open }),
       setIsLibraryOpen: (open) => set({ isLibraryOpen: open }),
       openQuiz: (req) =>

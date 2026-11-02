@@ -7,6 +7,8 @@ interface ActivityBarProps {
   onToggleSidebar: () => void
   onOpenLibrary?: () => void
   onOpenNotes?: () => void
+  notesLabel?: string
+  notesActive?: boolean
   onOpenSettings?: () => void
 }
 
@@ -16,6 +18,8 @@ export function ActivityBar({
   onToggleSidebar,
   onOpenLibrary,
   onOpenNotes,
+  notesLabel = '全书札记中心',
+  notesActive = false,
   onOpenSettings,
 }: ActivityBarProps) {
   return (
@@ -59,8 +63,9 @@ export function ActivityBar({
           variant="ghost"
           size="icon"
           className="size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-          aria-label="全书札记中心"
-          title="全书札记中心与闪卡"
+          aria-label={notesLabel}
+          aria-pressed={notesActive}
+          title={notesLabel}
           onClick={onOpenNotes}
         >
           <BookmarkCheck className="size-5" />

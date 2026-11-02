@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { ListTree, PanelRightClose } from 'lucide-react'
+import { PanelRightClose } from 'lucide-react'
 import type { MarkdownHeading } from '@/lib/editor/markdown-headings'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface DocumentOutlineProps {
   headings: MarkdownHeading[]
   activeHeadingId?: string
   onSelectHeading: (heading: MarkdownHeading) => void
-  /** 折叠右侧目录面板（仅隐藏面板，重新打开由标题栏按钮负责） */
+  /** 折叠页内目录面板（仅隐藏面板，重新打开由文档区内的目录按钮负责） */
   onHide?: () => void
 }
 
@@ -15,7 +16,7 @@ const INDENT_STEP = 12
 const MAX_INDENT_LEVELS = 4
 
 /**
- * 右侧文档目录：
+ * 文档正文右侧的页内目录：
  * - 仅在存在标题的 Markdown / 在线文档出现；
  * - 正文与目录双向联动，当前标题加粗并自动滚入可视区；
  * - 长目录独立纵向滚动，不影响正文阅读位置。
@@ -34,11 +35,6 @@ export function DocumentOutline({
     [headings],
   )
 
-  const activeHeading = useMemo(
-    () => headings.find((heading) => heading.id === activeHeadingId),
-    [activeHeadingId, headings],
-  )
-
   useEffect(() => {
     const container = scrollRef.current
     const activeItem = activeHeadingId ? itemRefs.current.get(activeHeadingId) : undefined
@@ -54,36 +50,31 @@ export function DocumentOutline({
   }, [activeHeadingId])
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-sidebar" aria-label="文档目录">
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 px-3">
-        <ListTree className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <section className="flex h-full min-h-0 flex-col" aria-label="文档目录">
+      <header className="flex h-7 shrink-0 items-center justify-between gap-2 px-2">
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
           目录
         </span>
-        <span
-          className="rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
-          title={`共 ${headings.length} 个标题`}
-        >
-          {headings.length}
-        </span>
         {onHide ? (
-          <button
+          <Button
             type="button"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            variant="ghost"
+            size="icon-sm"
+            className="size-6 text-muted-foreground"
             onClick={onHide}
             title="收起文档大纲"
             aria-label="收起文档大纲"
           >
-            <PanelRightClose className="size-3.5" />
-          </button>
+            <PanelRightClose className="size-3.5" aria-hidden="true" />
+          </Button>
         ) : null}
       </header>
 
-      <div ref={scrollRef} className="outline-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+      <div ref={scrollRef} className="outline-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
         {headings.length === 0 ? (
           <p className="px-2 py-3 text-xs text-muted-foreground">当前文档暂无标题</p>
         ) : (
-          <nav aria-label="文档标题导航">
+          <nav className="border-l border-border/60" aria-label="文档标题导航">
             <ul className="space-y-0.5">
               {headings.map((heading) => {
                 const active = heading.id === activeHeadingId
@@ -104,7 +95,7 @@ export function DocumentOutline({
                         'group relative flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-xs leading-relaxed transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         active
-                          ? 'bg-primary/10 font-semibold text-primary'
+                          ? 'font-semibold text-primary'
                           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                       )}
                       style={{ paddingLeft: `${depth * INDENT_STEP + 10}px` }}
@@ -127,12 +118,6 @@ export function DocumentOutline({
           </nav>
         )}
       </div>
-
-      {activeHeading ? (
-        <footer className="shrink-0 border-t border-border/50 px-3 py-1.5 text-[10px] text-muted-foreground/80">
-          <span className="truncate">当前位置：{activeHeading.text}</span>
-        </footer>
-      ) : null}
     </section>
   )
 }

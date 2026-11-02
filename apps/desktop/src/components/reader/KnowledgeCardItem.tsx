@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 
 export interface KnowledgeCardItemProps {
   mark: ReadingMark
+  referenceNotice?: string
   isActive?: boolean
   onToggleCollapse: () => void
   onPolish?: () => void
@@ -41,6 +42,7 @@ export interface KnowledgeCardItemProps {
 
 export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
   mark,
+  referenceNotice,
   isActive = false,
   onToggleCollapse,
   onPolish,
@@ -100,7 +102,9 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
     }
   }
 
-  const badge = getBadgeStyle(category)
+  const badge = mark.kind === 'bookmark'
+    ? { style: { backgroundColor: 'var(--muted)', color: 'var(--foreground)' }, label: '书签' }
+    : getBadgeStyle(category)
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -276,6 +280,8 @@ export const KnowledgeCardItem: React.FC<KnowledgeCardItemProps> = ({
           )}
         </div>
       </div>
+
+      {referenceNotice && <p className="mb-2 text-[11px] text-muted-foreground" role="status">{referenceNotice}</p>}
 
       {/* 出处：卡片主人的章节归属，点击同样定位正文 */}
       {sourceLabel && (

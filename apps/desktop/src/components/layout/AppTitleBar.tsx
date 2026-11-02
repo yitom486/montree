@@ -4,7 +4,6 @@ import {
   Coffee,
   FileText,
   Image as ImageIcon,
-  ListTree,
   Moon,
   PanelLeft,
   Search,
@@ -28,9 +27,6 @@ interface AppTitleBarProps {
   onQuickOpen?: () => void
   onToggleAgentPanel?: () => void
   agentPanelOpen?: boolean
-  outlineAvailable?: boolean
-  outlineVisible?: boolean
-  onToggleOutline?: () => void
   theme?: AppTheme
   onCycleTheme?: () => void
   onOpenSettings?: () => void
@@ -66,9 +62,6 @@ export function AppTitleBar({
   onQuickOpen,
   onToggleAgentPanel,
   agentPanelOpen = false,
-  outlineAvailable = false,
-  outlineVisible = false,
-  onToggleOutline,
   theme = 'dark',
   onCycleTheme,
   onOpenSettings,
@@ -172,28 +165,6 @@ export function AppTitleBar({
       >
         {/* 全局操作工具组 */}
         <div className="flex items-center gap-0.5 pr-1">
-          {outlineAvailable && onToggleOutline && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={onToggleOutline}
-                  className={cn(
-                    'flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors',
-                    outlineVisible && 'bg-primary/10 text-primary',
-                  )}
-                  aria-label={outlineVisible ? '收起文档目录' : '展开文档目录'}
-                  aria-pressed={outlineVisible}
-                >
-                  <ListTree className="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={6}>
-                {outlineVisible ? '收起文档目录' : '展开文档目录'}
-              </TooltipContent>
-            </Tooltip>
-          )}
-
           {onToggleAgentPanel && (
             <Tooltip>
               <TooltipTrigger asChild>
