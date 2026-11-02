@@ -47,9 +47,10 @@
 | `useReadingMarkInspector` | 点击高亮后的浮层：命中栈、当前标记、位置 |
 | `useMarkdownPreviewMarks` | Markdown 预览选区与引用快照、持久卡片、原文定位、CSS Highlight、Agent 标记 provider；按路径隔离并拒绝过期选区写入 |
 | `useReaderSidePanels` | 正文目录侧栏开关（标记统一进入外壳卡片区） |
-| `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/加入对话/问 Agent |
+| `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/翻译/加入对话/问 Agent |
+| `useReaderTranslation` / `.test.ts` | 划词翻译短生命周期状态：坏选区先 OCR 恢复再翻译、Settings 目标语言、隐藏 ACP 副会话、流式增量、复制/重试/关闭；覆盖识别失败、过期结果与文档切换 |
 | `useReaderExportMenu` | 三阅读器笔记与 Anki 导出菜单共享外壳（toc/当前章由各家传入） |
-| `usePdfPageOcr` | PDF 单页 OCR 域：页缓存/识别去重/统一正文读取/当前页识别 |
+| `usePdfPageOcr` / `.test.ts` | PDF 单页 OCR 域：强制识别返回带几何的页缓存、在途去重、缺失/损坏文字层按需恢复、全书导入互斥及切书隔离 |
 | `useOcrComponent` | OCR 组件状态（初始 invoke + 推送写回 Query 缓存、下载/取消） |
 | `useRosettaImport` | 罗盘导入视图状态：横幅按钮 + 进度 + 已索引信息（Query 按 fingerprint 缓存）+ 纯本地目录重建 |
 | `useReaderWheelNavigation` | 滚轮到顶/底翻页。逻辑已抽出，Viewer 里仍有内联调用，此 Hook **暂无引用** |

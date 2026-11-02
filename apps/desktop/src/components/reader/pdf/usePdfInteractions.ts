@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import type { ReadingMark } from '@yitom/contracts'
+import type { ReadingMark, PdfOcrPageCache } from '@yitom/contracts'
+import { textFromOcrSelection } from '@/lib/reader/pdf-ocr/pdf-ocr-selection'
+import { hasUnreadableText } from '@/lib/reader/text-quality'
 import { isOk } from '@yitom/contracts'
 import {
   clearWindowSelection,
@@ -58,6 +60,8 @@ export interface UsePdfInteractionsOptions {
   deleteMark: (id: string) => Promise<any>
   jumpToPage: (page: number) => void
   goToFlatIndex: (index: number) => void
+  runPageOcr: (page: number) => Promise<PdfOcrPageCache>
+  ocrPageCachesRef: React.RefObject<Record<number, PdfOcrPageCache>>
 }
 
 export function usePdfInteractions({
@@ -77,6 +81,8 @@ export function usePdfInteractions({
   deleteMark,
   jumpToPage,
   goToFlatIndex,
+  runPageOcr,
+  ocrPageCachesRef,
 }: UsePdfInteractionsOptions) {
   const [selectionSnapshot, setSelectionSnapshot] = useState<PdfSelectionSnapshot | null>(null)
   const [selectionToolbarPos, setSelectionToolbarPos] = useState<{ x: number; y: number } | null>(null)
@@ -260,6 +266,19 @@ export function usePdfInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    // 闭包锁定点击时的快照；识别期间的新选区不能改变本次翻译范围。
+    recoverTranslationText: selectionSnapshot ? async () => {
+      const cache = ocrPageCachesRef.current[selectionSnapshot.page]
+      if (cache?.words.length && cache.fileFingerprint === fileFingerprint) {
+        try {
+          const text = textFromOcrSelection(cache, selectionSnapshot)
+          if (!hasUnreadableText(text)) return text
+        } catch {
+          // 旧 Auto 缓存也可能来自坏原生层，重新强制 OCR 后再定位。
+        }
+      }
+      return textFromOcrSelection(await runPageOcr(selectionSnapshot.page), selectionSnapshot)
+    } : undefined,
     dimTextSelection,
     clearTextSelection,
     openAnnotateDialog: () => {
@@ -277,7 +296,7 @@ export function usePdfInteractions({
     onHighlightError: (cause) => {
       toast.error(cause instanceof Error ? cause.message : '添加高亮失败')
     },
-    sessionKey: fileFingerprint ?? filePath,
+    sessionKey: fileFingerprint || filePath,
   })
 
   const handleCreateMarkAt = useCallback(

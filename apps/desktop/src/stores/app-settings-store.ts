@@ -31,6 +31,21 @@ export type WorkspaceActiveSurface = 'none' | 'file' | 'web-doc'
 /** Markdown 编辑器内部模式：沉浸式实时预览 / 纯源码 */
 export type MarkdownEditorMode = 'live-preview' | 'source'
 
+/** 划词翻译目标语言；源语言由模型自动判断，不做单独配置。 */
+export const TRANSLATION_TARGET_OPTIONS = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'zh-TW', label: '繁體中文' },
+  { value: 'en', label: 'English' },
+  { value: 'ja', label: '日本語' },
+  { value: 'ko', label: '한국어' },
+] as const
+
+export type TranslationTargetLang = (typeof TRANSLATION_TARGET_OPTIONS)[number]['value']
+
+export function translationTargetLabel(lang: TranslationTargetLang): string {
+  return TRANSLATION_TARGET_OPTIONS.find((item) => item.value === lang)?.label ?? '简体中文'
+}
+
 export const AUTO_SAVE_INTERVAL_OPTIONS: Array<{ value: AutoSaveIntervalMs; label: string }> = [
   { value: 15000, label: '15 秒' },
   { value: 30000, label: '30 秒' },
@@ -113,6 +128,10 @@ export interface AppSettingsState {
   aiInlineCompletion: boolean
   /** 单独关闭行内补全的文件 */
   inlineCompletionDisabledFiles: string[]
+  /** 划词翻译目标语言（仅目标语言；源语言由模型自动判断） */
+  translationTargetLang: TranslationTargetLang
+  /** 翻译模型独立于聊天模型；按 ACP 运行时分桶，空串表示跟随运行时默认 */
+  translationModelByRuntime: Record<string, string>
 }
 
 interface AppSettingsStore extends AppSettingsState {
@@ -139,6 +158,8 @@ interface AppSettingsStore extends AppSettingsState {
   setAiEditReviewMode: (enabled: boolean) => void
   setAiInlineCompletion: (enabled: boolean) => void
   toggleInlineCompletionForFile: (filePath: string) => void
+  setTranslationTargetLang: (lang: TranslationTargetLang) => void
+  setTranslationModel: (runtimeId: string, model: string) => void
   setMarkdownEditorMode: (mode: MarkdownEditorMode) => void
   toggleMarkdownEditorMode: () => void
   addRecentFile: (filePath: string) => void
@@ -183,7 +204,17 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       setAiEditReviewMode: (enabled) => set({ aiEditReviewMode: enabled }),
       aiInlineCompletion: true,
       inlineCompletionDisabledFiles: [],
+      translationTargetLang: 'zh-CN',
+      translationModelByRuntime: {},
       setAiInlineCompletion: (enabled) => set({ aiInlineCompletion: enabled }),
+      setTranslationTargetLang: (lang) => set({ translationTargetLang: lang }),
+      setTranslationModel: (runtimeId, model) =>
+        set((state) => ({
+          translationModelByRuntime: {
+            ...state.translationModelByRuntime,
+            [runtimeId]: model.trim(),
+          },
+        })),
       toggleInlineCompletionForFile: (filePath) => set((state) => ({
         inlineCompletionDisabledFiles: state.inlineCompletionDisabledFiles.includes(filePath)
           ? state.inlineCompletionDisabledFiles.filter((item) => item !== filePath)
@@ -320,6 +351,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
         aiEditReviewMode: state.aiEditReviewMode,
         aiInlineCompletion: state.aiInlineCompletion,
         inlineCompletionDisabledFiles: state.inlineCompletionDisabledFiles,
+        translationTargetLang: state.translationTargetLang,
+        translationModelByRuntime: state.translationModelByRuntime,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppSettingsState>
@@ -337,6 +370,15 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
           aiEditReviewMode: p.aiEditReviewMode ?? false,
           aiInlineCompletion: p.aiInlineCompletion ?? true,
           inlineCompletionDisabledFiles: Array.isArray(p.inlineCompletionDisabledFiles) ? p.inlineCompletionDisabledFiles : [],
+          translationTargetLang: TRANSLATION_TARGET_OPTIONS.some((item) => item.value === p.translationTargetLang)
+            ? p.translationTargetLang!
+            : 'zh-CN',
+          translationModelByRuntime:
+            p.translationModelByRuntime && typeof p.translationModelByRuntime === 'object'
+              ? Object.fromEntries(
+                  Object.entries(p.translationModelByRuntime).filter(([, value]) => typeof value === 'string'),
+                )
+              : {},
         }
       },
     },

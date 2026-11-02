@@ -10,6 +10,7 @@ import { ReaderFooterNav } from '@/components/reader/ReaderFooterNav'
 import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
+import { TranslationCard } from '@/components/reader/TranslationCard'
 import { DeepAnswerDialog } from '@/components/reader/DeepAnswerDialog'
 import { useReaderBinary } from '@/hooks/reader/useReaderBinary'
 import { useReadingMarkInspector } from '@/hooks/reader/useReadingMarkInspector'
@@ -69,6 +70,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
 
   // 1. PDF 页面级 OCR
   const pdfDocHolderRef = useRef<any>(null)
+  const isImportRunningRef = useRef(false)
   const pdfPageOcr = usePdfPageOcr({
     filePath,
     fileFingerprint,
@@ -77,6 +79,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     isScannedPdf: false,
     isMixedPdf: false,
     importRunning: false,
+    importRunningRef: isImportRunningRef,
     getPageSizePt: useCallback(async (page: number) => {
       const pdf = pdfDocHolderRef.current
       if (!pdf) return null
@@ -91,7 +94,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     }, []),
   })
 
-  const isImportRunningRef = useRef(false)
   const ocrTocManagerRef = useRef<ReturnType<typeof usePdfOcrTocManager> | null>(null)
 
   // 2. PDF 文档渲染会话
@@ -229,6 +231,8 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
     deleteMark,
     jumpToPage: session.jumpToPage,
     goToFlatIndex: session.goToFlatIndex,
+    runPageOcr: pdfPageOcr.runPageOcr,
+    ocrPageCachesRef: pdfPageOcr.ocrPageCachesRef,
   })
 
   const {
@@ -640,6 +644,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           y={selectionToolbarPos.y}
           onCopy={selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
+          onTranslate={selectionActions.translate}
           onAnnotate={selectionActions.handleAnnotate}
           onReadAloud={() => {
             if (selectionSnapshot?.text) {
@@ -654,6 +659,15 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           onGenerateCardPreset={selectionActions.generateAiCard}
           cardPresetPending={selectionActions.aiCardPending}
           onDismiss={selectionActions.handleDismiss}
+        />
+      ) : null}
+
+      {selectionActions.translation ? (
+        <TranslationCard
+          translation={selectionActions.translation}
+          onClose={selectionActions.dismissTranslation}
+          onRetry={() => void selectionActions.retryTranslation()}
+          onCopy={selectionActions.copyTranslation}
         />
       ) : null}
 

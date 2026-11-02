@@ -86,6 +86,14 @@ async function handle(message) {
       const excerpt = (command.split('<原文>\n')[1] || '').split('\n</原文>')[0].trim()
       output = JSON.stringify({ title: 'MOCK卡:' + excerpt.slice(0, 12), category: 'concept', aiSummary: 'MOCK摘要：' + excerpt.slice(0, 60), keyPoints: ['要点一：' + excerpt.slice(0, 20), '要点二'] })
     }
+    if (command.includes('Translate the following text into')) {
+      const target = (command.match(/Translate the following text into ([^.]+)\./) || [])[1] || ''
+      const excerpt = (command.split('<text>\n')[1] || '').split('\n</text>')[0].trim()
+      text(sessionId, `[${target}] `)
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      text(sessionId, `MOCK译:${excerpt}`)
+      output = ''
+    }
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`

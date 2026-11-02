@@ -113,6 +113,21 @@ describe('ensure 建新与复用', () => {
     expect(mockedSessionNew).toHaveBeenCalledWith(expect.objectContaining({ toolScope: 'toc' }))
   })
 
+  it('新建后应用独立配置覆盖（翻译模型）', async () => {
+    mockedSessionNew.mockResolvedValueOnce(ok({
+      sessionId: 'model-sid',
+      configOptions: [{ configId: 'model', name: 'Model', type: 'select', currentValue: 'default' }],
+    }))
+    await ensureSubsessionSession(
+      baseOpts({ purpose: 'translate', key: 'opencode:fast', configPatches: [{ configId: 'model', value: 'fast' }] }),
+    )
+    expect(vi.mocked(acpApi.setConfigOption)).toHaveBeenCalledWith({
+      sessionId: 'model-sid',
+      configId: 'model',
+      value: 'fast',
+    })
+  })
+
   it('always-new 每次新建且不读 store', async () => {
     const store = createMemoryStore()
     const opts = baseOpts({ purpose: 'toc', key: 'op-1', rotation: { mode: 'always-new' }, store })
@@ -157,6 +172,21 @@ describe('purpose-key 隔离与流式路由', () => {
     const sent = await sendSubsessionPrompt(opts, 'hi')
     expect(sent.status).toBe('ok')
     expect(sent.reply).toBe('hello world')
+  })
+
+  it('onDelta 只转发本次 prompt 的增量', async () => {
+    const opts = baseOpts()
+    const ensured = await ensureSubsessionSession(opts)
+    const sid = 'sessionId' in ensured ? ensured.sessionId : ''
+    const deltas: string[] = []
+    mockedPrompt.mockImplementation(async () => {
+      streamText(sid, '你')
+      streamText(sid, '好')
+      return ok({ stopReason: 'end_turn' })
+    })
+    const sent = await sendSubsessionPrompt({ ...opts, onDelta: (delta) => deltas.push(delta) }, 'hi')
+    expect(sent.reply).toBe('你好')
+    expect(deltas).toEqual(['你', '好'])
   })
 
   it('非 prompting 且 sid 未命中时不收集', async () => {

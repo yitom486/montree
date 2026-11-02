@@ -18,6 +18,7 @@ import {
   READER_LINE_HEIGHT_OPTION_LABELS,
   RECENT_FILES_LIMIT_OPTIONS,
   TAB_SIZE_OPTION_LABELS,
+  TRANSLATION_TARGET_OPTIONS,
   PDF_OCR_SCALE_OPTION_LABELS,
   useAppSettingsStore,
   type AutoSaveIntervalMs,
@@ -28,8 +29,10 @@ import {
   type ReaderFontSize,
   type ReaderLineHeight,
   type PdfOcrScale,
+  type TranslationTargetLang,
 } from '@/stores/app-settings-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { useAcpUiStore } from '@/stores/acp-ui-store'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import type { EditorViewMode } from '@/stores/editor-ui-store'
 import { cn } from '@/lib/utils'
@@ -48,6 +51,9 @@ interface SettingsDialogProps {
   onOpenErrorLog: () => void
   onOpenAbout: () => void
 }
+
+/** 稳定空数组：Zustand selector 不能每次返回新 []，否则 useSyncExternalStore 会无限重渲染。 */
+const EMPTY_MODEL_CATALOG: string[] = []
 
 function SettingRow({
   title,
@@ -159,6 +165,15 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
   const setPdfOcrBackgroundPrefetch = useAppSettingsStore((state) => state.setPdfOcrBackgroundPrefetch)
   const pdfOcrAgentAutoOcr = useAppSettingsStore((state) => state.pdfOcrAgentAutoOcr)
   const setPdfOcrAgentAutoOcr = useAppSettingsStore((state) => state.setPdfOcrAgentAutoOcr)
+  const translationTargetLang = useAppSettingsStore((state) => state.translationTargetLang)
+  const setTranslationTargetLang = useAppSettingsStore((state) => state.setTranslationTargetLang)
+  const translationModelByRuntime = useAppSettingsStore((state) => state.translationModelByRuntime)
+  const setTranslationModel = useAppSettingsStore((state) => state.setTranslationModel)
+  const selectedAcpRuntimeId = useAcpUiStore((state) => state.selectedRuntimeId)
+  const translationModelCatalog = useAcpUiStore(
+    (state) => state.modelCatalogByRuntime[state.selectedRuntimeId] ?? EMPTY_MODEL_CATALOG,
+  )
+  const translationModel = translationModelByRuntime[selectedAcpRuntimeId] ?? ''
   const pdfOcrScale = useAppSettingsStore((state) => state.pdfOcrScale)
   const setPdfOcrScale = useAppSettingsStore((state) => state.setPdfOcrScale)
   const verboseRendererLogs = useAppSettingsStore((state) => state.verboseRendererLogs)
@@ -497,6 +512,47 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
               <ToggleSwitch checked={aiInlineCompletion} onChange={setAiInlineCompletion} label="行内补全" />
             </SettingRow>
             <InlineCompletionProviderSettings />
+          </section>
+
+          <Separator className="my-2" />
+
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI 阅读</h3>
+            <SettingRow
+              title="划词翻译"
+              description="阅读器选中文本后点「翻译」。只设置目标语言，源语言由模型自动判断；翻译会话复用当前 ACP Agent 与模型，不进入对话历史。"
+            >
+              <OptionButtons<TranslationTargetLang>
+                value={translationTargetLang}
+                options={TRANSLATION_TARGET_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={setTranslationTargetLang}
+              />
+            </SettingRow>
+            <SettingRow
+              title="翻译模型"
+              description="独立于聊天模型；空值跟随当前运行时默认模型。切换后下一次翻译生效，不影响正在进行的聊天。"
+            >
+              <select
+                value={translationModel}
+                disabled={!selectedAcpRuntimeId}
+                onChange={(event) => setTranslationModel(selectedAcpRuntimeId, event.target.value)}
+                className="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                aria-label="翻译模型"
+              >
+                <option value="">跟随运行时默认</option>
+                {translationModelCatalog.map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            </SettingRow>
+            <SettingRow
+              title="翻译 Agent"
+              description="当前窗口同时只有一个 ACP 连接，因此翻译运行时仍跟随当前 Agent；模型可独立配置。"
+            >
+              <span className="text-xs text-muted-foreground">
+                {selectedAcpRuntimeId || '未连接 Agent'}
+              </span>
+            </SettingRow>
           </section>
 
           <Separator className="my-2" />

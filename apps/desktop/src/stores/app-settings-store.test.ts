@@ -21,3 +21,29 @@ it('旧设置中的源码模式不影响默认所见即所得，其他偏好仍�
   await useAppSettingsStore.persist.rehydrate()
   expect(useAppSettingsStore.getState().markdownEditorMode).toBe('live-preview')
 })
+
+it('翻译目标语言默认简体中文，持久化值可恢复且忽略非法值', async () => {
+  expect(useAppSettingsStore.getState().translationTargetLang).toBe('zh-CN')
+  useAppSettingsStore.getState().setTranslationTargetLang('en')
+  expect(JSON.parse(localStorage.getItem('markdown-editor-settings')!).state.translationTargetLang).toBe('en')
+
+  localStorage.setItem('markdown-editor-settings', JSON.stringify({
+    state: { translationTargetLang: 'en' }, version: 0,
+  }))
+  await useAppSettingsStore.persist.rehydrate()
+  expect(useAppSettingsStore.getState().translationTargetLang).toBe('en')
+
+  localStorage.setItem('markdown-editor-settings', JSON.stringify({
+    state: { translationTargetLang: 'not-a-language' }, version: 0,
+  }))
+  await useAppSettingsStore.persist.rehydrate()
+  expect(useAppSettingsStore.getState().translationTargetLang).toBe('zh-CN')
+})
+
+it('翻译模型按运行时分桶保存，与聊天模型偏好互不覆盖', async () => {
+  useAppSettingsStore.getState().setTranslationModel('opencode', 'fast-model')
+  expect(useAppSettingsStore.getState().translationModelByRuntime.opencode).toBe('fast-model')
+  expect(JSON.parse(localStorage.getItem('markdown-editor-settings')!).state.translationModelByRuntime).toEqual({
+    opencode: 'fast-model',
+  })
+})

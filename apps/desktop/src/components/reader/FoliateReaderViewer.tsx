@@ -7,6 +7,7 @@ import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
 import { ReadingProgressRing } from '@/components/reader/ReadingProgressRing'
 import { ReaderTypographyControls } from '@/components/reader/ReaderTypographyControls'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
+import { TranslationCard } from '@/components/reader/TranslationCard'
 import { AnnotationNoteDialog } from '@/components/reader/AnnotationNoteDialog'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
@@ -296,6 +297,7 @@ export function FoliateReaderViewer({
           onCopy={interactions.selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(interactions.selectionSnapshot?.text?.trim())}
           keyEventDocs={session.getRenderedDocs().map((item) => item.doc)}
+          onTranslate={interactions.selectionActions.translate}
           onAnnotate={interactions.selectionActions.handleAnnotate}
           onReadAloud={() => {
             if (interactions.selectionSnapshot?.text) {
@@ -310,6 +312,15 @@ export function FoliateReaderViewer({
           onGenerateCardPreset={interactions.selectionActions.generateAiCard}
           cardPresetPending={interactions.selectionActions.aiCardPending}
           onDismiss={interactions.selectionActions.handleDismiss}
+        />
+      ) : null}
+
+      {interactions.selectionActions.translation ? (
+        <TranslationCard
+          translation={interactions.selectionActions.translation}
+          onClose={interactions.selectionActions.dismissTranslation}
+          onRetry={() => void interactions.selectionActions.retryTranslation()}
+          onCopy={interactions.selectionActions.copyTranslation}
         />
       ) : null}
 

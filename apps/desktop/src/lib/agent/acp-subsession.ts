@@ -47,12 +47,16 @@ export interface SubsessionEnsureOptions extends SubsessionIdentity {
   rotation: SubsessionRotation
   store?: SubsessionStore
   runtimeId?: string // 显式指定运行时的 Agent（如 TOC AI 自由选择运行时）
+  /** 新建会话后覆盖的配置项（如独立翻译模型）；key 必须已存在于 configOptions */
+  configPatches?: Array<{ configId: string; value: string | boolean }>
 }
 
 export interface SubsessionSendOptions extends SubsessionEnsureOptions {
   /** 显式指定已有会话（如 TOC prepare 后的特定会话），避免重复新建导致孤儿会话与配置丢失 */
   sessionId?: string
   images?: Array<{ id: string; kind: 'image'; name: string; mimeType: string; base64: string }> // toc 专用，缺省无
+  /** 流式增量（仅本次 prompt 有效；用于翻译等短文本边到边渲染） */
+  onDelta?: (delta: string) => void
 }
 
 export type SubsessionEnsureResult =
@@ -76,6 +80,8 @@ interface SubsessionEntry extends SubsessionPersistedState {
   fresh: boolean
   configOptions: AcpConfigOption[]
   progress?: SubsessionProgress
+  /** 仅本次 prompt 的流式回调；promptOnce finally 清理 */
+  onDelta?: (delta: string) => void
 }
 
 const entries = new Map<string, SubsessionEntry>()
@@ -241,7 +247,10 @@ export function accumulateSubsessionUpdate(
   for (const entry of entries.values()) {
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
-    if (text) entry.replyBuffer += text
+    if (text) {
+      entry.replyBuffer += text
+      entry.onDelta?.(text)
+    }
     entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
@@ -259,7 +268,10 @@ export function accumulateSubsessionUpdateFor(
     if (entry.purpose !== purpose) continue
     if (entry.sessionId !== sid && !entry.prompting) continue
     const text = extractTextFromContent(update.content)
-    if (text) entry.replyBuffer += text
+    if (text) {
+      entry.replyBuffer += text
+      entry.onDelta?.(text)
+    }
     entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
@@ -297,6 +309,15 @@ async function createSubsessionSession(
   const preferred = acpState.preferredConfigByRuntime[runtimeId] ?? undefined
   const patches = listPreferredConfigPatches(configOptions, preferred)
   for (const patch of patches) {
+    await acpApi.setConfigOption({
+      sessionId: sid,
+      configId: patch.configId,
+      value: patch.value,
+    })
+  }
+  // 子会话独立配置（如翻译模型）最后覆盖，避免被运行时偏好盖回。
+  for (const patch of opts.configPatches ?? []) {
+    if (!configOptions.some((option) => option.configId === patch.configId)) continue
     await acpApi.setConfigOption({
       sessionId: sid,
       configId: patch.configId,
@@ -412,6 +433,7 @@ async function promptOnce(
   const entry = entries.get(mapKey)
   if (!entry || entry.sessionId !== sessionId) return { error: true, retryable: true }
   entry.replyBuffer = ''
+  entry.onDelta = opts.onDelta
   entry.prompting = true
   try {
     const attachments: ComposerAttachment[] = (opts.images ?? []).map((image) => ({
@@ -454,6 +476,7 @@ async function promptOnce(
     return { error: true, retryable: false }
   } finally {
     entry.prompting = false
+    entry.onDelta = undefined
   }
 }
 

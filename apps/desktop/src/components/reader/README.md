@@ -7,7 +7,7 @@
 | `WebDocViewer` | 在线文档阅读（iframe 阅读模式、划词批注、卡片流与导出、本页标题大纲；拆量子目录 `web-doc/`：`useWebDocNavigation`、`useWebDocInteractions`、`useWebDocSession`） |
 | `FoliateReaderViewer` | EPUB / MOBI / AZW3 统一阅读（foliate 后端：章节导航、划词批注、卡片流与导出；拆量子目录 `foliate/`：`foliate-theme`、`useFoliateHighlights`、`useFoliateInteractions`、`useFoliateBookSession`） |
 | `PdfViewer` | PDF 主 Viewer（Agent 正文走 WASM 结构化阅读顺序，失败回退 pdf.js；UI/选区坐标系不动；已入库 Agent 正文只读库，缺文抛错不回退 OCR；拆量子目录 `pdf/`：`usePdfDocumentSession`、`usePdfRosettaIndex`、`usePdfAgentRegistry`、`usePdfOcrTocManager`、`usePdfInteractions`） |
-| `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay） |
+| `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay；原生文字层含替换字符、异常控制字符或私用字形编码时自动 OCR 并切换词层） |
 | `PdfOcrBanner` / `PdfOcrTocEditor` | 扫描版 OCR 提示与目录校正（含偏移自动推算、AI 整理槽位） |
 | `TocAiPolishControl` | 目录 AI 整理：独立副会话 + 运行时/模型/思考档三级级联选择 + 专属提示词与 montree-toc 工具隔离 + JSON 解析回填草稿 |
 | `TocAiLiveDashboard` | 目录 AI 整理实时动态面板：4 阶段进度条、脉冲指示灯、流式思考与工具调用终端卡片、计时器与取消控制 |
@@ -17,8 +17,9 @@
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
 | `ReadingMarkPopover` | 正文标记点击编辑浮层（共享 Morph 壳、边缘避让、键盘关闭）；列表统一由卡片流管理 |
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
-| `SelectionToolbar` | 划选工具条（复制、高亮色板+写批注、朗读、单一 AI 菜单；AI 菜单内含制卡预设、快速问答与去 Agent 面板） |
+| `SelectionToolbar` | 划选工具条（复制、高亮色板+写批注、翻译、朗读、单一 AI 菜单；AI 菜单内含制卡预设、快速问答与去 Agent 面板） |
 | `SelectionAiMenu` | 划选 AI 菜单内容（生成卡片 6 预设 + 更多要求、快速问答 3 方向、去 Agent 面板细问） |
+| `TranslationCard` | 划词翻译非模态锚定卡（OCR 恢复进度、assistant-ui fluid parts 流式主译文、目标语言、复制/重试；PDF 通过 `pdf/usePdfInteractions` 锁定原选区恢复文字） |
 | `DeepAnswerDialog` | 一键深度问答对话框（同会话直答选段、不进右侧时间线，可存为卡片批注） |
 | `MarginaliaBar` | 右侧知识卡片轨（统一管理批注/划线/书签；单一类型筛选菜单、全部/单项折叠、AI 智能制卡；测验/闪卡/导出集中在卡片操作菜单、时序图联动） |
 | `KnowledgeCardItem` | 知识卡片单项（批注/概念/引用/方法/图谱/思考微晶卡片、单行与多功能态切换、考考我/闪卡抽认/AI润色） |

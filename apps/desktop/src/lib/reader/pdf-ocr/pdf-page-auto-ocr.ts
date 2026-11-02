@@ -1,8 +1,8 @@
 import type { PdfOcrPageCache } from '@yitom/contracts'
 
 /**
- * W3 当前页自动识别门（纯函数）：该页已上报无原生层（nativeCharCount<8，有原生层的
- * 页根本不会上报）→ 只认当前页（窗口邻页只记不认，翻到再认）→ 有缓存/导入中不动。
+ * 当前页自动识别门：该页已上报原生层缺失（nativeCharCount<8）或字形映射损坏
+ * → 只认当前页（窗口邻页只记不认，翻到再认）→ 有缓存/导入中不动。
  * 不依赖文档级 isScannedOrMixed：profile 到达之前页级上报已能证明需要词层，
  * 等 profile 会整次认不了（竞态）。文档级标志仍只用于横幅与后台预识别。
  * 静默：调用方 catch 后不弹框，工具栏「识别本页」仍可手动重试。

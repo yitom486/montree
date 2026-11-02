@@ -12,6 +12,7 @@ import {
   type PdfTextLayerBuilderInstance,
 } from '@/lib/reader/pdf/pdf-text-layer-builder'
 import { mountOcrTextLayer } from '@/lib/reader/pdf-ocr/pdf-ocr-text-layer'
+import { pdfTextItemsHaveUnreadableChars } from '@/lib/reader/pdf/pdf-page-text'
 import { pageHasNativeText } from '@montree/ocr-core'
 import type { PdfOcrPageCache } from '@yitom/contracts'
 import {
@@ -31,7 +32,7 @@ interface PdfPageViewProps {
   theme: AppTheme
   marks: ReadingMark[]
   ocrPageCache?: PdfOcrPageCache | null
-  /** W3：无原生层又无词缓存时通知调用方（由调用方决定是否自动识别本页） */
+  /** 无原生层或原生文字层损坏且无词缓存时通知调用方，由调用方决定是否自动识别本页。 */
   onWordLayerMissing?: (pageNumber: number) => void
   transientSelection?: PdfSelectionSnapshot | null
   onMouseUp?: (pageNumber: number, pageElement: HTMLElement, point: { clientX: number; clientY: number }) => void
@@ -150,9 +151,19 @@ export function PdfPageView({
           const str = 'str' in item && typeof item.str === 'string' ? item.str : ''
           return sum + str.replace(/\s/g, '').length
         }, 0)
-        const useOcrLayer = !pageHasNativeText(nativeCharCount) && !!ocrPageCache?.words.length
-        // W3：无原生层又无词缓存 → 上报，调用方按门控自动识别（本组件不直接 OCR）
-        if (!pageHasNativeText(nativeCharCount) && !ocrPageCache?.words.length) {
+        const nativeTextCorrupt = pdfTextItemsHaveUnreadableChars(textContent.items)
+        // 字体映射损坏：Canvas 正常但文字层不可读。
+        // 与「无原生层」同一处理：有 OCR 缓存就改用 OCR 透明层，没有就上报触发识别。
+        const needsOcrLayer = !pageHasNativeText(nativeCharCount) || nativeTextCorrupt
+        const useOcrLayer = needsOcrLayer && !!ocrPageCache?.words.length
+        if (nativeTextCorrupt) {
+          console.info('[pdf] native text layer contains unreadable characters; use OCR layer if available', {
+            page: pageNumber,
+            cached: Boolean(ocrPageCache?.words.length),
+          })
+        }
+        // W3：无原生层/原生层损坏且无词缓存 → 上报，调用方按门控自动识别（本组件不直接 OCR）
+        if (needsOcrLayer && !ocrPageCache?.words.length) {
           onWordLayerMissingRef.current?.(pageNumber)
         }
 

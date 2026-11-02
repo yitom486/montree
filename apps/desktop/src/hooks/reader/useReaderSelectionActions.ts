@@ -11,6 +11,10 @@ import {
   getDeepAnswerDirection,
   type DeepAnswerDirectionId,
 } from '@/lib/agent/deep-answer'
+import {
+  useReaderTranslation,
+  type ReaderTranslationState,
+} from '@/hooks/reader/useReaderTranslation'
 
 /**
  * 三阅读器（PDF / Foliate / WebDoc）划选工具条的共享动作。
@@ -18,6 +22,8 @@ import {
  */
 export interface ReaderSelectionActionsOptions {
   snapshotText: string | null | undefined
+  /** PDF 坏文字层的 OCR 回退；闭包必须锁定本次选区。 */
+  recoverTranslationText?: () => Promise<string>
   dimTextSelection: () => void
   clearTextSelection: () => void
   /** 打开批注对话框：各家都是清编辑态 + 开弹窗 + 收工具条 */
@@ -44,6 +50,12 @@ export interface ReaderSelectionActions {
   handleAnnotate: () => void
   handleHighlight: (color: HighlightColorId) => void
   handleAskAgent: () => void
+  /** 划词翻译：隐藏副会话，卡片按流式增量渲染 */
+  translation: ReaderTranslationState | null
+  translate: (position: { x: number; y: number }) => Promise<void>
+  retryTranslation: () => Promise<void>
+  dismissTranslation: () => void
+  copyTranslation: () => void
   /**
    * AI 制卡（P1 菜单驱动）：选预设 → 本书会话调模型 → 落卡。
    * 调不通直接报错（无启发式兜底）；pending 期间调用方禁用菜单。
@@ -120,6 +132,13 @@ export function useReaderSelectionActions(
     addSelectionMarkerToComposer()
     dimTextSelection()
   }, [dimTextSelection])
+
+  const translationActions = useReaderTranslation({
+    getSourceText: () => snapshotText ?? null,
+    dimTextSelection,
+    recoverSourceText: options.recoverTranslationText,
+    sourceKey: sessionKey,
+  })
 
   const [aiCardPending, setAiCardPending] = useState(false)
 
@@ -310,6 +329,11 @@ export function useReaderSelectionActions(
     handleAnnotate,
     handleHighlight,
     handleAskAgent,
+    translation: translationActions.translation,
+    translate: translationActions.translate,
+    retryTranslation: translationActions.retry,
+    dismissTranslation: translationActions.dismiss,
+    copyTranslation: translationActions.copy,
     generateAiCard,
     aiCardPending,
     deepAnswer,

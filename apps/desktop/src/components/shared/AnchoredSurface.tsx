@@ -4,8 +4,10 @@ import { useMemo, useRef, type ReactNode } from 'react'
 import { Popover } from 'radix-ui'
 import { cn } from '@/lib/utils'
 
-export function AnchoredSurface({ x, y, children, label, interactive = false, onDismiss, onPointerEnter, onPointerLeave, className }: {
+export function AnchoredSurface({ x, y, children, label, interactive = false, autoFocus = true, onDismiss, onPointerEnter, onPointerLeave, className }: {
   x: number; y: number; children: ReactNode; label: string; interactive?: boolean
+  /** interactive 浮层是否自动聚焦首个可交互元素；翻译卡等阅读内浮层应关闭，避免抢焦点。 */
+  autoFocus?: boolean
   onDismiss: () => void
   onPointerEnter?: () => void; onPointerLeave?: () => void; className?: string
 }) {
@@ -18,7 +20,7 @@ export function AnchoredSurface({ x, y, children, label, interactive = false, on
         <Popover.Content
           role={interactive ? 'dialog' : 'tooltip'} aria-label={label}
           side="top" align="center" sideOffset={8} collisionPadding={8}
-          onOpenAutoFocus={(event) => { if (!interactive) event.preventDefault() }}
+          onOpenAutoFocus={(event) => { if (!interactive || !autoFocus) event.preventDefault() }}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             if (interactive && document.activeElement === document.body && previousFocus.current instanceof HTMLElement && previousFocus.current.isConnected) previousFocus.current.focus({ preventScroll: true })

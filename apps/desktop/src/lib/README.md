@@ -75,7 +75,7 @@
 |--------|--------|
 | `adapter/` | 统一阅读后端契约与 foliate 实现（EPUB/MOBI/AZW3）、阅读文件内容指纹 |
 | `pdf/` | PDF 打开/渲染/文字层、WASM 结构化解析（inspector/structure）、扫描探测、导入模式、Agent 搜索闸门与手动全书搜索 |
-| `pdf-ocr/` | PDF OCR：页缓存 hydrate/预取/文字层挂载、目录缓存/门控/租约锁、自动页 OCR、探测反馈 |
+| `pdf-ocr/` | PDF OCR：页缓存 hydrate/预取/文字层挂载、目录缓存/门控/租约锁、自动页 OCR、探测反馈、`pdf-ocr-selection` 原选区文字恢复（含回归）；跨格式坏字检测见 `reader/text-quality` |
 | `rosetta/` | 罗盘：目录归一/签名状态、块转 Agent 文本、只读取卫、目录 AI 整理（`toc-ai`） |
 | `marks/` | 阅读标记渲染/命中（PDF/MOBI/Web）、划词匹配、Anki 与读书笔记导出 |
 | `web-doc/` | 在线文档：正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、一键转 Markdown 导出、Agent 按页抓文 |
@@ -142,6 +142,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
+| `translation-session` | 划词翻译隐藏副会话：目标语言逐 turn prompt、按运行时独立的翻译模型覆盖、只返回译文、轻量流式增量；不落库、不进时间线 |
 | `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议）（已迁 @montree/chat-core，见包内同名模块） |
 | `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护（已迁 @montree/chat-core，见包内同名模块） |
 | `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史（已迁 @montree/chat-core，见包内同名模块） |

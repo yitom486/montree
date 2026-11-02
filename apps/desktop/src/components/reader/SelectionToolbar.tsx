@@ -5,6 +5,7 @@ import {
   Copy,
   Headphones,
   Highlighter,
+  Languages,
   Loader2,
   MessageSquarePlus,
   Sparkles,
@@ -31,6 +32,8 @@ export interface SelectionToolbarProps {
   onAnnotate?: () => void
   /** 从当前选区开始语音朗读 */
   onReadAloud?: () => void
+  /** 划词翻译；position 为卡片锚点（沿用工具条位置） */
+  onTranslate?: (position: { x: number; y: number }) => void
   /** 打开 Agent 面板并带着当前选区去提问 */
   onAskAgent?: () => void
   /** 一键快速问答（方向见 deep-answer），答案落对话框 */
@@ -56,6 +59,7 @@ export function SelectionToolbar({
   keyEventDocs,
   onAnnotate,
   onReadAloud,
+  onTranslate,
   onAskAgent,
   onAskDeepAnswer,
   deepAnswerPending = false,
@@ -255,6 +259,23 @@ export function SelectionToolbar({
         >
           <MessageSquarePlus className="size-3.5 text-muted-foreground" />
           <span>批注</span>
+        </Button>
+      ) : null}
+
+      {onTranslate ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 rounded-lg px-2 text-xs hover:bg-muted/80"
+          title="翻译当前选区"
+          onClick={() => {
+            setPaletteOpen(false)
+            setAiOpen(false)
+            onTranslate({ x, y })
+          }}
+        >
+          <Languages className="size-3.5 text-muted-foreground" />
+          <span>翻译</span>
         </Button>
       ) : null}
 

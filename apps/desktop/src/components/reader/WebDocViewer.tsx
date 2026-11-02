@@ -16,6 +16,7 @@ import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
 import { ReaderTypographyControls } from '@/components/reader/ReaderTypographyControls'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
+import { TranslationCard } from '@/components/reader/TranslationCard'
 import { DeepAnswerDialog } from '@/components/reader/DeepAnswerDialog'
 import { useReaderSidePanels } from '@/hooks/reader/useReaderSidePanels'
 import { useReaderExportMenu } from '@/hooks/reader/useReaderExportMenu'
@@ -357,6 +358,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             onCopy={selectionActions.handleCopy}
             hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
             keyEventDocs={iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : []}
+            onTranslate={selectionActions.translate}
             onAnnotate={selectionActions.handleAnnotate}
             onReadAloud={() => {
               if (selectionSnapshot?.text) {
@@ -371,6 +373,15 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             onGenerateCardPreset={selectionActions.generateAiCard}
             cardPresetPending={selectionActions.aiCardPending}
             onDismiss={selectionActions.handleDismiss}
+          />
+        ) : null}
+
+        {selectionActions.translation ? (
+          <TranslationCard
+            translation={selectionActions.translation}
+            onClose={selectionActions.dismissTranslation}
+            onRetry={() => void selectionActions.retryTranslation()}
+            onCopy={selectionActions.copyTranslation}
           />
         ) : null}
 

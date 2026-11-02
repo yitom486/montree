@@ -33,6 +33,7 @@ describe('SelectionToolbar', () => {
           onAnnotate: vi.fn(),
           onHighlight: vi.fn(),
           onReadAloud: vi.fn(),
+          onTranslate: vi.fn(),
           onGenerateCardPreset: vi.fn(),
           onAskDeepAnswer: vi.fn(),
           onAskAgent: vi.fn(),
@@ -43,11 +44,37 @@ describe('SelectionToolbar', () => {
 
     expect(container.textContent).toContain('复制')
     expect(container.textContent).toContain('高亮')
+    expect(container.textContent).toContain('翻译')
     expect(container.textContent).toContain('朗读')
     expect(container.textContent).toContain('AI')
     expect(container.textContent).not.toContain('引用')
     expect(container.textContent).not.toContain('深度问答')
     expect(container.textContent).not.toContain('智能制卡')
+  })
+
+  it('calls onTranslate with the toolbar anchor', async () => {
+    const onTranslate = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(SelectionToolbar, {
+          x: 100,
+          y: 200,
+          onCopy: vi.fn(),
+          onTranslate,
+          onDismiss: vi.fn(),
+        }),
+      )
+    })
+
+    const translate = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('翻译'),
+    )
+    expect(translate).toBeDefined()
+    await act(async () => {
+      translate?.click()
+    })
+    expect(onTranslate).toHaveBeenCalledWith({ x: 100, y: 200 })
   })
 
   it('applies the last highlight color from the main button', async () => {
