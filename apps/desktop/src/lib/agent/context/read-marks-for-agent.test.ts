@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ReadingMark } from '@yitom/contracts'
-import { collectHighlightPassages, isHighlightPassage } from './read-marks-for-agent'
+import { collectHighlightPassages, isHighlightPassage, listMarksForAgent } from './read-marks-for-agent'
+import { registerReaderMarks } from './reader-marks-registry'
+
+const mocks = vi.hoisted(() => ({ activeDocument: vi.fn(), list: vi.fn() }))
+vi.mock('./collect-turn-context', () => ({ collectActiveDocument: mocks.activeDocument }))
+vi.mock('@/api/reading-marks-api', () => ({ readingMarksApi: { list: mocks.list } }))
 
 function mark(overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' | 'anchor'>): ReadingMark {
   return {
@@ -13,6 +18,19 @@ function mark(overrides: Partial<ReadingMark> & Pick<ReadingMark, 'id' | 'kind' 
 }
 
 describe('collectHighlightPassages', () => {
+  it('Markdown 卡片查询要求当前路径已注册标记 provider，避免读取另一个文档', async () => {
+    mocks.activeDocument.mockReturnValue({ path: '/notes.md', kind: 'markdown', name: 'notes.md' })
+    mocks.list.mockResolvedValue({ ok: true, value: [mark({ id: 'md', filePath: '/notes.md', kind: 'note', excerpt: 'Markdown 摘录', note: '批注', anchor: { format: 'web', url: 'montree-markdown:///document?path=%2Fnotes.md' } })] })
+    const dispose = registerReaderMarks({ filePath: '/notes.md', createBookmark: vi.fn(), createNoteFromSelection: vi.fn(), createMarkAt: vi.fn() })
+    try {
+      const result = await listMarksForAgent()
+      expect(result).toMatchObject({ documentPath: '/notes.md', count: 1, marks: [{ id: 'md', note: '批注' }] })
+      mocks.activeDocument.mockReturnValue({ path: '/other.md', kind: 'markdown', name: 'other.md' })
+      await expect(listMarksForAgent()).rejects.toThrow('卡片模块尚未就绪')
+      expect(mocks.list).toHaveBeenCalledTimes(1)
+    } finally { dispose() }
+  })
+
   it('排除书签与无摘录标记，按页码排序', () => {
     const bookmark = mark({
       id: 'b',

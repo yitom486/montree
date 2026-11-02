@@ -892,3 +892,11 @@
 }
 
 
+
+::highlight(montree-md-yellow) { background-color: var(--markdown-highlight-yellow); color: inherit; }
+::highlight(montree-md-green) { background-color: var(--markdown-highlight-green); color: inherit; }
+::highlight(montree-md-blue) { background-color: var(--markdown-highlight-blue); color: inherit; }
+::highlight(montree-md-pink) { background-color: var(--markdown-highlight-pink); color: inherit; }
+::highlight(montree-md-orange) { background-color: var(--markdown-highlight-orange); color: inherit; }
+::highlight(montree-md-purple) { background-color: var(--markdown-highlight-purple); color: inherit; }
+::highlight(montree-md-focus) { background-color: var(--primary); color: var(--primary-foreground); }

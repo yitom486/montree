@@ -11,9 +11,12 @@ import {
   Suspense,
   lazy,
 } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Eye, Loader2, PanelsTopLeft, PenLine } from 'lucide-react'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 import { useDefaultLayout } from 'react-resizable-panels'
+import { Button } from '@/components/ui/button'
+import { MarkdownPreviewTools } from '@/components/preview/MarkdownPreviewTools'
+import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { FileBreadcrumb } from '@/components/layout/panels/FileBreadcrumb'
 import { WelcomePage } from '@/components/layout/main/WelcomePage'
 import { ViewModeToggle } from '@/components/layout/main/ViewModeToggle'
@@ -231,6 +234,12 @@ export const EditorWorkspaceMain = forwardRef<
     rememberLocalAnchor(path, anchor)
     onOpenRecentFile(path)
   }, [onOpenRecentFile])
+
+  const getPreviewRoot = useCallback(() => previewRef.current?.getScrollElement() ?? null, [])
+  const openMarkdownPreview = useCallback(() => {
+    setMarkdownEditorMode('live-preview')
+    setViewMode(filePath, 'preview')
+  }, [filePath, setViewMode, setMarkdownEditorMode])
 
   const contentPanelIds = useMemo(() => {
     if (showEditor && showPreview) return ['editor', 'preview']
@@ -513,6 +522,14 @@ export const EditorWorkspaceMain = forwardRef<
       <WorkspaceDocumentArea mainRef={dataRoot} readerViewport footer={isMarkdown && filePath ? (
         <div className="flex h-8 shrink-0 items-center border-t border-border/40 bg-editor px-3" role="toolbar" aria-label="文档编辑模式">
           <EditorModeToggle mode={markdownEditorMode} onChange={changeMarkdownMode} />
+          <Button variant="ghost" size="xs" className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground" aria-label={viewMode === 'preview' ? '返回编辑' : '预览'} aria-pressed={viewMode === 'preview'}
+            onClick={() => viewMode === 'preview' ? changeMarkdownMode('live-preview') : openMarkdownPreview()}>
+            {viewMode === 'preview' ? <PenLine className="size-3" /> : <Eye className="size-3" />}
+            {viewMode === 'preview' ? '返回编辑' : '预览'}
+          </Button>
+          <Button variant="ghost" size="xs" className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground" aria-label="打开卡片流" onClick={() => useReaderHudUiStore.getState().setIsCardRailOpen(true)}>
+            <PanelsTopLeft className="size-3" />卡片
+          </Button>
         </div>
       ) : undefined}>
         {isTextData && filePath && <TextDataReaderContext filePath={filePath} content={content} kind={documentKind} root={() => dataRoot.current} />}
@@ -650,6 +667,10 @@ export const EditorWorkspaceMain = forwardRef<
           </ProposalReviewLayout>
         )}
       </WorkspaceDocumentArea>
+      {isMarkdown && filePath && <MarkdownPreviewTools key={filePath} filePath={filePath} source={content} html={previewHtml}
+        visible={showPreview} surfaceKey={viewMode} theme={theme} headings={headings} activeHeadingId={activeHeadingId}
+        getSourceSelection={() => textDocument?.selectionSnapshot() ?? null}
+        getRoot={getPreviewRoot} openPreview={openMarkdownPreview} onHeadingChange={setActiveHeadingId} />}
     </div>
   )
 })

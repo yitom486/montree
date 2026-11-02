@@ -119,6 +119,7 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `acp-composer` | 输入框附件、工作区路径拖入与 ACP payload；通用发送判定已由包 `useChatComposerController` 持有 |
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
 | `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT/Typst、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
+| `context/read-marks-for-agent` / `.test.ts` | 阅读器与已注册卡片模块的 Markdown 的 MCP 标记/高亮/书签查询；要求 Markdown provider 与当前文档路径一致 |
 | `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @montree/chat-core，见包内 `permission-ui`） |
 | `permission-respond` | 审批响应宿主实现（跨卡幂等领取 + 清理 + `acpApi.respondPermission` 发送；包内审批卡经 `onRespond` 回调到此） |
 | `chat-transport-port` / `.test.ts` | P0 宿主侧 `ChatTransportPort`（`sendText/cancel/respondPermission` 委托现有 `acpApi` 链路：工作区前缀 + bootstrap 一次语义 + 附件透传位；只 resolve/reject，不写时间线不弹 toast；P1 并跑用，现有调用链不动） |

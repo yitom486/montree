@@ -115,7 +115,7 @@ test('卡片流与 AI 共用一栏：切换保留草稿、正文宽度不变、�
     await expect(chatTab).toHaveAttribute('aria-selected', 'true')
     await quickOpen(page, mdName)
     await expect(page.locator('#main .cm-content')).toBeVisible()
-    await expect(cardsTab).toHaveCount(0)
+    await expect(cardsTab).toBeAttached()
     await expect(input).toBeVisible()
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))
