@@ -661,6 +661,8 @@ export function useWebDocSession({
     }, () => {
       if (noteDialogOpen) return
       dimTextSelection()
+      // 点侧栏/导航等阅读区外 = 放弃当前选区；点 Agent 面板不会走到这里。
+      clearReaderSelection()
     })
   }, [dimTextSelection, iframeRef, noteDialogOpen])
 

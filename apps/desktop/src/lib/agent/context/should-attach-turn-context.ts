@@ -28,7 +28,7 @@ export function createTurnContextTrackerState(): TurnContextTrackerState {
  * 附加条件（满足其一）：
  * 1. 打开的文档发生变化（含首次打开、关闭文档）；
  * 2. 距离上次附加已达 `interval` 轮；
- * 3. 本轮有**新的**用户选区待通知（仅带 hasSelection 一次；正文走工具，下轮默认不再带）。
+ * 3. 发送时用户选区仍有效（带 hasSelection；正文走工具，本轮快照冻结）。
  * 4. T2：已附加过，且阅读位置键变化（含 null→有值、有值→null、页/章切换）；
  *    快照仍是位置不是正文，documentChanged 不因此置 true。
  *

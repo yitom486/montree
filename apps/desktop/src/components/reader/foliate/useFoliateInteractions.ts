@@ -39,6 +39,7 @@ export interface UseFoliateInteractionsOptions {
   filePath: string
   fileFingerprint: string
   kindRef: React.RefObject<'epub' | 'mobi'>
+  containerRef: React.RefObject<HTMLDivElement | null>
   viewRef: React.RefObject<FoliateViewElement | null>
   adapterRef: React.RefObject<FoliateBookAdapter | null>
   chaptersRef: React.RefObject<EpubChapter[]>
@@ -62,6 +63,7 @@ export function useFoliateInteractions({
   filePath,
   fileFingerprint,
   kindRef,
+  containerRef,
   viewRef,
   adapterRef,
   chaptersRef,
@@ -122,6 +124,19 @@ export function useFoliateInteractions({
     setSelectionToolbarPos(null)
     inspectorRef.current.close()
   }, [noteDialogOpen])
+
+  // 点侧栏/导航等阅读区外 = 放弃当前选区；点工具条或 Agent 面板不会走到这里。
+  useEffect(() => {
+    return bindOutsideReaderPointerDismiss(
+      (target) => {
+        const container = containerRef.current
+        return Boolean(container && (target === container || container.contains(target)))
+      },
+      () => {
+        if (!noteDialogOpen) clearTextSelection()
+      },
+    )
+  }, [clearTextSelection, containerRef, noteDialogOpen])
 
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
@@ -384,6 +399,8 @@ export function useFoliateInteractions({
         if (!snapshot) {
           if (isClick) {
             inspectorRef.current.close()
+            // 点击正文空白 = 用户主动放弃选区；滚轮折叠只收工具条，不动 sticky。
+            clearTextSelection()
           }
           return
         }
@@ -495,7 +512,7 @@ export function useFoliateInteractions({
         })
       }
     },
-    [filePath, markHoverHandlers, marksRef, viewRef],
+    [clearTextSelection, filePath, markHoverHandlers, marksRef, viewRef],
   )
 
   return {

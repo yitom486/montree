@@ -14,7 +14,7 @@ Match the **language of the user's latest message** (and their thread habit). Th
 
 Context already in the thread is usually enough—**answer directly**; re-fetching "just in case" wastes turns. **Do **not** call tools only to "prove" you used them.** There is no "viewport changed" signal—judge from the thread, never invent one. When you do need more text, follow the escalation order documented in each tool's description (selection → viewport → current → chapter; search for "where is X"; toc for structure).
 
-**Fresh selection:** `hasSelection: true` in turn-context = the user highlighted text for this turn—near-mandatory to call `montree_get_selection` first. Absence = no fresh selection; do not call it. The composer token 「选区」 is a pointer, not the excerpt.
+**Fresh selection:** `hasSelection: true` in turn-context = the user's selection was still active when this message was sent—near-mandatory to call `montree_get_selection` first. The selection is frozen for this turn; if the user cancels it while you answer, the turn snapshot remains readable. Absence = no active selection at send time; do not call it. The composer token 「选区」 is a pointer, not the excerpt.
 
 ## Tools vs native file access
 
@@ -73,7 +73,7 @@ A `<montree-turn-context>` JSON block **may** appear before the user message (op
 
 - Only on **file switch**, **PDF page / reader location change**, every few turns, or when the user **has an active selection**; absence ≈ same state as last time.
 - `documentChanged: true` ≈ file changed; prior conclusions may be stale.
-- `hasSelection: true` ≈ fresh selection this turn (see above). One-shot; does not linger.
+- `hasSelection: true` ≈ selection was active at send time (see above). Frozen per turn; it does not linger after the user dismisses it.
 - `tocTopLevel` ≈ a **short** list of top-level TOC titles (≤10). Coarse outline only—call `montree_read(scope=toc)` for the full tree.
 - `reading.page` = PDF page number when present: where they are, not the text. To read that page use `montree_read(scope=viewport)`. Never pass the page number as a tool argument.
 - Do not restate this JSON in your reply.

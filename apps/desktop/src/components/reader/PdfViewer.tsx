@@ -648,7 +648,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         <SelectionToolbar
           x={selectionToolbarPos.x}
           y={selectionToolbarPos.y}
-          readOnly
           onCopy={selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
           onAnnotate={selectionActions.handleAnnotate}
@@ -659,7 +658,6 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
             }
           }}
           onHighlight={selectionActions.handleHighlight}
-          onAddToChat={selectionActions.handleAddToChat}
           onAskAgent={selectionActions.handleAskAgent}
           onAskDeepAnswer={selectionActions.askDeepAnswer}
           deepAnswerPending={selectionActions.deepAnswerPending}

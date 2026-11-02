@@ -17,10 +17,8 @@
 | `ReaderTypographyControls` | 阅读排版控件（字号 / 行距） |
 | `ReadingMarkPanel` / `ReadingMarkPopover` | 书签/批注底层面板与点击编辑浮层（共享 Morph 壳、边缘避让、键盘关闭） |
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
-| `SelectionToolbar` | 划选工具条（划重点、问 Agent、从此句朗读、批注、AI 制卡预设菜单等） |
-| `SelectionBubble` | 就地划选悬浮微晶气泡（解释/摘要/制卡/对比/追问五大动作、莫兰迪柔光高亮与复制） |
-| `CardPresetMenu` | AI 制卡预设菜单内容（6 方向点选 + 更多要求次级入口，工具条与气泡共用） |
-| `DeepAnswerMenu` | 一键深度问答菜单内容（三方向点即直答 + composer 追问入口保留） |
+| `SelectionToolbar` | 划选工具条（复制、高亮色板+写批注、朗读、单一 AI 菜单；AI 菜单内含制卡预设、快速问答与去 Agent 面板） |
+| `SelectionAiMenu` | 划选 AI 菜单内容（生成卡片 6 预设 + 更多要求、快速问答 3 方向、去 Agent 面板细问） |
 | `DeepAnswerDialog` | 一键深度问答对话框（同会话直答选段、不进右侧时间线，可存为卡片批注） |
 | `MarginaliaBar` | 右侧知识卡片轨（分类药丸筛选、全部/单项折叠、AI 智能制卡、智考与闪卡控制台、时序图联动） |
 | `KnowledgeCardItem` | 知识卡片单项（批注/概念/引用/方法/图谱/思考微晶卡片、单行与多功能态切换、考考我/闪卡抽认/AI润色） |

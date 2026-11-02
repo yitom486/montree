@@ -95,10 +95,11 @@ export function usePdfInteractions({
     clearWindowSelection(window)
   }, [])
 
+  // 收工具条但保留 sticky：点「问 Agent」后发送时仍要能带出选区。
   const dimTextSelection = useCallback(() => {
-    clearTextSelection()
+    setSelectionToolbarPos(null)
     inspector.close()
-  }, [clearTextSelection, inspector])
+  }, [inspector])
 
   const captureSelectionSnapshot = useCallback((snapshot: PdfSelectionSnapshot) => {
     selectionTransactionRef.current = snapshot

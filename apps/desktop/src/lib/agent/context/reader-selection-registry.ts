@@ -14,12 +14,10 @@ export interface SelectionProvider {
 }
 
 let current: SelectionProvider | null = null
+/** 当前仍有效的选区；用户主动取消/点击空白时清空 */
 let sticky: StickyReaderSelection | null = null
-/**
- * 划选后等待在下一轮用户消息的 turn-context 里通知一次。
- * 通知并进入本轮工具可用后，下一轮用户消息开始时会清掉 sticky。
- */
-let selectionNotifyPending = false
+/** 本轮 prompt 发送时冻结的选区；AI 回答期间不再随 DOM 变化 */
+let turnSelection: StickyReaderSelection | null = null
 
 /**
  * 各 Viewer 在 mount 时注册，unmount 时注销。
@@ -29,10 +27,8 @@ export function registerSelectionProvider(provider: SelectionProvider): () => vo
   current = provider
   return () => {
     if (current === provider) current = null
-    if (sticky?.filePath === provider.filePath) {
-      sticky = null
-      selectionNotifyPending = false
-    }
+    // 只清「当前选区」；本轮已冻结的快照留给正在回答的 Agent 读完。
+    if (sticky?.filePath === provider.filePath) sticky = null
   }
 }
 
@@ -48,53 +44,41 @@ export function commitReaderSelection(filePath: string, text: string): void {
     return
   }
   sticky = { filePath, text: trimmed }
-  selectionNotifyPending = true
 }
 
 /** 坐标选区允许内容为空；地址才是编辑目标，不能通过相同文字反查。 */
 export function commitDocumentSelection(target: DocumentSelection, text: string): void {
   sticky = { filePath: target.documentPath, text, target }
-  selectionNotifyPending = true
 }
 
+/** 用户取消选区（点击空白、Esc、切换文档等）：只清当前选区，不回收本轮已冻结的快照 */
 export function clearReaderSelection(): void {
   sticky = null
-  selectionNotifyPending = false
 }
 
 export function getStickyReaderSelection(): StickyReaderSelection | null {
   return sticky
 }
 
-/** 「问 Agent」：若已有 sticky，重新挂起本轮 hasSelection 通知 */
-export function reviveSelectionNotify(): boolean {
-  if (!sticky?.text) return false
-  selectionNotifyPending = true
-  return true
+/** 本轮 prompt 冻结的选区快照；AI 回答期间只读这一份 */
+export function getTurnReaderSelection(): StickyReaderSelection | null {
+  return turnSelection
 }
 
 /**
  * 每轮构建 prompt 开头调用：
- * - 若上一轮已通知过选区且用户未重新划选 → 清掉 sticky，避免后续轮次仍 hasSelection
- * - 若本轮有待通知选区 → 返回 true（turn-context 带 hasSelection），并标记已通知、本轮仍保留 sticky 供工具读
+ * - 发送时选区仍有效 → 冻结为本轮 turnSelection，返回 true（turn-context 带 hasSelection）
+ * - 发送时选区已消失 → 返回 false，不带任何旧选区
+ * 本轮 AI 回答期间即使取消选区，工具仍读 turnSelection；下一轮再按当时状态重新冻结。
  */
 export function beginPromptSelectionCycle(): boolean {
-  if (!selectionNotifyPending) {
-    sticky = null
-    return false
-  }
-
-  if (!sticky?.text) {
-    selectionNotifyPending = false
-    sticky = null
-    return false
-  }
-
-  selectionNotifyPending = false
+  turnSelection = null
+  if (!sticky) return false
+  turnSelection = sticky
   return true
 }
 
-/** 是否有可供工具读取的选区（含本轮已通知、尚未开启下一轮的 sticky） */
+/** 是否有可供工具读取的选区（优先本轮冻结快照，其次当前活动选区） */
 export function hasActiveSelection(): boolean {
   return Boolean(readSelectionText())
 }
@@ -103,9 +87,10 @@ export function hasActiveSelection(): boolean {
 let selectionReadDepth = 0
 
 export function readSelectionText(expectedFilePath?: string): string | null {
-  if (sticky) {
-    if (expectedFilePath && sticky.filePath !== expectedFilePath) return null
-    return sticky.text
+  const frozen = turnSelection ?? sticky
+  if (frozen) {
+    if (expectedFilePath && frozen.filePath !== expectedFilePath) return null
+    return frozen.text
   }
   selectionReadDepth += 1
   if (selectionReadDepth > 1) {

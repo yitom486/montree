@@ -80,7 +80,7 @@ test.describe('foliate 标注链路', () => {
       await e2eSelectText(window, 'Montree E2E minimal EPUB paragraph.')
       const toolbar = window.getByRole('toolbar', { name: '选区操作' })
       await expect(toolbar).toBeVisible({ timeout: 10_000 })
-      await toolbar.getByRole('button', { name: '划重点 黄' }).click()
+      await toolbar.getByRole('button', { name: '高亮', exact: true }).click()
       await expect(window.getByText('已添加高亮')).toBeVisible({ timeout: 10_000 })
       await window.locator('#main').screenshot({ path: 'test-results/foliate-highlight.png' })
       // 从真实 iframe 的文字几何触发悬停（不注入预览状态）。
@@ -160,7 +160,8 @@ test.describe('foliate 标注链路', () => {
       await e2eSelectText(window, 'Montree E2E minimal EPUB paragraph.')
       const toolbar = window.getByRole('toolbar', { name: '选区操作' })
       await expect(toolbar).toBeVisible({ timeout: 10_000 })
-      await toolbar.getByRole('button', { name: '批注' }).click()
+      await toolbar.getByRole('button', { name: '选择高亮颜色' }).click()
+      await toolbar.getByRole('button', { name: '写批注' }).click()
 
       const dialog = window.getByRole('dialog', { name: '添加批注' })
       await expect(dialog).toBeVisible({ timeout: 10_000 })
@@ -231,7 +232,7 @@ test.describe('foliate 标注链路', () => {
       await e2eSelectText(window, 'Montree E2E minimal MOBI paragraph.')
       const toolbar = window.getByRole('toolbar', { name: '选区操作' })
       await expect(toolbar).toBeVisible({ timeout: 10_000 })
-      await toolbar.getByRole('button', { name: '划重点 黄' }).click()
+      await toolbar.getByRole('button', { name: '高亮', exact: true }).click()
       await expect(window.getByText('已添加高亮')).toBeVisible({ timeout: 10_000 })
 
       const marks = await e2eListMarks(window)

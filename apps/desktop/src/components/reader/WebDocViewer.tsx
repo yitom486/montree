@@ -375,7 +375,6 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           <SelectionToolbar
             x={selectionToolbarPos.x}
             y={selectionToolbarPos.y}
-            readOnly
             onCopy={selectionActions.handleCopy}
             hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
             keyEventDocs={iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : []}
@@ -387,7 +386,6 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
               }
             }}
             onHighlight={selectionActions.handleHighlight}
-            onAddToChat={selectionActions.handleAddToChat}
             onAskAgent={selectionActions.handleAskAgent}
             onAskDeepAnswer={selectionActions.askDeepAnswer}
             deepAnswerPending={selectionActions.deepAnswerPending}

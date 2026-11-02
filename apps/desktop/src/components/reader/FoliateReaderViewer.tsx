@@ -123,6 +123,7 @@ export function FoliateReaderViewer({
     filePath,
     fileFingerprint,
     kindRef,
+    containerRef,
     viewRef,
     adapterRef,
     chaptersRef,
@@ -296,7 +297,6 @@ export function FoliateReaderViewer({
         <SelectionToolbar
           x={interactions.selectionToolbarPos.x}
           y={interactions.selectionToolbarPos.y}
-          readOnly
           onCopy={interactions.selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(interactions.selectionSnapshot?.text?.trim())}
           keyEventDocs={session.getRenderedDocs().map((item) => item.doc)}
@@ -308,7 +308,6 @@ export function FoliateReaderViewer({
             }
           }}
           onHighlight={interactions.selectionActions.handleHighlight}
-          onAddToChat={interactions.selectionActions.handleAddToChat}
           onAskAgent={interactions.selectionActions.handleAskAgent}
           onAskDeepAnswer={interactions.selectionActions.askDeepAnswer}
           deepAnswerPending={interactions.selectionActions.deepAnswerPending}

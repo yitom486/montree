@@ -44,14 +44,15 @@ async function connectMock(page: Page) {
 async function highlight(page: Page, target: Locator) {
   const toolbar = page.getByRole('toolbar', { name: '选区操作' })
   await expect(toolbar).toBeVisible()
-  await toolbar.getByRole('button', { name: /^划重点 / }).first().click()
+  await toolbar.getByRole('button', { name: '高亮', exact: true }).click()
   await expect(page.getByText(/已添加高亮|已更新高亮/).first()).toBeVisible()
   void target
 }
 async function annotate(page: Page, note: string) {
   const toolbar = page.getByRole('toolbar', { name: '选区操作' })
   await expect(toolbar).toBeVisible()
-  await toolbar.getByRole('button', { name: '批注', exact: true }).click()
+  await toolbar.getByRole('button', { name: '选择高亮颜色' }).click()
+  await toolbar.getByRole('button', { name: '写批注', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '添加批注' })
   await dialog.getByPlaceholder('写下你的想法…').fill(note)
   await dialog.getByRole('button', { name: '保存', exact: true }).click()
@@ -94,7 +95,7 @@ async function smartCard(page: Page) {
   await expect(toolbar).toBeVisible()
   // 上一步的成功 toast 会盖住右侧弹出的制卡菜单（Windows 窄视口下必现）：先等它们收起
   await expect(page.locator('[data-sonner-toast][data-type="success"]')).toHaveCount(0, { timeout: 15_000 })
-  await toolbar.getByRole('button', { name: /智能制卡/ }).click()
+  await toolbar.getByRole('button', { name: 'AI', exact: true }).click()
   await page.getByRole('button', { name: /通用提炼/ }).or(page.getByRole('menuitem', { name: /通用提炼/ })).first().click()
   const ok = page.getByText(/AI 制卡：【MOCK卡/).first()
   const failed = page.getByText(/制卡失败|AI 无响应|本书信息缺失|没有可用选区|选中文本为空|请在 Agent 登录弹窗/).first()

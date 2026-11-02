@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  addSelectionMarkerToComposer,
-  openAgentComposerToAskSelection,
-} from '@/lib/agent/context/focus-agent-composer'
+import { addSelectionMarkerToComposer } from '@/lib/agent/context/focus-agent-composer'
 import { copyTextToClipboard } from '@yitom/reader-core'
 import type { HighlightColorId } from '@yitom/reader-core'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
@@ -17,7 +14,7 @@ import {
 
 /**
  * 三阅读器（PDF / Foliate / WebDoc）划选工具条的共享动作。
- * 只收敛六个按钮行为；选区快照的读取、批注落盘（anchor 各异）仍归各 Viewer。
+ * 只收敛复制/标记/朗读/AI 入口的行为；选区快照的读取、批注落盘（anchor 各异）仍归各 Viewer。
  */
 export interface ReaderSelectionActionsOptions {
   snapshotText: string | null | undefined
@@ -46,7 +43,6 @@ export interface ReaderSelectionActions {
   handleCopy: () => void
   handleAnnotate: () => void
   handleHighlight: (color: HighlightColorId) => void
-  handleAddToChat: () => void
   handleAskAgent: () => void
   /**
    * AI 制卡（P1 菜单驱动）：选预设 → 本书会话调模型 → 落卡。
@@ -119,13 +115,9 @@ export function useReaderSelectionActions(
     [retainSelection, saveHighlight, onHighlightError],
   )
 
-  const handleAddToChat = useCallback(() => {
-    addSelectionMarkerToComposer()
-    dimTextSelection()
-  }, [dimTextSelection])
-
+  // 打开面板并插入「选区」短标记：用户可继续写自己的问题，正文由 Agent 读取。
   const handleAskAgent = useCallback(() => {
-    openAgentComposerToAskSelection()
+    addSelectionMarkerToComposer()
     dimTextSelection()
   }, [dimTextSelection])
 
@@ -317,7 +309,6 @@ export function useReaderSelectionActions(
     handleCopy,
     handleAnnotate,
     handleHighlight,
-    handleAddToChat,
     handleAskAgent,
     generateAiCard,
     aiCardPending,
