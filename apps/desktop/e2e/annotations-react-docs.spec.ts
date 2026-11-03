@@ -190,6 +190,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
         const box = await loc.boundingBox()
         return Boolean(box) && await page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.pdf-text-layer-host')), [box!.x + 1, box!.y + box!.height / 2])
       }
+      let selected = ''
       if (!process.env.E2E_FORCE_RANGE_SELECT && await reachable(from) && await reachable(to)) {
         const a = (await from.boundingBox())!, b = (await to.boundingBox())!
         await page.mouse.move(a.x + 1, a.y + a.height / 2)
@@ -204,10 +205,11 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
           return range.getBoundingClientRect().right
         })
         await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
+        selected = await page.evaluate(() => getSelection()?.toString().trim() ?? '')
         await page.mouse.up()
       }
       const expectedSelection = new RegExp(`^${first} .* ${last}$`)
-      if (!expectedSelection.test(await page.evaluate(() => getSelection()?.toString().trim() ?? ''))) {
+      if (!expectedSelection.test(selected)) {
         // Windows CI 客户区内 PDF 视口被压得很矮，词落在可视区外、鼠标点不到：
         // 改用程序化 Range 选中同一段词（仍要求文字层可被用户选中），再在页面上派发 mouseup 走真实的选区处理
         const diag = await page.evaluate(() => {
@@ -217,7 +219,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
           return `inner=${innerHeight} viewport=${v?.clientHeight}/${v?.scrollHeight} chain=${chain.join(' < ')}`
         })
         console.log(`[selection-diag] native selection unavailable, using programmatic range; ${diag}`)
-        await from.evaluate((start, end) => {
+        selected = await from.evaluate((start, end) => {
           if (getComputedStyle(start).userSelect === 'none' || getComputedStyle(end as Element).userSelect === 'none') throw new Error('OCR 文字层不可被用户选中')
           const r = start.getBoundingClientRect(), e = (end as Element).getBoundingClientRect()
           start.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: r.left + 1, clientY: r.top + r.height / 2 }))
@@ -227,12 +229,15 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
           range.setEnd(endText, (endText.textContent ?? '').trimEnd().length)
           const sel = getSelection()!
           sel.removeAllRanges(); sel.addRange(range)
+          const text = sel.toString().trim()
           ;(end as Element).dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: e.right - 1, clientY: e.top + e.height / 2 }))
+          return text
         }, await to.elementHandle())
       }
       // 回归：OCR 逐词 span 之间必须有空格，选区/摘录不能粘成一串
-      const selected = await page.evaluate(() => getSelection()?.toString().trim() ?? '')
       expect(selected).toMatch(expectedSelection)
+      // mouseup 后阅读器冻结选区并清理 DOM 高亮，工具条继续使用冻结快照。
+      await expect(page.getByRole('toolbar', { name: '选区操作' })).toBeVisible()
     }
     const selectLine = async (needle: RegExp) => {
       const words: Record<string, [string, string]> = { 'JavaScript library': ['React', 'rendering'], 'user interfaces': ['user', 'units'], 'Components are reusable': ['Components', 'that'] }
