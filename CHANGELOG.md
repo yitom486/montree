@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.28] - 2026-11-03
+
 - **阅读器划词翻译**：支持 PDF、EPUB/MOBI/AZW3 与在线文档，译文实时流式显示，逐条补充短语和专有名词解读；翻译 Agent、模型与思考档独立配置，损坏 PDF 字体自动尝试 OCR 恢复选区。
 
 - **翻译浮窗与批注**：支持顺滑拖动、限高滚动和按文档临时保存；窗口最大化、最小化和阅读器重挂载后保留结果与位置，仅显式关闭或点击正文空白时收起；译文与解读可保存为原选区批注。
@@ -713,7 +717,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.27...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.28...HEAD
+[0.4.28]: https://github.com/yitom486/montree/compare/v0.4.27...v0.4.28
 [0.4.27]: https://github.com/yitom486/montree/compare/v0.4.26...v0.4.27
 [0.4.26]: https://github.com/yitom486/montree/compare/v0.4.25...v0.4.26
 [0.4.25]: https://github.com/yitom486/montree/compare/v0.4.24...v0.4.25
