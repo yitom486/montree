@@ -142,7 +142,8 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `acp-transport` | 子会话传输等待器（未连发直连信令，等 connected/auth-required，无驱动 1s 收兵） |
 | `card-studio-session` / `card-studio-presets` / `card-studio` | AI 制卡一书一会话 + 六预设拼装 + 结果校验（失败无卡，不兜底） |
 | `deep-answer` | 一键深度问答三方向拼装（答案落对话框，不进时间线） |
-| `translation-session` | 划词翻译隐藏副会话：目标语言逐 turn prompt、按运行时独立的翻译模型覆盖、只返回译文、轻量流式增量；不落库、不进时间线 |
+| `translation-session` / `translation-config`（各含 `.test`） | 划词翻译隐藏副会话与能力解析：从 Agent 实际选项选择独立模型，级联最低可用思考档或显式档位；跳过主聊天偏好，只配置副会话，拒绝未提供的模型值；目标语言逐 turn、流式返回译文 |
+| `translation-transport` / `.test` | 翻译专属连接和认证：只调用翻译 IPC，连接去重、按运行时路由流式增量、进程退出后按代际重建；右侧聊天未连接/断开/切换均不影响翻译，隔离同名会话 ID |
 | `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议）（已迁 @montree/chat-core，见包内同名模块） |
 | `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护（已迁 @montree/chat-core，见包内同名模块） |
 | `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史（已迁 @montree/chat-core，见包内同名模块） |

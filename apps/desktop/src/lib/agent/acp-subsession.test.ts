@@ -20,6 +20,7 @@ import type {
 } from './acp-subsession'
 import {
   accumulateSubsessionUpdate,
+  accumulateSubsessionUpdateFor,
   clearSubsessionSessions,
   ensureSubsessionSession,
   isSubsessionPrompting,
@@ -138,6 +139,26 @@ describe('ensure 建新与复用', () => {
     expect(store.load).not.toHaveBeenCalled()
   })
 
+  it('翻译可以跳过主聊天偏好并返回独立配置后的选项', async () => {
+    const initial = [{ configId: 'effort', name: 'Effort', type: 'select' as const, currentValue: 'medium', options: [{ value: 'medium', name: 'Medium' }, { value: 'max', name: 'Max' }] }]
+    const runtimeId = useAcpUiStore.getState().selectedRuntimeId
+    useAcpUiStore.setState({ preferredConfigByRuntime: { [runtimeId]: { effort: 'max' } } })
+    mockedSessionNew.mockResolvedValueOnce(ok({ sessionId: 'translation', configOptions: initial }))
+    const configureSession = vi.fn(async () => [{ ...initial[0], currentValue: 'low' }])
+    const ensured = await ensureSubsessionSession(baseOpts({ purpose: 'translate', runtimeId: useAcpUiStore.getState().selectedRuntimeId, inheritConfigPreferences: false, configureSession }))
+    expect(configureSession).toHaveBeenCalledWith('translation', initial)
+    expect(acpApi.setConfigOption).not.toHaveBeenCalled()
+    expect('configOptions' in ensured && ensured.configOptions[0].currentValue).toBe('low')
+  })
+
+  it('独立配置失败时不发送 prompt，也不复用未配置好的会话', async () => {
+    mockedSessionNew.mockResolvedValueOnce(ok({ sessionId: 'unconfigured', configOptions: [] }))
+    const opts = baseOpts({ purpose: 'translate', configureSession: async () => { throw new Error('配置被拒绝') } })
+    await expect(sendSubsessionPrompt(opts, 'hello')).rejects.toThrow('配置被拒绝')
+    expect(mockedPrompt).not.toHaveBeenCalled()
+    expect(subsessionOwnsSessionId('unconfigured')).toBe(false)
+  })
+
   it('promptCount 达阈值轮转新会话', async () => {
     const opts = baseOpts({ rotation: { idleMs: 2 * 60 * 60 * 1000, maxPrompts: 1 } })
     mockedPrompt.mockResolvedValue(ok({ stopReason: 'end_turn' }))
@@ -149,6 +170,21 @@ describe('ensure 建新与复用', () => {
 })
 
 describe('purpose-key 隔离与流式路由', () => {
+  it('独立翻译传输不拦截主聊天事件，主聊天增量不进入翻译', async () => {
+    const client = {
+      sessionNew: vi.fn(async () => ok({ sessionId: 'same-id', configOptions: [] })),
+      loadSession: acpApi.loadSession, setConfigOption: acpApi.setConfigOption,
+      prompt: vi.fn(async () => {
+        expect(subsessionOwnsSessionId('same-id')).toBe(false)
+        expect(isSubsessionPrompting()).toBe(false)
+        accumulateSubsessionUpdate('same-id', { content: [{ type: 'text', text: '主聊天' }] })
+        accumulateSubsessionUpdateFor('translate', 'same-id', { content: [{ type: 'text', text: '翻译' }] }, 'opencode')
+        return ok({ stopReason: 'end_turn' })
+      }),
+    }
+    const result = await sendSubsessionPrompt(baseOpts({ purpose: 'translate', runtimeId: 'opencode', client, ensureTransport: async () => 'connected', inheritConfigPreferences: false }), 'translate')
+    expect(result.reply).toBe('翻译')
+  })
   it('不同 purpose-key 互不干扰', async () => {
     const a = await ensureSubsessionSession(baseOpts({ purpose: 'quiz', key: 'default' }))
     const b = await ensureSubsessionSession(baseOpts({ purpose: 'card', key: 'fp-abc' }))

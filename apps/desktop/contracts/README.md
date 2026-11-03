@@ -1,5 +1,7 @@
 # Desktop contracts
 
+`translation.ts` defines the dedicated translation Agent IPC and preload bridge: connection/authentication, model configuration, sessions/prompts, and isolated status/stream events. The main process scopes these by trusted window and translation runtime, independently of the chat connection.
+
 `agent-inspection.ts` defines window-scoped Agent resource inspection IPC: observed MCP health/tool schemas, locally discovered Skill metadata/full instructions, and revealing a discovered Skill file. It never transports MCP tokens or runtime credentials.
 
 `html-preview.ts` defines the isolated local HTML preview: the `montree-html` scheme, register/update/release/resolve-link IPC, and the postMessage bridge messages between the preview page and the host (page messages are untrusted and only trigger restricted actions).

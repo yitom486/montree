@@ -2,6 +2,7 @@
 
 import type { AppError, ElectronAPI, Result, TypstExportPayload, TypstExportResult } from '@yitom/contracts'
 import type { TerminalAPI } from '../contracts/terminal'
+import type { TranslationAPI } from '../contracts/translation'
 import type { AgentInspectionAPI } from '../contracts/agent-inspection'
 import type { HtmlPreviewAPI } from '../contracts/html-preview'
 import type { InlineCompletionAPI } from '../contracts/inline-completion'
@@ -25,6 +26,7 @@ declare global {
   interface Window {
     electronAPI?: MontreeElectronAPI
     montreeTerminal?: TerminalAPI
+    montreeTranslation?: TranslationAPI
     montreeAgentInspection?: AgentInspectionAPI
     montreeHtmlPreview?: HtmlPreviewAPI
     montreeInlineCompletion?: InlineCompletionAPI

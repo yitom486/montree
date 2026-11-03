@@ -66,7 +66,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `reader-pdf-structure.spec.ts` | PDF 结构化 WASM：生产包真加载（非回退）+ Agent 正文走结构化（`E2E_PDF_STRUCTURE` 门控测试钩子） |
 | `reader-pdf-ocr.spec.ts` | 扫描版 PDF 单页 OCR：「更多工具 → 识别本页」落缓存 + 文字层可读（当前页无文字层会自动识别；`apps/desktop/e2e/fixtures/ocr/scanned-hello.pdf`） |
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |
-| `reader-translation.spec.ts` | 划词翻译：mock ACP 流式返回、目标语言、非模态卡片、复制与关闭；损坏 ToUnicode PDF 的自动 OCR 触发、识别进度、原选区恢复后继续翻译及窄窗口校验（OCR 引擎替身） |
+| `reader-translation.spec.ts` | 划词翻译：mock ACP 流式返回、目标语言、非模态卡片、复制与关闭；损坏 ToUnicode PDF 的自动 OCR 触发、识别进度与原选区恢复（OCR 引擎替身）；翻译独立 Agent/模型/思考档、最低档级联、持久化、主聊天从未连接时配置并翻译、后来连接 Max 与断开后翻译继续可用，含窄窗口校验 |
 | `web-doc-smoke.spec.ts` | 在线文档：正文选段批注保存及重载恢复、优先渲染 `rel=alternate` Markdown 源（失败回退 HTML）、真实 localhost HTTP 服务读取 mdBook/目录/跨章导航，Rust 代码语法高亮/亮暗主题/逐字复制、mdBook 独立 toc.html 章节树/子章跳转/底栏返回、打开、地址栏换页、目录跳转、论文 SVG 图片与表格对齐/合并/横向滚动 |
 | `web-doc-xss.spec.ts` | 在线文档 XSS 回归（真浏览器）：恶意载荷不执行、正文完好 |
 | `web-doc-rendering.spec.ts` | Markdown 优先读取后的 Pele 流程/时序图、源码复制、亮暗主题、KaTeX 行内/分式/矩阵与离线本地字体；`E2E_WEB_DOC_RENDERING_LIVE=1` 额外实测 MkDocs Math 与 D2L 线性代数真实网页，并输出截图和公式数量 |

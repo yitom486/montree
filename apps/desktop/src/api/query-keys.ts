@@ -9,6 +9,8 @@ import type { DocumentRef } from '@yitom/contracts'
  * - 既有单参调用方无需改动（workspaceId 缺省），有身份处显式传入。
  */
 export const queryKeys = {
+  translationConfig: (runtimeId: string, model: string, thought: string) =>
+    ['translation-config', runtimeId, model, thought] as const,
   agentInspection: (threadId: string, sessionId: string | null, runtimeId: string, kind: string | null) =>
     ['agent-inspection', threadId, sessionId, runtimeId, kind] as const,
   agentSkill: (threadId: string, sessionId: string | null, runtimeId: string, skillId: string | null) =>

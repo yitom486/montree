@@ -1,4 +1,5 @@
-import { ipcMain, type WebContents } from 'electron'
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { TRANSLATION_IPC, type TranslationAPI } from '../../contracts/translation'
 import { IPC, err, resolveSnapshotTimeoutMs, type AcpPermissionResponsePayload, type AcpSnapshotResponsePayload } from '@yitom/contracts'
 import type { AcpConnectPayload, AcpAuthenticatePayload, AcpLoadSessionPayload, AcpSessionNewPayload, AcpPromptPayload, AcpCancelPayload, AcpSetConfigOptionPayload, Result, AppError } from '@yitom/contracts'
 import {
@@ -51,18 +52,24 @@ function createSnapshotGate(maxInflight: number) {
 }
 
 /** Trusted IPC sender chooses the scope; renderer-supplied IDs never choose another window. */
-export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
-  const context = getAcpContext(`window-${sender.id}`)
+export function withAcpWindow<T>(sender: WebContents, callback: () => T, translationRuntime?: string): T {
+  // 上下文 ID 同时用于沙箱目录名，保持 Windows 文件名兼容。
+  const context = getAcpContext(`window-${sender.id}${translationRuntime ? `-translation-${translationRuntime}` : ''}`)
+  context.purpose = translationRuntime ? 'translation' : 'chat'
   return runInAcpContext(context, () => {
     if (!registered.has(context)) {
       registered.add(context)
       const send = (channel: string, payload: unknown) => {
         if (!sender.isDestroyed() && !context.closed) sender.send(channel, payload)
       }
-      onAcpSessionUpdate((event) => send(IPC.ACP_SESSION_UPDATE, event))
-      onAcpStatusChanged((event) => send(IPC.ACP_STATUS_CHANGED, event))
+      onAcpSessionUpdate((event) => send(translationRuntime ? TRANSLATION_IPC.update : IPC.ACP_SESSION_UPDATE,
+        translationRuntime ? { ...event, runtimeId: translationRuntime } : event))
+      onAcpStatusChanged((event) => send(translationRuntime ? TRANSLATION_IPC.status : IPC.ACP_STATUS_CHANGED,
+        translationRuntime ? { ...event, runtimeId: translationRuntime } : event))
       const snapshotGate = createSnapshotGate(MAX_SNAPSHOT_IN_FLIGHT)
       setAcpPermissionBridge(({ requestId, sessionId, params }) => new Promise((resolve) => {
+        // 翻译只处理传入的选中文字，不申请工作区工具权限。
+        if (translationRuntime) { resolve({ outcome: 'cancelled' }); return }
         if (sender.isDestroyed() || context.closed) { resolve({ outcome: 'cancelled' }); return }
         let settled = false
         const timer = setTimeout(() => finish({ outcome: 'cancelled' }), 120_000)
@@ -86,6 +93,7 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
         send(IPC.ACP_PERMISSION_REQUEST, { requestId, sessionId, toolCall, options: params.options, rawParams: params, summary: toolCall?.title ?? '工具调用' })
       }))
       setAcpSnapshotBridge(async ({ requestId, resource, args }) => {
+        if (translationRuntime) throw new Error('翻译会话仅使用选中文字')
         // 先取槽位再计时：排队等待不消耗快照超时
         let release = snapshotGate.tryAcquire()
         while (!release) {
@@ -148,7 +156,8 @@ function sessionError(sessionId: string | undefined, restoring = false, runtimeI
   if (!sessionId) return undefined
   if (ownsAcpSession(sessionId, runtimeId)) return undefined
   const context = currentAcpContext()
-  const foreign = listAcpContexts().some((other) => other !== context && !other.closed && ownsAcpSession(sessionId, runtimeId, other))
+  const foreign = listAcpContexts().some((other) => other !== context && !other.closed
+    && (other.purpose ?? 'chat') === (context.purpose ?? 'chat') && ownsAcpSession(sessionId, runtimeId, other))
   if (foreign || !restoring) {
     return err({ code: 'ACP_PROTOCOL_ERROR', message: '该 Agent 会话不属于当前窗口，请在当前窗口新建对话' })
   }
@@ -180,4 +189,19 @@ export function registerAcpWindowHandlers(): void {
   ipcMain.handle(IPC.ACP_PROMPT, (event, payload: AcpPromptPayload) => withAcpWindow(event.sender, () => sessionError(payload.sessionId) ?? promptAcp(payload)))
   ipcMain.handle(IPC.ACP_CANCEL, (event, payload: AcpCancelPayload) => withAcpWindow(event.sender, () => sessionError(payload.sessionId) ?? cancelAcp(payload)))
   ipcMain.handle(IPC.ACP_SET_CONFIG_OPTION, (event, payload: AcpSetConfigOptionPayload) => withAcpWindow(event.sender, () => sessionError(payload.sessionId) ?? setAcpConfigOption(payload)))
+  const translation = <T>(event: IpcMainInvokeEvent, runtimeId: string, action: () => T) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口使用翻译' })
+    }
+    if (typeof runtimeId !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(runtimeId)) {
+      return err({ code: 'INVALID_ARGUMENT', message: '翻译 Agent 无效' })
+    }
+    return withAcpWindow(event.sender, action, runtimeId)
+  }
+  ipcMain.handle(TRANSLATION_IPC.connect, (event, runtimeId: string) => translation(event, runtimeId, () => connectAcp({ runtimeId })))
+  ipcMain.handle(TRANSLATION_IPC.authenticate, (event, payload: Parameters<TranslationAPI['authenticate']>[0]) => translation(event, payload?.runtimeId, () => authenticateAcp(payload)))
+  ipcMain.handle(TRANSLATION_IPC.sessionNew, (event, payload: Parameters<TranslationAPI['sessionNew']>[0]) => translation(event, payload?.runtimeId, () => createAcpSession(payload.cwd)))
+  ipcMain.handle(TRANSLATION_IPC.loadSession, (event, payload: Parameters<TranslationAPI['loadSession']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? loadAcpSession(payload)))
+  ipcMain.handle(TRANSLATION_IPC.prompt, (event, payload: Parameters<TranslationAPI['prompt']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? promptAcp(payload)))
+  ipcMain.handle(TRANSLATION_IPC.setConfigOption, (event, payload: Parameters<TranslationAPI['setConfigOption']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? setAcpConfigOption(payload)))
 }

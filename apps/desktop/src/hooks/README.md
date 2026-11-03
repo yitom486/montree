@@ -49,6 +49,7 @@
 | `useReaderSidePanels` | 正文目录侧栏开关（标记统一进入外壳卡片区） |
 | `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/翻译/加入对话/问 Agent |
 | `useReaderTranslation` / `.test.ts` | 划词翻译短生命周期状态：坏选区先 OCR 恢复再翻译、Settings 目标语言、隐藏 ACP 副会话、流式增量、复制/重试/关闭；覆盖识别失败、过期结果与文档切换 |
+| `useTranslationConfig` | 设置页用 TanStack Query 读取翻译独立连接的模型/思考候选，按翻译 Agent、模型和思考偏好隔离；不依赖主聊天连接，提供独立认证 mutation，只准备配置、不发送翻译请求 |
 | `useReaderExportMenu` | 三阅读器笔记与 Anki 导出菜单共享外壳（toc/当前章由各家传入） |
 | `usePdfPageOcr` / `.test.ts` | PDF 单页 OCR 域：强制识别返回带几何的页缓存、在途去重、缺失/损坏文字层按需恢复、全书导入互斥及切书隔离 |
 | `useOcrComponent` | OCR 组件状态（初始 invoke + 推送写回 Query 缓存、下载/取消） |

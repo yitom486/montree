@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { copyTextToClipboard } from '@yitom/reader-core'
 import { useAppSettingsStore, translationTargetLabel, type TranslationTargetLang } from '@/stores/app-settings-store'
-import { useAcpUiStore } from '@/stores/acp-ui-store'
 import {
   hasUnreadableText,
   sendTranslationPrompt,
@@ -19,6 +18,7 @@ export interface ReaderTranslationState {
   targetLabel: string
   runtimeId?: string
   model?: string
+  thought?: string
   position: { x: number; y: number }
   text: string
   error?: string
@@ -60,6 +60,7 @@ export function useReaderTranslation(options: {
       runtimeId?: string,
       model?: string,
       recoverSourceText?: () => Promise<string>,
+      thought?: string,
     ) => {
       const targetLabel = translationTargetLabel(targetLang)
       const startedAt = Date.now()
@@ -73,6 +74,7 @@ export function useReaderTranslation(options: {
         targetLabel,
         runtimeId,
         model,
+        thought,
         position,
         text: EMPTY,
         startedAt,
@@ -96,6 +98,7 @@ export function useReaderTranslation(options: {
           targetLang: targetLabel,
           runtimeId,
           model,
+          thought,
           onDelta: (delta) => {
             if (requestSeq.current !== requestId) return
             firstTokenAt ??= Date.now()
@@ -141,7 +144,7 @@ export function useReaderTranslation(options: {
                 phase: 'error',
                 error:
                   result.status === 'auth-required'
-                    ? '需要先连接 Agent 并完成认证'
+                    ? '请在设置的翻译区域完成 Agent 认证'
                     : '翻译失败，请重试',
                 completedAt: Date.now(),
               }
@@ -176,12 +179,13 @@ export function useReaderTranslation(options: {
         return
       }
       const targetLang = useAppSettingsStore.getState().translationTargetLang
-      const runtimeId = useAcpUiStore.getState().selectedRuntimeId
+      const runtimeId = useAppSettingsStore.getState().translationRuntimeId
       const model = useAppSettingsStore.getState().translationModelByRuntime[runtimeId] ?? ''
+      const thought = useAppSettingsStore.getState().translationThoughtByRuntime[runtimeId]
       options.dimTextSelection()
       requestSeq.current += 1
       recoveryRef.current = options.recoverSourceText
-      await run(requestSeq.current, sourceText, targetLang, position, runtimeId, model, recoveryRef.current)
+      await run(requestSeq.current, sourceText, targetLang, position, runtimeId, model, recoveryRef.current, thought)
     },
     [options, run],
   )
@@ -197,6 +201,7 @@ export function useReaderTranslation(options: {
       translation.runtimeId,
       translation.model,
       recoveryRef.current,
+      translation.thought,
     )
   }, [run, translation])
 

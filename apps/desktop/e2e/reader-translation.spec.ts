@@ -8,6 +8,15 @@ import { webDocFixtureDir, welcomeWebDocUrlField } from './helpers/web-doc-fixtu
 
 const TRANSLATION_URL = 'https://e2e.montree.test/book/primitives.html'
 
+async function selectMockTranslation(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    if (window !== window.top) return
+    const settings = JSON.parse(localStorage.getItem('markdown-editor-settings') ?? '{"state":{}}')
+    settings.state.translationRuntimeId = 'mock-window'
+    localStorage.setItem('markdown-editor-settings', JSON.stringify(settings))
+  })
+}
+
 /** 显示为普通 Helvetica，但 T/S 的 ToUnicode 映射故意损坏。 */
 function corruptTextPdf(): Buffer {
   const mappings = Array.from({ length: 95 }, (_, index) => {
@@ -48,6 +57,7 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
   try {
     const page = await app.firstWindow()
     await page.waitForLoadState('domcontentloaded')
+    await selectMockTranslation(page)
     await seedMockChatThread(page, { id: 'translate-thread', title: '翻译' })
     await expect(page.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({ timeout: 15_000 })
     const connected = await page.evaluate(() =>
@@ -115,6 +125,7 @@ test('PDF 坏字体选区：识别进度、原选区恢复、自动继续翻译'
       })
     })
     const failure = page.waitForEvent('console', { predicate: (message) => message.text().includes('E2E first OCR fails') })
+    await selectMockTranslation(page)
     await seedMockChatThread(page, { id: 'pdf-translation', title: 'PDF 翻译' })
     await expect(page.getByRole('button', { name: '更多操作', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '更多操作', exact: true }).click()
@@ -173,4 +184,79 @@ test('PDF 坏字体选区：识别进度、原选区恢复、自动继续翻译'
   } finally {
     await app.close()
   }
+})
+
+test('主聊天未连接也能配置并翻译，随后主聊天保持 Max 且断开不影响翻译', async () => {
+  const app = await launchBuiltApp({
+    E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir(), E2E_ACP_WINDOW_TEST: '1', E2E_ACP_TRANSLATION_CONFIG_TEST: '1',
+    E2E_ACP_COMMAND: process.execPath, E2E_ACP_FIXTURE: resolve('apps/desktop/e2e/fixtures/mock-window-agent.cjs'),
+  })
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await selectMockTranslation(page)
+    await seedMockChatThread(page, { id: 'translation-config', title: '翻译配置' }, { theme: 'dark' })
+    const panel = page.locator('aside[aria-label="Agent 聊天"]:visible').first()
+    const mainStatuses: string[] = []
+    await page.exposeFunction('recordTranslationTestMainStatus', (status: string) => mainStatuses.push(status))
+    await page.evaluate(() => window.electronAPI!.onAcpStatusChanged((event) => {
+      void (window as unknown as { recordTranslationTestMainStatus: (status: string) => Promise<void> }).recordTranslationTestMainStatus(event.status)
+    }))
+    await page.getByRole('button', { name: '更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: /设置/ }).click()
+    const settings = page.getByRole('dialog', { name: '设置', exact: true })
+    const model = settings.getByRole('button', { name: '翻译模型', exact: true })
+    const thought = settings.getByRole('button', { name: '翻译思考档', exact: true })
+    await expect(model).toBeEnabled()
+    await expect(settings.getByText(/当前生效：Low/)).toBeVisible()
+    expect(mainStatuses).not.toContain('connected')
+    await model.click()
+    await page.getByRole('menuitemradio', { name: 'Small model', exact: true }).click()
+    await expect(model).toContainText('Small model')
+    await expect(settings.getByText(/当前生效：Minimal/)).toBeVisible()
+    await thought.click()
+    await page.getByRole('menuitemradio', { name: 'Low', exact: true }).click()
+    await expect(thought).toHaveText('Low')
+    await expect(settings.getByText(/当前生效：Low/)).toBeVisible()
+    await model.scrollIntoViewIfNeeded()
+    await settings.screenshot({ path: 'test-results/translation-settings.png' })
+    await page.keyboard.press('Escape')
+    await expect(settings).toBeHidden()
+
+    const field = welcomeWebDocUrlField(page)
+    await field.fill(TRANSLATION_URL)
+    await field.press('Enter')
+    const paragraph = page.frameLocator('.web-doc-viewer-host iframe').getByText('A chapter about primitive types in Rust.', { exact: true })
+    await expect(paragraph).toBeVisible()
+    await paragraph.click({ clickCount: 3 })
+    await page.getByRole('toolbar', { name: '选区操作' }).getByRole('button', { name: '翻译', exact: true }).click()
+    const card = page.getByRole('dialog', { name: '划词翻译' })
+    await expect(card).toContainText('CONFIG:small|low')
+    await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+    expect(mainStatuses).not.toContain('connected')
+    await card.getByRole('button', { name: '关闭翻译' }).click()
+    await panel.locator('textarea').fill('translation-config')
+    await panel.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(panel.locator('[data-slot="streaming-response"]').last()).toContainText('CONFIG:large|max')
+    await page.evaluate(() => window.electronAPI!.acpDisconnect())
+    await paragraph.click({ clickCount: 3 })
+    await page.getByRole('toolbar', { name: '选区操作' }).getByRole('button', { name: '翻译', exact: true }).click()
+    await expect(card).toContainText('CONFIG:small|low')
+    await card.getByRole('button', { name: '关闭翻译' }).click()
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('markdown-editor-settings')!).state)
+    expect(saved.translationModelByRuntime['mock-window']).toBe('small')
+    expect(saved.translationThoughtByRuntime['mock-window']).toBe('low')
+    expect(saved.translationRuntimeId).toBe('mock-window')
+
+    await page.getByRole('button', { name: '更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: /设置/ }).click()
+    await page.setViewportSize({ width: 600, height: 800 })
+    await model.scrollIntoViewIfNeeded()
+    await expect(model).toBeInViewport({ ratio: 1 })
+    await expect(thought).toBeInViewport({ ratio: 1 })
+    await model.click()
+    await expect(page.getByRole('menuitemradio', { name: 'Small model' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await settings.screenshot({ path: 'test-results/translation-settings-narrow.png' })
+  } finally { await app.close() }
 })

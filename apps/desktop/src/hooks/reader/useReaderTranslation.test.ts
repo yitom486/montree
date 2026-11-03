@@ -10,7 +10,7 @@ vi.mock('@/lib/agent/translation-session', async () => ({
   sendTranslationPrompt: vi.fn(), TRANSLATION_MAX_INPUT_CHARS: 4000,
 }))
 vi.mock('@/stores/app-settings-store', () => ({
-  useAppSettingsStore: { getState: () => ({ translationTargetLang: 'zh-CN', translationModelByRuntime: {} }) },
+  useAppSettingsStore: { getState: () => ({ translationTargetLang: 'zh-CN', translationRuntimeId: 'test', translationModelByRuntime: {}, translationThoughtByRuntime: {} }) },
   translationTargetLabel: () => '简体中文',
 }))
 vi.mock('@/stores/acp-ui-store', () => ({

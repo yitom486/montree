@@ -27,7 +27,10 @@ let sequence = 0, requestSequence = 1000
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
 const result = (id, value) => send({ id, result: value })
 const text = (sessionId, value) => send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: value } } } })
-const config = (value = 'default') => process.env.E2E_ACP_COMPOSER_TEST === '1' ? [
+const config = (value = 'default') => process.env.E2E_ACP_TRANSLATION_CONFIG_TEST === '1' ? [
+  { id: 'language-model', name: 'Model', category: 'model', type: 'select', currentValue: 'large', options: [{ value: 'large', name: 'Large model' }, { value: 'small', name: 'Small model' }] },
+  { id: 'thinking-level', name: 'Effort', category: 'thought_level', type: 'select', currentValue: 'max', options: [{ value: 'max', name: 'Max' }, { value: 'low', name: 'Low' }] },
+] : process.env.E2E_ACP_COMPOSER_TEST === '1' ? [
   { id: 'fast_mode', name: 'Fast mode', type: 'boolean', currentValue: false },
   { id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: 'auto', options: [{ value: 'auto', name: 'Auto review' }, { value: 'manual', name: 'Manual review' }] },
   { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'gpt-test', options: [{ value: 'gpt-test', name: '6 Luna' }] },
@@ -45,7 +48,7 @@ async function handle(message) {
     result(id, { protocolVersion: 1, agentInfo: { name: 'mock-window', version: '1' }, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true }, promptCapabilities: { image: true }, _meta: { toolsMode: { values: ['native', 'ptc'] } } }, authMethods: [] })
   } else if (method === 'session/new' || method === 'session/load' || method === 'session/resume') {
     const sessionId = params.sessionId || `mock-${process.pid}-${++sequence}`
-    sessions.set(sessionId, { cwd: params.cwd, mcp: params.mcpServers?.[0], meta: params._meta })
+    sessions.set(sessionId, { cwd: params.cwd, mcp: params.mcpServers?.[0], meta: params._meta, configOptions: config() })
     const recoveryFile = process.env.E2E_ACP_TOOL_RECOVERY_FILE
     const ids = params._meta?.toolOutputRecovery?.toolCallIds
     const outputs = recoveryFile && existsSync(recoveryFile) && Array.isArray(ids) ? JSON.parse(readFileSync(recoveryFile, 'utf8')).filter(row => ids.includes(row.toolCallId)) : []
@@ -90,6 +93,9 @@ async function handle(message) {
       const target = (command.match(/Translate the following text into ([^.]+)\./) || [])[1] || ''
       const excerpt = (command.split('<text>\n')[1] || '').split('\n</text>')[0].trim()
       text(sessionId, `[${target}] `)
+      if (process.env.E2E_ACP_TRANSLATION_CONFIG_TEST === '1') {
+        text(sessionId, 'CONFIG:' + sessions.get(sessionId).configOptions.map(option => option.currentValue).join('|') + ' ')
+      }
       await new Promise((resolve) => setTimeout(resolve, 80))
       text(sessionId, `MOCK译:${excerpt}`)
       output = ''
@@ -97,6 +103,8 @@ async function handle(message) {
     if (command.includes('[react-artifact-submit ') || command.includes('[react-artifact-repair ')) output = `ARTIFACT_REPLY:${sessionId}|${command}`
     if (command === 'identity') {
       output = `IDENTITY:${sessionId}|${sessions.get(sessionId).cwd}`
+    } else if (command === 'translation-config') {
+      output = 'CONFIG:' + sessions.get(sessionId).configOptions.map(option => option.currentValue).join('|')
     } else if (command === 'code-mode-meta') {
       output = `CODE_MODE:${sessions.get(sessionId).meta?.toolsMode ?? 'none'}`
     } else if (command.startsWith('diagram:') || command === 'inline-diagram') {
@@ -276,6 +284,20 @@ async function handle(message) {
     const pending = waiting.get(params.sessionId)
     if (pending != null) { waiting.delete(params.sessionId); result(pending, { stopReason: 'cancelled' }) }
   } else if (method === 'session/set_config_option') {
+    if (process.env.E2E_ACP_TRANSLATION_CONFIG_TEST === '1') {
+      const options = sessions.get(params.sessionId).configOptions
+      const option = options.find(option => option.id === params.configId)
+      if (!option?.options.some(item => item.value === params.value)) {
+        send({ id, error: { code: -32602, message: 'Unsupported translation config' } })
+        return
+      }
+      option.currentValue = params.value
+      if (params.configId === 'language-model' && params.value === 'small') {
+        options[1] = { ...options[1], currentValue: 'low', options: [{ value: 'low', name: 'Low' }, { value: 'minimal', name: 'Minimal' }] }
+      }
+      result(id, { configOptions: options })
+      return
+    }
     result(id, { configOptions: config(params.value) })
   } else if (id != null) {
     send({ id, error: { code: -32601, message: method } })

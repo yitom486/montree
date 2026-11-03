@@ -10,6 +10,7 @@
 | `app-api.ts` | 应用级：窗口/标题/关闭确认、更新、外部文件与链接、日志、E2E 门控、工作区监听等 |
 | `terminal-api.ts` | 交互终端 IPC：Shell 列表、会话创建/读写/尺寸/关闭及输出事件；独立沙盒 preload 桥接 |
 | `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@montree/contracts`，传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`，主进程留守见 `apps/desktop/electron/services/acp/`） |
+| `translation-api.ts` | 翻译专用 IPC：独立 Agent 连接/认证、会话/配置/翻译请求和专属流式/状态事件，经 `montreeTranslation` 访问，不改变右侧聊天状态 |
 | `agent-inspection-api.ts` | MCP/Skills 详情、完整技能说明和打开已发现文件位置；封装独立 preload 桥接与 Result 错误 |
 | `html-preview-api.ts` | 本地 HTML 预览会话：登记文件得到 `montree-html://` 独立源地址、推送当前（含未保存）HTML 文本、释放、请求主进程校验链接范围；封装独立 preload 桥接与 Result 错误 |
 | `reading-marks-api.ts` | 书签 / 高亮 / 批注 CRUD + 本书全文搜 + 按章查询 |

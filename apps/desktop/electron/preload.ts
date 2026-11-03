@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { TRANSLATION_IPC, type TranslationAPI } from '../contracts/translation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
@@ -464,3 +465,22 @@ const htmlPreviewAPI: HtmlPreviewAPI = {
   release: (token) => ipcRenderer.invoke(HTML_PREVIEW_IPC.release, token),
 }
 contextBridge.exposeInMainWorld('montreeHtmlPreview', htmlPreviewAPI)
+const translationAPI: TranslationAPI = {
+  connect: (runtimeId) => ipcRenderer.invoke(TRANSLATION_IPC.connect, runtimeId),
+  authenticate: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.authenticate, payload),
+  sessionNew: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.sessionNew, payload),
+  loadSession: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.loadSession, payload),
+  prompt: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.prompt, payload),
+  setConfigOption: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.setConfigOption, payload),
+  onSessionUpdate: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+    ipcRenderer.on(TRANSLATION_IPC.update, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.update, handler)
+  },
+  onStatusChanged: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+    ipcRenderer.on(TRANSLATION_IPC.status, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.status, handler)
+  },
+}
+contextBridge.exposeInMainWorld('montreeTranslation', translationAPI)

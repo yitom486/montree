@@ -47,3 +47,21 @@ it('翻译模型按运行时分桶保存，与聊天模型偏好互不覆盖', a
     opencode: 'fast-model',
   })
 })
+
+it('翻译思考档按运行时持久化，旧设置使用最低可用策略并过滤非法值', async () => {
+  expect(useAppSettingsStore.getState().translationThoughtByRuntime).toEqual({})
+  useAppSettingsStore.getState().setTranslationThought('opencode', 'low')
+  useAppSettingsStore.getState().setTranslationThought('codex-acp', 'minimal')
+  await useAppSettingsStore.persist.rehydrate()
+  expect(useAppSettingsStore.getState().translationThoughtByRuntime).toEqual({ opencode: 'low', 'codex-acp': 'minimal' })
+  localStorage.setItem('markdown-editor-settings', JSON.stringify({ state: { translationThoughtByRuntime: { opencode: 123, other: '' } }, version: 0 }))
+  await useAppSettingsStore.persist.rehydrate()
+  expect(useAppSettingsStore.getState().translationThoughtByRuntime).toEqual({})
+})
+
+it('翻译 Agent 单独保存，旧设置使用 OpenCode，重启后恢复独立选择', async () => {
+  expect(useAppSettingsStore.getState().translationRuntimeId).toBe('opencode')
+  useAppSettingsStore.getState().setTranslationRuntime('codex-acp')
+  await useAppSettingsStore.persist.rehydrate()
+  expect(useAppSettingsStore.getState().translationRuntimeId).toBe('codex-acp')
+})
