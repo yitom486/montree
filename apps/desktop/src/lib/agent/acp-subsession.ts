@@ -65,6 +65,8 @@ export interface SubsessionSendOptions extends SubsessionEnsureOptions {
   images?: Array<{ id: string; kind: 'image'; name: string; mimeType: string; base64: string }> // toc 专用，缺省无
   /** 流式增量（仅本次 prompt 有效；用于翻译等短文本边到边渲染） */
   onDelta?: (delta: string) => void
+  /** 已产生结构化副作用时禁止自动重放整个 prompt。 */
+  canRetry?: () => boolean
 }
 
 export type SubsessionEnsureResult =
@@ -258,7 +260,7 @@ export function accumulateSubsessionUpdate(
   for (const entry of entries.values()) {
     if (entry.isolated) continue
     if (entry.sessionId !== sid && !entry.prompting) continue
-    const text = extractTextFromContent(update.content)
+    const text = !update.sessionUpdate || update.sessionUpdate === 'agent_message_chunk' ? extractTextFromContent(update.content) : ''
     if (text) {
       entry.replyBuffer += text
       entry.onDelta?.(text)
@@ -282,7 +284,7 @@ export function accumulateSubsessionUpdateFor(
     if (entry.isolated && !runtimeId) continue
     if (runtimeId && entry.runtimeId !== runtimeId) continue
     if (entry.sessionId !== sid && !entry.prompting) continue
-    const text = extractTextFromContent(update.content)
+    const text = !update.sessionUpdate || update.sessionUpdate === 'agent_message_chunk' ? extractTextFromContent(update.content) : ''
     if (text) {
       entry.replyBuffer += text
       entry.onDelta?.(text)
@@ -546,7 +548,7 @@ export async function sendSubsessionPrompt(
     )
     return { status: 'ok', reply: first.reply }
   }
-  if (!first.retryable) {
+  if (!first.retryable || opts.canRetry?.() === false) {
     console.info(
       `[subsession] send:return purpose=${purpose} key=${keyTail(key)} outcome=failed error=${first.errorCode ?? 'thrown'}`,
     )

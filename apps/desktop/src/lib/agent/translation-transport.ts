@@ -1,12 +1,21 @@
 import type { AcpAuthMethod } from '@yitom/contracts'
 import { translationApi } from '@/api/translation-api'
 import { accumulateSubsessionUpdateFor } from './acp-subsession'
+import type { TranslationOutputEnvelope } from '../../../contracts/translation'
 
 const connected = new Set<string>()
 const generations = new Map<string, number>()
 const auth = new Map<string, AcpAuthMethod[]>()
 const pending = new Map<string, Promise<'connected' | 'auth-required'>>()
 let subscribed = false
+const outputListeners = new Map<string, (event: TranslationOutputEnvelope) => void>()
+
+export function subscribeTranslationOutput(runtimeId: string, requestId: string, listener: (event: TranslationOutputEnvelope) => void) {
+  subscribe()
+  const key = JSON.stringify([runtimeId, requestId])
+  outputListeners.set(key, listener)
+  return () => { outputListeners.delete(key) }
+}
 
 export class TranslationAuthRequiredError extends Error {
   constructor(public runtimeId: string, public methods: AcpAuthMethod[]) {
@@ -16,6 +25,7 @@ export class TranslationAuthRequiredError extends Error {
 
 function subscribe() {
   if (subscribed) return
+  translationApi.onOutput((event) => outputListeners.get(JSON.stringify([event.runtimeId, event.requestId]))?.(event))
   translationApi.onSessionUpdate((event) => accumulateSubsessionUpdateFor('translate', event.sessionId, event.update, event.runtimeId))
   translationApi.onStatusChanged((event) => {
     if (event.status === 'disconnected' || event.status === 'error') auth.delete(event.runtimeId)
@@ -67,11 +77,11 @@ export async function authenticateTranslation(runtimeId: string, methodId: strin
   auth.delete(runtimeId)
 }
 
-export function translationClient(runtimeId: string) {
+export function translationClient(runtimeId: string, requestId = '') {
   return {
     sessionNew: (payload: Omit<Parameters<typeof translationApi.sessionNew>[0], 'runtimeId'>) => translationApi.sessionNew({ ...payload, runtimeId }),
     loadSession: (payload: Omit<Parameters<typeof translationApi.loadSession>[0], 'runtimeId'>) => translationApi.loadSession({ ...payload, runtimeId }),
-    prompt: (payload: Omit<Parameters<typeof translationApi.prompt>[0], 'runtimeId'>) => translationApi.prompt({ ...payload, runtimeId }),
+    prompt: (payload: Omit<Parameters<typeof translationApi.prompt>[0], 'runtimeId' | 'requestId'>) => translationApi.prompt({ ...payload, runtimeId, requestId }),
     setConfigOption: (payload: Omit<Parameters<typeof translationApi.setConfigOption>[0], 'runtimeId'>) => translationApi.setConfigOption({ ...payload, runtimeId }),
   }
 }

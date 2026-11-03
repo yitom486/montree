@@ -382,6 +382,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
             onClose={selectionActions.dismissTranslation}
             onRetry={() => void selectionActions.retryTranslation()}
             onCopy={selectionActions.copyTranslation}
+            onSave={() => void selectionActions.saveTranslationNote()}
           />
         ) : null}
 

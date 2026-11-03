@@ -14,4 +14,5 @@ export const translationApi: TranslationAPI = {
   setConfigOption: (payload) => api().setConfigOption(payload),
   onSessionUpdate: (callback) => api().onSessionUpdate(callback),
   onStatusChanged: (callback) => api().onStatusChanged(callback),
+  onOutput: (callback) => api().onOutput(callback),
 }

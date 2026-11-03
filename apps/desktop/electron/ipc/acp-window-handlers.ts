@@ -13,6 +13,7 @@ import { disposeContextAcpProcesses } from '../services/acp/process-manager'
 import { captureReaderViewport } from '../services/reader-screenshot-service'
 import { startWindowMcpServer, stopWindowMcpServers } from '../services/acp/mcp/stdio-server'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
+import { onTranslationOutput, openTranslationOutput, isTranslationOutputPermission } from '../services/acp/mcp/translation-tools'
 
 const registered = new WeakSet<AcpContext>()
 
@@ -66,10 +67,16 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T, transla
         translationRuntime ? { ...event, runtimeId: translationRuntime } : event))
       onAcpStatusChanged((event) => send(translationRuntime ? TRANSLATION_IPC.status : IPC.ACP_STATUS_CHANGED,
         translationRuntime ? { ...event, runtimeId: translationRuntime } : event))
+      if (translationRuntime) onTranslationOutput((event) => send(TRANSLATION_IPC.output, { ...event, runtimeId: translationRuntime }))
       const snapshotGate = createSnapshotGate(MAX_SNAPSHOT_IN_FLIGHT)
       setAcpPermissionBridge(({ requestId, sessionId, params }) => new Promise((resolve) => {
         // 翻译只处理传入的选中文字，不申请工作区工具权限。
-        if (translationRuntime) { resolve({ outcome: 'cancelled' }); return }
+        if (translationRuntime) {
+          const option = isTranslationOutputPermission(params.toolCall as Record<string, unknown> | undefined)
+            ? (params.options as Array<{ kind: string; optionId: string }> | undefined)?.find((item) => item.kind === 'allow_once') : undefined
+          resolve(option ? { outcome: 'selected', optionId: option.optionId } : { outcome: 'cancelled' })
+          return
+        }
         if (sender.isDestroyed() || context.closed) { resolve({ outcome: 'cancelled' }); return }
         let settled = false
         const timer = setTimeout(() => finish({ outcome: 'cancelled' }), 120_000)
@@ -202,6 +209,13 @@ export function registerAcpWindowHandlers(): void {
   ipcMain.handle(TRANSLATION_IPC.authenticate, (event, payload: Parameters<TranslationAPI['authenticate']>[0]) => translation(event, payload?.runtimeId, () => authenticateAcp(payload)))
   ipcMain.handle(TRANSLATION_IPC.sessionNew, (event, payload: Parameters<TranslationAPI['sessionNew']>[0]) => translation(event, payload?.runtimeId, () => createAcpSession(payload.cwd)))
   ipcMain.handle(TRANSLATION_IPC.loadSession, (event, payload: Parameters<TranslationAPI['loadSession']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? loadAcpSession(payload)))
-  ipcMain.handle(TRANSLATION_IPC.prompt, (event, payload: Parameters<TranslationAPI['prompt']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? promptAcp(payload)))
+  ipcMain.handle(TRANSLATION_IPC.prompt, (event, payload: Parameters<TranslationAPI['prompt']>[0]) => translation(event, payload?.runtimeId, async () => {
+    const invalid = sessionError(payload.sessionId)
+    if (invalid) return invalid
+    let close: () => void
+    try { close = openTranslationOutput(payload.requestId, payload.sessionId) }
+    catch { return err({ code: 'INVALID_ARGUMENT', message: '翻译请求无效或重复' }) }
+    try { return await promptAcp(payload) } finally { close() }
+  }))
   ipcMain.handle(TRANSLATION_IPC.setConfigOption, (event, payload: Parameters<TranslationAPI['setConfigOption']>[0]) => translation(event, payload?.runtimeId, () => sessionError(payload.sessionId) ?? setAcpConfigOption(payload)))
 }

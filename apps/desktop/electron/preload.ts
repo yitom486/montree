@@ -466,6 +466,11 @@ const htmlPreviewAPI: HtmlPreviewAPI = {
 }
 contextBridge.exposeInMainWorld('montreeHtmlPreview', htmlPreviewAPI)
 const translationAPI: TranslationAPI = {
+  onOutput: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => callback(payload)
+    ipcRenderer.on(TRANSLATION_IPC.output, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.output, handler)
+  },
   connect: (runtimeId) => ipcRenderer.invoke(TRANSLATION_IPC.connect, runtimeId),
   authenticate: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.authenticate, payload),
   sessionNew: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.sessionNew, payload),

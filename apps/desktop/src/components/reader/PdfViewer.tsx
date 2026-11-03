@@ -668,6 +668,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
           onClose={selectionActions.dismissTranslation}
           onRetry={() => void selectionActions.retryTranslation()}
           onCopy={selectionActions.copyTranslation}
+          onSave={() => void selectionActions.saveTranslationNote()}
         />
       ) : null}
 

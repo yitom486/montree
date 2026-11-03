@@ -321,6 +321,7 @@ export function FoliateReaderViewer({
           onClose={interactions.selectionActions.dismissTranslation}
           onRetry={() => void interactions.selectionActions.retryTranslation()}
           onCopy={interactions.selectionActions.copyTranslation}
+          onSave={() => void interactions.selectionActions.saveTranslationNote()}
         />
       ) : null}
 

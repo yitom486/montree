@@ -125,4 +125,51 @@ describe('translation OCR recovery', () => {
     expect(model.translation?.phase).toBe('error')
     expect(sendTranslationPrompt).not.toHaveBeenCalled()
   })
+
+  it('shows translation while optional details are being completed', async () => {
+    const result = deferred<Awaited<ReturnType<typeof sendTranslationPrompt>>>()
+    vi.mocked(sendTranslationPrompt).mockImplementationOnce(async (request) => {
+      request.onDelta?.('译文')
+      request.onDetails?.({ sourceLanguage: '英语', phrases: [{ text: 'Hello', meaning: '问候' }], terms: [] })
+      request.onDetailsStart?.()
+      return result.promise
+    })
+    let pending!: Promise<void>
+    await act(async () => { pending = model.translate(position) })
+    expect(model.translation).toMatchObject({ phase: 'enriching', text: '译文', details: { sourceLanguage: '英语', phrases: [{ text: 'Hello', meaning: '问候' }] } })
+    await act(async () => {
+      result.resolve({ status: 'ok', reply: '译文', details: { sourceLanguage: '英语', phrases: [], terms: [] } })
+      await pending
+    })
+    expect(model.translation).toMatchObject({ phase: 'done', details: { sourceLanguage: '英语' } })
+  })
+
+  it('saves against the captured selection, prevents duplicate saves and preserves the card', async () => {
+    const save = deferred<unknown>()
+    const originalWriter = vi.fn(() => save.promise)
+    options.captureNoteWriter = () => originalWriter
+    await render()
+    await act(async () => { await model.translate(position) })
+    options = { ...options, getSourceText: () => 'Another selection', captureNoteWriter: () => vi.fn() }
+    await render()
+    let pending!: Promise<void>
+    await act(async () => { pending = model.saveNote(); await model.saveNote() })
+    expect(originalWriter).toHaveBeenCalledTimes(1)
+    expect(originalWriter).toHaveBeenCalledWith(expect.stringContaining('原文\nHello'), 'Hello')
+    expect(model.translation?.saving).toBe(true)
+    await act(async () => { save.resolve(undefined); await pending; await model.saveNote() })
+    expect(originalWriter).toHaveBeenCalledTimes(1)
+    expect(model.translation).toMatchObject({ phase: 'done', text: '译文', saved: true, saving: false })
+  })
+
+  it('retains translation on save failure and supports retry', async () => {
+    const writer = vi.fn().mockRejectedValueOnce(new Error('磁盘不可写')).mockResolvedValueOnce(undefined)
+    options.captureNoteWriter = () => writer
+    await render()
+    await act(async () => { await model.translate(position) })
+    await act(async () => { await model.saveNote() })
+    expect(model.translation).toMatchObject({ phase: 'done', text: '译文', saveError: '磁盘不可写', saving: false })
+    await act(async () => { await model.saveNote() })
+    expect(model.translation).toMatchObject({ saved: true, saveError: undefined })
+  })
 })

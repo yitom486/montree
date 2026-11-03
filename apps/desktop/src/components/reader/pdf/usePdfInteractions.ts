@@ -183,8 +183,9 @@ export function usePdfInteractions({
       color = DEFAULT_HIGHLIGHT_COLOR,
       overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
+      frozenSelection?: PdfSelectionSnapshot,
     ) => {
-      const snapshot = selectionTransactionRef.current
+      const snapshot = frozenSelection ?? selectionTransactionRef.current
       if (!snapshot) {
         throw new Error('当前没有可用选区，请先划选文本')
       }
@@ -198,7 +199,7 @@ export function usePdfInteractions({
         page: snapshot.page,
       })
       const meta = parseNoteToCardMeta(note)
-      if (existing) {
+      if (existing && !frozenSelection) {
         const trimmed = meta.note?.trim()
         const result = await updateMark({
           id: existing.id,
@@ -258,7 +259,7 @@ export function usePdfInteractions({
       }
 
       toast.success(note ? '已保存批注' : '已添加高亮')
-      clearTextSelection()
+      if (!frozenSelection) clearTextSelection()
       return result.value as ReadingMark
     },
     [clearTextSelection, createMark, fileFingerprint, filePath, marks, marksToc, updateMark],
@@ -266,6 +267,15 @@ export function usePdfInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    captureTranslationNote: () => {
+      const snapshot = selectionTransactionRef.current ?? selectionSnapshot
+      if (!snapshot) return undefined
+      return (note, text) => handleSaveAnnotation(note, 'yellow', undefined, '翻译', {
+        ...snapshot, text,
+        // 翻译期间可能 OCR 换层，固定原页几何，避免使用已失效的 item 索引。
+        begin: undefined, end: undefined, quote: undefined,
+      })
+    },
     // 闭包锁定点击时的快照；识别期间的新选区不能改变本次翻译范围。
     recoverTranslationText: selectionSnapshot ? async () => {
       const cache = ocrPageCachesRef.current[selectionSnapshot.page]

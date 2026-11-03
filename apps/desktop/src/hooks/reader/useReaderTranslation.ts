@@ -7,8 +7,10 @@ import {
   sendTranslationPrompt,
   TRANSLATION_MAX_INPUT_CHARS,
 } from '@/lib/agent/translation-session'
+import { translationNote, type TranslationDetails } from '@/lib/agent/translation-result'
 
-export type ReaderTranslationPhase = 'recognizing' | 'preparing' | 'streaming' | 'done' | 'error'
+export type ReaderTranslationPhase = 'recognizing' | 'preparing' | 'streaming' | 'enriching' | 'done' | 'error'
+export type TranslationNoteWriter = (note: string, sourceText: string) => Promise<unknown>
 
 export interface ReaderTranslationState {
   requestId: string
@@ -21,6 +23,11 @@ export interface ReaderTranslationState {
   thought?: string
   position: { x: number; y: number }
   text: string
+  details?: TranslationDetails
+  canSave?: boolean
+  saving?: boolean
+  saved?: boolean
+  saveError?: string
   error?: string
   startedAt: number
   firstTokenAt?: number
@@ -39,14 +46,20 @@ export function useReaderTranslation(options: {
   dimTextSelection: () => void
   recoverSourceText?: () => Promise<string>
   sourceKey?: string
+  captureNoteWriter?: () => TranslationNoteWriter | undefined
+  onNoteSaved?: () => void
 }) {
   const [translation, setTranslation] = useState<ReaderTranslationState | null>(null)
   const requestSeq = useRef(0)
   const recoveryRef = useRef<(() => Promise<string>) | undefined>(undefined)
+  const noteWriterRef = useRef<TranslationNoteWriter | undefined>(undefined)
+  const pendingSaves = useRef(new Set<string>())
+  const savedRequests = useRef(new Set<string>())
 
   useEffect(() => {
     requestSeq.current += 1
     recoveryRef.current = undefined
+    noteWriterRef.current = undefined
     setTranslation(null)
     return () => { requestSeq.current += 1 }
   }, [options.sourceKey])
@@ -77,6 +90,7 @@ export function useReaderTranslation(options: {
         thought,
         position,
         text: EMPTY,
+        canSave: Boolean(noteWriterRef.current),
         startedAt,
       })
       try {
@@ -99,6 +113,7 @@ export function useReaderTranslation(options: {
           runtimeId,
           model,
           thought,
+          isActive: () => requestSeq.current === requestId,
           onDelta: (delta) => {
             if (requestSeq.current !== requestId) return
             firstTokenAt ??= Date.now()
@@ -112,6 +127,14 @@ export function useReaderTranslation(options: {
                   }
                 : previous,
             )
+          },
+          onDetails: (details) => {
+            if (requestSeq.current !== requestId) return
+            setTranslation((previous) => previous ? { ...previous, details } : previous)
+          },
+          onDetailsStart: () => {
+            if (requestSeq.current !== requestId) return
+            setTranslation((previous) => previous ? { ...previous, phase: 'enriching' } : previous)
           },
         })
         if (result.status === 'ok') {
@@ -131,6 +154,7 @@ export function useReaderTranslation(options: {
                   ...previous,
                   phase: 'done',
                   text: result.reply || previous.text,
+                  details: result.details,
                   completedAt: Date.now(),
                 }
               : previous,
@@ -182,9 +206,11 @@ export function useReaderTranslation(options: {
       const runtimeId = useAppSettingsStore.getState().translationRuntimeId
       const model = useAppSettingsStore.getState().translationModelByRuntime[runtimeId] ?? ''
       const thought = useAppSettingsStore.getState().translationThoughtByRuntime[runtimeId]
+      const noteWriter = options.captureNoteWriter?.()
       options.dimTextSelection()
       requestSeq.current += 1
       recoveryRef.current = options.recoverSourceText
+      noteWriterRef.current = noteWriter
       await run(requestSeq.current, sourceText, targetLang, position, runtimeId, model, recoveryRef.current, thought)
     },
     [options, run],
@@ -207,8 +233,30 @@ export function useReaderTranslation(options: {
 
   const dismiss = useCallback(() => {
     requestSeq.current += 1
+    noteWriterRef.current = undefined
     setTranslation(null)
   }, [])
+
+  const saveNote = useCallback(async () => {
+    const writer = noteWriterRef.current
+    if (!translation || translation.phase !== 'done' || !translation.text.trim() || !writer) return
+    const id = translation.requestId
+    if (String(requestSeq.current) !== id || pendingSaves.current.has(id) || savedRequests.current.has(id)) return
+    pendingSaves.current.add(id)
+    setTranslation((previous) => previous ? { ...previous, saving: true, saveError: undefined } : previous)
+    try {
+      await writer(translationNote(translation.sourceText, translation.text, translation.targetLabel, translation.details), translation.sourceText)
+      savedRequests.current.add(id)
+      if (String(requestSeq.current) !== id) return
+      setTranslation((previous) => previous ? { ...previous, saving: false, saved: true } : previous)
+      options.onNoteSaved?.()
+    } catch (cause) {
+      if (String(requestSeq.current) !== id) return
+      setTranslation((previous) => previous ? {
+        ...previous, saving: false, saveError: cause instanceof Error ? cause.message : '保存失败，请重试',
+      } : previous)
+    } finally { pendingSaves.current.delete(id) }
+  }, [options.onNoteSaved, translation])
 
   const copy = useCallback(() => {
     const text = translation?.text.trim()
@@ -218,5 +266,5 @@ export function useReaderTranslation(options: {
     })
   }, [translation?.text])
 
-  return { translation, translate, retry, dismiss, copy }
+  return { translation, translate, retry, dismiss, copy, saveNote }
 }

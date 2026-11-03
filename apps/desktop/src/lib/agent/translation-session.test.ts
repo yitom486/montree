@@ -5,12 +5,17 @@ import { translationApi } from '@/api/translation-api'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
 import { TRANSLATION_LOWEST_THOUGHT, TRANSLATION_DEFAULT_THOUGHT } from './translation-config'
 import { buildTranslationPrompt, hasUnreadableText, sendTranslationPrompt } from './translation-session'
+import { subscribeTranslationOutput } from './translation-transport'
 import { sendSubsessionPrompt } from './acp-subsession'
 
 vi.mock('./acp-subsession', () => ({
   sendSubsessionPrompt: vi.fn(async () => ({ status: 'ok', reply: '译文' })),
 }))
 vi.mock('@/api/translation-api', () => ({ translationApi: { setConfigOption: vi.fn() } }))
+vi.mock('./translation-transport', () => ({
+  subscribeTranslationOutput: vi.fn(() => vi.fn()), translationConnectionEpoch: () => 0,
+  translationClient: (runtimeId: string) => ({ setConfigOption: (payload: object) => translationApi.setConfigOption({ ...payload, runtimeId } as never) }),
+}))
 
 const models: AcpConfigOption = {
   configId: 'language-model', category: 'model', name: 'Model', type: 'select', currentValue: 'large',
@@ -40,12 +45,64 @@ describe('translation-session', () => {
     expect(sendSubsessionPrompt).toHaveBeenCalledWith(
       expect.objectContaining({
         purpose: 'translate',
-        key: JSON.stringify(['opencode', '', TRANSLATION_LOWEST_THOUGHT, 0]),
+        key: JSON.stringify(['opencode', '', TRANSLATION_LOWEST_THOUGHT, 0, 'stream-v2']),
         inheritConfigPreferences: false,
-        onDelta,
       }),
       expect.stringContaining('English'),
     )
+  })
+
+  it('streams translation before the first turn completes, then emits each explanation', async () => {
+    const onDelta = vi.fn(), onDetails = vi.fn(), onDetailsStart = vi.fn()
+    vi.mocked(sendSubsessionPrompt)
+      .mockImplementationOnce(async (request) => {
+        request.onDelta?.('Unwanted preamble. {"translation":"你')
+        expect(request.canRetry?.()).toBe(false)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(onDelta).toHaveBeenLastCalledWith('你')
+        expect(onDetailsStart).not.toHaveBeenCalled()
+        request.onDelta?.('好，世界。","sourceLanguage":"英语"}')
+        return { status: 'ok', reply: 'Unwanted preamble. {"translation":"你好，世界。","sourceLanguage":"英语"}' }
+      })
+      .mockImplementationOnce(async (request, prompt) => {
+        expect(onDelta.mock.calls.flat().join('')).toBe('你好，世界。')
+        expect(onDetailsStart).toHaveBeenCalledOnce()
+        expect(request.onDelta).toBeUndefined()
+        expect(prompt).toContain('do NOT translate or repeat it')
+        const emit = vi.mocked(subscribeTranslationOutput).mock.calls.at(-1)![2]
+        const envelope = { runtimeId: 'opencode', sessionId: 'translation', requestId: 'test', sequence: 0 }
+        emit({ ...envelope, event: { type: 'phrase', text: 'Hello', meaning: '问候' } })
+        expect(onDetails).toHaveBeenLastCalledWith(expect.objectContaining({ phrases: [{ text: 'Hello', meaning: '问候' }] }))
+        emit({ ...envelope, sequence: 1, event: { type: 'term', text: 'World', meaning: '此处所指的世界' } })
+        expect(onDetails).toHaveBeenLastCalledWith(expect.objectContaining({ terms: [{ text: 'World', meaning: '此处所指的世界' }] }))
+        emit({ ...envelope, sequence: 2, event: { type: 'text', text: 'must never overwrite translation' } })
+        return { status: 'ok', reply: 'PRIVATE_THOUGHT unwanted narration' }
+      })
+    const result = await sendTranslationPrompt({ text: 'Hello World', targetLang: '简体中文', onDelta, onDetails, onDetailsStart })
+    expect(result).toMatchObject({ status: 'ok', reply: '你好，世界。', details: { sourceLanguage: '英语' } })
+    expect(onDelta.mock.calls.flat().join('')).toBe('你好，世界。')
+  })
+  it('rejects unstructured free text without displaying it or requesting explanations', async () => {
+    const onDelta = vi.fn()
+    const result = await sendTranslationPrompt({ text: 'Hello', targetLang: '简体中文', onDelta })
+    expect(result).toMatchObject({ status: 'failed', reply: '' })
+    expect(onDelta).not.toHaveBeenCalled()
+    expect(sendSubsessionPrompt).toHaveBeenCalledOnce()
+  })
+  it('preserves the completed translation when optional explanations fail and unsubscribes', async () => {
+    const close = vi.fn()
+    vi.mocked(subscribeTranslationOutput).mockReturnValueOnce(close)
+    vi.mocked(sendSubsessionPrompt)
+      .mockResolvedValueOnce({ status: 'ok', reply: '{"translation":"完整译文","sourceLanguage":"英语"}' })
+      .mockRejectedValueOnce(new Error('details disconnected'))
+    expect(await sendTranslationPrompt({ text: 'Hello', targetLang: '简体中文' })).toMatchObject({ status: 'ok', reply: '完整译文' })
+    expect(close).toHaveBeenCalledOnce()
+  })
+  it('skips the explanation request if the card was closed during translation', async () => {
+    vi.mocked(sendSubsessionPrompt).mockResolvedValueOnce({ status: 'ok', reply: '{"translation":"完整译文","sourceLanguage":null}' })
+    expect(await sendTranslationPrompt({ text: 'Hello', targetLang: '简体中文', isActive: () => false })).toMatchObject({ status: 'ok', reply: '完整译文' })
+    expect(sendSubsessionPrompt).toHaveBeenCalledOnce()
+    expect(subscribeTranslationOutput).not.toHaveBeenCalled()
   })
 
   it('uses independent model/effort configuration and isolates the session key', async () => {
@@ -59,7 +116,7 @@ describe('translation-session', () => {
     expect(sendSubsessionPrompt).toHaveBeenCalledWith(
       expect.objectContaining({
         purpose: 'translate',
-        key: JSON.stringify(['opencode', 'fast-model', TRANSLATION_LOWEST_THOUGHT, 0]),
+        key: JSON.stringify(['opencode', 'fast-model', TRANSLATION_LOWEST_THOUGHT, 0, 'stream-v2']),
         runtimeId: 'opencode',
         configureSession: expect.any(Function),
       }),

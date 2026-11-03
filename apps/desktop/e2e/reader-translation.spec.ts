@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
 import { seedMockChatThread } from './helpers/seed-chat'
 import { webDocFixtureDir, welcomeWebDocUrlField } from './helpers/web-doc-fixture'
+import { resolveWebDocDocumentId, resolveWebDocSiteId } from '../../../packages/web-doc/src/web-doc-site'
 
 const TRANSLATION_URL = 'https://e2e.montree.test/book/primitives.html'
 
@@ -48,7 +49,9 @@ function corruptTextPdf(): Buffer {
 }
 
 test('划词翻译：流式卡片、目标语言、复制与关闭', async () => {
+  const gates = await mkdtemp(join(tmpdir(), 'montree-translation-stream-'))
   const app = await launchBuiltApp({
+    E2E_TRANSLATION_GATE_DIR: gates,
     E2E_WEB_DOC_FIXTURE_DIR: webDocFixtureDir(),
     E2E_ACP_WINDOW_TEST: '1',
     E2E_ACP_COMMAND: process.execPath,
@@ -83,13 +86,86 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
     await expect(card).toBeVisible({ timeout: 10_000 })
     await expect(card).toContainText('简体中文')
     await expect(card).toContainText('A chapter about primitive types in Rust.')
+    // 第一轮仍被 gate 挂起：此时译文字符串与 JSON 都尚未结束。
+    await expect(card).toContainText('MOCK译:A')
+    await expect(card).not.toContainText('MOCK译:A chapter about primitive types in Rust.')
+    await expect(card).not.toContainText('UNWANTED_PREAMBLE')
+    await expect(card).not.toContainText('"translation"')
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeDisabled()
+    await writeFile(join(gates, 'translation-tail'), '')
     await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.', {
       timeout: 10_000,
     })
+    await expect(card).toContainText('英语')
+    await expect(card).not.toContainText('UNWANTED_DETAILS_NARRATION')
+    await expect(card).not.toContainText('PRIVATE_THOUGHT')
+    await expect(card).not.toContainText('UNWANTED_PREAMBLE')
+    await expect(card.getByRole('region', { name: '关键短语' })).toHaveCount(0)
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeDisabled()
+    await writeFile(join(gates, 'phrase'), '')
+    await expect(card.getByRole('region', { name: '关键短语' })).toContainText('primitive types')
+    await expect(card.getByRole('region', { name: '专有名词' })).toHaveCount(0)
+    await writeFile(join(gates, 'term'), '')
+    await expect(card.getByRole('region', { name: '专有名词' })).toContainText('Rust')
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeDisabled()
+    await writeFile(join(gates, 'done'), '')
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeEnabled()
+    const before = (await card.boundingBox())!
+    expect(before.height).toBeLessThanOrEqual(512)
+    const handle = card.getByLabel('拖动翻译卡，方向键移动')
+    const grip = (await handle.boundingBox())!
+    await page.mouse.move(grip.x + 50, grip.y + 12)
+    await page.mouse.down()
+    await page.mouse.move(grip.x + 150, grip.y + 52, { steps: 8 })
+    await page.mouse.up()
+    await expect.poll(async () => (await card.boundingBox())!.x).toBeGreaterThan(before.x + 40)
+    await handle.focus()
+    const draggedX = (await card.boundingBox())!.x
+    await page.keyboard.press('ArrowLeft')
+    await expect.poll(async () => (await card.boundingBox())!.x).toBeLessThan(draggedX)
+    const originalViewport = page.viewportSize()
+    await page.setViewportSize({ width: 540, height: 400 })
+    await expect(card).toBeInViewport({ ratio: 1 })
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeInViewport({ ratio: 1 })
+    const viewport = card.locator('[data-slot="scroll-area-viewport"]')
+    await expect.poll(() => viewport.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true)
+    await viewport.hover()
+    await page.mouse.wheel(0, 600)
+    await expect.poll(() => viewport.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+    if (originalViewport) await page.setViewportSize(originalViewport)
+    await expect(card).not.toContainText('sourceLanguage')
+    await expect(card).not.toContainText('<montree-details')
+    await expect(card.getByRole('button', { name: '关闭翻译' })).toBeInViewport({ ratio: 1 })
+    await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeInViewport({ ratio: 1 })
+    await card.getByRole('region', { name: '译文与解读' }).focus()
+    await page.keyboard.press('End')
+    await expect(card.getByRole('region', { name: '专有名词' })).toBeInViewport({ ratio: 1 })
+    await page.keyboard.press('Home')
     await card.screenshot({ path: 'test-results/translation-card.png' })
 
     await card.getByRole('button', { name: '复制' }).click()
     await expect(page.getByText('已复制译文')).toBeVisible()
+    const clipboard = await app.evaluate(({ clipboard }) => clipboard.readText())
+    expect(clipboard).toContain('MOCK译:A chapter about primitive types in Rust.')
+    expect(clipboard).not.toContain('sourceLanguage')
+    expect(clipboard).not.toContain('UNWANTED_PREAMBLE')
+    expect(clipboard).not.toContain('PRIVATE_THOUGHT')
+    expect(clipboard).not.toContain('关键短语')
+    await card.getByRole('button', { name: '存为批注', exact: true }).click()
+    await expect(card.getByRole('button', { name: '已存批注', exact: true })).toBeDisabled()
+    const documentId = resolveWebDocDocumentId(TRANSLATION_URL, resolveWebDocSiteId(TRANSLATION_URL))
+    const notes = await page.evaluate(async (id) => {
+      const result = await window.electronAPI!.listReadingMarks(id)
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value
+    }, documentId)
+    expect(notes).toHaveLength(1)
+    expect(notes[0].note).toContain('原文\nA chapter about primitive types in Rust.')
+    expect(notes[0].note).toContain('primitive types：基本类型')
+    expect(notes[0].note).toContain('Rust：文中提到的编程语言名称')
+    expect(notes[0].anchor).toMatchObject({ format: 'web', url: TRANSLATION_URL, selectedText: 'A chapter about primitive types in Rust.' })
+    await card.screenshot({ path: 'test-results/translation-card-saved.png' })
+    await expect(card.getByRole('button', { name: '关闭翻译' })).toBeInViewport({ ratio: 1 })
     await card.getByRole('button', { name: '关闭翻译' }).click()
     await expect(card).toBeHidden()
   } finally {
@@ -172,12 +248,22 @@ test('PDF 坏字体选区：识别进度、原选区恢复、自动继续翻译'
     await expect(card).toContainText('MOCK译:This SICP book', { timeout: 15_000 })
     await expect(card).not.toContainText('Other line')
     await expect(card).not.toContainText('\uFFFD')
+    await expect(card.getByRole('region', { name: '专有名词' })).toContainText('SICP')
+    await card.getByRole('button', { name: '存为批注', exact: true }).click()
+    await expect(card.getByRole('button', { name: '已存批注', exact: true })).toBeDisabled()
+    const notes = await page.evaluate(async (path) => {
+      const result = await window.electronAPI!.listReadingMarks(path)
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value
+    }, join(workspace, 'broken-font.pdf'))
+    expect(notes).toHaveLength(1)
+    expect(notes[0].anchor).toMatchObject({ format: 'pdf', page: 1, selectedText: 'This SICP book' })
+    expect(notes[0].note).toContain('原文\nThis SICP book')
+    expect(notes[0].note).not.toContain('\uFFFD')
     await card.screenshot({ path: 'test-results/translation-ocr-done.png' })
     await page.setViewportSize({ width: 540, height: 760 })
     await expect(card).toBeVisible()
-    const box = await card.boundingBox()
-    expect(box!.x).toBeGreaterThanOrEqual(0)
-    expect(box!.x + box!.width).toBeLessThanOrEqual(540)
+    await expect.poll(async () => { const box = (await card.boundingBox())!; return box.x >= 0 && box.x + box.width <= 540 }).toBe(true)
     await card.screenshot({ path: 'test-results/translation-ocr-narrow.png' })
     await card.getByRole('button', { name: '关闭翻译' }).click()
     await expect(card).toBeHidden()

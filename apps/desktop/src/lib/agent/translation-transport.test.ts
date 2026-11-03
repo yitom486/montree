@@ -7,23 +7,41 @@ import { accumulateSubsessionUpdateFor } from './acp-subsession'
 
 vi.mock('@/api/translation-api', () => ({ translationApi: {
   connect: vi.fn(), authenticate: vi.fn(), sessionNew: vi.fn(), loadSession: vi.fn(), prompt: vi.fn(), setConfigOption: vi.fn(),
-  onSessionUpdate: vi.fn(), onStatusChanged: vi.fn(),
+  onSessionUpdate: vi.fn(), onStatusChanged: vi.fn(), onOutput: vi.fn(),
 } }))
 vi.mock('./acp-subsession', () => ({ accumulateSubsessionUpdateFor: vi.fn() }))
 
 let status: Parameters<typeof translationApi.onStatusChanged>[0]
 let update: Parameters<typeof translationApi.onSessionUpdate>[0]
+let output: Parameters<typeof translationApi.onOutput>[0]
 const ready = () => ok({ phase: 'ready', sessionId: 'translation', runtimeId: 'opencode', protocolVersion: 1, configOptions: [] } as AcpConnectResult)
 beforeEach(() => {
   vi.resetModules()
   vi.resetAllMocks()
   vi.mocked(translationApi.onStatusChanged).mockImplementation((callback) => { status = callback; return () => {} })
   vi.mocked(translationApi.onSessionUpdate).mockImplementation((callback) => { update = callback; return () => {} })
+  vi.mocked(translationApi.onOutput).mockImplementation((callback) => { output = callback; return () => {} })
   vi.mocked(translationApi.connect).mockResolvedValue(ready())
   useAcpUiStore.setState({ status: 'disconnected', sessionId: null, selectedRuntimeId: 'codex-acp' })
 })
 
 describe('independent translation transport', () => {
+  it('isolates structured events by runtime/request and removes closed subscriptions', async () => {
+    const transport = await import('./translation-transport')
+    const listener = vi.fn()
+    const off = transport.subscribeTranslationOutput('opencode', 'request-a', listener)
+    const event = { runtimeId: 'opencode', sessionId: 's', requestId: 'request-a', sequence: 0, event: { type: 'text' as const, text: '译文' } }
+    output({ ...event, runtimeId: 'other' })
+    output({ ...event, requestId: 'request-b' })
+    expect(listener).not.toHaveBeenCalled()
+    output(event)
+    expect(listener).toHaveBeenCalledWith(event)
+    off()
+    output(event)
+    expect(listener).toHaveBeenCalledOnce()
+    await transport.translationClient('opencode', 'request-a').prompt({ sessionId: 's', prompt: [] })
+    expect(translationApi.prompt).toHaveBeenCalledWith({ runtimeId: 'opencode', requestId: 'request-a', sessionId: 's', prompt: [] })
+  })
   it('connects from an offline main chat, coalesces requests, and leaves main state unchanged', async () => {
     const transport = await import('./translation-transport')
     await Promise.all([transport.ensureTranslationConnection('opencode'), transport.ensureTranslationConnection('opencode')])

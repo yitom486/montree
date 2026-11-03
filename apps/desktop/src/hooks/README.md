@@ -48,7 +48,7 @@
 | `useMarkdownPreviewMarks` | Markdown 预览选区与引用快照、持久卡片、原文定位、CSS Highlight、Agent 标记 provider；按路径隔离并拒绝过期选区写入 |
 | `useReaderSidePanels` | 正文目录侧栏开关（标记统一进入外壳卡片区） |
 | `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/翻译/加入对话/问 Agent |
-| `useReaderTranslation` / `.test.ts` | 划词翻译短生命周期状态：坏选区先 OCR 恢复再翻译、Settings 目标语言、隐藏 ACP 副会话、流式增量、复制/重试/关闭；覆盖识别失败、过期结果与文档切换 |
+| `useReaderTranslation` / `.test.ts` | 划词翻译状态：OCR 回退、独立 Agent 配置、译文流式输出后补充语言/短语/术语、复制/重试/关闭；锁定原选区保存完整翻译批注、防重复写入与保存失败重试，丢弃过期结果 |
 | `useTranslationConfig` | 设置页用 TanStack Query 读取翻译独立连接的模型/思考候选，按翻译 Agent、模型和思考偏好隔离；不依赖主聊天连接，提供独立认证 mutation，只准备配置、不发送翻译请求 |
 | `useReaderExportMenu` | 三阅读器笔记与 Anki 导出菜单共享外壳（toc/当前章由各家传入） |
 | `usePdfPageOcr` / `.test.ts` | PDF 单页 OCR 域：强制识别返回带几何的页缓存、在途去重、缺失/损坏文字层按需恢复、全书导入互斥及切书隔离 |

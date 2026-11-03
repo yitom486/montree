@@ -186,18 +186,20 @@ export function useFoliateInteractions({
       color = DEFAULT_HIGHLIGHT_COLOR,
       overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
+      frozenSelection?: { snapshot: NonNullable<typeof selectionSnapshot>; kind: 'epub' | 'mobi'; sectionId: string },
     ): Promise<ReadingMark> => {
-      const snapshot = selectionSnapshotRef.current
+      const snapshot = frozenSelection?.snapshot ?? selectionSnapshotRef.current
       if (!snapshot || !fileFingerprint) {
         throw new Error('当前没有可用选区，请先划选文本')
       }
       const sectionIndex = lastLocationRef.current?.sectionIndex
-      const sectionId =
+      const sectionId = frozenSelection?.sectionId ?? (
         typeof sectionIndex === 'number'
           ? (adapterRef.current?.sections[sectionIndex]?.id ?? '')
-          : ''
+          : '')
+      const kind = frozenSelection?.kind ?? kindRef.current
       const anchor =
-        kindRef.current === 'epub'
+        kind === 'epub'
           ? {
               format: 'epub' as const,
               cfi: snapshot.cfiRange,
@@ -214,14 +216,14 @@ export function useFoliateInteractions({
             }
 
       const existing = findMarkForSelection(marks, {
-        format: kindRef.current,
+        format: kind,
         text: snapshot.text,
         cfiRange: snapshot.cfiRange,
       })
       const anchorChapter =
         toCanonicalChapter(anchor, tocFromEpubUnits(chaptersRef.current)) ?? undefined
       const meta = parseNoteToCardMeta(note)
-      if (existing) {
+      if (existing && !frozenSelection) {
         const trimmed = meta.note?.trim()
         const result = await updateMark({
           id: existing.id,
@@ -267,10 +269,12 @@ export function useFoliateInteractions({
       if (!isOk(result)) {
         throw new Error(result.error.message || '创建批注失败')
       }
-      removePendingAnnotateHighlight()
-      syncVisualMarks()
+      if (!frozenSelection) {
+        removePendingAnnotateHighlight()
+        syncVisualMarks()
+        clearTextSelection()
+      }
       toast.success(note ? '已保存批注' : '已添加高亮')
-      clearTextSelection()
       return result.value as ReadingMark
     },
     [
@@ -291,6 +295,18 @@ export function useFoliateInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    captureTranslationNote: () => {
+      const snapshot = selectionSnapshotRef.current
+      if (!snapshot) return undefined
+      const sectionIndex = lastLocationRef.current?.sectionIndex
+      const frozen = {
+        snapshot, kind: kindRef.current,
+        sectionId: typeof sectionIndex === 'number' ? adapterRef.current?.sections[sectionIndex]?.id ?? '' : '',
+      }
+      return (note, text) => handleSaveAnnotation(note, DEFAULT_HIGHLIGHT_COLOR, undefined, '翻译', {
+        ...frozen, snapshot: { ...snapshot, text },
+      })
+    },
     dimTextSelection,
     clearTextSelection,
     openAnnotateDialog: () => {

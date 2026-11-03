@@ -14,6 +14,7 @@ import {
 import {
   useReaderTranslation,
   type ReaderTranslationState,
+  type TranslationNoteWriter,
 } from '@/hooks/reader/useReaderTranslation'
 
 /**
@@ -24,6 +25,7 @@ export interface ReaderSelectionActionsOptions {
   snapshotText: string | null | undefined
   /** PDF 坏文字层的 OCR 回退；闭包必须锁定本次选区。 */
   recoverTranslationText?: () => Promise<string>
+  captureTranslationNote?: () => TranslationNoteWriter | undefined
   dimTextSelection: () => void
   clearTextSelection: () => void
   /** 打开批注对话框：各家都是清编辑态 + 开弹窗 + 收工具条 */
@@ -56,6 +58,7 @@ export interface ReaderSelectionActions {
   retryTranslation: () => Promise<void>
   dismissTranslation: () => void
   copyTranslation: () => void
+  saveTranslationNote: () => Promise<void>
   /**
    * AI 制卡（P1 菜单驱动）：选预设 → 本书会话调模型 → 落卡。
    * 调不通直接报错（无启发式兜底）；pending 期间调用方禁用菜单。
@@ -138,6 +141,8 @@ export function useReaderSelectionActions(
     dimTextSelection,
     recoverSourceText: options.recoverTranslationText,
     sourceKey: sessionKey,
+    captureNoteWriter: options.captureTranslationNote,
+    onNoteSaved: () => useReaderHudUiStore.getState().setIsCardRailOpen(true),
   })
 
   const [aiCardPending, setAiCardPending] = useState(false)
@@ -334,6 +339,7 @@ export function useReaderSelectionActions(
     retryTranslation: translationActions.retry,
     dismissTranslation: translationActions.dismiss,
     copyTranslation: translationActions.copy,
+    saveTranslationNote: translationActions.saveNote,
     generateAiCard,
     aiCardPending,
     deepAnswer,

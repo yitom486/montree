@@ -45,3 +45,5 @@ Agent 工作区文件、Shell 和 Git 使用运行时的原生工具，Montree M
 `mcp/document-tools.ts` 为宿主文档编辑扩展：`montree_table_read/edit`、`montree_ppt_read/edit/edit_text/delete/chart_edit/design_edit/animation_edit`、`montree_document_undo/save`，通过快照桥接操作当前内存模型；工具使用文档路径、revision、选区 ID 和匹配数量校验，不自行解析用户文件。`edit_text` 支持段落、片段与 UTF-16 字符范围及组合内部，替换前核对原文，保留范围外样式。高级查询先返回能力/影响范围/样式/效果 ID；图表与内嵌 XLSX 同步，设计工具核对共享影响页，动画工具核对旧列表，复杂内容保留并拒绝覆盖。`montree_present` 另含展示声明（`chapter-comparison` / `html-artifact` / `component-ui` 生成式 UI 树，后者经 `present-result-builder.buildComponentUi` 验章节归属与白名单后由渲染 `generative/ComponentUiCard` 经官方 `GenerativeUIRender` 呈现）。
 
 montree_markdown_guide 按需返回 Markdown 文档图解/本地交互组件格式及静态降级规则；模型须走当前正文 revision 与 text-edit 插入，不以聊天 present 代替写入。
+
+`mcp/translation-tools.ts`（+ `.test.ts`）为独立翻译上下文唯一结果工具 `montree_translation_emit`：严格参数校验、请求归属、连续序号/重试去重与逐项 IPC 推送；翻译端点不暴露工作区/阅读器工具。

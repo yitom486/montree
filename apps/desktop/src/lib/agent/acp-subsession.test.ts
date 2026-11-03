@@ -84,6 +84,27 @@ beforeEach(() => {
 })
 
 describe('ensure 建新与复用', () => {
+  it('does not replay a failed prompt after the caller has received structured output', async () => {
+    mockedPrompt.mockResolvedValueOnce(err({ code: 'ACP_PROTOCOL_ERROR', message: 'connection lost' }))
+    const result = await sendSubsessionPrompt({ ...baseOpts(), canRetry: () => false }, 'translate')
+    expect(result.status).toBe('failed')
+    expect(mockedPrompt).toHaveBeenCalledOnce()
+    expect(mockedSessionNew).toHaveBeenCalledOnce()
+  })
+  it('does not merge agent thoughts or tool output into assistant reply text', async () => {
+    const opts = baseOpts()
+    const sid = sidOf(await ensureSubsessionSession(opts))
+    const deltas: string[] = []
+    mockedPrompt.mockImplementationOnce(async () => {
+      for (const sessionUpdate of ['agent_thought_chunk', 'tool_call_update', 'user_message_chunk']) {
+        accumulateSubsessionUpdate(sid, { sessionUpdate, content: { type: 'text', text: 'private' } })
+      }
+      accumulateSubsessionUpdate(sid, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'reply' } })
+      return ok({ stopReason: 'end_turn' })
+    })
+    expect(await sendSubsessionPrompt({ ...opts, onDelta: text => deltas.push(text) }, 'hi')).toMatchObject({ reply: 'reply' })
+    expect(deltas).toEqual(['reply'])
+  })
   it('首次建新会话并写 store', async () => {
     const store = createMemoryStore()
     const ensured = await ensureSubsessionSession(baseOpts({ store }))
