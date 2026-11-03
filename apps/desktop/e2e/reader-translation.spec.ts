@@ -113,17 +113,20 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
     await writeFile(join(gates, 'done'), '')
     await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeEnabled()
     // 原生窗口状态切换会转移焦点/触发重排，不能被当作关闭卡片。
-    const nativeWindow = await app.browserWindow(page)
-    await nativeWindow.evaluate(win => win.maximize())
-    await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(true)
-    await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
-    await nativeWindow.evaluate(win => win.unmaximize())
-    await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(false)
-    await nativeWindow.evaluate(win => win.minimize())
-    await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(true)
-    await nativeWindow.evaluate(win => { win.restore(); win.focus() })
-    await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(false)
-    await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+    // Linux CI 的 Xvfb 没有窗口管理器，原生最大化/最小化在 Windows 真实窗口验证。
+    if (process.platform === 'win32') {
+      const nativeWindow = await app.browserWindow(page)
+      await nativeWindow.evaluate(win => win.maximize())
+      await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(true)
+      await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+      await nativeWindow.evaluate(win => win.unmaximize())
+      await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(false)
+      await nativeWindow.evaluate(win => win.minimize())
+      await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(true)
+      await nativeWindow.evaluate(win => { win.restore(); win.focus() })
+      await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(false)
+      await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+    }
     await page.locator('aside[aria-label="Agent 聊天"]:visible').first().locator('textarea').click()
     await expect(card).toBeVisible()
     const before = (await card.boundingBox())!

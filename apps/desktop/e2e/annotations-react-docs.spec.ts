@@ -65,7 +65,13 @@ async function annotate(page: Page, note: string) {
  * 聊天里出现提议卡，用户「采用并保存」后落库。摘录必须能在渲染后的正文里重新定位。
  */
 async function agentProposeNote(page: Page, excerpt: string, note: string): Promise<string> {
+  // 制卡后共享辅助区停在「卡片流」；要发 Agent 消息必须先切回「AI 对话」。
+  await page.mouse.move(0, 0)
+  await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15_000 })
+  const aiTab = page.getByRole('tab', { name: 'AI 对话' })
+  if (await aiTab.isVisible().catch(() => false)) await aiTab.click()
   const chat = page.getByRole('region', { name: 'Agent 聊天' })
+  await expect(chat).toBeVisible({ timeout: 15_000 })
   const composer = chat.locator('textarea').first()
   await composer.fill(`mcp-call:montree_propose_mark:${JSON.stringify({ excerpt, note })}`)
   await chat.getByRole('button', { name: '发送', exact: true }).click()
@@ -137,8 +143,9 @@ test('React 在线文档：划重点 / 批注 / 智能制卡，重载后持久�
     // 重新锚定到原文：高亮仍覆盖原句文字
     const anchored = await after.locator('[data-mark-id]').evaluateAll((els) => els.map((el) => el.textContent ?? '').join(' '))
     expect(anchored).toContain('React is a JavaScript library')
-    // 落库的是改后的批注
-    await expect(page.locator('#main').getByText(webNote).first()).toBeAttached({ timeout: 15_000 })
+    // 卡片轨已移到共享辅助区，重载后显式打开卡片流再检查改稿持久化。
+    await page.getByRole('tab', { name: '卡片流', exact: true }).click()
+    await expect(page.getByRole('tabpanel', { name: '卡片流', exact: true }).getByText(webNote).first()).toBeAttached({ timeout: 15_000 })
     await shot(page, 'react-webdoc-after-reload.png')
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))
@@ -198,7 +205,9 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
         })
         await page.mouse.move(Math.min(endX + 1, b.x + b.width - 1), b.y + b.height / 2, { steps: 5 })
         await page.mouse.up()
-      } else {
+      }
+      const expectedSelection = new RegExp(`^${first} .* ${last}$`)
+      if (!expectedSelection.test(await page.evaluate(() => getSelection()?.toString().trim() ?? ''))) {
         // Windows CI 客户区内 PDF 视口被压得很矮，词落在可视区外、鼠标点不到：
         // 改用程序化 Range 选中同一段词（仍要求文字层可被用户选中），再在页面上派发 mouseup 走真实的选区处理
         const diag = await page.evaluate(() => {
@@ -207,7 +216,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
           for (let el: HTMLElement | null = v; el && chain.length < 6; el = el.parentElement) chain.push(`${el.tagName}.${String(el.className).slice(0, 40)}=${el.clientHeight}`)
           return `inner=${innerHeight} viewport=${v?.clientHeight}/${v?.scrollHeight} chain=${chain.join(' < ')}`
         })
-        console.log(`[selection-diag] words not reachable by mouse, using programmatic range; ${diag}`)
+        console.log(`[selection-diag] native selection unavailable, using programmatic range; ${diag}`)
         await from.evaluate((start, end) => {
           if (getComputedStyle(start).userSelect === 'none' || getComputedStyle(end as Element).userSelect === 'none') throw new Error('OCR 文字层不可被用户选中')
           const r = start.getBoundingClientRect(), e = (end as Element).getBoundingClientRect()
@@ -223,7 +232,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
       }
       // 回归：OCR 逐词 span 之间必须有空格，选区/摘录不能粘成一串
       const selected = await page.evaluate(() => getSelection()?.toString().trim() ?? '')
-      expect(selected).toMatch(new RegExp(`^${first} .* ${last}$`))
+      expect(selected).toMatch(expectedSelection)
     }
     const selectLine = async (needle: RegExp) => {
       const words: Record<string, [string, string]> = { 'JavaScript library': ['React', 'rendering'], 'user interfaces': ['user', 'units'], 'Components are reusable': ['Components', 'that'] }
@@ -242,12 +251,14 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
     await expect.poll(async () => (await marks.evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length).toBe(4)
     await shot(page, 'react-scanned-pdf-annotations.png')
     // 卡片轨中的摘录保留词间空格
+    await page.getByRole('tab', { name: '卡片流', exact: true }).click()
     await expect(page.getByText(/React is a JavaScript library for rendering/).first()).toBeVisible()
 
     await page.reload()
     await expect(page.locator('#main').getByText(/已识别 \d+\/\d+/)).toBeVisible({ timeout: 60_000 })
     await expect.poll(async () => (await page.locator('#main [data-mark-id]').evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).dataset.markId))])).length, { timeout: 30_000 }).toBe(4)
-    await expect(page.locator('#main').getByText(pdfNote).first()).toBeAttached({ timeout: 15_000 })
+    await page.getByRole('tab', { name: '卡片流', exact: true }).click()
+    await expect(page.getByRole('tabpanel', { name: '卡片流', exact: true }).getByText(pdfNote).first()).toBeAttached({ timeout: 15_000 })
     await shot(page, 'react-scanned-pdf-after-reload.png')
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.removeAllListeners('close')))

@@ -25,7 +25,7 @@ test('会话菜单展示真实 MCP 发现状态与 Skills 完整说明，搜索�
       localStorage.setItem('montree-chat-session/v1' + suffix, JSON.stringify({ version: 1, authorityVersion: 1, snapshot: { threads: [{ id: 'resources-test', hostThreadId: 'resources-test', runtimeId: 'mock-window', title: '资源详情', feed: { messages: [], turnSettled: false } }], activeThreadId: 'resources-test', modelConfig: { runtimeId: 'mock-window' } } }))
       location.reload()
     })
-    const panel = page.locator('aside[aria-label="Agent 聊天"]:visible').first()
+    const panel = page.locator('[data-testid="agent-panel"]:visible').first()
     const more = panel.getByRole('button', { name: '更多面板操作' })
     const open = async (name: string) => { await more.click(); await page.getByRole('menuitem', { name, exact: true }).click(); return page.getByRole('dialog', { name, exact: true }) }
 
@@ -87,6 +87,10 @@ test('会话菜单展示真实 MCP 发现状态与 Skills 完整说明，搜索�
     await skills.getByRole('textbox', { name: '搜索 Skills' }).fill('resource-test')
     await page.evaluate(() => { document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light'); document.documentElement.style.colorScheme = 'light' })
     await screenshotWithoutToasts(skills, info.outputPath('skills-light.png'))
+    await page.keyboard.press('Escape')
+    await expect(skills).toBeHidden()
+    await expect(more).toBeFocused()
+    await open('Skills 技能详情')
     await app.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setMinimumSize(480, 500); window.setSize(600, 760) })
     await expect(skills).toBeInViewport({ ratio: 1 })
     expect(await skills.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
@@ -94,7 +98,6 @@ test('会话菜单展示真实 MCP 发现状态与 Skills 完整说明，搜索�
     await screenshotWithoutToasts(skills, info.outputPath('skills-narrow.png'))
     await page.keyboard.press('Escape')
     await expect(skills).toBeHidden()
-    await expect(more).toBeFocused()
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((window) => window.destroy())).catch(() => {})
     await app.close()

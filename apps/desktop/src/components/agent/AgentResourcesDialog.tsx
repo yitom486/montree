@@ -130,8 +130,8 @@ export function AgentResourcesDialog({ context, kind, onClose }: { context: Agen
   return <Dialog open={kind !== null} onOpenChange={(open) => { if (!open) onClose() }}>
     <DialogContent className="flex h-[min(760px,calc(100dvh-2rem))] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-[960px]" onCloseAutoFocus={(event) => {
       // 菜单项会在选中后卸载，将焦点还给本面板的菜单按钮。
-      const buttons = document.querySelectorAll<HTMLButtonElement>('aside[aria-label="Agent 聊天"] button[aria-label="更多面板操作"]')
-      const button = [...buttons].find((node) => node.getClientRects().length)
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[data-testid="agent-panel"] button[aria-label="更多面板操作"]')
+      const button = [...buttons].find((node) => [...node.getClientRects()].some(rect => rect.width > 0 && rect.height > 0))
       if (button) { event.preventDefault(); button.focus() }
     }}>
       <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
