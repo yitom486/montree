@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useReaderTranslation } from './useReaderTranslation'
+import { useReaderTranslationStore } from '@/stores/reader-translation-store'
 import { sendTranslationPrompt } from '@/lib/agent/translation-session'
 
 vi.mock('@/lib/agent/translation-session', async () => ({
@@ -35,6 +36,7 @@ describe('translation OCR recovery', () => {
   const position = { x: 100, y: 150 }
 
   beforeEach(async () => {
+    useReaderTranslationStore.setState({ entries: {} })
     vi.mocked(sendTranslationPrompt).mockReset().mockResolvedValue({ status: 'ok', reply: '译文' })
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -105,7 +107,7 @@ describe('translation OCR recovery', () => {
     expect(recover).toHaveBeenCalledTimes(2)
   })
 
-  it('invalidates OCR when switching documents', async () => {
+  it('isolates documents while retaining the original translation for return navigation', async () => {
     const recovery = deferred<string>()
     options = { ...options, getSourceText: () => '\uFFFD', recoverSourceText: () => recovery.promise }
     await render()
@@ -113,9 +115,48 @@ describe('translation OCR recovery', () => {
     await act(async () => { pending = model.translate(position) })
     options = { ...options, sourceKey: 'another-book' }
     await render()
-    await act(async () => { recovery.resolve('Old book'); await pending })
-    expect(sendTranslationPrompt).not.toHaveBeenCalled()
     expect(model.translation).toBeNull()
+    await act(async () => { recovery.resolve('Old book'); await pending })
+    expect(sendTranslationPrompt).toHaveBeenCalledWith(expect.objectContaining({ text: 'Old book' }))
+    expect(model.translation).toBeNull()
+    options = { ...options, sourceKey: 'book' }
+    await render()
+    expect(model.translation).toMatchObject({ phase: 'done', sourceText: 'Old book', text: '译文' })
+  })
+
+  it('keeps streaming results and moved position across unmount/remount, until explicit dismissal', async () => {
+    const response = deferred<Awaited<ReturnType<typeof sendTranslationPrompt>>>()
+    let send!: Parameters<typeof sendTranslationPrompt>[0]
+    vi.mocked(sendTranslationPrompt).mockImplementationOnce(async (request) => { send = request; return response.promise })
+    let pending!: Promise<void>
+    await act(async () => { pending = model.translate(position) })
+    await act(async () => { send.onDelta?.('第一段'); model.move({ x: 230, y: 160 }); root.unmount() })
+    send.onDelta?.('第二段')
+    root = createRoot(host)
+    await render()
+    expect(model.translation).toMatchObject({ text: '第一段第二段', floatingPosition: { x: 230, y: 160 }, phase: 'streaming' })
+    await act(async () => { response.resolve({ status: 'ok', reply: '完整译文' }); await pending })
+    expect(model.translation?.phase).toBe('done')
+    act(() => model.dismiss())
+    send.onDelta?.('late')
+    await act(async () => { root.unmount() })
+    root = createRoot(host)
+    await render()
+    expect(model.translation).toBeNull()
+    expect(useReaderTranslationStore.getState().entries.book).toBeUndefined()
+  })
+
+  it('retains the captured note writer after remount and still prevents duplicate saves', async () => {
+    const writer = vi.fn(async () => undefined)
+    options.captureNoteWriter = () => writer
+    await render()
+    await act(async () => { await model.translate(position); root.unmount() })
+    options = { ...options, captureNoteWriter: () => undefined }
+    root = createRoot(host)
+    await render()
+    await act(async () => { await model.saveNote(); await model.saveNote() })
+    expect(writer).toHaveBeenCalledOnce()
+    expect(model.translation?.saved).toBe(true)
   })
 
   it.each(['', '\uFFFD remains', 'a'.repeat(4001)])('never sends invalid recovered text (%#)', async (text) => {

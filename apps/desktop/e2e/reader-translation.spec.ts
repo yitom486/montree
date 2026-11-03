@@ -92,6 +92,8 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
     await expect(card).not.toContainText('UNWANTED_PREAMBLE')
     await expect(card).not.toContainText('"translation"')
     await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeDisabled()
+    await page.locator('aside[aria-label="Agent 聊天"]:visible').first().locator('textarea').click()
+    await expect(card).toContainText('MOCK译:A')
     await writeFile(join(gates, 'translation-tail'), '')
     await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.', {
       timeout: 10_000,
@@ -110,13 +112,42 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
     await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeDisabled()
     await writeFile(join(gates, 'done'), '')
     await expect(card.getByRole('button', { name: '存为批注', exact: true })).toBeEnabled()
+    // 原生窗口状态切换会转移焦点/触发重排，不能被当作关闭卡片。
+    const nativeWindow = await app.browserWindow(page)
+    await nativeWindow.evaluate(win => win.maximize())
+    await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(true)
+    await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+    await nativeWindow.evaluate(win => win.unmaximize())
+    await expect.poll(() => nativeWindow.evaluate(win => win.isMaximized())).toBe(false)
+    await nativeWindow.evaluate(win => win.minimize())
+    await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(true)
+    await nativeWindow.evaluate(win => { win.restore(); win.focus() })
+    await expect.poll(() => nativeWindow.evaluate(win => win.isMinimized())).toBe(false)
+    await expect(card).toContainText('MOCK译:A chapter about primitive types in Rust.')
+    await page.locator('aside[aria-label="Agent 聊天"]:visible').first().locator('textarea').click()
+    await expect(card).toBeVisible()
     const before = (await card.boundingBox())!
     expect(before.height).toBeLessThanOrEqual(512)
     const handle = card.getByLabel('拖动翻译卡，方向键移动')
     const grip = (await handle.boundingBox())!
+    const windowBounds = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
     await page.mouse.move(grip.x + 50, grip.y + 12)
     await page.mouse.down()
-    await page.mouse.move(grip.x + 150, grip.y + 52, { steps: 8 })
+    for (const distance of [20, 45, 75, 100]) {
+      await page.mouse.move(grip.x + 50 + distance, grip.y + 12 + distance * 0.4)
+      // 鼠标仍按住时检查下一绘制帧，避免只验证松手后最终位置而漏掉追赶延迟。
+      const sample = await card.evaluate((element) => new Promise<{ x: number; y: number; transition: string }>((resolve) => {
+        requestAnimationFrame(() => {
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          resolve({ x: rect.x, y: rect.y, transition: `${style.transitionProperty} ${style.transitionDuration}` })
+        })
+      }))
+      const expectedX = Math.max(8, Math.min(before.x + distance, windowBounds.width - before.width - 8))
+      const expectedY = Math.max(8, Math.min(before.y + distance * 0.4, windowBounds.height - before.height - 8))
+      expect(Math.abs(sample.x - expectedX), sample.transition).toBeLessThanOrEqual(1)
+      expect(Math.abs(sample.y - expectedY), sample.transition).toBeLessThanOrEqual(1)
+    }
     await page.mouse.up()
     await expect.poll(async () => (await card.boundingBox())!.x).toBeGreaterThan(before.x + 40)
     await handle.focus()
@@ -166,8 +197,29 @@ test('划词翻译：流式卡片、目标语言、复制与关闭', async () =>
     expect(notes[0].anchor).toMatchObject({ format: 'web', url: TRANSLATION_URL, selectedText: 'A chapter about primitive types in Rust.' })
     await card.screenshot({ path: 'test-results/translation-card-saved.png' })
     await expect(card.getByRole('button', { name: '关闭翻译' })).toBeInViewport({ ratio: 1 })
-    await card.getByRole('button', { name: '关闭翻译' }).click()
+    // 将浮窗拖离正文，随后用真实点击验证 iframe 内的关闭范围。
+    await page.setViewportSize({ width: 1280, height: 900 })
+    const freeGrip = (await handle.boundingBox())!
+    await page.mouse.move(freeGrip.x + 35, freeGrip.y + 12)
+    await page.mouse.down()
+    await page.mouse.move(1250, freeGrip.y + 12, { steps: 8 })
+    await page.mouse.up()
+    // iframe 内点击正文文字保留卡片；只在正文空白处显式关闭。
+    const plainParagraph = frame.getByText('Integers, floating point numbers and booleans.', { exact: true })
+    const character = await plainParagraph.evaluate(element => {
+      const text = element.firstChild!
+      const range = element.ownerDocument.createRange()
+      range.setStart(text, 0); range.setEnd(text, 1)
+      const rect = range.getBoundingClientRect(), parent = element.getBoundingClientRect()
+      return { x: rect.x + rect.width / 2 - parent.x, y: rect.y + rect.height / 2 - parent.y }
+    })
+    await plainParagraph.click({ position: character })
+    await expect(card).toBeVisible()
+    const body = frame.locator('body')
+    await body.click({ position: { x: 5, y: 5 } })
     await expect(card).toBeHidden()
+    await page.setViewportSize({ width: 800, height: 700 })
+    await expect(card).toHaveCount(0)
   } finally {
     await app.close()
   }

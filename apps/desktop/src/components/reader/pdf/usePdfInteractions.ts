@@ -307,6 +307,7 @@ export function usePdfInteractions({
       toast.error(cause instanceof Error ? cause.message : '添加高亮失败')
     },
     sessionKey: fileFingerprint || filePath,
+    translationSourceKey: filePath,
   })
 
   const handleCreateMarkAt = useCallback(

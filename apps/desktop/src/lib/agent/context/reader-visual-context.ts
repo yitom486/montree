@@ -42,7 +42,7 @@ export function collectDomImages(documents: readonly (Document | Element)[], sco
       const visible = isVisible(element)
       if (scope === 'viewport' && !visible) continue
       const img = kind === 'img' ? element as HTMLImageElement : null
-      const src = img?.currentSrc || element.getAttribute('src') || element.getAttribute('data-src')
+      const src = element.getAttribute('data-montree-image-source') || img?.currentSrc || element.getAttribute('src') || element.getAttribute('data-src')
       images.push({
         id: `image-${images.length + 1}`,
         kind: kind === 'img' ? 'image' : kind,

@@ -13,6 +13,7 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `draft-store.ts` | 未保存草稿（localStorage；键按 workspaceId 隔离，local 沿用裸键） |
 | `workspace-store.ts` / `.test.ts` | 当前窗口工作区描述符/连接状态（身份与代际守卫；对象 selector 经 useShallow） |
 | `error-log-store.ts` | 渲染端错误日志列表 |
+| `reader-translation-store.ts` | 按文档隔离的翻译卡临时会话：流式译文/解读、保存状态、原选区写入器与浮窗位置；组件重挂载/窗口缩放保留，显式关闭才删除，不落盘 |
 | `reader-navigation-store.ts` | 阅读器目录 / flatIndex / 当前章（侧栏与底栏共用）/ PDF 当前页 pageNum（仅 Agent 快照用） |
 | `reading-progress-store.ts` | 阅读进度百分比等（含在线文档滚动比例） |
 | `web-doc-store.ts` | 当前在线文档 URL、最近打开的文档站 |

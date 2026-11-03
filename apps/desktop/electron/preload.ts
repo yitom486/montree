@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { WEB_DOC_IMAGE_IPC, type WebDocImagesAPI } from '../contracts/web-doc'
 import { TRANSLATION_IPC, type TranslationAPI } from '../contracts/translation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
@@ -30,6 +31,11 @@ const windowInit = ipcRenderer.sendSync(IPC.APP_GET_WINDOW_INIT) as WindowInit
 const isFreshWindow = windowInit?.isFreshWindow ?? false
 const e2eFoliateReader = windowInit?.e2eFoliateReader ?? false
 const e2ePdfStructure = windowInit?.e2ePdfStructure ?? false
+
+const webDocImagesAPI: WebDocImagesAPI = {
+  fetch: (payload) => ipcRenderer.invoke(WEB_DOC_IMAGE_IPC, payload),
+}
+contextBridge.exposeInMainWorld('montreeWebDocImages', webDocImagesAPI)
 
 const electronAPI: ElectronAPI = {
   typstGetConfig: filePath => ipcRenderer.invoke(IPC.TYPST_GET_CONFIG, filePath),

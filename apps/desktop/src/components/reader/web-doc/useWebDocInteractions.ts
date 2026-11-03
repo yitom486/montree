@@ -230,6 +230,7 @@ export function useWebDocInteractions({
     showPendingHighlight: showPendingSelectionHighlight,
     saveHighlight: handleSaveAnnotation,
     sessionKey: fileFingerprint ?? documentId,
+    translationSourceKey: documentId,
   })
 
   const handleCreateMarkAt = useCallback(

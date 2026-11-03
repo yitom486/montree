@@ -45,6 +45,7 @@ export interface ReaderSelectionActionsOptions {
    * 决定一书一会话落哪一行；缺省仅内存会话（不断流，但重启不恢复）。
    */
   sessionKey?: string
+  translationSourceKey?: string
 }
 
 export interface ReaderSelectionActions {
@@ -57,6 +58,7 @@ export interface ReaderSelectionActions {
   translate: (position: { x: number; y: number }) => Promise<void>
   retryTranslation: () => Promise<void>
   dismissTranslation: () => void
+  moveTranslation: (position: { x: number; y: number }) => void
   copyTranslation: () => void
   saveTranslationNote: () => Promise<void>
   /**
@@ -140,7 +142,7 @@ export function useReaderSelectionActions(
     getSourceText: () => snapshotText ?? null,
     dimTextSelection,
     recoverSourceText: options.recoverTranslationText,
-    sourceKey: sessionKey,
+    sourceKey: options.translationSourceKey ?? sessionKey,
     captureNoteWriter: options.captureTranslationNote,
     onNoteSaved: () => useReaderHudUiStore.getState().setIsCardRailOpen(true),
   })
@@ -338,6 +340,7 @@ export function useReaderSelectionActions(
     translate: translationActions.translate,
     retryTranslation: translationActions.retry,
     dismissTranslation: translationActions.dismiss,
+    moveTranslation: translationActions.move,
     copyTranslation: translationActions.copy,
     saveTranslationNote: translationActions.saveNote,
     generateAiCard,

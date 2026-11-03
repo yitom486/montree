@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { copyTextToClipboard } from '@yitom/reader-core'
 import { useAppSettingsStore, translationTargetLabel, type TranslationTargetLang } from '@/stores/app-settings-store'
@@ -7,37 +7,13 @@ import {
   sendTranslationPrompt,
   TRANSLATION_MAX_INPUT_CHARS,
 } from '@/lib/agent/translation-session'
-import { translationNote, type TranslationDetails } from '@/lib/agent/translation-result'
+import { translationNote } from '@/lib/agent/translation-result'
 
-export type ReaderTranslationPhase = 'recognizing' | 'preparing' | 'streaming' | 'enriching' | 'done' | 'error'
-export type TranslationNoteWriter = (note: string, sourceText: string) => Promise<unknown>
-
-export interface ReaderTranslationState {
-  requestId: string
-  phase: ReaderTranslationPhase
-  sourceText: string
-  targetLang: TranslationTargetLang
-  targetLabel: string
-  runtimeId?: string
-  model?: string
-  thought?: string
-  position: { x: number; y: number }
-  text: string
-  details?: TranslationDetails
-  canSave?: boolean
-  saving?: boolean
-  saved?: boolean
-  saveError?: string
-  error?: string
-  startedAt: number
-  firstTokenAt?: number
-  completedAt?: number
-}
-
-const EMPTY = ''
+import { useReaderTranslationStore, type ReaderTranslationState, type TranslationNoteWriter } from '@/stores/reader-translation-store'
+export type { ReaderTranslationPhase, ReaderTranslationState, TranslationNoteWriter } from '@/stores/reader-translation-store'
 
 /**
- * 阅读器划词翻译的短生命周期状态。
+ * 阅读器划词翻译的窗口内会话状态，组件卸载不清除在途请求或已完成结果。
  * 选区文本由调用方传入；目标语言在每次 translate 时从 Settings 读取，
  * 之后锁定在本次卡片里，避免 Settings 变更把同一张卡的语言弄混。
  */
@@ -49,24 +25,14 @@ export function useReaderTranslation(options: {
   captureNoteWriter?: () => TranslationNoteWriter | undefined
   onNoteSaved?: () => void
 }) {
-  const [translation, setTranslation] = useState<ReaderTranslationState | null>(null)
-  const requestSeq = useRef(0)
-  const recoveryRef = useRef<(() => Promise<string>) | undefined>(undefined)
-  const noteWriterRef = useRef<TranslationNoteWriter | undefined>(undefined)
-  const pendingSaves = useRef(new Set<string>())
-  const savedRequests = useRef(new Set<string>())
-
-  useEffect(() => {
-    requestSeq.current += 1
-    recoveryRef.current = undefined
-    noteWriterRef.current = undefined
-    setTranslation(null)
-    return () => { requestSeq.current += 1 }
-  }, [options.sourceKey])
+  const sourceKey = options.sourceKey ?? 'reader:default'
+  const translation = useReaderTranslationStore(state => state.entries[sourceKey]?.translation ?? null)
+  const entry = () => useReaderTranslationStore.getState().entries[sourceKey]
+  const active = (id: string) => useReaderTranslationStore.getState().entries[sourceKey]?.translation.requestId === id
 
   const run = useCallback(
     async (
-      requestId: number,
+      requestId: string,
       sourceText: string,
       targetLang: TranslationTargetLang,
       position: { x: number; y: number },
@@ -74,13 +40,15 @@ export function useReaderTranslation(options: {
       model?: string,
       recoverSourceText?: () => Promise<string>,
       thought?: string,
+      noteWriter?: TranslationNoteWriter,
+      floatingPosition?: { x: number; y: number },
     ) => {
       const targetLabel = translationTargetLabel(targetLang)
       const startedAt = Date.now()
       let firstTokenAt: number | undefined
       let sourceReady = !hasUnreadableText(sourceText)
-      setTranslation({
-        requestId: String(requestId),
+      useReaderTranslationStore.getState().start(sourceKey, { recoverSourceText, noteWriter, translation: {
+        requestId,
         phase: !sourceReady && recoverSourceText ? 'recognizing' : 'preparing',
         sourceText,
         targetLang,
@@ -89,15 +57,17 @@ export function useReaderTranslation(options: {
         model,
         thought,
         position,
-        text: EMPTY,
-        canSave: Boolean(noteWriterRef.current),
+        floatingPosition,
+        text: '',
+        canSave: Boolean(noteWriter),
         startedAt,
-      })
+      } })
+      const setTranslation = (change: (previous: ReaderTranslationState) => ReaderTranslationState) => useReaderTranslationStore.getState().update(sourceKey, requestId, change)
       try {
         if (!sourceReady) {
           if (!recoverSourceText) throw new Error('选中文字包含无法识别的字符，请先识别本页后重试')
           sourceText = (await recoverSourceText()).trim()
-          if (requestSeq.current !== requestId) return
+          if (!active(requestId)) return
           if (!sourceText || hasUnreadableText(sourceText)) {
             throw new Error('OCR 未能恢复可读的选中文字，请重新划选或识别本页后重试')
           }
@@ -113,9 +83,9 @@ export function useReaderTranslation(options: {
           runtimeId,
           model,
           thought,
-          isActive: () => requestSeq.current === requestId,
+          isActive: () => active(requestId),
           onDelta: (delta) => {
-            if (requestSeq.current !== requestId) return
+            if (!active(requestId)) return
             firstTokenAt ??= Date.now()
             setTranslation((previous) =>
               previous
@@ -129,11 +99,11 @@ export function useReaderTranslation(options: {
             )
           },
           onDetails: (details) => {
-            if (requestSeq.current !== requestId) return
+            if (!active(requestId)) return
             setTranslation((previous) => previous ? { ...previous, details } : previous)
           },
           onDetailsStart: () => {
-            if (requestSeq.current !== requestId) return
+            if (!active(requestId)) return
             setTranslation((previous) => previous ? { ...previous, phase: 'enriching' } : previous)
           },
         })
@@ -146,7 +116,7 @@ export function useReaderTranslation(options: {
             totalMs: Date.now() - startedAt,
           })
         }
-        if (requestSeq.current !== requestId) return
+        if (!active(requestId)) return
         if (result.status === 'ok') {
           setTranslation((previous) =>
             previous
@@ -175,7 +145,7 @@ export function useReaderTranslation(options: {
             : previous,
         )
       } catch (cause) {
-        if (requestSeq.current !== requestId) return
+        if (!active(requestId)) return
         setTranslation((previous) =>
           previous
             ? {
@@ -188,7 +158,7 @@ export function useReaderTranslation(options: {
         )
       }
     },
-    [],
+    [sourceKey],
   )
 
   const translate = useCallback(
@@ -208,55 +178,61 @@ export function useReaderTranslation(options: {
       const thought = useAppSettingsStore.getState().translationThoughtByRuntime[runtimeId]
       const noteWriter = options.captureNoteWriter?.()
       options.dimTextSelection()
-      requestSeq.current += 1
-      recoveryRef.current = options.recoverSourceText
-      noteWriterRef.current = noteWriter
-      await run(requestSeq.current, sourceText, targetLang, position, runtimeId, model, recoveryRef.current, thought)
+      await run(crypto.randomUUID(), sourceText, targetLang, position, runtimeId, model, options.recoverSourceText, thought, noteWriter)
     },
     [options, run],
   )
 
   const retry = useCallback(async () => {
     if (!translation) return
-    requestSeq.current += 1
+    const current = entry()
     await run(
-      requestSeq.current,
+      crypto.randomUUID(),
       translation.sourceText,
       translation.targetLang,
       translation.position,
       translation.runtimeId,
       translation.model,
-      recoveryRef.current,
+      current?.recoverSourceText,
       translation.thought,
+      current?.noteWriter,
+      translation.floatingPosition,
     )
   }, [run, translation])
 
   const dismiss = useCallback(() => {
-    requestSeq.current += 1
-    noteWriterRef.current = undefined
-    setTranslation(null)
-  }, [])
+    const id = useReaderTranslationStore.getState().entries[sourceKey]?.translation.requestId
+    if (id) useReaderTranslationStore.getState().dismiss(sourceKey, id)
+  }, [sourceKey])
+
+  const move = useCallback((position: { x: number; y: number }) => {
+    const state = useReaderTranslationStore.getState()
+    const id = translation?.requestId
+    if (id) state.update(sourceKey, id, previous => previous.floatingPosition?.x === position.x && previous.floatingPosition?.y === position.y
+      ? previous : { ...previous, floatingPosition: position })
+  }, [sourceKey, translation?.requestId])
 
   const saveNote = useCallback(async () => {
-    const writer = noteWriterRef.current
+    const current = entry()
+    const translation = current?.translation
+    const writer = current?.noteWriter
     if (!translation || translation.phase !== 'done' || !translation.text.trim() || !writer) return
     const id = translation.requestId
-    if (String(requestSeq.current) !== id || pendingSaves.current.has(id) || savedRequests.current.has(id)) return
-    pendingSaves.current.add(id)
+    if (translation.saving || translation.saved) return
+    const setTranslation = (change: (previous: ReaderTranslationState) => ReaderTranslationState) => useReaderTranslationStore.getState().update(sourceKey, id, change)
     setTranslation((previous) => previous ? { ...previous, saving: true, saveError: undefined } : previous)
     try {
       await writer(translationNote(translation.sourceText, translation.text, translation.targetLabel, translation.details), translation.sourceText)
-      savedRequests.current.add(id)
-      if (String(requestSeq.current) !== id) return
+      if (!active(id)) return
       setTranslation((previous) => previous ? { ...previous, saving: false, saved: true } : previous)
       options.onNoteSaved?.()
     } catch (cause) {
-      if (String(requestSeq.current) !== id) return
+      if (!active(id)) return
       setTranslation((previous) => previous ? {
         ...previous, saving: false, saveError: cause instanceof Error ? cause.message : '保存失败，请重试',
       } : previous)
-    } finally { pendingSaves.current.delete(id) }
-  }, [options.onNoteSaved, translation])
+    }
+  }, [options.onNoteSaved, sourceKey])
 
   const copy = useCallback(() => {
     const text = translation?.text.trim()
@@ -266,5 +242,5 @@ export function useReaderTranslation(options: {
     })
   }, [translation?.text])
 
-  return { translation, translate, retry, dismiss, copy, saveNote }
+  return { translation, translate, retry, dismiss, copy, saveNote, move }
 }

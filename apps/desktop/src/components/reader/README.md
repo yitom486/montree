@@ -4,7 +4,7 @@
 
 | 文件 | 功能 |
 |------|------|
-| `WebDocViewer` | 在线文档阅读（iframe 阅读模式、划词批注、卡片流与导出、本页标题大纲；拆量子目录 `web-doc/`：`useWebDocNavigation`、`useWebDocInteractions`、`useWebDocSession`） |
+| `WebDocViewer` | 在线文档阅读（iframe 阅读模式、划词批注、卡片流与导出、本页标题大纲；拆量子目录 `web-doc/`：`useWebDocNavigation`、`useWebDocInteractions`、`useWebDocSession`：含图片 error/已失败图片的受限恢复，离开文档后忽略迟到资源） |
 | `FoliateReaderViewer` | EPUB / MOBI / AZW3 统一阅读（foliate 后端：章节导航、划词批注、卡片流与导出；拆量子目录 `foliate/`：`foliate-theme`、`useFoliateHighlights`、`useFoliateInteractions`、`useFoliateBookSession`） |
 | `PdfViewer` | PDF 主 Viewer（Agent 正文走 WASM 结构化阅读顺序，失败回退 pdf.js；UI/选区坐标系不动；已入库 Agent 正文只读库，缺文抛错不回退 OCR；拆量子目录 `pdf/`：`usePdfDocumentSession`、`usePdfRosettaIndex`、`usePdfAgentRegistry`、`usePdfOcrTocManager`、`usePdfInteractions`） |
 | `PdfPageView` | PDF 单页（渲染 + text layer + 批注 overlay；原生文字层含替换字符、异常控制字符或私用字形编码时自动 OCR 并切换词层） |
@@ -19,7 +19,7 @@
 | `FlashcardReviewDialog` | 沉浸式 3D 闪卡复习弹窗（挖空遮罩、正反翻转、原书一键秒回与记忆打分） |
 | `SelectionToolbar` | 划选工具条（复制、高亮色板+写批注、翻译、朗读、单一 AI 菜单；AI 菜单内含制卡预设、快速问答与去 Agent 面板） |
 | `SelectionAiMenu` | 划选 AI 菜单内容（生成卡片 6 预设 + 更多要求、快速问答 3 方向、去 Agent 面板细问） |
-| `TranslationSurface` | 复用 Dialog 的非模态翻译浮窗，D3 拖动/方向键移动、窗口边界约束、最大高度与固定操作区 |
+| `TranslationSurface` | 复用 Dialog 的非模态翻译浮窗，D3 拖动/方向键移动；关闭位置过渡，按帧写入 transform，尺寸变化时更新边界缓存；最大高度与固定操作区；浮窗位置写回 Zustand，焦点移出/窗口状态变化不关闭，仅 × 或正文空白点击关闭 |
 | `TranslationCard` | 划词翻译非模态锚定卡：assistant-ui 流式译文、语言方向、关键短语/专有名词说明、复制/重试/存为批注；译文字段按真实文本增量持续显示，短语/术语工具事件逐项显示，ScrollArea 限高滚动；不展示普通消息/思考/JSON；三阅读器锁定原选区新增批注，PDF OCR 换层保留原页几何；`foliate/translation-note-anchors.test` 覆盖 EPUB/MOBI 的 CFI/章节与已有笔记保护 |
 | `DeepAnswerDialog` | 一键深度问答对话框（同会话直答选段、不进右侧时间线，可存为卡片批注） |
 | `MarginaliaBar` | 右侧知识卡片轨（统一管理批注/划线/书签；单一类型筛选菜单、全部/单项折叠、AI 智能制卡；测验/闪卡/导出集中在卡片操作菜单、时序图联动） |

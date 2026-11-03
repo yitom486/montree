@@ -9,7 +9,7 @@
 |-------------|------|
 | `main.ts` | 应用生命周期、初始化用户 `~/.montree` 规则/Skills（已有文件不覆盖）、注册 IPC、创建窗口、退出时释放 ACP / 工作区监听 |
 | `mcp-stdio.ts` | Agent 启动的 MCP stdio 子进程入口；经窗口专属命名管道/Unix socket 访问主进程文档服务，stdout 仅输出协议消息 |
-| `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI` |
+| `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI`；`window.montreeWebDocImages` 仅供宿主恢复阅读器失败图片 |
 | [`ipc/`](./ipc/) | `ipcMain` 处理器注册 |
 | [`window/`](./window/) | BrowserWindow 创建、关闭确认、标题；`window/app-menu.ts` 安装 Edit 菜单角色（Ctrl+C/V） |
 | [`services/`](./services/) | 业务服务（文件、工作区、阅读标记、ACP、**在线文档 web-doc**、**OCR 目录**；含 `web-doc/`（`url-policy`/`site-registry` 留守网络边界，目录抽取/站点谓词已迁 `@montree/web-doc`）、`ocr/`；ACP 纯逻辑已独立至 `@yitom/acp-client`，本树 `services/acp/` 仅留守 client/manager/terminal/fs/preflight/router/session-open；标注纯核/合并见 `@montree/annotations`） |

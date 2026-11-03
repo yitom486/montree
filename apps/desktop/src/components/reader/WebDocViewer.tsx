@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import {
   forwardRef,
   useEffect,
@@ -180,6 +181,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       addPageBookmark,
       handleSaveAnnotation,
       handleCreateMarkAt,
+      onDismissTranslation: selectionActions.dismissTranslation,
     })
 
     syncWebMarkOverlaysRef.current = session.syncWebMarkOverlays
@@ -252,6 +254,9 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         <div
           className={cn('web-doc-viewer-host relative h-full min-h-0 bg-[var(--color-bg-base)]', `theme-${theme}`)}
           data-reader-viewport
+          onClick={(event) => {
+            if (isReaderBlankClick(event.nativeEvent, event.currentTarget)) selectionActions.dismissTranslation()
+          }}
           data-theme={theme}
         >
           {isLoading && !data ? (
@@ -380,6 +385,7 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           <TranslationCard
             translation={selectionActions.translation}
             onClose={selectionActions.dismissTranslation}
+          onMove={selectionActions.moveTranslation}
             onRetry={() => void selectionActions.retryTranslation()}
             onCopy={selectionActions.copyTranslation}
             onSave={() => void selectionActions.saveTranslationNote()}

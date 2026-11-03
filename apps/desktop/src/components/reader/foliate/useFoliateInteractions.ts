@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FoliateViewElement } from '@foliate/view.js'
 import type { ReadingMark } from '@yitom/contracts'
@@ -317,6 +318,7 @@ export function useFoliateInteractions({
     showPendingHighlight: showPendingAnnotateHighlight,
     saveHighlight: handleSaveAnnotation,
     sessionKey: fileFingerprint ?? filePath,
+    translationSourceKey: filePath,
   })
 
   const markHoverHandlers = useCallback(
@@ -463,6 +465,8 @@ export function useFoliateInteractions({
         if (!mark) return
         emitRailFocus(mark.id)
       }
+      const onBlankClick = (event: MouseEvent) => { if (isReaderBlankClick(event, doc.documentElement)) selectionActions.dismissTranslation() }
+      doc.addEventListener('click', onBlankClick)
       doc.addEventListener('click', onMarkClick)
       const unbindCollapse = doc.defaultView
         ? bindDocumentSelectionCollapse(doc, doc.defaultView as Window, () => {
@@ -472,6 +476,7 @@ export function useFoliateInteractions({
       cleanupFns.push(() => {
         doc.removeEventListener('mousedown', onMouseDown)
         doc.removeEventListener('mouseup', onMouseUp)
+        doc.removeEventListener('click', onBlankClick)
         doc.removeEventListener('click', onMarkClick)
         unbindCollapse()
       })
@@ -528,7 +533,7 @@ export function useFoliateInteractions({
         })
       }
     },
-    [clearTextSelection, filePath, markHoverHandlers, marksRef, viewRef],
+    [clearTextSelection, filePath, markHoverHandlers, marksRef, viewRef, selectionActions.dismissTranslation],
   )
 
   return {

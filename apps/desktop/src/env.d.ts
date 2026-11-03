@@ -3,6 +3,7 @@
 import type { AppError, ElectronAPI, Result, TypstExportPayload, TypstExportResult } from '@yitom/contracts'
 import type { TerminalAPI } from '../contracts/terminal'
 import type { TranslationAPI } from '../contracts/translation'
+import type { WebDocImagesAPI } from '../contracts/web-doc'
 import type { AgentInspectionAPI } from '../contracts/agent-inspection'
 import type { HtmlPreviewAPI } from '../contracts/html-preview'
 import type { InlineCompletionAPI } from '../contracts/inline-completion'
@@ -27,6 +28,7 @@ declare global {
     electronAPI?: MontreeElectronAPI
     montreeTerminal?: TerminalAPI
     montreeTranslation?: TranslationAPI
+    montreeWebDocImages?: WebDocImagesAPI
     montreeAgentInspection?: AgentInspectionAPI
     montreeHtmlPreview?: HtmlPreviewAPI
     montreeInlineCompletion?: InlineCompletionAPI

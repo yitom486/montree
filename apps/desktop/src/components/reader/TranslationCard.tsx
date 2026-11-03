@@ -44,12 +44,14 @@ export function TranslationCard({
   onRetry,
   onCopy,
   onSave,
+  onMove,
 }: {
   translation: ReaderTranslationState
   onClose: () => void
   onRetry: () => void
   onCopy: () => void
   onSave: () => void
+  onMove: (position: { x: number; y: number }) => void
 }) {
   const [copied, setCopied] = useState(false)
   const messages = useMemo(
@@ -79,7 +81,7 @@ export function TranslationCard({
   const pending = translation.phase === 'recognizing' || translation.phase === 'preparing' || translation.phase === 'streaming' || translation.phase === 'enriching'
 
   return (
-    <TranslationSurface key={translation.requestId} x={translation.position.x} y={translation.position.y} onClose={onClose}>
+    <TranslationSurface key={translation.requestId} x={translation.position.x} y={translation.position.y} floatingPosition={translation.floatingPosition} onMove={onMove}>
       <div data-translation-drag tabIndex={0} aria-label="拖动翻译卡，方向键移动" className="flex shrink-0 touch-none cursor-grab select-none items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           <span className="shrink-0">译</span>

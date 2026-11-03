@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, ScanText, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -550,6 +551,9 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
             ref={containerRef}
             className="h-full min-h-0 overflow-auto bg-[var(--color-bg-base)]"
             data-reader-viewport
+            onClick={(event) => {
+              if (isReaderBlankClick(event.nativeEvent, event.currentTarget)) selectionActions.dismissTranslation()
+            }}
             onMouseMove={handlePdfMarkHoverMove}
             onMouseLeave={handlePdfMarkHoverLeave}
           >
@@ -666,6 +670,7 @@ export function PdfViewer({ filePath, theme, workspaceRoot }: PdfViewerProps) {
         <TranslationCard
           translation={selectionActions.translation}
           onClose={selectionActions.dismissTranslation}
+          onMove={selectionActions.moveTranslation}
           onRetry={() => void selectionActions.retryTranslation()}
           onCopy={selectionActions.copyTranslation}
           onSave={() => void selectionActions.saveTranslationNote()}

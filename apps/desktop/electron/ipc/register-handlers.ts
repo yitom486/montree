@@ -46,7 +46,7 @@ import type {
   AcpProxySettings,
 } from '@yitom/contracts'
 import type { WebDocDiscoverTocPayload } from '@yitom/contracts'
-import type { WebDocFetchPayloadWithMarkdown } from '../../contracts/web-doc'
+import { WEB_DOC_IMAGE_IPC, type WebDocImagePayload, type WebDocFetchPayloadWithMarkdown } from '../../contracts/web-doc'
 import { saveBinaryDocument } from '../services/binary-document-service'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
@@ -193,6 +193,7 @@ import type { QuizSessionRecord } from '@yitom/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,
+  fetchWebDocImage,
   parseWebDocUrlInput,
 } from '../services/web-doc-service'
 import { readPdfOcrTocCache, deletePdfOcrTocCache, clearAllPdfOcrCaches, writePdfOcrTocCache } from '../services/ocr/ocr-toc-cache'
@@ -959,6 +960,12 @@ export function registerIpcHandlers(): void {
   )
 
   // --- 在线文档 ---
+  ipcMain.handle(WEB_DOC_IMAGE_IPC, (event, payload: WebDocImagePayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口读取阅读器图片' })
+    }
+    return fetchWebDocImage(payload)
+  })
   ipcMain.handle(IPC.WEB_DOC_FETCH_PAGE, async (_event, payload: WebDocFetchPayloadWithMarkdown) => {
     const urlResult = parseWebDocUrlInput(payload?.url, true)
     if (!urlResult.ok) return urlResult

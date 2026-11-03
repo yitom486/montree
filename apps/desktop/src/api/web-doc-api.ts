@@ -9,6 +9,7 @@ import { err } from '@yitom/contracts'
 import type {
   WebDocFetchPayloadWithMarkdown,
   WebDocFetchResultWithMarkdown,
+  WebDocImagePayload, WebDocImageResult,
 } from '../../contracts/web-doc'
 
 function requireElectronAPI(): Result<ElectronAPI, AppError> {
@@ -23,6 +24,10 @@ function requireElectronAPI(): Result<ElectronAPI, AppError> {
 }
 
 export const webDocApi = {
+  async fetchImage(payload: WebDocImagePayload): Promise<Result<WebDocImageResult, AppError>> {
+    if (!window.montreeWebDocImages) return err({ code: 'API_UNAVAILABLE', message: '阅读器图片接口未就绪，请重启应用' })
+    return window.montreeWebDocImages.fetch(payload)
+  },
   async fetchPage(
     payload: WebDocFetchPayloadWithMarkdown,
   ): Promise<Result<WebDocFetchResultWithMarkdown, AppError>> {

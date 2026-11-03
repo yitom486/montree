@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import { useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
@@ -248,6 +249,9 @@ export function FoliateReaderViewer({
               ref={containerRef}
               className="foliate-reader-host relative h-full min-h-0 overflow-hidden bg-[var(--color-bg-base)]"
               data-reader-viewport
+              onClick={(event) => {
+                if (isReaderBlankClick(event.nativeEvent, event.currentTarget)) interactions.selectionActions.dismissTranslation()
+              }}
               data-theme={theme}
             >
               {isLoading && (
@@ -319,6 +323,7 @@ export function FoliateReaderViewer({
         <TranslationCard
           translation={interactions.selectionActions.translation}
           onClose={interactions.selectionActions.dismissTranslation}
+          onMove={interactions.selectionActions.moveTranslation}
           onRetry={() => void interactions.selectionActions.retryTranslation()}
           onCopy={interactions.selectionActions.copyTranslation}
           onSave={() => void interactions.selectionActions.saveTranslationNote()}

@@ -3,9 +3,56 @@ import { isOk } from '@yitom/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,
+  fetchWebDocImage,
   parseWebDocUrlInput,
   validateWebDocUrl,
 } from './web-doc-service'
+
+describe('web document image resources', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('loads a CORP protected image as bounded image data, and coalesces repeat reads', async () => {
+    const fetch = vi.fn(async () => new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png', 'cross-origin-resource-policy': 'same-origin' } }))
+    vi.stubGlobal('fetch', fetch)
+    const payload = { pageUrl: 'https://claude.dev/blog/post/', url: 'https://claude.dev/media/test-corp.png' }
+    const [a, b] = await Promise.all([fetchWebDocImage(payload), fetchWebDocImage(payload)])
+    expect(a).toEqual(b)
+    expect(a).toMatchObject({ ok: true, value: { dataUrl: 'data:image/png;base64,iVBORw==' } })
+    await fetchWebDocImage(payload)
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+  it('does not grant local network access from the image URL itself', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    for (const url of ['http://127.0.0.1/image.png', 'http://192.168.1.2/image.png', 'file:///image.png', 'data:image/png;base64,AA==']) {
+      expect((await fetchWebDocImage({ pageUrl: 'https://claude.dev/blog/post/', url })).ok).toBe(false)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+  it('inherits explicit local document access only for that origin and validates every redirect', async () => {
+    const fetch = vi.fn(async (url: string) => url.includes('redirect')
+      ? new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/private.png' } })
+      : new Response('png', { headers: { 'content-type': 'image/png' } }))
+    vi.stubGlobal('fetch', fetch)
+    expect((await fetchWebDocImage({ pageUrl: 'http://localhost:47831/page', url: 'http://localhost:47831/image.png' })).ok).toBe(true)
+    expect((await fetchWebDocImage({ pageUrl: 'http://localhost:47831/page', url: 'http://localhost:47832/image.png' })).ok).toBe(false)
+    expect((await fetchWebDocImage({ pageUrl: 'https://claude.dev/', url: 'https://claude.dev/media/redirect.png' })).ok).toBe(false)
+    expect(fetch.mock.calls.map(([url]) => url)).not.toContain('http://127.0.0.1/private.png')
+  })
+  it('rejects HTML, empty bodies and oversized image streams without trusting content-length', async () => {
+    let cancelled = false
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('html')) return new Response('<html>not an image</html>', { headers: { 'content-type': 'text/html' } })
+      if (url.includes('empty')) return new Response('', { headers: { 'content-type': 'image/png' } })
+      if (url.includes('declared')) return new Response('small', { headers: { 'content-type': 'image/png', 'content-length': String(13 * 1024 * 1024) } })
+      let chunks = 0
+      return new Response(new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(1024 * 1024)); if (++chunks === 14) controller.close() }, cancel() { cancelled = true } }), { headers: { 'content-type': 'image/png' } })
+    }))
+    for (const kind of ['html', 'empty', 'declared', 'stream']) {
+      expect((await fetchWebDocImage({ pageUrl: 'https://claude.dev/', url: `https://claude.dev/media/${kind}.png` })).ok).toBe(false)
+    }
+    expect(cancelled).toBe(true)
+  })
+})
 
 describe('web-doc-service', () => {
   beforeEach(() => {
