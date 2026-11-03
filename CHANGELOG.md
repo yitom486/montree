@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.29] - 2026-11-03
+
 - **正式发布阅读器 AI 翻译与网页图片修复**：包含 v0.4.28 中的独立翻译 Agent、模型与思考档配置、译文和词句解读流式输出、可拖动且保留状态的翻译浮窗、批注与 Markdown 卡片流，以及 Claude 开发者博客图片恢复。
 
 - **完善发布验证**：设置冒烟使用独立测试 Agent，终端审批按每轮唯一回执验证，避免未安装运行时或高 DPI 消息虚拟化造成回归误报。v0.4.28 未发布安装包，本版通过完整检查后提供正式下载。
@@ -723,7 +727,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.28...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.29...HEAD
+[0.4.29]: https://github.com/yitom486/montree/compare/v0.4.28...v0.4.29
 [0.4.28]: https://github.com/yitom486/montree/compare/v0.4.27...v0.4.28
 [0.4.27]: https://github.com/yitom486/montree/compare/v0.4.26...v0.4.27
 [0.4.26]: https://github.com/yitom486/montree/compare/v0.4.25...v0.4.26
