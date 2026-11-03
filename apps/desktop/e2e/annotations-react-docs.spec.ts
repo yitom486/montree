@@ -75,7 +75,9 @@ async function agentProposeNote(page: Page, excerpt: string, note: string): Prom
   const composer = chat.locator('textarea').first()
   await composer.fill(`mcp-call:montree_propose_mark:${JSON.stringify({ excerpt, note })}`)
   await chat.getByRole('button', { name: '发送', exact: true }).click()
-  const draft = chat.getByRole('button', { name: /批注草稿.*展开确认/ }).last()
+  await expect(chat.getByText('MCP_CALLED:montree_propose_mark', { exact: true })).toBeVisible({ timeout: 30_000 })
+  const draft = chat.getByRole('button', { name: /批注草稿.*展开确认/ })
+  await expect(draft).toHaveCount(1)
   await expect(draft).toBeVisible({ timeout: 30_000 })
   await draft.click()
   const adopt = chat.getByRole('button', { name: '采用并保存', exact: true }).last()
@@ -172,10 +174,7 @@ test('React 扫描版 PDF：OCR 文字层上划重点 / 批注 / 智能制卡，
     const done = panel.getByText(/已识别 \d+\/\d+/)
     const unread = panel.getByText(/本页未识别/)
     await expect(done.or(unread).or(panel.getByText(/识别中…/))).toBeVisible({ timeout: 30_000 })
-    if (await unread.isVisible()) {
-      await panel.getByRole('button', { name: '更多工具' }).click()
-      await page.getByRole('menuitem', { name: '识别本页', exact: true }).click()
-    }
+    // 缺失文字层现已自动触发 OCR；不在「未识别→识别中」瞬间追点会变名的菜单。
     await expect(done).toBeVisible({ timeout: 240_000 })
     const layer = panel.locator('.pdf-text-layer-host')
     await expect(layer).toContainText('JavaScript', { timeout: 10_000 })

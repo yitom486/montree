@@ -1,9 +1,28 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { promoteMarkProposalsToLastAgent, isProposalPromotedToAgent } from '@/lib/agent/promote-mark-proposals'
 import type { AcpChatMessage } from '@/stores/acp-chat-types'
 import { toProposedMark } from '@yitom/annotations'
+import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 
 describe('promote-mark-proposals', () => {
+  afterEach(() => {
+    useAnnotationAgentStore.getState().setPendingDraft(null)
+    useAnnotationAgentStore.getState().setProposeHost(null)
+  })
+
+  it('没有本轮 MCP 提议工具时保留草稿兜底，上一轮工具不影响本轮', () => {
+    const store = useAnnotationAgentStore.getState()
+    store.setPendingDraft({ fileKey: 'standalone', excerpt: '本轮原文', note: '本轮批注', source: 'ai', lastIntentLabel: '批注草稿' })
+    store.setProposeHost('main-agent')
+    const messages: AcpChatMessage[] = [
+      { id: 'old-tool', role: 'tool', toolTitle: 'montree_propose_mark', text: '{}', createdAt: 1 },
+      { id: 'user', role: 'user', text: '继续批注', createdAt: 2 },
+      { id: 'agent', role: 'agent', text: '请确认。', createdAt: 3 },
+    ]
+    const result = promoteMarkProposalsToLastAgent(messages)
+    expect(result.at(-1)?.markProposals).toHaveLength(1)
+    expect(result.at(-1)?.markProposals?.[0]?.proposal).toMatchObject({ id: 'main:standalone', excerpt: '本轮原文', note: '本轮批注' })
+  })
   it('把工具 propose 挂到最近 Agent 回复下方', () => {
     const proposal = toProposedMark({ excerpt: '原文', note: '批注', source: 'agent' })
     const messages: AcpChatMessage[] = [

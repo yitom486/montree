@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { configureMockTranslation, mockAgentEnv } from './helpers/mock-agent'
 
 /** 内存 WebDAV stub：PROPFIND / MKCOL / GET / PUT，不依赖外网 */
 async function startWebDavStub(): Promise<{
@@ -73,11 +74,12 @@ async function startWebDavStub(): Promise<{
 test.describe('WebDAV 同步（本地 stub）', () => {
   test('测试连接成功并可执行一次同步', async () => {
     const stub = await startWebDavStub()
-    const app = await launchBuiltApp()
+    const app = await launchBuiltApp(mockAgentEnv(''))
 
     try {
       const window = await app.firstWindow()
       await window.waitForLoadState('domcontentloaded')
+      await configureMockTranslation(window)
       await expect(window.getByRole('button',   { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })

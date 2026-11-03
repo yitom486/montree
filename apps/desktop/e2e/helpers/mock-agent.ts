@@ -13,6 +13,17 @@ export function mockAgentEnv(workspace: string, extra: Record<string, string> = 
   }
 }
 
+/** 设置页会独立读取翻译配置，打开设置的离线测试也要显式选择 mock 运行时。 */
+export async function configureMockTranslation(page: Page): Promise<void> {
+  await page.waitForLoadState('domcontentloaded')
+  await page.evaluate(() => {
+    const settings = JSON.parse(localStorage.getItem('markdown-editor-settings') ?? '{"state":{}}')
+    settings.state.translationRuntimeId = 'mock-window'
+    localStorage.setItem('markdown-editor-settings', JSON.stringify(settings))
+  })
+  await page.reload()
+}
+
 /** 播种聊天线程、打开面板并连接 mock Agent。 */
 export async function connectMockAgent(page: Page, threadId = 'mock-thread'): Promise<void> {
   await seedMockChatThread(page, { id: threadId, title: 'mock' })

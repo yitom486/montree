@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
-import { mockAgentEnv } from './helpers/mock-agent'
+import { configureMockTranslation, mockAgentEnv } from './helpers/mock-agent'
 
 test.describe('应用启动', () => {
   test('未绑定窗口不能凭 renderer workspaceId 读写远端会话', async () => {
@@ -32,12 +32,7 @@ test.describe('应用启动', () => {
     try {
       const window = await app.firstWindow()
       await window.waitForLoadState('domcontentloaded')
-      await window.evaluate(() => {
-        const settings = JSON.parse(localStorage.getItem('markdown-editor-settings') ?? '{"state":{}}')
-        settings.state.translationRuntimeId = 'mock-window'
-        localStorage.setItem('markdown-editor-settings', JSON.stringify(settings))
-      })
-      await window.reload()
+      await configureMockTranslation(window)
       await expect(window.getByRole('button', { name: '更多操作', exact: true })).toBeVisible({
         timeout: 15_000,
       })

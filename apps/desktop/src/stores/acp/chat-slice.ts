@@ -236,11 +236,11 @@ export const createChatSlice: StateCreator<
 
   finishStreaming: () => {
     set((s) => {
-      const proposalFallback = collectStoreFallbackProposal()
       return {
         prompting: false,
         turnSettled: true,
         ...patchActiveThread(s, (t) => {
+          const proposalFallback = collectStoreFallbackProposal(t.messages)
           const feed = dispatchOwnedChatEvent(t, { type: 'finish-turn', proposalFallback })
           return { ...t, messages: feed.messages, updatedAt: Date.now() }
         }),
@@ -252,9 +252,9 @@ export const createChatSlice: StateCreator<
   // load 恢复时 prompting 本就 false（断言式保持：prompt 回合的收尾仍走 finishStreaming）。
   freezeSettledStreaming: () => {
     set((s) => {
-      const proposalFallback = collectStoreFallbackProposal()
       return {
         ...patchActiveThread(s, (t) => {
+          const proposalFallback = collectStoreFallbackProposal(t.messages)
           const feed = dispatchOwnedChatEvent(t, { type: 'finish-turn', proposalFallback, settle: false })
           return { ...t, messages: feed.messages, updatedAt: Date.now() }
         }),
@@ -296,9 +296,9 @@ export const createChatSlice: StateCreator<
     set((s) => {
       let remaining = [...s.pendingMarkProposalSnapshotContents, content]
       let attachedCount = 0
-      const proposalFallback = collectStoreFallbackProposal()
       const patched = patchActiveThread(s, (t) => {
         const attached = attachPendingMarkProposals(t.messages, remaining)
+        const proposalFallback = collectStoreFallbackProposal(attached.messages)
         remaining = attached.remaining.slice(-3)
         attachedCount = attached.attachedCount
         const hasStreamingAgent = attached.messages.some(
@@ -565,8 +565,8 @@ export const createChatSlice: StateCreator<
       case 'tool-content-chunk': {
         const { toolCallId, text: chunkText } = intent
         set((s) => {
-          const proposalFallback = collectStoreFallbackProposal()
           return patchActiveThread(s, (t) => {
+            const proposalFallback = collectStoreFallbackProposal(t.messages)
             const feed = dispatchOwnedChatEvent(t, { type: 'tool-chunk', toolCallId, text: chunkText, proposalFallback })
             return { ...t, messages: feed.messages, updatedAt: Date.now() }
           })
@@ -604,8 +604,9 @@ export const createChatSlice: StateCreator<
           let remaining = s.pendingMarkProposalSnapshotContents
           let attachedCount = 0
           let proposalToolTitle: string | undefined
-          const proposalFallback = collectStoreFallbackProposal()
           const patched = patchActiveThread(s, (t) => {
+            const proposalFallback = isProposeMarkToolTitle(call?.title)
+              ? null : collectStoreFallbackProposal(t.messages)
             const base = call
               ? dispatchOwnedChatEvent(t, { type: 'tool-call', call, proposalFallback }).messages
               : t.messages

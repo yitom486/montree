@@ -12,15 +12,17 @@ export {
 } from '@yitom/chat-core'
 
 import {
-  collectToolProposals,
   currentTurnStart,
-  mergeProposals,
+  isProposeMarkToolTitle,
   promoteMarkProposalsToLastAgent as promoteCore,
 } from '@yitom/chat-core'
 
-export function collectStoreFallbackProposal(): ChatMarkProposal | null {
+export function collectStoreFallbackProposal(messages: AcpChatMessage[]): ChatMarkProposal | null {
   const store = useAnnotationAgentStore.getState()
   if (store.proposeHost !== 'main-agent' || !store.pendingDraft) return null
+  // MCP 工具与快照旁路拥有相同的 toolCallId；编辑器草稿只是兜底，不能再生成 main:* 副本。
+  if (messages.slice(currentTurnStart(messages)).some(message =>
+    message.role === 'tool' && isProposeMarkToolTitle(message.toolTitle))) return null
   const draft = store.pendingDraft
   return {
     proposal: toProposedMark({
@@ -37,5 +39,5 @@ export function collectStoreFallbackProposal(): ChatMarkProposal | null {
 export function promoteMarkProposalsToLastAgent(
   messages: AcpChatMessage[],
 ): AcpChatMessage[] {
-  return promoteCore(messages, collectStoreFallbackProposal())
+  return promoteCore(messages, collectStoreFallbackProposal(messages))
 }

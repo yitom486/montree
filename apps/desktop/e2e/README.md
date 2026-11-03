@@ -13,6 +13,8 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 高 DPI：`E2E_DEVICE_SCALE_FACTOR=1.5 bun run test:e2e …` 以 `--force-device-scale-factor` 启动（CI 的 Windows 作业跑 1x 与 1.5x）。截图请用 `helpers/screenshot.ts` 的 `screenshotWithoutToasts`（样式隐藏 toast，**不要删除 toast DOM**，会让 React 崩溃）。
 
+打开设置的离线用例应使用 `helpers/mock-agent.ts` 的 `mockAgentEnv` 与 `configureMockTranslation`，防止独立翻译配置读取启动真实 Agent 或依赖外网登录。
+
 ## 用例
 
 | 文件 | 说明 |

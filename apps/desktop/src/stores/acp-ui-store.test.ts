@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MONTREE_SETTLE_COMPLETE_KIND } from '@yitom/contracts'
 import { toToolDisplayModel } from '@yitom/chat-core'
+import { useAnnotationAgentStore } from '@/stores/annotation-agent-store'
 import { updateOwnedChatThreadMessages } from '@/lib/agent/chat-session-authority'
 import { buildMontreePromptPrefix } from '@/lib/agent/context/build-prompt-prefix'
 import { formatTurnContextBlock } from '@/lib/agent/context/turn-context'
@@ -11,6 +12,32 @@ import {
 } from '@/stores/acp-ui-store'
 
 describe('acp-ui-store history + plan', () => {
+  it.each([false, true])('MCP 快照和草稿兜底只生成一张批注卡（ACP 回显结果：%s）', (echoResult) => {
+    const store = useAcpUiStore.getState()
+    const annotations = useAnnotationAgentStore.getState()
+    store.appendUserMessage('提出批注')
+    store.beginAgentReply()
+    store.applySessionUpdate({ sessionUpdate: 'tool_call', toolCallId: 'proposal-once', title: 'montree_propose_mark', status: 'in_progress' })
+    annotations.setPendingDraft({ fileKey: 'test-document', excerpt: '原文', note: '批注', source: 'ai', lastIntentLabel: '批注草稿' })
+    annotations.setProposeHost('main-agent')
+    try {
+      const result = { proposed: true, excerpt: '原文', note: '批注', message: '等待采用' }
+      store.attachMarkProposalsFromSnapshot(JSON.stringify({ proposed: true, marks: [result], count: 1 }))
+      store.applySessionUpdate({ sessionUpdate: 'tool_call_update', toolCallId: 'proposal-once', status: 'completed',
+        ...(echoResult ? { content: [{ type: 'content', content: { type: 'text', text: JSON.stringify(result) } }] } : {}),
+      })
+      store.applySessionUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '请确认批注。' } })
+      store.finishStreaming()
+      const state = useAcpUiStore.getState()
+      const messages = state.threads.find(thread => thread.id === state.activeThreadId)!.messages
+      const proposals = messages.filter(message => message.role === 'agent').flatMap(message => message.markProposals ?? [])
+      expect(proposals).toHaveLength(1)
+      expect(proposals[0]!.proposal).toMatchObject({ id: 'tool:proposal-once:0', excerpt: '原文', note: '批注' })
+    } finally {
+      annotations.setPendingDraft(null)
+      annotations.setProposeHost(null)
+    }
+  })
   it('agy 实际消息形状保留思考、解开 MCP 工具参数且稀疏完成不丢主题', () => {
     const store = useAcpUiStore.getState()
     store.appendUserMessage('画登录时序图')
