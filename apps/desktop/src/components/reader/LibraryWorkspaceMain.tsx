@@ -5,15 +5,17 @@ import { appApi } from '@/api/app-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { HnStory } from '../../../contracts/hn'
+import type { FeedItem } from '../../../contracts/feed'
+import { findFeedSource } from '../../../contracts/feed'
 import {
   useLibraryStore,
   useLibraryUi,
+  feedItemKey,
   type LibraryPrimaryTab,
   type ReadLaterEntry,
   type ShelfEntry,
 } from '@/stores/library-store'
-import { HnFeed } from './library/HnFeed'
+import { FeedStream } from './library/FeedStream'
 import { RecentView } from './library/RecentView'
 import { ReadLaterView } from './library/ReadLaterView'
 import { ShelfView } from './library/ShelfView'
@@ -99,48 +101,57 @@ export const LibraryWorkspaceMain: React.FC<LibraryWorkspaceMainProps> = ({
     return null
   }, [activeFilePath, isDirty, webPageUrl])
 
-  const openStory = (story: HnStory) => {
-    const target = story.url ?? story.commentUrl
+  const openStory = (item: FeedItem) => {
+    const target = item.url ?? item.discussionUrl
+    const source = findFeedSource(item.source)
     setReturnContext({
       fromLibrary: true,
       tab: 'discover',
-      hnChannel: useLibraryStore.getState().hnChannel,
-      itemTitle: story.title,
-      hnId: story.id,
-      discussionUrl: story.commentUrl,
-      discussionSource: 'Hacker News',
-      discussionCount: story.comments,
+      sourceId: item.source,
+      feedChannel: useLibraryStore.getState().feedChannel,
+      itemTitle: item.title,
+      itemKey: feedItemKey(item.source, item.id),
+      hnId: item.source === 'hacker-news' ? Number(item.id) : undefined,
+      discussionUrl: item.comments > 0 ? item.discussionUrl : undefined,
+      discussionSource: source.label,
+      discussionCount: item.comments,
       originalUrl: target,
     })
     onOpenWebDoc?.(target)
     onResumeActiveSession()
   }
 
-  const openDiscussion = (story: HnStory) => {
+  const openDiscussion = (item: FeedItem) => {
+    const source = findFeedSource(item.source)
     setReturnContext({
       fromLibrary: true,
       tab: 'discover',
-      hnChannel: useLibraryStore.getState().hnChannel,
-      itemTitle: `讨论 · ${story.title}`,
-      hnId: story.id,
-      discussionUrl: story.commentUrl,
-      discussionSource: 'Hacker News',
-      discussionCount: story.comments,
-      originalUrl: story.url ?? story.commentUrl,
+      sourceId: item.source,
+      feedChannel: useLibraryStore.getState().feedChannel,
+      itemTitle: `讨论 · ${item.title}`,
+      itemKey: feedItemKey(item.source, item.id),
+      hnId: item.source === 'hacker-news' ? Number(item.id) : undefined,
+      discussionUrl: item.discussionUrl,
+      discussionSource: source.label,
+      discussionCount: item.comments,
+      originalUrl: item.url ?? item.discussionUrl,
     })
-    onOpenWebDoc?.(story.commentUrl)
+    onOpenWebDoc?.(item.discussionUrl)
     onResumeActiveSession()
   }
 
   const openShelfEntry = (item: ShelfEntry) => {
+    const source = item.sourceId ? findFeedSource(item.sourceId) : null
     setReturnContext({
       fromLibrary: true,
       tab: 'shelf',
-      hnChannel: useLibraryStore.getState().hnChannel,
+      sourceId: item.sourceId,
+      feedChannel: useLibraryStore.getState().feedChannel,
       itemTitle: item.title,
+      itemKey: item.hnId ? feedItemKey('hacker-news', item.hnId) : undefined,
       hnId: item.hnId,
       discussionUrl: item.commentUrl,
-      discussionSource: item.hnId ? 'Hacker News' : undefined,
+      discussionSource: source?.label,
       discussionCount: item.commentsCount,
       originalUrl: item.target,
     })
@@ -150,14 +161,17 @@ export const LibraryWorkspaceMain: React.FC<LibraryWorkspaceMainProps> = ({
   }
 
   const openReadLater = (item: ReadLaterEntry) => {
+    const source = item.sourceId ? findFeedSource(item.sourceId) : null
     setReturnContext({
       fromLibrary: true,
       tab: 'later',
-      hnChannel: useLibraryStore.getState().hnChannel,
+      sourceId: item.sourceId,
+      feedChannel: useLibraryStore.getState().feedChannel,
       itemTitle: item.title,
+      itemKey: item.id,
       hnId: item.hnId,
       discussionUrl: item.commentUrl,
-      discussionSource: item.hnId ? 'Hacker News' : undefined,
+      discussionSource: source?.label,
       discussionCount: item.commentsCount,
       originalUrl: item.url,
     })
@@ -166,15 +180,17 @@ export const LibraryWorkspaceMain: React.FC<LibraryWorkspaceMainProps> = ({
   }
 
   const moveReadLaterToShelf = (item: ReadLaterEntry) => {
+    const source = item.sourceId ? findFeedSource(item.sourceId) : null
     toggleShelfItem({
-      id: `hn-${item.hnId ?? item.id}`,
+      id: item.id,
       kind: 'article',
+      sourceId: item.sourceId,
       hnId: item.hnId,
       title: item.title,
       authorOrSource: item.domain,
       domain: item.domain,
-      format: 'Hacker News',
-      versionOrYear: `${item.points ?? 0} 分`,
+      format: source?.label ?? '文章',
+      versionOrYear: item.points ? `${item.points} 分` : undefined,
       target: item.url,
       commentUrl: item.commentUrl,
       points: item.points,
@@ -192,7 +208,7 @@ export const LibraryWorkspaceMain: React.FC<LibraryWorkspaceMainProps> = ({
 
   const searchPlaceholder =
     activeTab === 'discover'
-      ? '搜索当前 Hacker News 列表…'
+      ? '搜索当前资讯列表…'
       : activeTab === 'shelf'
         ? '搜索书架…'
         : activeTab === 'later'
@@ -282,7 +298,7 @@ export const LibraryWorkspaceMain: React.FC<LibraryWorkspaceMainProps> = ({
       >
         <div className="mx-auto w-full max-w-5xl px-4 py-3">
           {activeTab === 'discover' && (
-            <HnFeed
+            <FeedStream
               searchQuery={searchQuery}
               activeSessionSummary={activeSessionSummary}
               onResumeActiveSession={onResumeActiveSession}

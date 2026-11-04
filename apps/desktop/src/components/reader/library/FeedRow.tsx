@@ -1,11 +1,11 @@
 import { Bookmark, Check, Clock, ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import type { HnStory } from '../../../../contracts/hn'
+import type { FeedItem } from '../../../../contracts/feed'
 import { formatRelativeTime } from './format'
 
-interface HnStoryRowProps {
-  story: HnStory
+interface FeedRowProps {
+  item: FeedItem
   rank: number
   isRead: boolean
   isSaved: boolean
@@ -47,8 +47,8 @@ function RowAction({
   )
 }
 
-export function HnStoryRow({
-  story,
+export function FeedRow({
+  item,
   rank,
   isRead,
   isSaved,
@@ -60,7 +60,7 @@ export function HnStoryRow({
   onToggleLater,
   onToggleShelf,
   onOpenExternal,
-}: HnStoryRowProps) {
+}: FeedRowProps) {
   return (
     <li
       className={cn(
@@ -82,31 +82,43 @@ export function HnStoryRow({
               isRead ? 'text-muted-foreground' : 'text-foreground',
             )}
           >
-            {story.title}
+            {item.title}
           </button>
-          {!isRead && <span className="sr-only">未读</span>}
+          {isRead && <span className="sr-only">已读</span>}
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-          {story.domain && (
+          {item.domain && (
             <>
-              <span className="max-w-64 truncate">{story.domain}</span>
+              <span className="max-w-64 truncate">{item.domain}</span>
               <span className="text-border">·</span>
             </>
           )}
-          <span className="tabular-nums">{story.points} 分</span>
-          <span className="text-border">·</span>
-          <span className="truncate">{story.author}</span>
-          <span className="text-border">·</span>
-          <span>{formatRelativeTime(story.createdAt)}</span>
-          <span className="text-border">·</span>
-          <button
-            type="button"
-            onClick={onOpenDiscussion}
-            className="rounded tabular-nums transition-colors hover:text-foreground focus-visible:underline focus-visible:outline-none"
-          >
-            {story.comments} 条评论
-          </button>
+          {item.points > 0 && (
+            <>
+              <span className="tabular-nums">{item.points} 分</span>
+              <span className="text-border">·</span>
+            </>
+          )}
+          {item.author && item.author !== 'unknown' && (
+            <>
+              <span className="truncate">{item.author}</span>
+              <span className="text-border">·</span>
+            </>
+          )}
+          <span>{formatRelativeTime(item.createdAt)}</span>
+          {item.comments > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <button
+                type="button"
+                onClick={onOpenDiscussion}
+                className="rounded tabular-nums transition-colors hover:text-foreground focus-visible:underline focus-visible:outline-none"
+              >
+                {item.comments} 条评论
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -120,7 +132,7 @@ export function HnStoryRow({
         <RowAction label={isSaved ? '从书架移除' : '收藏到书架'} active={isSaved} onClick={onToggleShelf}>
           <Bookmark className={cn('size-3.5', isSaved && 'fill-current')} />
         </RowAction>
-        {story.url && (
+        {item.url && (
           <RowAction label="在浏览器中打开原文" onClick={onOpenExternal}>
             <ExternalLink className="size-3.5" />
           </RowAction>

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { WEB_DOC_IMAGE_IPC, type WebDocImagesAPI } from '../contracts/web-doc'
-import { HN_FETCH_FEED_IPC, HN_FIND_DISCUSSION_IPC, type HnAPI } from '../contracts/hn'
+import { HN_FIND_DISCUSSION_IPC, type HnAPI } from '../contracts/hn'
+import { FEED_FETCH_IPC, type FeedAPI } from '../contracts/feed'
 import { TRANSLATION_IPC, type TranslationAPI } from '../contracts/translation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
@@ -39,10 +40,14 @@ const webDocImagesAPI: WebDocImagesAPI = {
 contextBridge.exposeInMainWorld('montreeWebDocImages', webDocImagesAPI)
 
 const hnAPI: HnAPI = {
-  fetchFeed: (payload) => ipcRenderer.invoke(HN_FETCH_FEED_IPC, payload),
   findDiscussion: (payload) => ipcRenderer.invoke(HN_FIND_DISCUSSION_IPC, payload),
 }
 contextBridge.exposeInMainWorld('montreeHn', hnAPI)
+
+const feedAPI: FeedAPI = {
+  fetch: (payload) => ipcRenderer.invoke(FEED_FETCH_IPC, payload),
+}
+contextBridge.exposeInMainWorld('montreeFeed', feedAPI)
 
 const electronAPI: ElectronAPI = {
   typstGetConfig: filePath => ipcRenderer.invoke(IPC.TYPST_GET_CONFIG, filePath),

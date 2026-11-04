@@ -116,7 +116,7 @@ export const WebDocWorkspaceMain = forwardRef<WebDocWorkspaceMainHandle, WebDocW
       setReturnContext({
         fromLibrary: false,
         tab: 'discover',
-        hnChannel: useLibraryStore.getState().hnChannel,
+        feedChannel: useLibraryStore.getState().feedChannel,
         itemTitle: link.title || link.source,
         discussionUrl: link.url,
         discussionSource: link.source,

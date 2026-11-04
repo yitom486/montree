@@ -1,6 +1,5 @@
 import type { AppError, Result } from '@yitom/contracts'
 
-export const HN_FETCH_FEED_IPC = 'hn:fetch-feed'
 export const HN_FIND_DISCUSSION_IPC = 'hn:find-discussion'
 
 /** 与 Hacker News 官方 Firebase API 的四个列表端点一一对应 */
@@ -10,7 +9,7 @@ export interface HnFeedPayload {
   channel: HnFeedChannel
   /** 需要的条目数（1-60）。服务端按频道缓存同一批结果，未命中或过期才回源。 */
   limit?: number
-  /** 忽略 60 秒缓存，强制回源 */
+  /** 忽略 60 分钟缓存，强制回源 */
   force?: boolean
 }
 
@@ -40,7 +39,6 @@ export interface HnFeedResult {
 }
 
 export interface HnAPI {
-  fetchFeed: (payload: HnFeedPayload) => Promise<Result<HnFeedResult, AppError>>
   /** 按文章 URL 反查 HN 讨论；没有对应帖子时返回 null */
   findDiscussion: (payload: HnFindDiscussionPayload) => Promise<Result<HnDiscussionRef | null, AppError>>
 }
