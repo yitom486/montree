@@ -51,6 +51,78 @@ class FeedHttpError extends Error {
   }
 }
 
+interface FeedPageState {
+  kind: 'next-link' | 'substack'
+  /** page → 该页文档的 next 地址 */
+  nextByPage: Map<number, string>
+}
+
+const feedPageState = new Map<string, FeedPageState>()
+
+function pageStateKey(source: FeedSourceId, channel: string): string {
+  return `${source}:${channel}`
+}
+
+export function clearFeedPageState(): void {
+  feedPageState.clear()
+}
+
+function isSubstackFeed(feedUrl: string): boolean {
+  try {
+    const url = new URL(feedUrl)
+    return url.hostname.endsWith('.substack.com') && /\/feed\/?$/i.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
+function substackArchiveUrl(feedUrl: string, page: number, pageSize = 20): string {
+  const url = new URL(feedUrl)
+  return `${url.origin}/api/v1/archive?sort=new&offset=${page * pageSize}&limit=${pageSize}`
+}
+
+/** RSS/Atom 的 rel="next"（RFC 5005 或 RSS 的 atom:link） */
+export function parseFeedNextUrl(xml: string, baseUrl: string): string | null {
+  for (const match of xml.matchAll(/<(?:[a-z0-9]+:)?link\b[^>]*>/gi)) {
+    const tag = match[0]
+    if (!/rel\s*=\s*["']next["']/i.test(tag)) continue
+    const href = tag.match(/href\s*=\s*["']([^"']+)["']/i)?.[1]?.trim()
+    if (!href) continue
+    try {
+      return new URL(href, baseUrl).toString()
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
+interface SubstackPost {
+  title?: string
+  canonical_url?: string
+  post_date?: string
+  publishedBylines?: Array<{ name?: string }>
+}
+
+function mapSubstackPost(post: SubstackPost, source: FeedSourceId): FeedItem | null {
+  const url = post.canonical_url?.trim()
+  const title = post.title?.trim()
+  if (!url || !title) return null
+  return {
+    id: url,
+    source,
+    title,
+    url,
+    domain: domainOf(url),
+    points: 0,
+    author: post.publishedBylines?.[0]?.name?.trim() || 'unknown',
+    createdAt: toUnixSeconds(post.post_date, Math.floor(Date.now() / 1000)),
+    comments: 0,
+    discussionUrl: url,
+    text: null,
+  }
+}
+
 const ARXIV_CATEGORIES: Record<string, string> = {
   'cs-ai': 'cs.AI',
   'cs-lg': 'cs.LG',
@@ -77,6 +149,7 @@ const feedCache = new Map<string, CachedFeed>()
 /** 仅测试使用 */
 export function clearFeedCache(): void {
   feedCache.clear()
+  feedPageState.clear()
 }
 
 function normalizeLimit(limit: number | undefined): number {
@@ -325,6 +398,52 @@ export interface FeedFetchDeps {
   now?: () => number
 }
 
+async function fetchRssLikePage(
+  source: FeedSourceId,
+  channel: string,
+  feedUrl: string,
+  page: number,
+  limit: number,
+  fetchImpl: typeof fetch,
+): Promise<Result<{ items: FeedItem[]; hasMore: boolean; feedTitle?: string }, AppError>> {
+  const key = pageStateKey(source, channel)
+  let state = feedPageState.get(key)
+  if (!state || page === 0) {
+    state = {
+      kind: isSubstackFeed(feedUrl) ? 'substack' : 'next-link',
+      nextByPage: new Map(),
+    }
+    feedPageState.set(key, state)
+  }
+
+  let pageUrl: string | null
+  if (page === 0) pageUrl = feedUrl
+  else if (state.kind === 'substack') pageUrl = substackArchiveUrl(feedUrl, page)
+  else pageUrl = state.nextByPage.get(page - 1) ?? null
+  if (!pageUrl) return ok({ items: [], hasMore: false })
+
+  // Substack 没有 rel=next，归档接口才是真正的分页游标
+  if (state.kind === 'substack' && page > 0) {
+    const payload = await fetchJson(pageUrl, fetchImpl)
+    const posts = Array.isArray(payload) ? payload : []
+    const items = posts
+      .map((post) => mapSubstackPost(post as SubstackPost, source))
+      .filter((item): item is FeedItem => item !== null)
+    return ok({ items, hasMore: posts.length >= 20 })
+  }
+
+  const { text, finalUrl } = await fetchFeedText(pageUrl, fetchImpl)
+  const next = parseFeedNextUrl(text, finalUrl)
+  if (next) state.nextByPage.set(page, next)
+  const items = parseFeedXml(text, finalUrl, limit, source)
+  return ok({
+    items,
+    hasMore:
+      Boolean(next) || (state.kind === 'substack' && page === 0 && items.length >= 20),
+    feedTitle: parseFeedTitle(text) ?? undefined,
+  })
+}
+
 async function fetchSourceItems(
   source: FeedSourceId,
   channel: string,
@@ -384,13 +503,7 @@ async function fetchSourceItems(
     if (!feedUrl) {
       return err({ code: 'INVALID_ARGUMENT', message: `未知的 AI 资讯源：${channel}` })
     }
-    if (page > 0) return ok({ items: [], hasMore: false })
-    const { text, finalUrl } = await fetchFeedText(feedUrl, deps.fetchImpl ?? fetch)
-    return ok({
-      items: parseFeedXml(text, finalUrl, limit, 'ai'),
-      hasMore: false,
-      feedTitle: parseFeedTitle(text) ?? undefined,
-    })
+    return fetchRssLikePage(source, channel, feedUrl, page, limit, deps.fetchImpl ?? fetch)
   }
 
   if (source === 'linux-do') {
@@ -414,20 +527,13 @@ async function fetchSourceItems(
     })
   }
 
-  if (page > 0) return ok({ items: [], hasMore: false })
-
   // 自定义订阅：channel 形如 custom:<base64url(feedUrl)>
   const customUrl = decodeCustomFeedChannel(channel)
   const feedUrl = customUrl ?? RSS_FEEDS[channel]
   if (!feedUrl) {
     return err({ code: 'INVALID_ARGUMENT', message: `未知的订阅源：${channel}` })
   }
-  const { text, finalUrl } = await fetchFeedText(feedUrl, deps.fetchImpl ?? fetch)
-  return ok({
-    items: parseFeedXml(text, finalUrl, limit),
-    hasMore: false,
-    feedTitle: parseFeedTitle(text) ?? undefined,
-  })
+  return fetchRssLikePage(source, channel, feedUrl, page, limit, deps.fetchImpl ?? fetch)
 }
 
 /**

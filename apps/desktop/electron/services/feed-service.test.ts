@@ -3,6 +3,7 @@ import {
   clearFeedCache,
   fetchFeed,
   mapLobstersStory,
+  parseFeedNextUrl,
   parseFeedTitle,
   parseFeedXml,
 } from './feed-service'
@@ -270,6 +271,88 @@ describe('feed-service', () => {
       domain: 'claude.dev',
     })
     expect(result.value.feedTitle).toBe('claude.dev Blog')
+  })
+
+  it('解析 RSS/Atom 的 rel=next 游标', () => {
+    expect(
+      parseFeedNextUrl(
+        `<rss><channel><atom:link rel="next" href="/feed?page=2" /></channel></rss>`,
+        'https://example.com/feed',
+      ),
+    ).toBe('https://example.com/feed?page=2')
+    expect(
+      parseFeedNextUrl(
+        `<feed><link href="https://example.com/atom?page=2" rel="next"/></feed>`,
+        'https://example.com/feed',
+      ),
+    ).toBe('https://example.com/atom?page=2')
+    expect(parseFeedNextUrl('<rss><channel /></rss>', 'https://example.com/feed')).toBeNull()
+  })
+
+  it('通用 rel=next 分页：第 2 页沿用下一页地址', async () => {
+    const feedUrl = 'https://example.com/feed.xml'
+    const channel = `custom:${Buffer.from(feedUrl).toString('base64url')}`
+    const fetchImpl = vi.fn(async (target: string | URL | Request) => {
+      const url = String(target)
+      if (url === feedUrl) {
+        return textResponse(
+          `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Example</title><item><title>First</title><link>https://example.com/first</link></item><atom:link rel="next" href="https://example.com/feed.xml?page=2" /></channel></rss>`,
+        )
+      }
+      if (url === 'https://example.com/feed.xml?page=2') {
+        return textResponse(
+          `<rss version="2.0"><channel><title>Example</title><item><title>Second</title><link>https://example.com/second</link></item></channel></rss>`,
+        )
+      }
+      throw new Error(`unexpected ${url}`)
+    }) as unknown as typeof fetch
+
+    const first = await fetchFeed({ source: 'rss', channel, limit: 30 }, { fetchImpl })
+    expect(first.ok && first.value.hasMore).toBe(true)
+    const second = await fetchFeed(
+      { source: 'rss', channel, limit: 30, page: 1 },
+      { fetchImpl },
+    )
+    expect(second.ok && second.value.items[0]?.title).toBe('Second')
+    expect(second.ok && second.value.hasMore).toBe(false)
+  })
+
+  it('Substack 归档接口分页：Import AI 第 2 页', async () => {
+    const rssItems = Array.from({ length: 20 }, (_, index) => (
+      `<item><title>Post ${index}</title><link>https://importai.substack.com/p/${index}</link></item>`
+    )).join('')
+    const fetchImpl = vi.fn(async (target: string | URL | Request) => {
+      const url = String(target)
+      if (url === 'https://importai.substack.com/feed') {
+        return textResponse(
+          `<rss version="2.0"><channel><title>Import AI</title>${rssItems}</channel></rss>`,
+        )
+      }
+      expect(url).toContain('/api/v1/archive?sort=new&offset=20&limit=20')
+      return jsonResponse([
+        {
+          title: 'Archive post',
+          canonical_url: 'https://importai.substack.com/p/archive-post',
+          post_date: '2026-11-01T10:00:00Z',
+          publishedBylines: [{ name: 'Jack Clark' }],
+        },
+      ])
+    }) as unknown as typeof fetch
+
+    const first = await fetchFeed({ source: 'ai', channel: 'import-ai', limit: 30 }, { fetchImpl })
+    expect(first.ok && first.value.hasMore).toBe(true)
+    const second = await fetchFeed(
+      { source: 'ai', channel: 'import-ai', limit: 30, page: 1 },
+      { fetchImpl },
+    )
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.value.items[0]).toMatchObject({
+      title: 'Archive post',
+      author: 'Jack Clark',
+      source: 'ai',
+    })
+    expect(second.value.hasMore).toBe(false)
   })
 
   it('arXiv 分页传递 start 并返回页码', async () => {
