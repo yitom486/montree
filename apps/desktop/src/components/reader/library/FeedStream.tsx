@@ -103,16 +103,41 @@ export function FeedStream({
   }, [channels, feedChannel, setFeedChannel])
 
   const customFeedId = feedChannel.startsWith('custom:') ? feedChannel.slice('custom:'.length) : null
-  const { data, isPending, isFetching, isError, error, refetch, refresh } = useFeed(
-    feedSource,
-    feedChannel,
-  )
+  const {
+    data,
+    isPending,
+    isFetching,
+    isError,
+    error,
+    refetch,
+    refresh,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useFeed(feedSource, feedChannel)
+
+  const allItems = useMemo(() => {
+    const seen = new Set<string>()
+    const items: FeedItem[] = []
+    for (const page of data?.pages ?? []) {
+      for (const item of page.items) {
+        const key = `${item.source}:${item.id}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        items.push(item)
+      }
+    }
+    return items
+  }, [data])
+
+  const feedTitle = data?.pages[0]?.feedTitle
+  const fetchedAt = data?.pages[0]?.fetchedAt
 
   useEffect(() => {
-    if (!customFeedId || !data?.feedTitle) return
+    if (!customFeedId || !feedTitle) return
     const feed = customFeeds.find((item) => item.id === customFeedId)
-    if (feed && feed.title !== data.feedTitle) renameCustomFeed(customFeedId, data.feedTitle)
-  }, [customFeedId, customFeeds, data?.feedTitle, renameCustomFeed])
+    if (feed && feed.title !== feedTitle) renameCustomFeed(customFeedId, feedTitle)
+  }, [customFeedId, customFeeds, feedTitle, renameCustomFeed])
 
   const handleAddFeed = (event: FormEvent) => {
     event.preventDefault()
@@ -152,7 +177,7 @@ export function FeedStream({
   }
 
   const items = useMemo(() => {
-    const sourceItems = data?.items ?? []
+    const sourceItems = allItems
     const query = searchQuery.trim().toLowerCase()
     return sourceItems.filter((item) => {
       const key = feedItemKey(item.source, item.id)
@@ -164,7 +189,7 @@ export function FeedStream({
         item.author.toLowerCase().includes(query)
       )
     })
-  }, [data, searchQuery, unreadOnly, readItemKeys])
+  }, [allItems, searchQuery, unreadOnly, readItemKeys])
 
   const handleRefresh = async () => {
     const failure = await refresh()
@@ -354,7 +379,7 @@ export function FeedStream({
         </button>
 
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          {data ? `${items.length} 条 · 更新于 ${formatClock(data.fetchedAt)}` : '正在加载'}
+          {data ? `${items.length} 条 · 更新于 ${formatClock(fetchedAt ?? Date.now())}` : '正在加载'}
         </span>
 
         <div className="ml-auto flex items-center gap-1">
@@ -442,7 +467,22 @@ export function FeedStream({
         </ul>
       )}
 
-      {isFetching && !isPending && (
+      {hasNextPage && (
+        <div className="flex justify-center py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 px-4 text-xs"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage && <Loader2 className="size-3.5 animate-spin" />}
+            {isFetchingNextPage ? '正在加载…' : '加载更多'}
+          </Button>
+        </div>
+      )}
+
+      {isFetching && !isPending && !isFetchingNextPage && (
         <div className="flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground">
           <Loader2 className="size-3 animate-spin" />
           正在同步最新条目

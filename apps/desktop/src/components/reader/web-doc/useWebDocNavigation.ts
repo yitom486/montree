@@ -14,6 +14,7 @@ import {
   stripWebDocFragment,
 } from '@montree/web-doc'
 import {
+  isWebDocExternalResource,
   resolveWebDocClickHref,
   resolveWebDocFragment,
   shouldNavigateWebDocInApp,
@@ -258,7 +259,10 @@ export function useWebDocNavigation({
   const handleWebDocLink = useCallback(
     (href: string) => {
       logWebDoc('link-click', { href, pageUrl: pageUrlRef.current })
-      if (shouldNavigateWebDocInApp(href, pageUrlRef.current)) {
+      if (
+        shouldNavigateWebDocInApp(href, pageUrlRef.current) &&
+        !isWebDocExternalResource(href)
+      ) {
         navigateToUrl(href)
         return
       }

@@ -11,6 +11,7 @@ import {
   normalizeWebDocFigureRows,
   normalizeWebDocSandpackPlaygrounds,
   normalizeWebDocStandaloneFigures,
+  normalizeLatexmlTransformedBlocks,
   backfillWebDocCardHrefs,
   extractNextFlightCardHrefs,
   stripCodeBlockLineNumbers,
@@ -1088,6 +1089,7 @@ export function extractWebDocArticle(
   const clone = root.cloneNode(true) as HTMLElement
   normalizeWebDocImageObjects(clone, pageUrl)
   stripWebDocChrome(clone, siteId, pageUrl)
+  normalizeLatexmlTransformedBlocks(clone)
   // flight 回填必须在消毒（扔 script）之前从原始 HTML 提取，在归一化之后落到卡上
   backfillWebDocCardHrefs(clone, extractNextFlightCardHrefs(html))
   rewriteRelativeUrls(clone, pageUrl)
@@ -1412,6 +1414,7 @@ export function buildWebDocReaderDocument(
     normalizeWebDocCardGrids(root)
     normalizeWebDocStandaloneFigures(root)
     normalizeWebDocSandpackPlaygrounds(root)
+    normalizeLatexmlTransformedBlocks(root)
     // 缓存里可能有修复前生成的 bodyHtml（演示区带同源沙箱或 srcdoc），生成阅读文档前统一收紧
     root.querySelectorAll('iframe').forEach(hardenWebDocIframe)
     root.querySelectorAll('table').forEach((table) => {
@@ -1455,6 +1458,15 @@ export function buildWebDocReaderDocument(
   <style>
     body { margin: 0; padding: 1.25rem 1.5rem 2rem; }
     a { word-break: break-word; }
+    /* LaTeXML（arXiv HTML）的缩放容器在阅读器里改为正常文档流，宽表交给滚动容器 */
+    .web-doc-ltx-transformed {
+      display: block !important;
+      width: 100% !important;
+      height: auto !important;
+      transform: none !important;
+      vertical-align: baseline !important;
+    }
+    .web-doc-ltx-transformed table { width: auto; max-width: none; }
     [data-montree-href] { cursor: pointer; }
     pre { overflow-x: auto; }
     img { max-width: 100%; height: auto; }

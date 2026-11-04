@@ -74,6 +74,8 @@ export function findFeedSource(id: FeedSourceId): FeedSourceDefinition {
 export interface FeedFetchPayload {
   source: FeedSourceId
   channel: string
+  /** 0 起始页码 */
+  page?: number
   limit?: number
   force?: boolean
 }
@@ -100,9 +102,13 @@ export interface FeedItem {
 export interface FeedResult {
   source: FeedSourceId
   channel: string
+  /** 0 起始页码 */
+  page: number
   items: FeedItem[]
   fetchedAt: number
   cached: boolean
+  /** 是否还有下一页 */
+  hasMore: boolean
   /** RSS/Atom 自带标题；用于自定义订阅自动命名 */
   feedTitle?: string
 }

@@ -9,6 +9,8 @@ export interface HnFeedPayload {
   channel: HnFeedChannel
   /** 需要的条目数（1-60）。服务端按频道缓存同一批结果，未命中或过期才回源。 */
   limit?: number
+  /** 从频道 id 列表的哪个位置开始（分页用） */
+  offset?: number
   /** 忽略 60 分钟缓存，强制回源 */
   force?: boolean
 }
@@ -36,6 +38,8 @@ export interface HnFeedResult {
   fetchedAt: number
   /** 本次结果是否直接来自服务端缓存 */
   cached: boolean
+  /** 频道 id 列表是否还有下一页 */
+  hasMore: boolean
 }
 
 export interface HnAPI {

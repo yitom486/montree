@@ -159,6 +159,33 @@ describe('feed-service', () => {
     if (!failing.ok) expect(failing.error.code).toBe('NETWORK_ERROR')
   })
 
+  it('Lobsters 分页使用 /page/N.json 路径', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toBe('https://lobste.rs/newest/page/2.json')
+      return jsonResponse([
+        {
+          short_id: 'page2',
+          title: 'Page two',
+          url: 'https://example.com/page2',
+          score: 1,
+          submitter_user: 'alice',
+          created_at: '2026-11-04T10:00:00Z',
+          comment_count: 0,
+          comments_url: 'https://lobste.rs/s/page2',
+        },
+      ])
+    }) as unknown as typeof fetch
+
+    const result = await fetchFeed(
+      { source: 'lobsters', channel: 'newest', limit: 30, page: 1 },
+      { fetchImpl },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.page).toBe(1)
+    expect(result.value.items[0]?.title).toBe('Page two')
+  })
+
   it('RSS 频道按订阅地址抓取并解析', async () => {
     const fetchImpl = vi.fn(async () =>
       textResponse(
@@ -221,6 +248,34 @@ describe('feed-service', () => {
       ),
     ).toBe('Atom Feed')
     expect(parseFeedTitle('<broken>')).toBeNull()
+  })
+
+  it('arXiv 分页传递 start 并返回页码', async () => {
+    const fetchImpl = vi.fn(async () =>
+      textResponse(`<?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <title>Page two</title>
+            <link rel="alternate" href="http://arxiv.org/abs/2611.00031v1" />
+            <id>http://arxiv.org/abs/2611.00031v1</id>
+            <published>2026-11-04T08:00:00Z</published>
+            <author><name>Bob</name></author>
+          </entry>
+        </feed>`),
+    ) as unknown as typeof fetch
+
+    const result = await fetchFeed(
+      { source: 'arxiv', channel: 'cs-ai', limit: 30, page: 1 },
+      { fetchImpl },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.page).toBe(1)
+    expect(result.value.hasMore).toBe(false)
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.stringContaining('start=30'),
+      expect.objectContaining({ signal: expect.anything() }),
+    )
   })
 
   it('arXiv 按分类抓取 Atom 并标记 source', async () => {

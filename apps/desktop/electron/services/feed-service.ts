@@ -42,6 +42,7 @@ interface CachedFeed {
   items: FeedItem[]
   limit: number
   fetchedAt: number
+  hasMore: boolean
   feedTitle?: string
 }
 
@@ -302,27 +303,43 @@ async function fetchSourceItems(
   source: FeedSourceId,
   channel: string,
   limit: number,
+  page: number,
   force: boolean,
   deps: FeedFetchDeps,
-): Promise<Result<{ items: FeedItem[]; feedTitle?: string }, AppError>> {
+): Promise<Result<{ items: FeedItem[]; hasMore: boolean; feedTitle?: string }, AppError>> {
   const now = deps.now ?? Date.now
   if (source === 'hacker-news') {
-    const result = await fetchHnFeed({ channel: channel as never, limit, force }, deps)
+    const result = await fetchHnFeed(
+      { channel: channel as never, limit, offset: page * limit, force },
+      deps,
+    )
     if (!result.ok) return result
-    return ok({ items: result.value.stories.map(hnItemToFeedItem) })
+    return ok({
+      items: result.value.stories.map(hnItemToFeedItem),
+      hasMore: result.value.hasMore,
+    })
   }
 
   if (source === 'lobsters') {
     if (channel !== 'hottest' && channel !== 'newest') {
       return err({ code: 'INVALID_ARGUMENT', message: `未知的 Lobsters 频道：${channel}` })
     }
-    const payload = await fetchJson(`https://lobste.rs/${channel}.json`, deps.fetchImpl ?? fetch)
+    // Lobsters JSON 的分页路径不是 ?page=N：
+    // 热门第 2 页是 /page/2.json，最新第 2 页是 /newest/page/2.json。
+    const pageUrl =
+      page === 0
+        ? `https://lobste.rs/${channel}.json`
+        : channel === 'newest'
+          ? `https://lobste.rs/newest/page/${page + 1}.json`
+          : `https://lobste.rs/page/${page + 1}.json`
+    const payload = await fetchJson(pageUrl, deps.fetchImpl ?? fetch)
     if (!Array.isArray(payload)) throw new Error('Lobsters 响应不是数组')
     const items = payload
       .map((story) => mapLobstersStory(story as LobstersStory, now()))
       .filter((item): item is FeedItem => item !== null)
       .slice(0, limit)
-    return ok({ items })
+    // Lobsters 每页固定 25 条；满页就认为还有下一页
+    return ok({ items, hasMore: payload.length >= 25 })
   }
 
   if (source === 'arxiv') {
@@ -330,10 +347,13 @@ async function fetchSourceItems(
     if (!category) {
       return err({ code: 'INVALID_ARGUMENT', message: `未知的 arXiv 分类：${channel}` })
     }
-    const queryUrl = `https://export.arxiv.org/api/query?search_query=cat:${encodeURIComponent(category)}&sortBy=submittedDate&sortOrder=descending&max_results=${limit}`
+    const queryUrl = `https://export.arxiv.org/api/query?search_query=cat:${encodeURIComponent(category)}&sortBy=submittedDate&sortOrder=descending&start=${page * limit}&max_results=${limit}`
     const { text } = await fetchFeedText(queryUrl, deps.fetchImpl ?? fetch)
-    return ok({ items: parseFeedXml(text, queryUrl, limit, 'arxiv') })
+    const items = parseFeedXml(text, queryUrl, limit, 'arxiv')
+    return ok({ items, hasMore: items.length >= limit })
   }
+
+  if (page > 0) return ok({ items: [], hasMore: false })
 
   // 自定义订阅：channel 形如 custom:<base64url(feedUrl)>
   const customUrl = decodeCustomFeedChannel(channel)
@@ -344,6 +364,7 @@ async function fetchSourceItems(
   const { text, finalUrl } = await fetchFeedText(feedUrl, deps.fetchImpl ?? fetch)
   return ok({
     items: parseFeedXml(text, finalUrl, limit),
+    hasMore: false,
     feedTitle: parseFeedTitle(text) ?? undefined,
   })
 }
@@ -361,38 +382,51 @@ export async function fetchFeed(
     return err({ code: 'INVALID_ARGUMENT', message: '缺少资讯源或频道' })
   }
   const limit = normalizeLimit(payload.limit)
+  const page = Math.max(0, Math.round(payload.page ?? 0))
   const now = deps.now ?? Date.now
   const ttl = ttlFor(source)
-  const cacheKey = `${source}:${channel}`
+  const cacheKey = `${source}:${channel}:${page}`
 
   const cached = feedCache.get(cacheKey)
   if (!payload.force && cached && cached.limit >= limit && now() - cached.fetchedAt < ttl) {
     return ok({
       source,
       channel,
+      page,
       items: cached.items.slice(0, limit),
       fetchedAt: cached.fetchedAt,
       cached: true,
+      hasMore: cached.hasMore,
       feedTitle: cached.feedTitle,
     })
   }
 
   try {
-    const result = await fetchSourceItems(source, channel, limit, Boolean(payload.force), deps)
+    const result = await fetchSourceItems(
+      source,
+      channel,
+      limit,
+      page,
+      Boolean(payload.force),
+      deps,
+    )
     if (!result.ok) return result
     const fetchedAt = now()
     feedCache.set(cacheKey, {
       items: result.value.items,
       limit,
       fetchedAt,
+      hasMore: result.value.hasMore,
       feedTitle: result.value.feedTitle,
     })
     return ok({
       source,
       channel,
+      page,
       items: result.value.items.slice(0, limit),
       fetchedAt,
       cached: false,
+      hasMore: result.value.hasMore,
       feedTitle: result.value.feedTitle,
     })
   } catch (cause) {

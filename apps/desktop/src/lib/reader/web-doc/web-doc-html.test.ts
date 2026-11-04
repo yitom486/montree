@@ -1228,4 +1228,24 @@ describe('web-doc-html', () => {
     expect(doc.querySelector('.mermaid')?.getAttribute('data-mermaid-source')).toContain('A --> B')
     expect(doc.querySelector('details pre')?.textContent).toContain('flowchart LR')
   })
+
+  it('移除 LaTeXML 表格的缩放/固定高度 style，避免压住正文', () => {
+    const html = `<article>
+      <p>before</p>
+      <figure class="ltx_table"><figcaption>Table 1</figcaption>
+        <div class="ltx_inline-block ltx_transformed_outer" style="width:397.5pt;height:85.9pt;vertical-align:-41.9pt">
+          <span class="ltx_transformed_inner" style="transform:translate(-278.1pt,60.1pt) scale(0.4168,0.4168)">
+            <table class="ltx_tabular"><tbody><tr><td>Cell</td></tr></tbody></table>
+          </span>
+        </div>
+      </figure>
+      <p>after</p>
+    </article>`
+    const result = extractWebDocArticle(html, 'https://arxiv.org/html/2611.05377v1')
+    expect(result.bodyHtml).not.toContain('height:85.9pt')
+    expect(result.bodyHtml).not.toContain('translate(-278.1pt')
+    expect(result.bodyHtml).toContain('web-doc-ltx-transformed')
+    const doc = new DOMParser().parseFromString(result.bodyHtml, 'text/html')
+    expect(doc.querySelector('table td')?.textContent).toBe('Cell')
+  })
 })

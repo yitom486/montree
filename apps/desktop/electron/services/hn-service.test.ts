@@ -203,6 +203,30 @@ describe('hn-service', () => {
     if (!failing.ok) expect(failing.error.code).toBe('NETWORK_ERROR')
   })
 
+  it('按 offset 分页并返回 hasMore', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const target = String(url)
+      if (target.endsWith('/topstories.json')) return jsonResponse([1, 2, 3, 4, 5])
+      const match = target.match(/item\/(\d+)\.json/)
+      if (match) return jsonResponse({ id: Number(match[1]), title: `Story ${match[1]}` })
+      throw new Error(`unexpected ${target}`)
+    }) as unknown as typeof fetch
+
+    const middle = await fetchHnFeed(
+      { channel: 'top', limit: 2, offset: 2 },
+      { fetchImpl, now: () => 1_000 },
+    )
+    expect(middle.ok && middle.value.stories.map((story) => story.id)).toEqual([3, 4])
+    expect(middle.ok && middle.value.hasMore).toBe(true)
+
+    const last = await fetchHnFeed(
+      { channel: 'top', limit: 2, offset: 4 },
+      { fetchImpl, now: () => 2_000 },
+    )
+    expect(last.ok && last.value.stories.map((story) => story.id)).toEqual([5])
+    expect(last.ok && last.value.hasMore).toBe(false)
+  })
+
   it('频道非法返回 INVALID_ARGUMENT，网络失败返回 NETWORK_ERROR', async () => {
     const invalid = await fetchHnFeed({ channel: 'unknown' as never })
     expect(invalid.ok).toBe(false)

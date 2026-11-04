@@ -41,18 +41,24 @@ interface HnItemJson {
   dead?: boolean
 }
 
-interface CachedFeed {
-  stories: HnStory[]
-  limit: number
+interface CachedIds {
+  ids: number[]
   fetchedAt: number
 }
 
-const feedCache = new Map<HnFeedChannel, CachedFeed>()
+interface CachedItem {
+  story: HnStory
+  fetchedAt: number
+}
+
+const idCache = new Map<HnFeedChannel, CachedIds>()
+const itemCache = new Map<number, CachedItem>()
 const discussionCache = new Map<string, { value: HnDiscussionRef | null; expires: number }>()
 
-/** 仅测试使用：清空进程内频道缓存 */
+/** 仅测试使用：清空进程内频道与条目缓存 */
 export function clearHnFeedCache(): void {
-  feedCache.clear()
+  idCache.clear()
+  itemCache.clear()
 }
 
 /** 仅测试使用：清空文章 URL → 讨论反查缓存 */
@@ -197,8 +203,8 @@ export async function findHnDiscussion(
 }
 
 /**
- * 拉取真实 Hacker News 列表：先取频道 id 序列，再按 id 并发取 item。
- * 同一频道 60 分钟内复用上一批结果；请求条数变大时才重新回源。
+ * 拉取真实 Hacker News 列表：频道 id 序列单独缓存，条目按 id 缓存。
+ * 分页只取 id 列表的一段，不会因为加载下一页而重复拉取前面的条目。
  */
 export async function fetchHnFeed(
   payload: HnFeedPayload,
@@ -210,37 +216,53 @@ export async function fetchHnFeed(
   }
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, Math.round(payload.limit ?? DEFAULT_LIMIT)))
+  const offset = Math.max(0, Math.round(payload.offset ?? 0))
   const now = deps.now ?? Date.now
-  const cached = feedCache.get(channel)
-  if (!payload.force && cached && cached.limit >= limit && now() - cached.fetchedAt < FEED_TTL_MS) {
-    return ok({
-      channel,
-      stories: cached.stories.slice(0, limit),
-      fetchedAt: cached.fetchedAt,
-      cached: true,
-    })
-  }
-
   const fetchImpl = deps.fetchImpl ?? fetch
+
   try {
-    const ids = await fetchJson<unknown>(`${HN_API_BASE}/${CHANNEL_ENDPOINT[channel]}.json`, fetchImpl)
-    if (!Array.isArray(ids)) throw new Error('频道响应不是数组')
-    const storyIds = ids.filter((id): id is number => typeof id === 'number').slice(0, limit)
-    const items = await mapWithConcurrency(storyIds, ITEM_CONCURRENCY, async (id) => {
+    let idsEntry = idCache.get(channel)
+    const idsFromCache =
+      !payload.force && Boolean(idsEntry && now() - idsEntry.fetchedAt < FEED_TTL_MS)
+    if (!idsFromCache) {
+      const ids = await fetchJson<unknown>(
+        `${HN_API_BASE}/${CHANNEL_ENDPOINT[channel]}.json`,
+        fetchImpl,
+      )
+      if (!Array.isArray(ids)) throw new Error('频道响应不是数组')
+      idsEntry = {
+        ids: ids.filter((id): id is number => typeof id === 'number'),
+        fetchedAt: now(),
+      }
+      idCache.set(channel, idsEntry)
+    }
+
+    const ids = idsEntry!.ids
+    const pageIds = ids.slice(offset, offset + limit)
+    let allItemsCached = true
+    const items = await mapWithConcurrency(pageIds, ITEM_CONCURRENCY, async (id) => {
+      const cached = payload.force ? undefined : itemCache.get(id)
+      if (cached && now() - cached.fetchedAt < FEED_TTL_MS) return cached.story
+      allItemsCached = false
       try {
-        return await fetchJson<HnItemJson>(`${HN_API_BASE}/item/${id}.json`, fetchImpl)
+        const item = await fetchJson<HnItemJson>(`${HN_API_BASE}/item/${id}.json`, fetchImpl)
+        const story = mapHnItem(item)
+        if (story) itemCache.set(id, { story, fetchedAt: now() })
+        return story
       } catch {
         // 单条失败不应拖垮整页；跳过该条，其余照常展示。
         return null
       }
     })
-    const stories = items
-      .map(mapHnItem)
-      .filter((story): story is HnStory => story !== null)
 
-    const fetchedAt = now()
-    feedCache.set(channel, { stories, limit, fetchedAt })
-    return ok({ channel, stories: stories.slice(0, limit), fetchedAt, cached: false })
+    const stories = items.filter((story): story is HnStory => story !== null)
+    return ok({
+      channel,
+      stories,
+      fetchedAt: now(),
+      cached: idsFromCache && allItemsCached,
+      hasMore: ids.length > offset + limit,
+    })
   } catch (cause) {
     return err({
       code: 'NETWORK_ERROR',
