@@ -43,6 +43,27 @@ const WEB_DOC_MAX_REDIRECTS = 5
 const WEB_DOC_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Montree/0.2.7'
 
+/**
+ * Hacker News 讨论页没有章节结构；页面里的同源链接全是导航、用户主页与回复链接，
+ * 交给通用 TOC 会产出上百条噪声。这里只保留当前讨论页本身作为唯一目录项。
+ */
+function isHackerNewsItemUrl(url: URL): boolean {
+  return url.hostname === 'news.ycombinator.com' && url.pathname === '/item'
+}
+
+function hackerNewsPageTitle(html: string): string {
+  const raw = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''
+  return raw
+    .replace(/\s*\|\s*Hacker News\s*$/i, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function webDocHtmlHeaders(): Record<string, string> {
   return {
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -357,6 +378,14 @@ export async function discoverWebDocToc(
   try {
     const pageUrl = new URL(fetchResult.value.url)
     const siteId = resolveWebDocSiteId(pageUrl)
+    // HN 讨论页单页成文：不要抓同源链接当目录
+    if (isHackerNewsItemUrl(pageUrl)) {
+      const label = hackerNewsPageTitle(fetchResult.value.html)
+      return ok({
+        siteId,
+        entries: label ? [{ href: fetchResult.value.url, label, level: 1 }] : [],
+      })
+    }
     const mdbookInline = extractMdBookToc(fetchResult.value.html, fetchResult.value.url)
     if (mdbookInline.length) return ok({ siteId, entries: mdbookInline })
     const mdbookTocUrl = resolveMdBookTocUrl(fetchResult.value.html, fetchResult.value.url)

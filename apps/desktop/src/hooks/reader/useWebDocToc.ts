@@ -21,6 +21,9 @@ export function useWebDocToc(discoveryUrl: string | null | undefined) {
     enabled: Boolean(safeUrl),
     queryFn: () => fetchWebDocToc(safeUrl!),
     placeholderData: keepPreviousData,
-    staleTime: 5 * 60_000,
+    // 目录变化远慢于正文；60 分钟内不重复发现
+    staleTime: 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }

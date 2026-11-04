@@ -19,6 +19,7 @@
 | `quiz-api.ts` | AI 测验与答题打分记录持久化（全局 `montree.db`，API 签名自 JSONL 时代未变） |
 | `sync-api.ts` | 云端同步（WebDAV 配置、连接测试、双向同步） |
 | `web-doc-api.ts` | 在线文档：抓取页面（优先页面声明的 Markdown 源，失败回退 HTML）、发现目录 |
+| `hn-api.ts` | 真实 Hacker News 频道列表（top/new/ask/show）与文章 URL → HN 讨论反查，经 preload `montreeHn` 桥接；主进程负责回源、60 分钟频道缓存与 24 小时反查缓存 |
 | `bun-api.ts` | Bun 运行时状态查询与一键安装 |
 | `ocr-api.ts` | OCR 组件状态、单页识别、目录识别与目录页范围探测（只建议范围） |
 | `rosetta-api.ts` | 罗盘索引：扫描书一键导入、进度订阅、书信息、统一读查询、纯本地目录重建、正文水印只读预览、备份并应用正文水印（二次确认后调用，空计划 noop）、已入库内容只读取证 |

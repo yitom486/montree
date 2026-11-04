@@ -80,7 +80,7 @@
 | `pdf-ocr/` | PDF OCR：页缓存 hydrate/预取/文字层挂载、目录缓存/门控/租约锁、自动页 OCR、探测反馈、`pdf-ocr-selection` 原选区文字恢复（含回归）；跨格式坏字检测见 `reader/text-quality` |
 | `rosetta/` | 罗盘：目录归一/签名状态、块转 Agent 文本、只读取卫、目录 AI 整理（`toc-ai`） |
 | `marks/` | 阅读标记渲染/命中（PDF/MOBI/Web）、划词匹配、Anki 与读书笔记导出 |
-| `web-doc/` | 在线文档：`web-doc-images` 恢复 CORP 等导致的图片失败；正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、一键转 Markdown 导出、Agent 按页抓文 |
+| `web-doc/` | 在线文档：`web-doc-images` 恢复 CORP 等导致的图片失败；正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、一键转 Markdown 导出、Agent 按页抓文；`hn-discussion` 单独重建 Hacker News 讨论页（去 `s.gif` 缩进占位图、按 indent 还原评论树）；`discussion-link` 从文章 HTML 自动发现 Hacker News / Reddit / Lobsters / GitHub Discussions 入口，供正文页挂讨论链接 |
 | `tts/` | 语音朗读：正文智能降噪清洗（过滤 URL/角标/脚注并保留链接正文）、静态声学物理停顿对齐器（严格 1:1 数量守恒与静态二分查表）、Web Audio 实时流式 PCM 播放器 |
 
 根目录留跨格式骨架：`reader-adapter` / `reader-unit-tree` / `scroll-anchor` / `reader-viewport-*`（测试助手）/ `wait-for-dom`。

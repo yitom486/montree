@@ -4,6 +4,7 @@ import type { AppError, ElectronAPI, Result, TypstExportPayload, TypstExportResu
 import type { TerminalAPI } from '../contracts/terminal'
 import type { TranslationAPI } from '../contracts/translation'
 import type { WebDocImagesAPI } from '../contracts/web-doc'
+import type { HnAPI } from '../contracts/hn'
 import type { AgentInspectionAPI } from '../contracts/agent-inspection'
 import type { HtmlPreviewAPI } from '../contracts/html-preview'
 import type { InlineCompletionAPI } from '../contracts/inline-completion'
@@ -29,6 +30,7 @@ declare global {
     montreeTerminal?: TerminalAPI
     montreeTranslation?: TranslationAPI
     montreeWebDocImages?: WebDocImagesAPI
+    montreeHn?: HnAPI
     montreeAgentInspection?: AgentInspectionAPI
     montreeHtmlPreview?: HtmlPreviewAPI
     montreeInlineCompletion?: InlineCompletionAPI

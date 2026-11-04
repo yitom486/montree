@@ -44,6 +44,16 @@ import {
   pickPeopleDailyArticleRoot,
 } from '@/lib/reader/web-doc/people-daily-extract'
 import { pickHrttArticleRoot } from '@/lib/reader/web-doc/hrtt-extract'
+import {
+  detectDiscussionLink,
+  type WebDocPageContentWithDiscussion,
+} from '@/lib/reader/web-doc/discussion-link'
+import {
+  buildHackerNewsDiscussion,
+  buildWebDocHnDiscussionCss,
+  extractHackerNewsTitle,
+  isHackerNewsItemUrl,
+} from '@/lib/reader/web-doc/hn-discussion'
 
 const GENERIC_ARTICLE_SELECTORS = [
   'article.md-content__inner',
@@ -859,6 +869,11 @@ export function pickArticleRoot(
   if (siteId === 'hrtt-news') {
     return pickHrttArticleRoot(doc)
   }
+  // HN 讨论页没有正文图，占位图与缩进层级需要单独重建
+  if (isHackerNewsItemUrl(pageUrl)) {
+    const hn = buildHackerNewsDiscussion(doc, pageUrl!)
+    if (hn) return hn
+  }
 
   const selectors = SITE_ARTICLE_SELECTORS[siteId] ?? GENERIC_ARTICLE_SELECTORS
   let winner: HTMLElement | null = null
@@ -1080,6 +1095,7 @@ export function extractWebDocArticle(
   const { bodyHtml } = ensureWebDocHeadingIds(sanitized)
   const title =
     (siteId === 'people-daily-paper' ? extractPeopleDailyTitle(doc, pageUrl) : null) ??
+    (isHackerNewsItemUrl(pageUrl) ? extractHackerNewsTitle(doc) : null) ??
     extractDocumentTitle(doc)
   return {
     title,
@@ -1377,6 +1393,7 @@ export function buildWebDocReaderDocument(
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss(theme)
   const playgroundCss = buildWebDocPlaygroundCss(theme)
+  const hnDiscussionCss = buildWebDocHnDiscussionCss(theme)
   const safeTitle = DOMPurify.sanitize(content.title)
   // Query cache/HMR 可能让旧版 bodyHtml 在一次会话内继续存在；在最终生成
   // srcdoc 前再归一化一次，确保旧片段也不会把 display:contents 卡片撑坏。
@@ -1434,6 +1451,7 @@ export function buildWebDocReaderDocument(
   <style>${mathCss}</style>
   <style>${embedCss}</style>
   <style>${playgroundCss}</style>
+  <style>${hnDiscussionCss}</style>
   <style>
     body { margin: 0; padding: 1.25rem 1.5rem 2rem; }
     a { word-break: break-word; }
@@ -1542,12 +1560,14 @@ export function buildWebDocPageContent(
   html: string,
   pageUrl: string,
   siteId: WebDocSiteId,
-): WebDocPageContent {
+): WebDocPageContentWithDiscussion {
   const article = extractWebDocArticle(html, pageUrl, siteId)
+  const discussion = detectDiscussionLink(html, pageUrl)
   return {
     ...article,
     baseUrl: pageUrl,
     siteId,
+    ...(discussion ? { discussion } : {}),
   }
 }
 

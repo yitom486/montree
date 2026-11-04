@@ -37,6 +37,10 @@ export const queryKeys = {
   marksSearchPrefix: (filePath: string, workspaceId: string = LOCAL_WORKSPACE_ID) =>
     ['reading-marks-search', workspaceId, filePath] as const,
   webDocPage: (pageUrl: string) => ['web-doc-page', pageUrl] as const,
+  /** Hacker News 频道列表（top / new / ask / show），服务端另有 60 分钟缓存 */
+  hnFeed: (channel: string) => ['hn-feed', channel] as const,
+  /** 文章 URL → HN 讨论反查，空结果也缓存 24 小时 */
+  hnDiscussion: (url: string) => ['hn-discussion', url] as const,
   webDocToc: (discoveryUrl: string) => ['web-doc-toc', discoveryUrl] as const,
   /** 按书籍路径读取测验历史 */
   quizSessions: (filePath: string, workspaceId: string = LOCAL_WORKSPACE_ID) =>

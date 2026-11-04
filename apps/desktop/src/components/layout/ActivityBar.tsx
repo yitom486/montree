@@ -6,17 +6,19 @@ interface ActivityBarProps {
   sidebarVisible: boolean
   onToggleSidebar: () => void
   onOpenLibrary?: () => void
+  libraryActive?: boolean
   onOpenNotes?: () => void
   notesLabel?: string
   notesActive?: boolean
   onOpenSettings?: () => void
 }
 
-/** 左侧活动栏：资源管理器 + 书库 + 札记 + 设置 */
+/** 左侧活动栏：资源管理器 + 阅读馆 + 札记 + 设置 */
 export function ActivityBar({
   sidebarVisible,
   onToggleSidebar,
   onOpenLibrary,
+  libraryActive = false,
   onOpenNotes,
   notesLabel = '全书札记中心',
   notesActive = false,
@@ -33,10 +35,10 @@ export function ActivityBar({
         size="icon"
         className={cn(
           'size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-          sidebarVisible && 'border-primary bg-accent/40 text-foreground',
+          sidebarVisible && !libraryActive && 'border-primary bg-accent/40 text-foreground',
         )}
         aria-label={sidebarVisible ? '隐藏资源管理器' : '显示资源管理器'}
-        aria-pressed={sidebarVisible}
+        aria-pressed={sidebarVisible && !libraryActive}
         title={sidebarVisible ? '隐藏资源管理器 (Ctrl+B)' : '显示资源管理器 (Ctrl+B)'}
         onClick={onToggleSidebar}
       >
@@ -48,9 +50,13 @@ export function ActivityBar({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-          aria-label="馆藏书卷与在线规范"
-          title="馆藏书卷与在线规范 (书库抽屉)"
+          className={cn(
+            'size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+            libraryActive && 'border-primary bg-accent/40 text-foreground',
+          )}
+          aria-label="阅读馆"
+          aria-pressed={libraryActive}
+          title={libraryActive ? '返回当前文档 (阅读馆开启中)' : '阅读馆 (发现资讯、我的书架与稍后阅读)'}
           onClick={onOpenLibrary}
         >
           <BookOpen className="size-5" />
@@ -62,7 +68,10 @@ export function ActivityBar({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          className={cn(
+            'size-10 rounded-none border-l-2 border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+            notesActive && 'border-primary bg-accent/40 text-foreground',
+          )}
           aria-label={notesLabel}
           aria-pressed={notesActive}
           title={notesLabel}
@@ -88,4 +97,3 @@ export function ActivityBar({
     </aside>
   )
 }
-

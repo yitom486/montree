@@ -196,6 +196,13 @@ import {
   fetchWebDocImage,
   parseWebDocUrlInput,
 } from '../services/web-doc-service'
+import { fetchHnFeed, findHnDiscussion } from '../services/hn-service'
+import {
+  HN_FETCH_FEED_IPC,
+  HN_FIND_DISCUSSION_IPC,
+  type HnFeedPayload,
+  type HnFindDiscussionPayload,
+} from '../../contracts/hn'
 import { readPdfOcrTocCache, deletePdfOcrTocCache, clearAllPdfOcrCaches, writePdfOcrTocCache } from '../services/ocr/ocr-toc-cache'
 import {
   deleteAllPdfOcrPageCaches,
@@ -958,6 +965,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.AI_SESSIONS_TOUCH, (_event, payload: AiSessionTouchPayload) =>
     touchAiSession(withAiSessionWindow(_event.sender, payload)),
   )
+
+  // --- Hacker News 资讯源 ---
+  ipcMain.handle(HN_FETCH_FEED_IPC, (event, payload: HnFeedPayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口读取 Hacker News' })
+    }
+    return fetchHnFeed(payload)
+  })
+  ipcMain.handle(HN_FIND_DISCUSSION_IPC, (event, payload: HnFindDiscussionPayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口查询 Hacker News 讨论' })
+    }
+    return findHnDiscussion(payload)
+  })
 
   // --- 在线文档 ---
   ipcMain.handle(WEB_DOC_IMAGE_IPC, (event, payload: WebDocImagePayload) => {

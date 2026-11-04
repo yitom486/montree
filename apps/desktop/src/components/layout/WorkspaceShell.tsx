@@ -26,7 +26,7 @@ import type { useFileTreeActions } from '@/hooks/workspace/useFileTreeActions'
 import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
 import { DiagramModal } from '@/components/agent/DiagramModal'
 import { NotesDrawer } from '@/components/reader/NotesDrawer'
-import { LibraryDrawer } from '@/components/reader/LibraryDrawer'
+import { LibraryWorkspaceMain } from '@/components/reader/LibraryWorkspaceMain'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useReadingMarks } from '@/hooks/reader/useReadingMarks'
 import { parseDiagramFromMark } from '@/lib/reader/marks/diagram-mark-parser'
@@ -147,8 +147,9 @@ export function WorkspaceShell({
     (!dockedAgentVisible || workspacePanelTab === 'cards')
   const isDockedPanelVisible = dockedAgentVisible || showCards
 
-  const isSidebarVisible = !zenMode && sidebarVisible
-  const outlineAvailable = !zenMode && headings.length > 0 && Boolean(onSelectHeading)
+  // 进入阅读馆主视图时收起左侧文件树面板，让阅读馆独占完整主工作区；返回文档时恢复原侧栏状态
+  const isSidebarVisible = !zenMode && !isLibraryOpen && sidebarVisible
+  const outlineAvailable = !zenMode && !isLibraryOpen && headings.length > 0 && Boolean(onSelectHeading)
   const showOutline = outlineAvailable && outlineVisible
 
   const { marks, deleteMark } = useReadingMarks(activeFilePath || '')
@@ -162,11 +163,22 @@ export function WorkspaceShell({
   })
 
   const handleToggleSidebar = () => {
-    preserveScrollAnchor(() => toggleSidebar())
+    preserveScrollAnchor(() => {
+      if (isLibraryOpen) {
+        setIsLibraryOpen(false)
+        setSidebarVisible(true)
+        return
+      }
+      toggleSidebar()
+    })
   }
 
   const handleSetSidebarVisible = (visible: boolean) => {
     preserveScrollAnchor(() => setSidebarVisible(visible))
+  }
+
+  const handleToggleLibrary = () => {
+    preserveScrollAnchor(() => setIsLibraryOpen(!isLibraryOpen))
   }
 
   const handleToggleAgentPanel = () => {
@@ -210,9 +222,9 @@ export function WorkspaceShell({
     <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
       {!zenMode && (
         <AppTitleBar
-          activeFilePath={activeFilePath}
+          activeFilePath={isLibraryOpen ? '阅读馆' : activeFilePath}
           isDirty={isDirty}
-          sidebarVisible={sidebarVisible}
+          sidebarVisible={isSidebarVisible}
           onToggleSidebar={handleToggleSidebar}
           onQuickOpen={onQuickOpen}
           onToggleAgentPanel={handleToggleAgentPanel}
@@ -228,7 +240,8 @@ export function WorkspaceShell({
           <ActivityBar
             sidebarVisible={sidebarVisible}
             onToggleSidebar={handleToggleSidebar}
-            onOpenLibrary={() => setIsLibraryOpen(true)}
+            onOpenLibrary={handleToggleLibrary}
+            libraryActive={isLibraryOpen}
             notesLabel={readerAvailable ? '卡片流' : '全书札记中心'}
             notesActive={showCards}
             onOpenNotes={() => readerAvailable
@@ -268,10 +281,16 @@ export function WorkspaceShell({
               onOpenFolder={onOpenFolder}
               onOpenRemote={handleOpenRemoteModal}
               onCloseWorkspace={onCloseWorkspace}
-              onOpenWebDoc={onOpenWebDoc}
+              onOpenWebDoc={(url) => {
+                setIsLibraryOpen(false)
+                onOpenWebDoc?.(url)
+              }}
               onRescanWorkspace={onRescanWorkspace}
               isRescanningWorkspace={isRescanningWorkspace}
-              onSelectFile={onSelectFile}
+              onSelectFile={(path) => {
+                setIsLibraryOpen(false)
+                onSelectFile(path)
+              }}
               onHideSidebar={() => handleSetSidebarVisible(false)}
               treeActions={treeActions}
               readOnly={readOnly}
@@ -295,24 +314,42 @@ export function WorkspaceShell({
           <ResizablePanel id="main" defaultSize={isDockedPanelVisible ? '57%' : '75%'} minSize="30%" className="min-w-0">
             <ResizablePanelGroup orientation="vertical">
               <ResizablePanel id="document" defaultSize="70%" minSize="20%">
-                {/* 文档区隔离：内容（工具栏、滚动条、异步渲染）的尺寸变化不外溢到外壳布局 */}
+                {/* 文档区隔离：底层文档始终保持挂载以保留阅读位置与编辑草稿；阅读馆以完整页面层呈现于主工作区 */}
                 <div className="relative h-full w-full overflow-hidden" style={{ contain: 'strict' }} data-testid="workspace-document-frame">
-                  <WorkspaceDocumentOutlineContext.Provider value={{
-                    available: outlineAvailable,
-                    onToggle: () => preserveScrollAnchor(() => setOutlineVisible(!outlineVisible)),
-                    content: showOutline ? (
-                      <DocumentOutline
-                        headings={headings}
-                        activeHeadingId={activeHeadingId}
-                        onSelectHeading={onSelectHeading ?? (() => undefined)}
-                        onHide={() => preserveScrollAnchor(() => setOutlineVisible(false))}
+                  <div className={isLibraryOpen ? 'hidden h-full w-full' : 'h-full w-full'}>
+                    <WorkspaceDocumentOutlineContext.Provider value={{
+                      available: outlineAvailable,
+                      onToggle: () => preserveScrollAnchor(() => setOutlineVisible(!outlineVisible)),
+                      content: showOutline ? (
+                        <DocumentOutline
+                          headings={headings}
+                          activeHeadingId={activeHeadingId}
+                          onSelectHeading={onSelectHeading ?? (() => undefined)}
+                          onHide={() => preserveScrollAnchor(() => setOutlineVisible(false))}
+                        />
+                      ) : null,
+                    }}>
+                      <WorkspaceCardRailContext.Provider value={cardRailContext}>
+                        {children}
+                      </WorkspaceCardRailContext.Provider>
+                    </WorkspaceDocumentOutlineContext.Provider>
+                  </div>
+
+                  {isLibraryOpen && (
+                    <div className="h-full w-full">
+                      <LibraryWorkspaceMain
+                        activeFilePath={activeFilePath}
+                        isDirty={isDirty}
+                        webPageUrl={webPageUrl}
+                        recentFiles={recentFiles}
+                        recentWebUrls={recentWebUrls}
+                        onResumeActiveSession={() => setIsLibraryOpen(false)}
+                        onOpenWebDoc={onOpenWebDoc}
+                        onSelectFile={onSelectFile}
+                        onOpenFile={onOpenFile}
                       />
-                    ) : null,
-                  }}>
-                    <WorkspaceCardRailContext.Provider value={cardRailContext}>
-                      {children}
-                    </WorkspaceCardRailContext.Provider>
-                  </WorkspaceDocumentOutlineContext.Provider>
+                    </div>
+                  )}
                 </div>
               </ResizablePanel>
               {terminalVisible && <ResizableHandle withHandle />}
@@ -397,18 +434,6 @@ export function WorkspaceShell({
             }
           }
         }}
-      />
-
-      <LibraryDrawer
-        isOpen={isLibraryOpen}
-        onClose={() => setIsLibraryOpen(false)}
-        recentFiles={recentFiles}
-        activeFilePath={activeFilePath}
-        onSelectFile={onSelectFile}
-        recentWebUrls={recentWebUrls}
-        webPageUrl={webPageUrl}
-        onOpenWebDoc={onOpenWebDoc}
-        onOpenFile={onOpenFile}
       />
 
       {/* 大图全屏交互模态框：必须置于抽屉之后渲染并保持最高层叠优先级 */}

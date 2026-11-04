@@ -684,3 +684,26 @@
 .outline-scroll::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklch, var(--muted-foreground) 48%, transparent);
 }
+
+
+/* ==========================================================================
+   阅读馆（Digital Reading Room）：局部来源标识色与书架封面编目语义令牌
+   ========================================================================== */
+:root,
+.light {
+  --color-hn: #d95a11;
+  --color-hn-subtle: rgba(217, 90, 17, 0.10);
+  --color-hn-border: rgba(217, 90, 17, 0.25);
+}
+
+.sepia {
+  --color-hn: #c85312;
+  --color-hn-subtle: rgba(200, 83, 18, 0.12);
+  --color-hn-border: rgba(200, 83, 18, 0.28);
+}
+
+.dark {
+  --color-hn: #f26b21;
+  --color-hn-subtle: rgba(242, 107, 33, 0.15);
+  --color-hn-border: rgba(242, 107, 33, 0.32);
+}
