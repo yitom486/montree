@@ -1,16 +1,26 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AlertTriangle,
   BookOpen,
   Check,
   ChevronDown,
   Loader2,
+  Plus,
   RefreshCw,
   Rss,
   SearchX,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +34,12 @@ import { cn } from '@/lib/utils'
 import type { FeedItem } from '../../../../contracts/feed'
 import { FEED_SOURCES, findFeedSource } from '../../../../contracts/feed'
 import { useFeed } from '@/hooks/reader/useFeed'
-import { useLibraryStore, useLibraryUi, feedItemKey } from '@/stores/library-store'
+import {
+  useLibraryStore,
+  useLibraryUi,
+  feedItemKey,
+  encodeFeedId,
+} from '@/stores/library-store'
 import { FeedRow } from './FeedRow'
 import { formatClock } from './format'
 
@@ -45,7 +60,7 @@ export function FeedStream({
   onOpenDiscussion,
   onOpenExternal,
 }: FeedStreamProps) {
-  const { feedSource, feedChannel, readItemKeys, readLaterItems, shelfItems, unreadOnly, returnContext } =
+  const { feedSource, feedChannel, readItemKeys, readLaterItems, shelfItems, unreadOnly, returnContext, customFeeds } =
     useLibraryUi((s) => ({
       feedSource: s.feedSource,
       feedChannel: s.feedChannel,
@@ -54,6 +69,7 @@ export function FeedStream({
       shelfItems: s.shelfItems,
       unreadOnly: s.unreadOnly,
       returnContext: s.returnContext,
+      customFeeds: s.customFeeds,
     }))
   const setFeedSource = useLibraryStore((s) => s.setFeedSource)
   const setFeedChannel = useLibraryStore((s) => s.setFeedChannel)
@@ -62,12 +78,78 @@ export function FeedStream({
   const markItemRead = useLibraryStore((s) => s.markItemRead)
   const toggleReadLater = useLibraryStore((s) => s.toggleReadLater)
   const toggleShelfItem = useLibraryStore((s) => s.toggleShelfItem)
+  const addCustomFeed = useLibraryStore((s) => s.addCustomFeed)
+  const removeCustomFeed = useLibraryStore((s) => s.removeCustomFeed)
+  const renameCustomFeed = useLibraryStore((s) => s.renameCustomFeed)
+
+  const [subscribeOpen, setSubscribeOpen] = useState(false)
+  const [feedUrlInput, setFeedUrlInput] = useState('')
+  const [subscribeError, setSubscribeError] = useState<string | null>(null)
 
   const source = findFeedSource(feedSource)
+  const channels = useMemo(
+    () => [
+      ...source.channels,
+      ...(feedSource === 'rss'
+        ? customFeeds.map((feed) => ({ id: `custom:${feed.id}`, label: feed.title }))
+        : []),
+    ],
+    [customFeeds, feedSource, source.channels],
+  )
+
+  useEffect(() => {
+    if (channels.some((channel) => channel.id === feedChannel)) return
+    setFeedChannel(channels[0]?.id ?? '')
+  }, [channels, feedChannel, setFeedChannel])
+
+  const customFeedId = feedChannel.startsWith('custom:') ? feedChannel.slice('custom:'.length) : null
   const { data, isPending, isFetching, isError, error, refetch, refresh } = useFeed(
     feedSource,
     feedChannel,
   )
+
+  useEffect(() => {
+    if (!customFeedId || !data?.feedTitle) return
+    const feed = customFeeds.find((item) => item.id === customFeedId)
+    if (feed && feed.title !== data.feedTitle) renameCustomFeed(customFeedId, data.feedTitle)
+  }, [customFeedId, customFeeds, data?.feedTitle, renameCustomFeed])
+
+  const handleAddFeed = (event: FormEvent) => {
+    event.preventDefault()
+    const rawUrl = feedUrlInput.trim()
+    let parsed: URL
+    try {
+      parsed = new URL(rawUrl)
+    } catch {
+      setSubscribeError('请输入合法的订阅地址')
+      return
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      setSubscribeError('仅支持 http / https 订阅地址')
+      return
+    }
+    if (customFeeds.some((feed) => feed.url === rawUrl)) {
+      setSubscribeError('这个订阅已经存在')
+      return
+    }
+    const id = encodeFeedId(rawUrl)
+    addCustomFeed({
+      id,
+      title: parsed.hostname.replace(/^www\./, ''),
+      url: rawUrl,
+    })
+    setFeedChannel(`custom:${id}`)
+    setFeedUrlInput('')
+    setSubscribeError(null)
+    setSubscribeOpen(false)
+  }
+
+  const handleRemoveFeed = (id: string) => {
+    removeCustomFeed(id)
+    if (feedChannel === `custom:${id}`) {
+      setFeedChannel(source.channels[0]?.id ?? '')
+    }
+  }
 
   const items = useMemo(() => {
     const sourceItems = data?.items ?? []
@@ -182,13 +264,80 @@ export function FeedStream({
 
         <Tabs value={feedChannel} onValueChange={setFeedChannel}>
           <TabsList className="h-8 bg-muted/70 p-0.5">
-            {source.channels.map((channel) => (
+            {channels.map((channel) => (
               <TabsTrigger key={channel.id} value={channel.id} className="h-7 px-3 text-xs">
                 {channel.label}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
+
+        {feedSource === 'rss' && (
+          <Dialog open={subscribeOpen} onOpenChange={setSubscribeOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                title="添加自定义 RSS / Atom 订阅"
+              >
+                <Plus className="size-3.5" />
+                订阅
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>自定义 RSS 订阅</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddFeed} className="flex gap-2">
+                <Input
+                  value={feedUrlInput}
+                  onChange={(event) => {
+                    setFeedUrlInput(event.target.value)
+                    setSubscribeError(null)
+                  }}
+                  placeholder="https://example.com/feed.xml"
+                  className="h-9"
+                  autoFocus
+                />
+                <Button type="submit" size="sm" className="h-9 shrink-0">
+                  添加
+                </Button>
+              </form>
+              {subscribeError && (
+                <p className="text-xs text-destructive">{subscribeError}</p>
+              )}
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {customFeeds.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">
+                    还没有自定义订阅，添加一个 RSS / Atom 地址即可。
+                  </p>
+                ) : (
+                  customFeeds.map((feed) => (
+                    <div
+                      key={feed.id}
+                      className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-medium">{feed.title}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">{feed.url}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFeed(feed.id)}
+                        title="删除订阅"
+                        aria-label={`删除订阅：${feed.title}`}
+                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
 
         <button
           type="button"

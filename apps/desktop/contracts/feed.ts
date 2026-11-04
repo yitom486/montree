@@ -2,7 +2,7 @@ import type { AppError, Result } from '@yitom/contracts'
 
 export const FEED_FETCH_IPC = 'feed:fetch'
 
-export type FeedSourceId = 'hacker-news' | 'lobsters' | 'rss'
+export type FeedSourceId = 'hacker-news' | 'lobsters' | 'rss' | 'arxiv'
 
 export interface FeedChannelDefinition {
   id: string
@@ -52,6 +52,17 @@ export const FEED_SOURCES: FeedSourceDefinition[] = [
       { id: 'cloudflare', label: 'Cloudflare' },
     ],
   },
+  {
+    id: 'arxiv',
+    label: 'arXiv',
+    description: '计算机科学最新预印本',
+    channels: [
+      { id: 'cs-ai', label: '人工智能' },
+      { id: 'cs-lg', label: '机器学习' },
+      { id: 'cs-pl', label: '编程语言' },
+      { id: 'cs-dc', label: '分布式系统' },
+    ],
+  },
 ]
 
 export const DEFAULT_FEED_SOURCE: FeedSourceId = 'hacker-news'
@@ -92,6 +103,8 @@ export interface FeedResult {
   items: FeedItem[]
   fetchedAt: number
   cached: boolean
+  /** RSS/Atom 自带标题；用于自定义订阅自动命名 */
+  feedTitle?: string
 }
 
 export interface FeedAPI {

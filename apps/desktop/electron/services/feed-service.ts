@@ -7,13 +7,16 @@ import type {
   FeedSourceId,
 } from '../../contracts/feed'
 import { fetchHnFeed } from './hn-service'
+import { assertWebDocUrlAllowed } from './web-doc/url-policy'
 
 const FEED_TIMEOUT_MS = 15_000
+const MAX_REDIRECTS = 5
 const RSS_MAX_BYTES = 4 * 1024 * 1024
 const DEFAULT_LIMIT = 30
 const MAX_LIMIT = 60
 const AGGREGATOR_TTL_MS = 60 * 60_000
 const RSS_TTL_MS = 30 * 60_000
+const ARXIV_TTL_MS = 6 * 60 * 60_000
 
 const RSS_FEEDS: Record<string, string> = {
   sspai: 'https://sspai.com/feed',
@@ -22,10 +25,24 @@ const RSS_FEEDS: Record<string, string> = {
   cloudflare: 'https://blog.cloudflare.com/rss/',
 }
 
+const ARXIV_CATEGORIES: Record<string, string> = {
+  'cs-ai': 'cs.AI',
+  'cs-lg': 'cs.LG',
+  'cs-pl': 'cs.PL',
+  'cs-dc': 'cs.DC',
+}
+
+function ttlFor(source: FeedSourceId): number {
+  if (source === 'rss') return RSS_TTL_MS
+  if (source === 'arxiv') return ARXIV_TTL_MS
+  return AGGREGATOR_TTL_MS
+}
+
 interface CachedFeed {
   items: FeedItem[]
   limit: number
   fetchedAt: number
+  feedTitle?: string
 }
 
 const feedCache = new Map<string, CachedFeed>()
@@ -54,20 +71,54 @@ function toUnixSeconds(value: string | null | undefined, fallback: number): numb
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : fallback
 }
 
-async function fetchText(url: string, fetchImpl: typeof fetch): Promise<string> {
-  const response = await fetchImpl(url, {
-    headers: {
-      Accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Montree/0.4.30',
-    },
-    signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const declaredLength = Number(response.headers.get('content-length') ?? 0)
-  if (declaredLength > RSS_MAX_BYTES) throw new Error('订阅内容超过 4MB 限制')
-  const text = await response.text()
-  if (text.length > RSS_MAX_BYTES) throw new Error('订阅内容超过 4MB 限制')
-  return text
+function decodeCustomFeedChannel(channel: string): string | null {
+  if (!channel.startsWith('custom:')) return null
+  try {
+    const url = Buffer.from(channel.slice('custom:'.length), 'base64url').toString('utf8').trim()
+    return url || null
+  } catch {
+    return null
+  }
+}
+
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
+
+/**
+ * 抓取订阅内容：自定义 URL 必须逐跳做 SSRF 校验，禁止跳转到内网/本机。
+ * 内置订阅同样走这条路径，规则一致。
+ */
+async function fetchFeedText(
+  rawUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<{ text: string; finalUrl: string }> {
+  let current = assertWebDocUrlAllowed(rawUrl).toString()
+
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
+    const response = await fetchImpl(current, {
+      headers: {
+        Accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Montree/0.4.30',
+      },
+      signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
+      redirect: 'manual',
+    })
+
+    if (REDIRECT_STATUS.has(response.status)) {
+      const location = response.headers.get('location')
+      if (!location) throw new Error('重定向缺少 Location')
+      current = assertWebDocUrlAllowed(new URL(location, current).toString()).toString()
+      continue
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    const declaredLength = Number(response.headers.get('content-length') ?? 0)
+    if (declaredLength > RSS_MAX_BYTES) throw new Error('订阅内容超过 4MB 限制')
+    const text = await response.text()
+    if (text.length > RSS_MAX_BYTES) throw new Error('订阅内容超过 4MB 限制')
+    return { text, finalUrl: response.url || current }
+  }
+
+  throw new Error('重定向次数过多')
 }
 
 async function fetchJson(url: string, fetchImpl: typeof fetch): Promise<unknown> {
@@ -157,7 +208,12 @@ function entryLink(entry: XmlNode, baseUrl: string): string {
  * 解析 RSS 2.0 / Atom。只提取列表需要的字段，不注入正文 HTML；
  * 相对链接按订阅地址解析，方便阅读器直接抓原文。
  */
-export function parseFeedXml(xml: string, feedUrl: string, limit = DEFAULT_LIMIT): FeedItem[] {
+export function parseFeedXml(
+  xml: string,
+  feedUrl: string,
+  limit = DEFAULT_LIMIT,
+  source: FeedSourceId = 'rss',
+): FeedItem[] {
   if (!xml.trim()) return []
   const doc = new DOMParser().parseFromString(xml, 'text/xml')
   if (doc.getElementsByTagName('parsererror').length > 0) {
@@ -170,17 +226,17 @@ export function parseFeedXml(xml: string, feedUrl: string, limit = DEFAULT_LIMIT
 
   return entries
     .map((entry): FeedItem | null => {
-      const title = elementText(entry, ['title'])
+      const title = elementText(entry, ['title']).replace(/\s+/g, ' ')
       const url = entryLink(entry, feedUrl)
       if (!title || !url) return null
       const guid = elementText(entry, ['guid', 'id']) || url
       const author =
-        elementText(entry, ['dc:creator', 'creator', 'author', 'name']) || 'unknown'
+        elementText(entry, ['name', 'dc:creator', 'creator', 'author']) || 'unknown'
       const published =
         elementText(entry, ['pubDate', 'published', 'updated', 'dc:date']) || ''
       return {
         id: guid,
-        source: 'rss',
+        source,
         title,
         url,
         domain: domainOf(url),
@@ -193,6 +249,21 @@ export function parseFeedXml(xml: string, feedUrl: string, limit = DEFAULT_LIMIT
       }
     })
     .filter((item): item is FeedItem => item !== null)
+}
+
+export function parseFeedTitle(xml: string): string | null {
+  if (!xml.trim()) return null
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml')
+    if (doc.getElementsByTagName('parsererror').length > 0) return null
+    const root =
+      doc.getElementsByTagName('channel').item(0) ??
+      doc.getElementsByTagName('feed').item(0)
+    const title = root ? elementText(root, ['title']) : ''
+    return title.replace(/\s+/g, ' ').trim() || null
+  } catch {
+    return null
+  }
 }
 
 function hnItemToFeedItem(story: {
@@ -233,12 +304,12 @@ async function fetchSourceItems(
   limit: number,
   force: boolean,
   deps: FeedFetchDeps,
-): Promise<Result<FeedItem[], AppError>> {
+): Promise<Result<{ items: FeedItem[]; feedTitle?: string }, AppError>> {
   const now = deps.now ?? Date.now
   if (source === 'hacker-news') {
     const result = await fetchHnFeed({ channel: channel as never, limit, force }, deps)
     if (!result.ok) return result
-    return ok(result.value.stories.map(hnItemToFeedItem))
+    return ok({ items: result.value.stories.map(hnItemToFeedItem) })
   }
 
   if (source === 'lobsters') {
@@ -251,15 +322,30 @@ async function fetchSourceItems(
       .map((story) => mapLobstersStory(story as LobstersStory, now()))
       .filter((item): item is FeedItem => item !== null)
       .slice(0, limit)
-    return ok(items)
+    return ok({ items })
   }
 
-  const feedUrl = RSS_FEEDS[channel]
+  if (source === 'arxiv') {
+    const category = ARXIV_CATEGORIES[channel]
+    if (!category) {
+      return err({ code: 'INVALID_ARGUMENT', message: `未知的 arXiv 分类：${channel}` })
+    }
+    const queryUrl = `https://export.arxiv.org/api/query?search_query=cat:${encodeURIComponent(category)}&sortBy=submittedDate&sortOrder=descending&max_results=${limit}`
+    const { text } = await fetchFeedText(queryUrl, deps.fetchImpl ?? fetch)
+    return ok({ items: parseFeedXml(text, queryUrl, limit, 'arxiv') })
+  }
+
+  // 自定义订阅：channel 形如 custom:<base64url(feedUrl)>
+  const customUrl = decodeCustomFeedChannel(channel)
+  const feedUrl = customUrl ?? RSS_FEEDS[channel]
   if (!feedUrl) {
     return err({ code: 'INVALID_ARGUMENT', message: `未知的订阅源：${channel}` })
   }
-  const xml = await fetchText(feedUrl, deps.fetchImpl ?? fetch)
-  return ok(parseFeedXml(xml, feedUrl, limit))
+  const { text, finalUrl } = await fetchFeedText(feedUrl, deps.fetchImpl ?? fetch)
+  return ok({
+    items: parseFeedXml(text, finalUrl, limit),
+    feedTitle: parseFeedTitle(text) ?? undefined,
+  })
 }
 
 /**
@@ -276,7 +362,7 @@ export async function fetchFeed(
   }
   const limit = normalizeLimit(payload.limit)
   const now = deps.now ?? Date.now
-  const ttl = source === 'rss' ? RSS_TTL_MS : AGGREGATOR_TTL_MS
+  const ttl = ttlFor(source)
   const cacheKey = `${source}:${channel}`
 
   const cached = feedCache.get(cacheKey)
@@ -287,20 +373,27 @@ export async function fetchFeed(
       items: cached.items.slice(0, limit),
       fetchedAt: cached.fetchedAt,
       cached: true,
+      feedTitle: cached.feedTitle,
     })
   }
 
   try {
-    const items = await fetchSourceItems(source, channel, limit, Boolean(payload.force), deps)
-    if (!items.ok) return items
+    const result = await fetchSourceItems(source, channel, limit, Boolean(payload.force), deps)
+    if (!result.ok) return result
     const fetchedAt = now()
-    feedCache.set(cacheKey, { items: items.value, limit, fetchedAt })
+    feedCache.set(cacheKey, {
+      items: result.value.items,
+      limit,
+      fetchedAt,
+      feedTitle: result.value.feedTitle,
+    })
     return ok({
       source,
       channel,
-      items: items.value.slice(0, limit),
+      items: result.value.items.slice(0, limit),
       fetchedAt,
       cached: false,
+      feedTitle: result.value.feedTitle,
     })
   } catch (cause) {
     return err({

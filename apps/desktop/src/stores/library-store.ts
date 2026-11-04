@@ -12,6 +12,14 @@ export function feedItemKey(source: FeedSourceId, id: string | number): string {
   return `${source}:${id}`
 }
 
+/** 自定义订阅 id：URL → base64url，作为频道 id 传给主进程解码 */
+export function encodeFeedId(url: string): string {
+  const bytes = new TextEncoder().encode(url)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 export interface ShelfEntry {
   id: string
   kind: 'book' | 'doc' | 'article'
@@ -51,6 +59,13 @@ export interface ReadLaterEntry {
   createdAt?: number
   addedAt: number
   isRead?: boolean
+}
+
+export interface CustomFeed {
+  /** base64url(feedUrl)，频道 id 为 custom:<id> */
+  id: string
+  title: string
+  url: string
 }
 
 export interface LibraryStoreState {
@@ -93,6 +108,8 @@ export interface LibraryStoreState {
   readLaterItems: ReadLaterEntry[]
   /** 我的书架正式馆藏列表（不与最近记录混同） */
   shelfItems: ShelfEntry[]
+  /** 用户自定义 RSS 订阅 */
+  customFeeds: CustomFeed[]
 
   // Actions
   setActiveTab: (tab: LibraryPrimaryTab) => void
@@ -110,6 +127,10 @@ export interface LibraryStoreState {
   removeReadLater: (id: string) => void
   toggleShelfItem: (entry: Omit<ShelfEntry, 'addedAt'>) => boolean
   removeShelfItem: (id: string) => void
+  /** 添加自定义订阅；同一 URL 已存在时返回 false */
+  addCustomFeed: (feed: CustomFeed) => boolean
+  removeCustomFeed: (id: string) => void
+  renameCustomFeed: (id: string, title: string) => void
 }
 
 export const useLibraryStore = create<LibraryStoreState>()(
@@ -126,6 +147,7 @@ export const useLibraryStore = create<LibraryStoreState>()(
       readItemKeys: [],
       readLaterItems: [],
       shelfItems: [],
+      customFeeds: [],
 
       setActiveTab: (activeTab) => set({ activeTab }),
       setFeedSource: (source) =>
@@ -217,6 +239,25 @@ export const useLibraryStore = create<LibraryStoreState>()(
         set((state) => ({
           shelfItems: state.shelfItems.filter((item) => item.id !== id),
         })),
+
+      addCustomFeed: (feed) => {
+        const exists = get().customFeeds.some((item) => item.url === feed.url)
+        if (exists) return false
+        set((state) => ({ customFeeds: [...state.customFeeds, feed] }))
+        return true
+      },
+
+      removeCustomFeed: (id) =>
+        set((state) => ({
+          customFeeds: state.customFeeds.filter((item) => item.id !== id),
+        })),
+
+      renameCustomFeed: (id, title) =>
+        set((state) => ({
+          customFeeds: state.customFeeds.map((item) =>
+            item.id === id ? { ...item, title } : item,
+          ),
+        })),
     }),
     {
       name: 'montree-reading-library-v3',
@@ -229,6 +270,7 @@ export const useLibraryStore = create<LibraryStoreState>()(
         readItemKeys: state.readItemKeys,
         readLaterItems: state.readLaterItems,
         shelfItems: state.shelfItems,
+        customFeeds: state.customFeeds,
       }),
     },
   ),

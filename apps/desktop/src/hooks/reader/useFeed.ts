@@ -19,7 +19,9 @@ interface StoredFeed {
 }
 
 function staleMsFor(source: FeedSourceId): number {
-  return source === 'rss' ? RSS_STALE_MS : AGGREGATOR_STALE_MS
+  if (source === 'rss') return RSS_STALE_MS
+  if (source === 'arxiv') return 6 * 60 * 60_000
+  return AGGREGATOR_STALE_MS
 }
 
 function storageKey(source: FeedSourceId, channel: string): string {

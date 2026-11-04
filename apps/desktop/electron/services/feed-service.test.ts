@@ -3,6 +3,7 @@ import {
   clearFeedCache,
   fetchFeed,
   mapLobstersStory,
+  parseFeedTitle,
   parseFeedXml,
 } from './feed-service'
 
@@ -171,6 +172,86 @@ describe('feed-service', () => {
     expect(result.ok && result.value.items[0]?.title).toBe('Hello')
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://sspai.com/feed',
+      expect.objectContaining({ signal: expect.anything() }),
+    )
+  })
+
+  it('自定义订阅解码 URL、返回 feedTitle，并拦截内网地址', async () => {
+    const feedUrl = 'https://example.com/custom.xml'
+    const channel = `custom:${Buffer.from(feedUrl).toString('base64url')}`
+    const xml = `<rss version="2.0"><channel><title>My Feed</title><item><title>Post</title><link>https://example.com/post</link></item></channel></rss>`
+    const fetchImpl = vi.fn(async (target: string | URL | Request) => {
+      expect(String(target)).toBe(feedUrl)
+      return textResponse(xml)
+    }) as unknown as typeof fetch
+
+    const result = await fetchFeed({ source: 'rss', channel }, { fetchImpl })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.feedTitle).toBe('My Feed')
+    expect(result.value.items[0]?.title).toBe('Post')
+
+    const blockedChannel = `custom:${Buffer.from('http://127.0.0.1/feed.xml').toString('base64url')}`
+    const blocked = await fetchFeed({ source: 'rss', channel: blockedChannel }, { fetchImpl })
+    expect(blocked.ok).toBe(false)
+  })
+
+  it('自定义订阅重定向到内网时拒绝继续', async () => {
+    const feedUrl = 'https://example.com/custom.xml'
+    const channel = `custom:${Buffer.from(feedUrl).toString('base64url')}`
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 302,
+      headers: { get: (name: string) => (name === 'location' ? 'http://127.0.0.1/feed.xml' : null) },
+      text: async () => '',
+    })) as unknown as typeof fetch
+
+    const result = await fetchFeed({ source: 'rss', channel }, { fetchImpl })
+    expect(result.ok).toBe(false)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('解析 RSS/Atom 频道标题', () => {
+    expect(
+      parseFeedTitle(`<rss version="2.0"><channel><title> RSS  Feed </title></channel></rss>`),
+    ).toBe('RSS Feed')
+    expect(
+      parseFeedTitle(
+        `<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom Feed</title></feed>`,
+      ),
+    ).toBe('Atom Feed')
+    expect(parseFeedTitle('<broken>')).toBeNull()
+  })
+
+  it('arXiv 按分类抓取 Atom 并标记 source', async () => {
+    const fetchImpl = vi.fn(async () =>
+      textResponse(`<?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <title>A  Very
+              Long Title</title>
+            <link rel="alternate" href="http://arxiv.org/abs/2611.00001v1" />
+            <id>http://arxiv.org/abs/2611.00001v1</id>
+            <published>2026-11-04T09:00:00Z</published>
+            <author><name>Alice</name></author>
+          </entry>
+        </feed>`),
+    ) as unknown as typeof fetch
+
+    const result = await fetchFeed(
+      { source: 'arxiv', channel: 'cs-lg', limit: 5 },
+      { fetchImpl },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.items[0]).toMatchObject({
+      source: 'arxiv',
+      title: 'A Very Long Title',
+      domain: 'arxiv.org',
+      author: 'Alice',
+    })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.stringContaining('search_query=cat:cs.LG'),
       expect.objectContaining({ signal: expect.anything() }),
     )
   })
