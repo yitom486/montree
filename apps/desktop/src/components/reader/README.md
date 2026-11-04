@@ -25,7 +25,7 @@
 | `MarginaliaBar` | 右侧知识卡片轨（统一管理批注/划线/书签；单一类型筛选菜单、全部/单项折叠、AI 智能制卡；测验/闪卡/导出集中在卡片操作菜单、时序图联动） |
 | `KnowledgeCardItem` | 知识卡片单项（批注/概念/引用/方法/图谱/思考微晶卡片、单行与多功能态切换、考考我/闪卡抽认/AI润色） |
 | `LibraryDrawer` | 馆藏书卷与在线规范侧拉抽屉（旧版抽屉组件，保留兼容） |
-| `LibraryWorkspaceMain` | 阅读馆主工作区完整页面：发现（通用资讯流：Hacker News / Lobsters / 精选 RSS / arXiv，来源切换、频道、搜索与未读筛选、稍后读/书架快捷操作）、书架、稍后阅读、最近阅读；列表数据由主进程适配器拉取，点击条目才抓取正文 || `library/` | 阅读馆子组件：`FeedStream`（来源/频道切换、自定义 RSS 订阅与删除、加载更多分页、加载/错误/空态与刷新）、`FeedRow`（条目行与快捷操作）、`ShelfView` / `ReadLaterView` / `RecentView`（书架、待读与足迹视图）、`format`（相对时间/域名/文件名） |
+| `LibraryWorkspaceMain` | 阅读馆主工作区完整页面：发现（通用资讯流：Hacker News / Lobsters / 精选 RSS / arXiv / AI 前沿 / Linux.do，来源切换、频道、搜索与未读筛选、稍后读/书架快捷操作）、书架、稍后阅读、最近阅读；列表数据由主进程适配器拉取，点击条目才抓取正文 || `library/` | 阅读馆子组件：`FeedStream`（来源/频道切换、需要登录来源的登录/退出入口、自定义 RSS 订阅与删除、加载更多分页、加载/错误/空态与刷新）、`FeedRow`（条目行与快捷操作）、`ShelfView` / `ReadLaterView` / `RecentView`（书架、待读与足迹视图）、`format`（相对时间/域名/文件名） |
 | `NotesDrawer` | 全书札记中心与知识卡片箱（富文本 Markdown/Mermaid 拓扑渲染、资产盘点看板、彩色分类胶囊、宽屏自适应、一键 AI 智考出卷与闪卡复习） |
 | `BracketConnector` | 细线分支抱合括号引线（正文锚点与知识卡片间的发丝级微光连线） |
 | `AnnotationNoteDialog` | 批注输入；可选 AI 意图/结果 chip 与草稿确认 |

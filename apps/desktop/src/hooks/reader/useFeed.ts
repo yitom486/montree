@@ -22,7 +22,7 @@ interface StoredFeed {
 }
 
 function staleMsFor(source: FeedSourceId): number {
-  if (source === 'rss') return RSS_STALE_MS
+  if (source === 'rss' || source === 'ai' || source === 'linux-do') return RSS_STALE_MS
   if (source === 'arxiv') return 6 * 60 * 60_000
   return AGGREGATOR_STALE_MS
 }

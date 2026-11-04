@@ -198,7 +198,15 @@ import {
 } from '../services/web-doc-service'
 import { findHnDiscussion } from '../services/hn-service'
 import { fetchFeed } from '../services/feed-service'
-import { FEED_FETCH_IPC, type FeedFetchPayload } from '../../contracts/feed'
+import {
+  FEED_AUTH_LOGIN_IPC,
+  FEED_AUTH_LOGOUT_IPC,
+  FEED_AUTH_STATUS_IPC,
+  FEED_FETCH_IPC,
+  type FeedFetchPayload,
+  type FeedSourceId,
+} from '../../contracts/feed'
+import { getFeedAuthStatus, loginFeed, logoutFeed } from '../services/feed-auth-service'
 import {
   HN_FIND_DISCUSSION_IPC,
   type HnFindDiscussionPayload,
@@ -972,6 +980,33 @@ export function registerIpcHandlers(): void {
       return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口读取资讯源' })
     }
     return fetchFeed(payload)
+  })
+  ipcMain.handle(FEED_AUTH_STATUS_IPC, async (event, source: FeedSourceId) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口查询登录状态' })
+    }
+    return ok(await getFeedAuthStatus(source))
+  })
+  ipcMain.handle(FEED_AUTH_LOGIN_IPC, async (event, source: FeedSourceId) => {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender)
+    if (!senderWindow) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口发起登录' })
+    }
+    try {
+      return ok(await loginFeed(source, senderWindow))
+    } catch (cause) {
+      return err({
+        code: 'UNKNOWN',
+        message: `打开登录窗口失败：${cause instanceof Error ? cause.message : String(cause)}`,
+      })
+    }
+  })
+  ipcMain.handle(FEED_AUTH_LOGOUT_IPC, async (event, source: FeedSourceId) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口退出登录' })
+    }
+    await logoutFeed(source)
+    return ok(undefined)
   })
 
   // --- Hacker News 资讯源 ---

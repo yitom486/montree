@@ -6,6 +6,7 @@ import type {
   FeedResult,
   FeedSourceId,
 } from '../../contracts/feed'
+import { feedAuthPartition, FEED_BROWSER_UA } from '../../contracts/feed'
 import { fetchHnFeed } from './hn-service'
 import { assertWebDocUrlAllowed } from './web-doc/url-policy'
 
@@ -25,6 +26,31 @@ const RSS_FEEDS: Record<string, string> = {
   cloudflare: 'https://blog.cloudflare.com/rss/',
 }
 
+const AI_FEEDS: Record<string, string> = {
+  claude: 'https://claude.dev/rss.xml',
+  huggingface: 'https://huggingface.co/blog/feed.xml',
+  openai: 'https://openai.com/news/rss.xml',
+  deepmind: 'https://deepmind.google/blog/rss.xml',
+  'google-ai': 'https://blog.google/technology/ai/rss/',
+  bair: 'https://bair.berkeley.edu/blog/feed.xml',
+  'import-ai': 'https://importai.substack.com/feed',
+}
+
+const LINUX_DO_FEEDS: Record<string, string> = {
+  latest: 'https://linux.do/latest.rss',
+  top: 'https://linux.do/top.rss?period=weekly',
+}
+
+class FeedHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'FeedHttpError'
+  }
+}
+
 const ARXIV_CATEGORIES: Record<string, string> = {
   'cs-ai': 'cs.AI',
   'cs-lg': 'cs.LG',
@@ -33,7 +59,7 @@ const ARXIV_CATEGORIES: Record<string, string> = {
 }
 
 function ttlFor(source: FeedSourceId): number {
-  if (source === 'rss') return RSS_TTL_MS
+  if (source === 'rss' || source === 'ai' || source === 'linux-do') return RSS_TTL_MS
   if (source === 'arxiv') return ARXIV_TTL_MS
   return AGGREGATOR_TTL_MS
 }
@@ -110,7 +136,7 @@ async function fetchFeedText(
       current = assertWebDocUrlAllowed(new URL(location, current).toString()).toString()
       continue
     }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.ok) throw new FeedHttpError(response.status, `HTTP ${response.status}`)
 
     const declaredLength = Number(response.headers.get('content-length') ?? 0)
     if (declaredLength > RSS_MAX_BYTES) throw new Error('订阅内容超过 4MB 限制')
@@ -353,6 +379,41 @@ async function fetchSourceItems(
     return ok({ items, hasMore: items.length >= limit })
   }
 
+  if (source === 'ai') {
+    const feedUrl = AI_FEEDS[channel]
+    if (!feedUrl) {
+      return err({ code: 'INVALID_ARGUMENT', message: `未知的 AI 资讯源：${channel}` })
+    }
+    if (page > 0) return ok({ items: [], hasMore: false })
+    const { text, finalUrl } = await fetchFeedText(feedUrl, deps.fetchImpl ?? fetch)
+    return ok({
+      items: parseFeedXml(text, finalUrl, limit, 'ai'),
+      hasMore: false,
+      feedTitle: parseFeedTitle(text) ?? undefined,
+    })
+  }
+
+  if (source === 'linux-do') {
+    const feedUrl = LINUX_DO_FEEDS[channel]
+    if (!feedUrl) {
+      return err({ code: 'INVALID_ARGUMENT', message: `未知的 Linux.do 频道：${channel}` })
+    }
+    if (page > 0) return ok({ items: [], hasMore: false })
+    // 登录 Cookie 在该来源的持久化分区里；session.fetch 会自动携带
+    const { session } = await import('electron')
+    const ses = session.fromPartition(feedAuthPartition(source))
+    ses.setUserAgent(FEED_BROWSER_UA)
+    const { text, finalUrl } = await fetchFeedText(
+      feedUrl,
+      ses.fetch.bind(ses) as unknown as typeof fetch,
+    )
+    return ok({
+      items: parseFeedXml(text, finalUrl, limit, 'linux-do'),
+      hasMore: false,
+      feedTitle: parseFeedTitle(text) ?? undefined,
+    })
+  }
+
   if (page > 0) return ok({ items: [], hasMore: false })
 
   // 自定义订阅：channel 形如 custom:<base64url(feedUrl)>
@@ -430,6 +491,13 @@ export async function fetchFeed(
       feedTitle: result.value.feedTitle,
     })
   } catch (cause) {
+    if (
+      cause instanceof FeedHttpError &&
+      (cause.status === 401 || cause.status === 403) &&
+      source === 'linux-do'
+    ) {
+      return err({ code: 'UNAUTHORIZED', message: '需要登录 Linux.do 后才能读取该频道' })
+    }
     return err({
       code: 'NETWORK_ERROR',
       message: `拉取 ${source} / ${channel} 失败：${

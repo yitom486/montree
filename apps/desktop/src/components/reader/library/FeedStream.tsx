@@ -5,6 +5,8 @@ import {
   Check,
   ChevronDown,
   Loader2,
+  LogIn,
+  LogOut,
   Plus,
   RefreshCw,
   Rss,
@@ -34,6 +36,7 @@ import { cn } from '@/lib/utils'
 import type { FeedItem } from '../../../../contracts/feed'
 import { FEED_SOURCES, findFeedSource } from '../../../../contracts/feed'
 import { useFeed } from '@/hooks/reader/useFeed'
+import { useFeedAuth } from '@/hooks/reader/useFeedAuth'
 import {
   useLibraryStore,
   useLibraryUi,
@@ -116,6 +119,8 @@ export function FeedStream({
     fetchNextPage,
   } = useFeed(feedSource, feedChannel)
 
+  const auth = useFeedAuth(feedSource, Boolean(source.auth))
+
   const allItems = useMemo(() => {
     const seen = new Set<string>()
     const items: FeedItem[] = []
@@ -194,6 +199,28 @@ export function FeedStream({
   const handleRefresh = async () => {
     const failure = await refresh()
     if (failure) toast.error('刷新失败', { description: failure.message })
+  }
+
+  const handleLogin = async () => {
+    const result = await auth.login()
+    if ('error' in result) {
+      toast.error('登录窗口打开失败', { description: result.error.message })
+      return
+    }
+    if (!result.status.authenticated) {
+      toast.info('登录窗口已关闭，未检测到登录状态')
+      return
+    }
+    toast.success(
+      result.status.user ? `已登录 ${result.status.user}` : `已登录 ${source.label}`,
+    )
+    await refetch()
+  }
+
+  const handleLogout = async () => {
+    await auth.logout()
+    toast.info('已退出登录')
+    await refetch()
   }
 
   const handleToggleLater = (item: FeedItem) => {
@@ -296,6 +323,48 @@ export function FeedStream({
             ))}
           </TabsList>
         </Tabs>
+
+        {source.auth && !auth.isPending && (
+          auth.data?.authenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs text-primary"
+                  title="登录状态"
+                >
+                  <span className="size-1.5 rounded-full bg-primary" />
+                  {auth.data.user ?? '已登录'}
+                  <ChevronDown className="size-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                  {source.label}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs"
+                  onClick={() => void handleLogout()}
+                >
+                  <LogOut className="size-3.5" />
+                  退出登录
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs"
+              onClick={() => void handleLogin()}
+            >
+              <LogIn className="size-3.5" />
+              登录 {source.label}
+            </Button>
+          )
+        )}
 
         {feedSource === 'rss' && (
           <Dialog open={subscribeOpen} onOpenChange={setSubscribeOpen}>
@@ -410,22 +479,40 @@ export function FeedStream({
           ))}
         </ul>
       ) : isError ? (
-        <div
-          role="alert"
-          className="mx-auto my-12 flex max-w-sm flex-col items-center rounded-xl border border-border/70 bg-card px-6 py-8 text-center"
-        >
-          <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <AlertTriangle className="size-5" />
-          </span>
-          <p className="text-sm font-medium">无法连接 {source.label}</p>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-            {error?.message ?? '请检查网络或代理设置后重试。'}
-          </p>
-          <Button size="sm" className="mt-4 h-8 gap-1.5 text-xs" onClick={() => void refetch()}>
-            <RefreshCw className="size-3.5" />
-            重试
-          </Button>
-        </div>
+        source.auth && !auth.data?.authenticated ? (
+          <div className="mx-auto my-12 flex max-w-sm flex-col items-center rounded-xl border border-border/70 bg-card px-6 py-8 text-center">
+            <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <LogIn className="size-5" />
+            </span>
+            <p className="text-sm font-medium">需要登录 {source.label}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {auth.data?.blocked
+                ? `${source.label} 拒绝了未登录请求。请在登录窗口中完成登录后返回。`
+                : `登录后即可读取该来源的资讯。账号密码只在 ${source.label} 官方页面输入，Montree 不保存。`}
+            </p>
+            <Button size="sm" className="mt-4 h-8 gap-1.5 text-xs" onClick={() => void handleLogin()}>
+              <LogIn className="size-3.5" />
+              登录 {source.label}
+            </Button>
+          </div>
+        ) : (
+          <div
+            role="alert"
+            className="mx-auto my-12 flex max-w-sm flex-col items-center rounded-xl border border-border/70 bg-card px-6 py-8 text-center"
+          >
+            <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="size-5" />
+            </span>
+            <p className="text-sm font-medium">无法连接 {source.label}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {error?.message ?? '请检查网络或代理设置后重试。'}
+            </p>
+            <Button size="sm" className="mt-4 h-8 gap-1.5 text-xs" onClick={() => void refetch()}>
+              <RefreshCw className="size-3.5" />
+              重试
+            </Button>
+          </div>
+        )
       ) : items.length === 0 ? (
         <div className="mx-auto my-12 flex max-w-sm flex-col items-center text-center">
           <SearchX className="mb-3 size-6 text-muted-foreground/60" />

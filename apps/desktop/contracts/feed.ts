@@ -1,8 +1,11 @@
 import type { AppError, Result } from '@yitom/contracts'
 
 export const FEED_FETCH_IPC = 'feed:fetch'
+export const FEED_AUTH_LOGIN_IPC = 'feed:auth:login'
+export const FEED_AUTH_STATUS_IPC = 'feed:auth:status'
+export const FEED_AUTH_LOGOUT_IPC = 'feed:auth:logout'
 
-export type FeedSourceId = 'hacker-news' | 'lobsters' | 'rss' | 'arxiv'
+export type FeedSourceId = 'hacker-news' | 'lobsters' | 'rss' | 'arxiv' | 'ai' | 'linux-do'
 
 export interface FeedChannelDefinition {
   id: string
@@ -14,6 +17,10 @@ export interface FeedSourceDefinition {
   label: string
   description: string
   channels: FeedChannelDefinition[]
+  /** 需要登录的来源：渲染端展示登录入口，主进程打开真实登录窗口 */
+  auth?: {
+    loginUrl: string
+  }
 }
 
 /**
@@ -61,6 +68,30 @@ export const FEED_SOURCES: FeedSourceDefinition[] = [
       { id: 'cs-lg', label: '机器学习' },
       { id: 'cs-pl', label: '编程语言' },
       { id: 'cs-dc', label: '分布式系统' },
+    ],
+  },
+  {
+    id: 'ai',
+    label: 'AI 前沿',
+    description: '模型厂商与研究团队的最新动态',
+    channels: [
+      { id: 'claude', label: 'Claude' },
+      { id: 'huggingface', label: 'Hugging Face' },
+      { id: 'openai', label: 'OpenAI' },
+      { id: 'deepmind', label: 'DeepMind' },
+      { id: 'google-ai', label: 'Google AI' },
+      { id: 'bair', label: 'BAIR' },
+      { id: 'import-ai', label: 'Import AI' },
+    ],
+  },
+  {
+    id: 'linux-do',
+    label: 'Linux.do',
+    description: '中文技术社区，需要登录',
+    auth: { loginUrl: 'https://linux.do/login' },
+    channels: [
+      { id: 'latest', label: '最新' },
+      { id: 'top', label: '热门' },
     ],
   },
 ]
@@ -115,4 +146,27 @@ export interface FeedResult {
 
 export interface FeedAPI {
   fetch: (payload: FeedFetchPayload) => Promise<Result<FeedResult, AppError>>
+}
+
+export interface FeedAuthStatus {
+  authenticated: boolean
+  /** 登录态探测到的用户名 */
+  user?: string
+  /** 被站点 WAF 拦截，登录窗口也未必可用 */
+  blocked?: boolean
+}
+
+export interface FeedAuthAPI {
+  login: (source: FeedSourceId) => Promise<Result<FeedAuthStatus, AppError>>
+  status: (source: FeedSourceId) => Promise<Result<FeedAuthStatus, AppError>>
+  logout: (source: FeedSourceId) => Promise<Result<void, AppError>>
+}
+
+/** 登录窗口与主进程抓取共用，避免 UA 不一致导致 Cloudflare 登录态失效 */
+export const FEED_BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Montree/0.4.30'
+
+/** 每个登录来源独立的持久化分区，避免 Cookie 串站 */
+export function feedAuthPartition(source: FeedSourceId): string {
+  return `persist:montree-feed-auth-${source}`
 }

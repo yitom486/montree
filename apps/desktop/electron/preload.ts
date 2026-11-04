@@ -1,7 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { WEB_DOC_IMAGE_IPC, type WebDocImagesAPI } from '../contracts/web-doc'
 import { HN_FIND_DISCUSSION_IPC, type HnAPI } from '../contracts/hn'
-import { FEED_FETCH_IPC, type FeedAPI } from '../contracts/feed'
+import {
+  FEED_AUTH_LOGIN_IPC,
+  FEED_AUTH_LOGOUT_IPC,
+  FEED_AUTH_STATUS_IPC,
+  FEED_FETCH_IPC,
+  type FeedAPI,
+  type FeedAuthAPI,
+} from '../contracts/feed'
 import { TRANSLATION_IPC, type TranslationAPI } from '../contracts/translation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
@@ -48,6 +55,13 @@ const feedAPI: FeedAPI = {
   fetch: (payload) => ipcRenderer.invoke(FEED_FETCH_IPC, payload),
 }
 contextBridge.exposeInMainWorld('montreeFeed', feedAPI)
+
+const feedAuthAPI: FeedAuthAPI = {
+  login: (source) => ipcRenderer.invoke(FEED_AUTH_LOGIN_IPC, source),
+  status: (source) => ipcRenderer.invoke(FEED_AUTH_STATUS_IPC, source),
+  logout: (source) => ipcRenderer.invoke(FEED_AUTH_LOGOUT_IPC, source),
+}
+contextBridge.exposeInMainWorld('montreeFeedAuth', feedAuthAPI)
 
 const electronAPI: ElectronAPI = {
   typstGetConfig: filePath => ipcRenderer.invoke(IPC.TYPST_GET_CONFIG, filePath),

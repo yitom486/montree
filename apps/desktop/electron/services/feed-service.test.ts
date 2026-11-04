@@ -250,6 +250,28 @@ describe('feed-service', () => {
     expect(parseFeedTitle('<broken>')).toBeNull()
   })
 
+  it('AI 前沿按频道抓取官方 RSS', async () => {
+    const fetchImpl = vi.fn(async (target: string | URL | Request) => {
+      expect(String(target)).toBe('https://claude.dev/rss.xml')
+      return textResponse(
+        `<rss version="2.0"><channel><title>claude.dev Blog</title><item><title>Claude Code review</title><link>https://claude.dev/blog/review/</link><pubDate>Thu, 15 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>`,
+      )
+    }) as unknown as typeof fetch
+
+    const result = await fetchFeed(
+      { source: 'ai', channel: 'claude', limit: 5 },
+      { fetchImpl },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.items[0]).toMatchObject({
+      source: 'ai',
+      title: 'Claude Code review',
+      domain: 'claude.dev',
+    })
+    expect(result.value.feedTitle).toBe('claude.dev Blog')
+  })
+
   it('arXiv 分页传递 start 并返回页码', async () => {
     const fetchImpl = vi.fn(async () =>
       textResponse(`<?xml version="1.0"?>

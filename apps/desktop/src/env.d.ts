@@ -5,7 +5,7 @@ import type { TerminalAPI } from '../contracts/terminal'
 import type { TranslationAPI } from '../contracts/translation'
 import type { WebDocImagesAPI } from '../contracts/web-doc'
 import type { HnAPI } from '../contracts/hn'
-import type { FeedAPI } from '../contracts/feed'
+import type { FeedAPI, FeedAuthAPI } from '../contracts/feed'
 import type { AgentInspectionAPI } from '../contracts/agent-inspection'
 import type { HtmlPreviewAPI } from '../contracts/html-preview'
 import type { InlineCompletionAPI } from '../contracts/inline-completion'
@@ -33,6 +33,7 @@ declare global {
     montreeWebDocImages?: WebDocImagesAPI
     montreeHn?: HnAPI
     montreeFeed?: FeedAPI
+    montreeFeedAuth?: FeedAuthAPI
     montreeAgentInspection?: AgentInspectionAPI
     montreeHtmlPreview?: HtmlPreviewAPI
     montreeInlineCompletion?: InlineCompletionAPI

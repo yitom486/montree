@@ -20,7 +20,8 @@
 | `sync-api.ts` | 云端同步（WebDAV 配置、连接测试、双向同步） |
 | `web-doc-api.ts` | 在线文档：抓取页面（优先页面声明的 Markdown 源，失败回退 HTML）、发现目录 |
 | `hn-api.ts` | 文章 URL → HN 讨论反查，经 preload `montreeHn` 桥接；24 小时反查缓存 |
-| `feed-api.ts` | 通用资讯流：Hacker News / Lobsters / 精选 RSS / arXiv / 自定义订阅，主进程按 source+channel 回源与缓存 |
+| `feed-api.ts` | 通用资讯流：Hacker News / Lobsters / 精选 RSS / arXiv / AI 前沿 / 自定义订阅，主进程按 source+channel 回源与缓存 |
+| `feed-auth-api.ts` | 需要登录的资讯来源：打开真实登录窗口、查询登录态、退出登录；Cookie 只留在主进程独立分区 |
 | `bun-api.ts` | Bun 运行时状态查询与一键安装 |
 | `ocr-api.ts` | OCR 组件状态、单页识别、目录识别与目录页范围探测（只建议范围） |
 | `rosetta-api.ts` | 罗盘索引：扫描书一键导入、进度订阅、书信息、统一读查询、纯本地目录重建、正文水印只读预览、备份并应用正文水印（二次确认后调用，空计划 noop）、已入库内容只读取证 |
