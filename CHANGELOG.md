@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.31] - 2026-11-05
+
 - **阅读馆资讯源重构**：发现页改为通用 `FeedSource` / `FeedItem`，接入 Hacker News、Lobsters、arXiv、AI 前沿、技术博客与自定义 RSS；来源/频道切换、已读、稍后读与书架按 `source:id` 隔离。
 
 - **通用分页与缓存**：Hacker News 按 id 列表分页、Lobsters 使用 `/page/N.json`、arXiv 使用 `start` 参数；RSS/Atom 支持 `rel="next"`，Substack 订阅走归档接口；列表底部统一「加载更多」，各来源独立缓存时长与本地快照。
@@ -751,7 +755,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.30...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.31...HEAD
+[0.4.31]: https://github.com/yitom486/montree/compare/v0.4.30...v0.4.31
 [0.4.30]: https://github.com/yitom486/montree/compare/v0.4.29...v0.4.30
 [0.4.29]: https://github.com/yitom486/montree/compare/v0.4.28...v0.4.29
 [0.4.28]: https://github.com/yitom486/montree/compare/v0.4.27...v0.4.28
