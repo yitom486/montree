@@ -6,6 +6,22 @@
 
 ## [未发布]
 
+- **阅读馆资讯源重构**：发现页改为通用 `FeedSource` / `FeedItem`，接入 Hacker News、Lobsters、arXiv、AI 前沿、技术博客与自定义 RSS；来源/频道切换、已读、稍后读与书架按 `source:id` 隔离。
+
+- **通用分页与缓存**：Hacker News 按 id 列表分页、Lobsters 使用 `/page/N.json`、arXiv 使用 `start` 参数；RSS/Atom 支持 `rel="next"`，Substack 订阅走归档接口；列表底部统一「加载更多」，各来源独立缓存时长与本地快照。
+
+- **AI 前沿**：新增 Claude、Hugging Face、OpenAI、Google DeepMind、Google AI、BAIR、Import AI 七个频道。
+
+- **自定义 RSS**：技术博客来源支持添加/删除 RSS/Atom 订阅并自动读取 feed 标题；抓取逐跳校验重定向并拦截本机/内网地址。
+
+- **Linux.do 与登录窗口**：新增 Linux.do 最新/热门频道；需要登录的来源通过独立持久化分区打开真实登录窗口，不接触账号密码，登录状态可探测/退出，抓取使用同一会话。
+
+- **正文与讨论连接**：HN 讨论页重建评论树、清理缩进占位图并生成顶层评论目录；正文页与讨论页双向切换；手动打开文章可按 URL 反查 HN 讨论。
+
+- **arXiv 阅读修复**：修复 LaTeXML 缩放表格压住正文；PDF / TeX 源码等非 HTML 资源改为系统浏览器打开；arXiv 讨论页目录只保留标题。
+
+- **打包**：补充 `@xmldom/xmldom` 主进程运行时白名单，修复 CI `check:bundle`。
+
 ---
 
 ## [0.4.30] - 2026-11-03
