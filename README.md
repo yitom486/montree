@@ -136,6 +136,6 @@ bun update @yitom/contracts @yitom/reader-core @yitom/annotations @yitom/chat-co
 
 ## 📜 许可证
 
-本项目基于 [MIT License](./LICENSE) 开源。
+本项目基于 [MIT License](./LICENSE) 开源。第三方组件与资源许可见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
 *山木自寇也，膏火自煎也。在信息喧嚣的时代，愿 Montree 成为陪伴你静心阅读的那方净土。*
