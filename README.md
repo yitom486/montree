@@ -97,6 +97,8 @@ curl -fsSL https://bun.sh/install | bash
 
 Montree 项目统一采用极速现代包管理工具 **[Bun](https://bun.sh)**（请勿使用 npm / yarn / pnpm）。
 
+测试运行时另需真实 Node.js 24（版本见 `.node-version`），并确保 `node` 在 PATH 中可用；Bun 负责包管理，不能替代依赖 Node SQLite、子进程及远端协议的测试运行时。
+
 ```bash
 # 1. 克隆仓库（包含阅读后端子模块）
 git clone --recurse-submodules https://github.com/yitom486/montree.git
@@ -124,15 +126,17 @@ Typst 文档可从文件树的新建菜单创建，或直接打开 `.typ` 文件
 
 ### 聊天与 ACP 包依赖
 
-通用聊天与协议实现分别由外部的 montree-chat、acp-client 仓库维护，Montree 从 npm 安装正式发布包。七个自有包的依赖及根 overrides 统一使用 `latest`，具体安装版本由 `bun.lock` 记录。
+通用聊天、共享契约、阅读器与标注实现由外部 montree-chat 仓库维护，ACP 客户端由 acp-client 仓库维护，Montree 安装正式发布的 `@yitom/*` 包。当前聊天相关六个包由根 overrides 固定为 `0.1.26`，`@yitom/acp-client` 使用 `latest`；确切安装版本由 `bun.lock` 记录。升级时同步调整依赖与 overrides，并验证桌面接入。
 
 ```bash
 bun install
-# 更新到自有包最新发布版本
+# 按 package.json 中的版本约束更新（升级固定版本时先调整依赖与 overrides）
 bun update @yitom/contracts @yitom/reader-core @yitom/annotations @yitom/chat-core @yitom/chat-ui @yitom/chat-session @yitom/acp-client
 ```
 
 已移除迁移期的本地 tarball 快照及同步脚本，安装不再依赖相邻源码目录。Electron 窗口、IPC、文档快照和业务操作仍在本仓。
+
+本仓 `packages/` 仅保留五个本地包：`@montree/pdf`、`@montree/ocr-core`、`@montree/web-doc`、`@montree/workspace-core` 与 `@montree/remote-server`。跨项目通用契约使用 `@yitom/contracts`，桌面专用 IPC 补充契约放在 `apps/desktop/contracts/`。架构分工见 [AGENTS.md](./AGENTS.md)、[渲染端说明](./apps/desktop/src/README.md)和[主进程说明](./apps/desktop/electron/README.md)。
 
 ## 📜 许可证
 

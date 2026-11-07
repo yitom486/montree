@@ -20,9 +20,9 @@ Selector 返回对象时必须 `useShallow`：见 `.cursor/rules/zustand-selecto
 | `library-store.ts` | 阅读馆视图状态与持久化：主导航 Tab（发现 / 书架 / 稍后阅读 / 最近）、资讯来源与频道（HN / Lobsters / RSS / arXiv / AI 前沿 / Linux.do）、自定义 RSS 订阅、书架分类筛选、滚动位置记忆、阅读器返回上下文、已读条目 key、稍后阅读与书架条目；不含演示数据，首次使用为空 |
 | `acp-ui-store.ts` | Agent 连接、权限、业务线程元数据与包消息只读投影；消息 feed/回合由 `@yitom/chat-session` 唯一归约和持久化；元数据同步落盘，线程会话 id 按运行时分桶（`agentSessionIds`） |
 | `annotation-agent-store.ts` | 批注 AI 助手：按书线程、独立 agentSessionIds（按运行时分桶）、pendingDraft |
-| `tts-store.ts` | 语音朗读听书：Google Gemini / Azure Speech / Local OpenAI / 系统语音；接收段号、排队、缓冲等待与播放完成分别维护，云端确认结束且播放队列耗尽才完成。主备容灾由主进程处理；接收中断后缓冲音频继续播放，耗尽后保留位置并暂停，按服务端额度恢复时间保护重试。未接收完的进度条显示已验证、可播放音频进度。按正文与语音配置指纹持久保存最近 100 章的实际播放秒数（每 2 秒、暂停/关闭/退出时保存），恢复时跳过已经听过的缓存 PCM，完整播放后清除位置。悬浮播放器、章节进度记忆。回归测试见 `tts-store-stream.test.ts`。 |
+| `tts-store.ts` | 语音朗读状态适配与偏好持久化：保留组件公开动作、配置校验/主进程同步、播放器位置与最近 100 章播放位置快照；音频资源、流订阅、暂停/跳转与释放由 `lib/reader/tts/playback-engine` 实例管理，经状态端口回写；热更新释放实例。原有行为回归见 `tts-store-stream.test.ts`，引擎生命周期回归见 `lib/reader/tts/playback-engine.test`。 |
 | `subsession-progress-store.ts` | 独立副会话（目录 AI 整理等）流式进度与实时看板状态（步骤计数、当前工具、思考摘要） |
-| `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store）；兼容 ACP `content` 与 MCP `rawOutput.result.content/structuredContent`，主聊天与批注助手共用；现为 `@montree/chat-core` 的兼容重导出层（类型/函数源已迁 core） |
+| `acp-chat-types.ts` | Agent 聊天消息结构与解析辅助（非独立 store）；兼容 ACP `content` 与 MCP `rawOutput.result.content/structuredContent`，主聊天与批注助手共用；现为 `@yitom/chat-core` 的兼容重导出层（类型/函数源已迁 core） |
 | `acp/` | ACP 智能体交互与次世代伴读 HUD 专职子状态（见 `acp/README.md`） |
 
 协议/传输/认证纯逻辑已独立至 `@yitom/acp-client`；本目录仅存 UI 与会话展示状态，不放 IPC 数据。

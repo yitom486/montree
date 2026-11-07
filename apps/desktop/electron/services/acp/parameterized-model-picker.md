@@ -93,7 +93,7 @@ display 顺序固定为 mode0/model1/thought2/context3（`splitConfigOptions` �
 
 - `zed-industries/zed#57571`：`https://github.com/zed-industries/zed/pull/57571`
 - 握手注释见 `acp-connection.ts`（`_meta.parameterizedModelPicker=true` 处）。
-- 解析兼容：`packages/acp/src/session/config-options.ts`
+- 解析兼容：外部包 `@yitom/acp-client` 的配置选项解析模块
   （布尔/数字选项值转 string，boolean `currentValue` 原样保留）。
 
 ## 9. 双命名空间：方括号 variants vs 横杠 canonical（受控尝试）
@@ -111,7 +111,7 @@ display 顺序固定为 mode0/model1/thought2/context3（`splitConfigOptions` �
   `auto` 保留原样，空输出/超时/非零退出一律 null），进程级内存缓存一次
   （不断言跨版本新鲜度）。`openSessionAfterAuth` 在 cursor 成功建会话后附带拉取，
   失败吞掉记 dev 日志、不阻断连接，经 `AcpConnectResult.modelCatalog`
-  （`packages/contracts/src/types/acp.ts` 可选字段）带回渲染；
+  （`@yitom/contracts` 的 `AcpConnectResult` 可选字段）带回渲染；
   渲染端 `session-slice` 以 `modelCatalogByRuntime` 内存态（不持久化）按运行时存放，
   连接成功写入、disconnect/切换清空（沿用 `setSession`/`setStatus` 现有清位语义）。
   全程无新 IPC 方法；渲染禁 spawn 红线不变（目录只在主进程拉）。

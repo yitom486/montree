@@ -1,5 +1,7 @@
 # M1 文件级搬运清单：`apps/desktop/src` → `packages/chat-core/src`
 
+> 历史迁移记录：本文保留拆包时的目录、包名与验收结果。相关实现现由外部 montree-chat 仓库维护，包名已从 `@montree/*` 迁为 `@yitom/*`；本文中的旧 `packages/` 路径不代表当前仓库布局。当前依赖与职责见[根 README](../README.md#聊天与-acp-包依赖)。
+
 > 原则：行为不变、只换 import 源；按批执行，每批独立可合（单测 + `lint:deps` + `tsconfig.node` 全绿）。
 
 ## 0. 基线（迁移前，原目录 `master@551be1f` 实测）

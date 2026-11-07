@@ -1,7 +1,7 @@
 # @montree/workspace-core
 
 workspace 独立协议的**纯逻辑**包：零运行时导入（仅 `import type` 消费
-`@montree/contracts`），可被 `electron-vite` 打进主进程，也可被 Bun 内联进
+`@yitom/contracts`），可被 `electron-vite` 打进主进程，也可被 Bun 内联进
 远端自包含 bundle。
 
 | 文件 | 功能 |
@@ -13,5 +13,5 @@ workspace 独立协议的**纯逻辑**包：零运行时导入（仅 `import typ
 | `src/revision.ts` | 不透明 revision token（`size:mtimeMs:hash`）拼装/解析/全等比较 |
 | `src/protocol.test.ts` / `src/pure.test.ts` | 分帧/校验/握手/路径/revision 单测 |
 
-协议细节（帧格式、握手字段、限额）见 `@montree/contracts` 的
-`src/types/workspace.ts`；服务端实现见 `@montree/remote-server`。
+协议细节（帧格式、握手字段、限额）见 `@yitom/contracts` 的
+公开子路径 `@yitom/contracts/types/workspace`；服务端实现见 `@montree/remote-server`。

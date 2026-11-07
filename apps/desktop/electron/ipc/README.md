@@ -10,7 +10,7 @@
 | `terminal-handlers.ts` | 主 frame 校验、可信窗口/工作区选择、终端会话归属；刷新、崩溃与窗口销毁时清理 |
 | `acp-window-handlers.ts` / `acp-window-handlers.test.ts` | 以可信 IPC sender 隔离 Agent 连接、事件、权限和文档快照；翻译使用按窗口/运行时独立的上下文与 `translation:*` 通道，连接/认证/状态不进入主聊天，校验跨用途会话归属；窗口销毁时清理全部上下文及进程 |
 
-通道名与 payload 类型在 `packages/contracts/src/ipc/`（`@montree/contracts`，原 `shared/ipc/`）。有返回值的一律 `Result<T, AppError>`；用户取消 `CANCELLED`。
+通道名与 payload 类型在 外部包 `@yitom/contracts`（通道与 IPC 类型），桌面专用补充契约位于 `apps/desktop/contracts/`。有返回值的一律 `Result<T, AppError>`；用户取消 `CANCELLED`。
 
 - `inline-completion-handlers.ts`：行内补全 IPC（请求/取消/状态/专用 provider/ChatGPT 登录/动态模型列表），按窗口取消在途请求；`E2E_INLINE_COMPLETION_MOCK=1` 时使用模拟模型。
 - `typst-handlers.ts`：Typst IPC 主窗口/本机宿主校验、会话归属、导出对话框与原子 PDF 写入。

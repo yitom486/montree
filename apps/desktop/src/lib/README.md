@@ -1,6 +1,6 @@
 # src/lib
 
-渲染进程**纯逻辑**（无 React Hook）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@yitom/reader-core`（`node_modules/@yitom/reader-core/dist/`）。  
+渲染进程**无 React Hook 的逻辑与运行时模块**（阅读器包含 DOM、音频等端侧能力）。按产品域分子目录；通过 `@/lib/<域>/模块` 引用；通用导航/选区/标记逻辑走 `@yitom/reader-core`（`node_modules/@yitom/reader-core/dist/`）。
 **不要**在根目录再堆新文件。例外：`utils.ts` 是 shadcn 的 `cn()`，必须留在 `@/lib/utils`。
 
 组件胶水在 `src/hooks/`，IPC 在 `src/api/`，UI 状态在 `src/stores/`。
@@ -15,7 +15,7 @@
 | `preview/` | 预览 DOM：代码块复制、消毒、Mermaid hydrate |
 | `html/` | 本地 HTML 阅读正文抽取：可见纯文本、标题单元与目录 |
 | `reader/` | EPUB / PDF / MOBI / **在线文档 HTML** 渲染端专属逻辑，按域分子目录（`adapter/` `pdf/` `pdf-ocr/` `rosetta/` `marks/` `web-doc/` `tts/`，详见该目录 README） |
-| `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@montree/contracts`） |
+| `quiz/` | AI 伴读考官出题、自动判卷打分、JSONL 知识库与仓储抽象（`parse`/`serialize` 已下沉 `@yitom/contracts`） |
 | `workspace/` | 文件树、对话框路径、全局错误上报 |
 | `agent/` | ACP 会话辅助；`context/` 为 Montree 注入 Agent 的 Skill / 快照 / 选区（协议/传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`） |
 | `data/` | CSV/TSV 表格数据集、JSON 树形模型与 LOG 日志流数据解析与 CRUD（纯逻辑模型层） |
@@ -81,7 +81,7 @@
 | `rosetta/` | 罗盘：目录归一/签名状态、块转 Agent 文本、只读取卫、目录 AI 整理（`toc-ai`） |
 | `marks/` | 阅读标记渲染/命中（PDF/MOBI/Web）、划词匹配、Anki 与读书笔记导出 |
 | `web-doc/` | 在线文档：`web-doc-images` 恢复 CORP 等导致的图片失败；正文提取、页头剥离、链接、本页大纲、公式/代码块/iframe、一键转 Markdown 导出、Agent 按页抓文；`hn-discussion` 单独重建 Hacker News 讨论页（去 `s.gif` 缩进占位图、按 indent 还原评论树）；`discussion-link` 从文章 HTML 自动发现 Hacker News / Reddit / Lobsters / GitHub Discussions 入口，供正文页挂讨论链接 |
-| `tts/` | 语音朗读：正文智能降噪清洗（过滤 URL/角标/脚注并保留链接正文）、静态声学物理停顿对齐器（严格 1:1 数量守恒与静态二分查表）、Web Audio 实时流式 PCM 播放器 |
+| `tts/` | 独立播放引擎 `playback-engine`（状态端口 `playback-types`，无 Zustand 依赖），语音朗读：正文智能降噪清洗（过滤 URL/角标/脚注并保留链接正文）、静态声学物理停顿对齐器（严格 1:1 数量守恒与静态二分查表）、Web Audio 实时流式 PCM 播放器 |
 
 根目录留跨格式骨架：`reader-adapter` / `reader-unit-tree` / `scroll-anchor` / `reader-viewport-*`（测试助手）/ `wait-for-dom`。
 
@@ -97,7 +97,7 @@
 | `dialog-default-path` | 打开/保存对话框默认目录 |
 | `workspace-session` | 启动时恢复上次文件 / 在线文档 |
 | `report-error` / `error-reporter` | AppError 与运行时错误上报 |
-| `path-utils.test` / `document-types.test` | 测的是 `@montree/contracts`（原 `@shared`）路径与文档类型，放在工作区侧 |
+| `path-utils.test` / `document-types.test` | 测的是 `@yitom/contracts`（原 `@shared`）路径与文档类型，放在工作区侧 |
 
 ## quiz/
 
@@ -114,7 +114,7 @@
 
 生成式 UI 参数模板：`agent/context/present-presets.ts`（阅读对比/引用/测验）与 `agent/context/present-diagram.ts`（三类 SVG 图解；思维导图快照经 `agent/context/mindmap-artifact.ts` 还原为大纲后交给 Markmap，其它类型或无法解析时仍走隔离 iframe；历史快照由 `agent/context/upgrade-legacy-mindmap.ts` 动态热升级折叠支持），经 `agent/context/present-result-builder.ts` 统一验证与组装，不执行模型提供的模板源码。
 
-Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `@montree/chat-ui` 包内 `chat-markdown`（M3a 由原 components/markdown 下 `AgentMarkdown` 入口整搬改名）。
+Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染器迁移节点；入口见 `@yitom/chat-ui` 包内 `chat-markdown`（M3a 由原 components/markdown 下 `AgentMarkdown` 入口整搬改名）。
 
 | 文件 | 功能 |
 |------|------|
@@ -122,10 +122,10 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `context/reader-visual-context` | 网页/EPUB DOM 与 Markdown 图片引用、图注/可见状态、当前阅读区裁剪范围；回归见同名 `.test.ts` |
 | `context/document-tool-registry` / `.test.ts` | 当前 Markdown/TXT/Typst、表格/PPT 的结构化读写、撤销、保存桥接与 dirty 通知；空白选区回归 |
 | `context/read-marks-for-agent` / `.test.ts` | 阅读器与已注册卡片模块的 Markdown 的 MCP 标记/高亮/书签查询；要求 Markdown provider 与当前文档路径一致 |
-| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @montree/chat-core，见包内 `permission-ui`） |
+| `acp-permission` / `acp-permission-ui` | 权限请求与卡片展示（孤立审批兜底按时间线实际渲染判定：分组跳过/晚到/缺 ID/裁剪时才浮出）（`acp-permission-ui` 已迁 @yitom/chat-core，见包内 `permission-ui`） |
 | `permission-respond` | 审批响应宿主实现（跨卡幂等领取 + 清理 + `acpApi.respondPermission` 发送；包内审批卡经 `onRespond` 回调到此） |
 | `chat-transport-port` / `.test.ts` | P0 宿主侧 `ChatTransportPort`（`sendText/cancel/respondPermission` 委托现有 `acpApi` 链路：工作区前缀 + bootstrap 一次语义 + 附件透传位；只 resolve/reject，不写时间线不弹 toast；P1 并跑用，现有调用链不动） |
-| `acp-plan` | 计划条目解析与进度摘要（已迁 @montree/chat-core，见包内 `plan`） |
+| `acp-plan` | 计划条目解析与进度摘要（已迁 @yitom/chat-core，见包内 `plan`） |
 | `acp-config-preferences` | Mode/Model 等配置记忆 |
 | `acp-config-menu` | Agent 配置项下拉分类与 primary/secondary 切分（含 boolean 开关直通 secondary；fast 类 boolean 由 `findFastToggle` 单列 `fastToggle` 并从 secondary 摘出，`selectFastDefaultOffTarget` 给首次连接默认关一次） |
 | `acp-model-thinking` | 模型值尾缀思考档提取与只读徽标条件 |
@@ -147,14 +147,14 @@ Agent 正文分块由单个 Streamdown 实例维护，避免自研头尾渲染�
 | `translation-session` / `translation-config`（各含 `.test`） | 划词翻译隐藏副会话与能力解析：从 Agent 实际选项选择独立模型，级联最低可用思考档或显式档位；跳过主聊天偏好，只配置副会话，拒绝未提供的模型值；目标语言逐 turn、流式返回译文 |
 | `translation-transport` / `.test` | 翻译专属连接和认证：只调用翻译 IPC，连接去重、按运行时路由流式增量、进程退出后按代际重建；右侧聊天未连接/断开/切换均不影响翻译，隔离同名会话 ID |
 | `translation-result` / `.test` | 使用 AI SDK 增量解析译文字段（JSON 尚未结束即可出字）、归并解读工具事件与生成批注正文：校验短语/术语确实来自选段、去重并限制为 3/2 条；原文、译文与解读共同存入批注，不展示模型前言、思考或 JSON 外壳 |
-| `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议）（已迁 @montree/chat-core，见包内同名模块） |
-| `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护（已迁 @montree/chat-core，见包内同名模块） |
-| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史（已迁 @montree/chat-core，见包内同名模块） |
-| `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线）（已迁 @montree/chat-core，见包内同名模块） |
-| `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文）（已迁 @montree/chat-core，见包内同名模块） |
-| `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标）（已迁 @montree/chat-core，见包内同名模块） |
-| `chat-timeline` / `.test.ts` | 聊天时间线纯分组：按真实 user 回合归属（同一回合普通调用汇总一条工作记录，文本保序；无 user 前缀独立成段，scopeKey 按线程隔离）；整回合计数+窗口适配（未加载注记）；失败/待审批/富结果提升单条；稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组）（已迁 @montree/chat-core，见包内同名模块） |
-| `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote（已迁 @montree/chat-core，见包内 `parse-chapter-mark-plan` / `chapter-mark-plans`） |
+| `enrich-tool-message` | tool 消息 enrich（提议卡 + 章级建议）（已迁 @yitom/chat-core，见包内同名模块） |
+| `inline-present` / `.test.ts` | 聊天正文 montree-present 围栏分段与同回合结果关联；只引用此前已成功的校验结果，流式保留原卡片，分页与重复引用保护（已迁 @yitom/chat-core，见包内同名模块） |
+| `parse-present-result` / `.test.ts` | `montree_present` 结果 enrich；严格工具标识判定，不误报 schema 文件；恢复时仅为当前线程已有成功工具补充校验后的呈现正文，保持消息 ID、不新增历史（已迁 @yitom/chat-core，见包内同名模块） |
+| `generative-submit` / `.test.ts` | 生成式 UI 提交归属守卫纯函数（界面线程须等于活动线程，否则拒绝，防切线程串线）（已迁 @yitom/chat-core，见包内同名模块） |
+| `tool-failure-message` | 工具失败 → 聊天气泡内业务说明（折叠标题 + 展开正文）（已迁 @yitom/chat-core，见包内同名模块） |
+| `tool-display-model` / `.test.ts` | 工具纯展示适配：ACP → 中文标题/目标摘要/展示状态/错误摘要/可靠时长（取消·未知不进成功；无元数据不编造目标）（已迁 @yitom/chat-core，见包内同名模块） |
+| `chat-timeline` / `.test.ts` | 聊天时间线纯分组：按真实 user 回合归属（同一回合普通调用汇总一条工作记录，文本保序；无 user 前缀独立成段，scopeKey 按线程隔离）；整回合计数+窗口适配（未加载注记）；失败/待审批/富结果提升单条；稳定 key（`groupChatTimeline` / `isRichToolMessage`；组件旧实现已删，`AnnotationNoteDialog` 同走此分组）（已迁 @yitom/chat-core，见包内同名模块） |
+| `parse-chapter-mark-plan` / `promote-chapter-mark-plans` | 章级划重点 tool 解析与 promote（已迁 @yitom/chat-core，见包内 `parse-chapter-mark-plan` / `chapter-mark-plans`） |
 | `mark-proposal-failure` | 提议/采用失败分类与「打开该章 / 去划词」引导 |
 | `acp-workspace-integration.test` | 工作区绑定会话全生命周期集成测试（跨工作区切换隔离、离线无感切换、Resume 对齐、WSL UNC 别名识别与历史菜单分桶） |
 

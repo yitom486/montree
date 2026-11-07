@@ -1,5 +1,7 @@
 # M3 盘点：聊天渲染 30 文件耦合清单（只读）
 
+> 历史迁移记录：本文保留拆包时的目录、包名与验收结果。相关实现现由外部 montree-chat 仓库维护，包名已从 `@montree/*` 迁为 `@yitom/*`；本文中的旧 `packages/` 路径不代表当前仓库布局。当前依赖与职责见[根 README](../README.md#聊天与-acp-包依赖)。
+
 > 工作树 `chat-render-init`，基线 `master@551be1f`。计划见 `docs/chat-render-extraction-plan.md` §M3。
 > 路径注：任务清单里的 `chat/*|tools/*|generative/*|propose/*|permission/*` 实际位于
 > `apps/desktop/src/components/agent/chat|tools|generative|propose|permission/`；

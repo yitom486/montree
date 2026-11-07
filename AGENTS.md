@@ -46,11 +46,10 @@ apps/desktop/src/styles/      # 全局与阅读器 CSS（见 README）
 apps/desktop/e2e/        # Playwright E2E（见该目录 README）
 apps/desktop/resources/  # 图标等构建资源（`icon.png`/`icon.ico`）
 apps/desktop/electron.vite.config.ts | electron-builder.yml | playwright.config.ts  # 三配置已搬入 apps/desktop/，根命令经 --config 引用
-shared/          # 已清空：仅剩无文件空目录，阶段 10 删除；新代码禁止引用
-packages/        # `@montree/*` 私有 workspace 包：contracts / reader-core / pdf / ocr-core / annotations / web-doc / workspace-core（协议纯逻辑） / remote-server（Node 远端服务；ACP 已独立为外部包 `@yitom/acp-client`）
+packages/        # 五个本地 `@montree/*` workspace 包：pdf / ocr-core / web-doc / workspace-core / remote-server
 scripts/ | third-party/  # 留守根（含手搓 JSON-RPC 教学归档，三无隔离，禁被正式 import）
 out/             # 留守根：构建输出（main / preload / renderer）；release/ 亦落根
-.plan/           # 本地计划（已 gitignore，不提交）
+.plan/           # 可选的本地计划目录（已 gitignore，不提交；当前检出可不存在）
 .cursor/rules/   # Agent 强制细则
 ```
 
@@ -59,7 +58,9 @@ out/             # 留守根：构建输出（main / preload / renderer）；rel
 ACP（阶段 A/B/C）：协议与客户端底层纯逻辑已独立至 `@yitom/acp-client`（传输/认证/会话/多运行时适配/MCP）；主进程 `apps/desktop/electron/services/acp/` 留守接入桥接 + `apps/desktop/src/api/acp-api.ts` + `AgentPanel`；协议 v1，默认 `codex-acp`。  
 UI：**壳自研、皮复用**（shadcn + 可选开源消息渲染）；认证：**复用 `~/.codex` / ACP authMethods**（对齐 VS Code / Zed）。细则见本地 `.plan/`（若有）。
 
-路径别名：`@/` → `apps/desktop/src/`，`@montree/*` → `packages/*/src/index.ts`，`@foliate` → `third-party/foliate-js`；`@shared/` → `shared/` 已废弃（渲染/测试已剔除，新代码禁用）。
+共享契约、阅读器、标注和聊天由外部 montree-chat 仓库维护，使用已发布的 `@yitom/contracts`、`@yitom/reader-core`、`@yitom/annotations`、`@yitom/chat-core`、`@yitom/chat-ui`、`@yitom/chat-session`；ACP 客户端使用 `@yitom/acp-client`。版本以根 `package.json` 与 `bun.lock` 为准，不再保留本地同名包。
+
+路径别名：`@/` → `apps/desktop/src/`，本地五个 `@montree/*` 包按构建与 TypeScript 配置解析至各自 `src/index.ts`（渲染端仅开放所需包），`@foliate` → `third-party/foliate-js`。`@yitom/*` 经正常包解析加载；旧 `@shared/` 禁用。
 
 **子目录 README**：`apps/desktop/src/`、`apps/desktop/electron/` 及其子目录等凡有 `README.md` 的目录，增删文件或改文件名后必须同步更新其中的列表与路径引用（叶目录若写「见上级 README」，则改上级清单）。`acp/mcp/` 等更底层实现以代码与上级 README 为准，不必层层铺文档。避免文档与目录脱节。
 
@@ -78,7 +79,7 @@ webPreferences: {
 }
 ```
 
-新增能力顺序：`packages/contracts`（`@montree/contracts`；`shared/` 已清空待删）类型/错误 → `apps/desktop/electron/services` → `ipc/register-handlers` → `electron-api.types`（已迁 contracts） → `preload` → `apps/desktop/src/api` → hooks。
+新增能力顺序：外部包 `@yitom/contracts`（共享类型/错误；桌面专用契约放 `apps/desktop/contracts/`） → `apps/desktop/electron/services` → `ipc/register-handlers` → `electron-api.types`（已迁 contracts） → `preload` → `apps/desktop/src/api` → hooks。
 
 有返回值的 IPC 一律 `Result<T, AppError>`；用户取消用 `CANCELLED`（不弹错误）。
 

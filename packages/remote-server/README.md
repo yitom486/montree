@@ -20,6 +20,6 @@ stdin/stdout 只走长度分帧协议，日志走 stderr。
 `@agentclientprotocol/*` / `scripts/`·`third-party/` 手搓 RPC；
 请求 id 统一 `ws-` 命名空间，不复用 ACP 消息 ID。
 
-协议类型与限额见 `@montree/contracts` 的 `src/types/workspace.ts`；
+协议类型与限额见 `@yitom/contracts` 的 公开子路径 `@yitom/contracts/types/workspace`；
 纯逻辑（分帧/路径/revision）见 `@montree/workspace-core`；
 主进程管道客户端见 `apps/desktop/electron/services/remote/`。
