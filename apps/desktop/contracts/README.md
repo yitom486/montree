@@ -1,5 +1,7 @@
 # Desktop contracts
 
+`acp-elicitation.ts` defines standard ACP form-elicitation IPC, request/reply types and shared schema/content validation. It supports single/multiple selections, text, numeric and boolean fields. Only form mode is advertised; URL mode remains unsupported. The bridge stays local until the published contracts package exposes it.
+
 `translation.ts` defines the dedicated translation Agent IPC and preload bridge: connection/authentication, model configuration, sessions/prompts, and isolated status/stream events. The main process scopes these by trusted window and translation runtime, independently of the chat connection.
 
 `agent-inspection.ts` defines window-scoped Agent resource inspection IPC: observed MCP health/tool schemas, locally discovered Skill metadata/full instructions, and revealing a discovered Skill file. It never transports MCP tokens or runtime credentials.

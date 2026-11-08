@@ -5,6 +5,8 @@ React UI。按产品域分子目录；shadcn 落在 `ui/`。
 | 目录 | 管什么 |
 |------|--------|
 | [`ui/`](./ui/) | shadcn 基础组件（勿轻易改核心逻辑） |
+| [`motion/`](./motion/) | 官方 registry 安装的 beUI 折叠组件与配套动效参数 |
+| [`assistant-ui/`](./assistant-ui/README.md) | 官方 registry 安装的 OptionList 及其布局、范围、焦点工具；供 ACP 标准表单提问复用 |
 | [`layout/`](./layout/) | 窗口壳、侧栏、编辑/阅读主工作区 |
 | [`editor/`](./editor/) | CodeMirror Markdown 编辑器 |
 | [`typst/`](./typst/) | Typst 源码编辑、Tinymist 智能提示、实时预览、字体/入口配置与 PDF 导出 |

@@ -28,6 +28,8 @@ import { handleSnapshotRequest, handlePermissionRequest, emitSessionUpdate } fro
 import { currentAcpContext, getAcpContext, forgetAcpContext } from '../services/acp/acp-context'
 import { disposeContextAcpProcesses } from '../services/acp/process-manager'
 import { createSdkStreamHandle } from '../services/acp/sdk-client'
+import { ACP_ELICITATION_IPC } from '../../contracts/acp-elicitation'
+import { requestElicitation } from '../services/acp/elicitation'
 
 let nextId = 800
 const windows: FakeWindow[] = []
@@ -52,6 +54,23 @@ afterEach(async () => {
 })
 
 describe('window-owned ACP IPC', () => {
+  it('elicitation answers only settle the owning window and renderer loss closes pending forms', async () => {
+    const a = window(), b = window()
+    const form = { mode: 'form' as const, sessionId: 's1', message: '选择策略', requestedSchema: { properties: { strategy: { type: 'string', enum: ['clone', 'mirror'] } }, required: ['strategy'] } }
+    const pending = withAcpWindow(a.webContents, () => requestElicitation(form, new AbortController().signal))
+    const event = a.sent.find(event => event.channel === ACP_ELICITATION_IPC.event)!.payload
+    const reply = { id: event.request.id, response: { action: 'accept', content: { strategy: 'mirror' } } }
+    expect((await invoke(b, ACP_ELICITATION_IPC.respond, reply)).ok).toBe(false)
+    expect((await invoke(a, ACP_ELICITATION_IPC.respond, reply)).ok).toBe(true)
+    expect(await pending).toEqual(reply.response)
+    expect((await invoke(a, ACP_ELICITATION_IPC.respond, reply)).ok).toBe(false)
+    const crashed = withAcpWindow(a.webContents, () => requestElicitation(form, new AbortController().signal))
+    a.emit('render-process-gone')
+    expect(await crashed).toEqual({ action: 'cancel' })
+    const navigated = withAcpWindow(a.webContents, () => requestElicitation(form, new AbortController().signal))
+    a.emit('did-start-navigation', {}, 'file:///reload', false, true)
+    expect(await navigated).toEqual({ action: 'cancel' })
+  })
   it('翻译连接及事件独立于同窗口主聊天，跨用途会话不可操作', async () => {
     const owner = window()
     withAcpWindow(owner.webContents, () => { acpState.runtimeId = 'opencode'; acpState.sessionId = 'main'; claimAcpSession('main') })

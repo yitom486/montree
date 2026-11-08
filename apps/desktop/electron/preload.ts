@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { ACP_ELICITATION_IPC, type AcpElicitationAPI, type ElicitationEvent } from '../contracts/acp-elicitation'
 import { WEB_DOC_IMAGE_IPC, type WebDocImagesAPI } from '../contracts/web-doc'
 import { HN_FIND_DISCUSSION_IPC, type HnAPI } from '../contracts/hn'
 import {
@@ -497,6 +498,15 @@ const htmlPreviewAPI: HtmlPreviewAPI = {
   release: (token) => ipcRenderer.invoke(HTML_PREVIEW_IPC.release, token),
 }
 contextBridge.exposeInMainWorld('montreeHtmlPreview', htmlPreviewAPI)
+const acpElicitationAPI: AcpElicitationAPI = {
+  subscribe: callback => {
+    const handler = (_event: Electron.IpcRendererEvent, event: ElicitationEvent) => callback(event)
+    ipcRenderer.on(ACP_ELICITATION_IPC.event, handler)
+    return () => { ipcRenderer.removeListener(ACP_ELICITATION_IPC.event, handler) }
+  },
+  respond: reply => ipcRenderer.invoke(ACP_ELICITATION_IPC.respond, reply),
+}
+contextBridge.exposeInMainWorld('montreeAcpElicitation', acpElicitationAPI)
 const translationAPI: TranslationAPI = {
   onOutput: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => callback(payload)

@@ -18,6 +18,7 @@ import { ToolBusinessResult } from '@/components/agent/tools/ToolBusinessResult'
 import { AgentPlanCard } from '@/components/agent/tools/AgentPlanCard'
 import { AgentMark } from '@/components/agent/AgentMark'
 import { AgentContextMenu } from '@/components/agent/chat/AgentContextMenu'
+import { AgentElicitationPanel } from './AgentElicitationPanel'
 import { toast } from 'sonner'
 import { appApi } from '@/api/app-api'
 import { adoptProposedMark } from '@/lib/agent/context/propose-mark'
@@ -125,6 +126,7 @@ const ThreadMessageList = memo(function ThreadMessageList({
   }, [])
 
   return (
+    <>
     <AgentContextMenu selectionRoot={messagesRef} onQuote={onQuote} getMessage={(id) => messages.find((message) => message.id === id)} onScrollToBottom={handleScrollToBottom}>
       <ChatMessageList
         ref={listHandle}
@@ -188,6 +190,8 @@ const ThreadMessageList = memo(function ThreadMessageList({
         theme={theme}
       />
     </AgentContextMenu>
+    <AgentElicitationPanel />
+    </>
   )
 })
 

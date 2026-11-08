@@ -9,6 +9,7 @@ ACP 智能体交互与次世代伴读 HUD 专职状态管理。由原 1182 行�
 | `chat-slice.ts` | 宿主线程业务元数据、工作区路由、回放清洗与快照提议；`setThreadCodeMode` 只改线程请求，不重连当前会话；通用消息/回合意图经 `chat-session-authority` 仅在包内归约，宿主 messages 是包 feed 的兼容投影 |
 | `chat-helpers.ts` | 线程草稿修剪、提议挂载与工具调用卡片解析纯逻辑辅助；线程↔运行时绑定防线（`ensureActiveThreadForRuntime` + `patchActiveThread` 错位纠偏） |
 | `permission-slice.ts` | 工具调用权限审批拦截（pendingPermission）与审批记录同步 |
+| `elicitation-store.ts` | 独立瞬态表单队列和至多 40 条回执；绑定线程，不持久化待回答请求，不写入包的消息 feed |
 | `hud-slice.ts` | 伴读 HUD 面板开闭与输入框调度（打开/聚焦时切回共享辅助区的聊天页） |
 | `reader-hud-store.ts` | 伴读 HUD 独立表现层（三态切换、自由拖拽坐标、四大 Tab、共享辅助区当前页、卡轨开关（新用户默认收起）、全屏图表模态） |
 | `acp-store.ts` | Slices 组装、包 feed 只读投影与业务元数据持久化（`montree-acp-metadata/v2`）；旧历史键保留，消息正文仅由包会话持久化 |

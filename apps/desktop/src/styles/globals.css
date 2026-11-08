@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'tw-shimmer';
 
 /*
  * Streamdown 社区组件的 Tailwind 任意值类（token 高亮 --sdm-c/--shiki-dark、

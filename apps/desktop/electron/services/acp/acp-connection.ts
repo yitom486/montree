@@ -54,6 +54,7 @@ import {
 import { buildCursorMissingCliMessage, getCursorCatalogIds } from '@yitom/acp-client'
 import { buildAgyMissingCliMessage } from './runtimes/agy'
 import { acpState, claimAcpSession, PROTOCOL_VERSION, armSuppressSettle, disarmSuppressSettle, setStatus } from './acp-state'
+import { cancelElicitations } from './elicitation'
 import {
   emitSessionUpdate,
   handlePermissionRequest,
@@ -677,6 +678,7 @@ async function connectAcpAttempt(payload: ConnectPayload, gen: number, allowWarm
             writeTextFile: true,
           },
           terminal: true,
+          elicitation: { form: {} },
           session: { configOptions: { boolean: {} } },
           _meta: { parameterizedModelPicker: true },
         },
@@ -912,6 +914,7 @@ export function disconnectAcp(
   reason?: string,
   opts?: { killProcess?: boolean },
 ): Promise<Result<void, AppError>> {
+  cancelElicitations()
   // 立即取消在途连接；实际清理排在它之后，避免拆掉下一条新连接。
   ++acpState.connectGeneration
   cancelMcpRecovery()
@@ -926,6 +929,7 @@ async function disconnectAcpNow(
   reason?: string,
   opts?: { killProcess?: boolean; preserveStatus?: boolean },
 ): Promise<Result<void, AppError>> {
+  cancelElicitations()
   if (acpState.closeSessionSupported && acpState.sdkConn?.agent) {
     const ids = acpState.ownedSessionIds.get(acpState.runtimeId ?? '') ?? new Set<string>()
     await closeAcpSessions(acpState.sdkConn.agent, ids)

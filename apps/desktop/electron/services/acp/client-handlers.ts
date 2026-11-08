@@ -10,6 +10,7 @@ import { acpReadTextFile, acpWriteTextFile } from './acp-fs'
 import type { AcpTerminalManager } from '@yitom/acp-client'
 import type { TerminalApprovalPolicy } from './terminal-approval'
 import { bindAcpContext } from './acp-context'
+import { requestElicitation } from './elicitation'
 
 export interface AcpClientHandlerDeps {
   getWorkspaceRoot: () => string | null
@@ -44,6 +45,7 @@ function toServerError(error: unknown, fallback: string): RequestError {
  * 无需手写 transport.respond/respondError。
  */
 export function registerAcpClientHandlers(app: ClientApp, deps: AcpClientHandlerDeps): void {
+  app.onRequest(methods.client.elicitation.create, bindAcpContext(ctx => requestElicitation(ctx.params, ctx.signal)))
   app.onRequest(methods.client.session.requestPermission, bindAcpContext(async (ctx) => {
     const params = ctx.params
     const toolCall = params.toolCall

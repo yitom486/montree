@@ -6,7 +6,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { history, undo } from '@codemirror/commands'
 import { livePreviewExtension } from './index'
-import { livePreviewBlocks, parsePreviewBlocks, showBlockPreview, tableCellRange } from './live-preview-blocks'
+import { livePreviewBlocks, parsePreviewBlocks, showBlockPreview, showBlockSource, tableCellRange } from './live-preview-blocks'
 import { buildLivePreviewDecorations } from './live-preview-inline'
 
 vi.mock('@/components/markdown/LivePreviewBlock', () => ({ LivePreviewBlock: () => null }))
@@ -17,6 +17,34 @@ function state(doc = source, cursor = 0): EditorState {
   return EditorState.create({ doc, selection: { anchor: cursor }, extensions: [EditorState.allowMultipleSelections.of(true), markdown({ extensions: [GFM] }), livePreviewExtension()] })
 }
 describe('live preview block integration', () => {
+  it('独立注释保留摘要入口，显式编辑后完成或离开收起，原文与撤销保留', () => {
+    const text = '<!--\n====\n【待审阅】\n\n### 提纲\n1. **勇气**\n-->\n\n末尾正文'
+    let current = state(text)
+    const block = current.field(livePreviewBlocks).blocks[0]
+    expect(block).toMatchObject({ kind: 'html-comment', from: 0, source: text.slice(0, text.indexOf('\n\n末尾正文')) })
+    const isPreview = () => {
+      let result = false
+      current.field(livePreviewBlocks).decorations.between(0, block.to, (from, to) => { if (to > from) result = true })
+      return result
+    }
+    expect(isPreview()).toBe(true)
+    current = current.update({ selection: { anchor: text.indexOf('勇气') }, effects: showBlockSource.of(0) }).state
+    expect(isPreview()).toBe(false)
+    current = current.update({ changes: { from: text.indexOf('勇气'), insert: '真正的' } }).state
+    expect(isPreview()).toBe(false)
+    expect(current.field(livePreviewBlocks).blocks[0].source).toContain('**真正的勇气**')
+    current = current.update({ effects: showBlockPreview.of(0) }).state
+    expect(isPreview()).toBe(true)
+    current = current.update({ effects: showBlockSource.of(0) }).state
+    current = current.update({ selection: { anchor: current.doc.length } }).state
+    expect(isPreview()).toBe(true)
+    expect(current.doc.toString()).toBe(text.replace('勇气', '真正的勇气'))
+  })
+  it('单行独立注释可发现，未闭合注释仍保留源码，代码注释不转成备注', () => {
+    expect(parsePreviewBlocks(state('<!-- 备注 -->'))[0].kind).toBe('html-comment')
+    expect(parsePreviewBlocks(state('<!--\n未完成注释'))).toEqual([])
+    expect(parsePreviewBlocks(state('```html\n<!-- 代码示例 -->\n```')).map((block) => block.kind)).toEqual(['fence'])
+  })
   it('图片与隐藏组件参数使用同一原文范围，所见即所得可切回源码', () => {
     const text = '![静态图](./diagram.svg)\n\n<!-- montree-diagram\n{"schemaVersion":1}\n-->\n\n末尾'
     const blocks = parsePreviewBlocks(state(text, text.length))
@@ -79,9 +107,9 @@ describe('live preview block integration', () => {
   it('伪折叠标签、HTML 注释和代码不参与跨块合并，相邻折叠区保持独立', () => {
     const text = '# 文档\n\n<!-- <details> -->\n\n```html\n<details><summary>代码</summary>\n```\n\n<details><summary>一</summary>\n\n正文一\n\n</details>\n\n<details><summary>二</summary>\n\n正文二\n\n</details>\n\n末尾'
     const blocks = state(text, text.length).field(livePreviewBlocks).blocks
-    expect(blocks.map((block) => block.kind)).toEqual(['fence', 'details', 'details'])
-    expect(blocks[1].source).not.toContain('正文二')
-    expect(blocks[2].source).not.toContain('末尾')
+    expect(blocks.map((block) => block.kind)).toEqual(['html-comment', 'fence', 'details', 'details'])
+    expect(blocks[2].source).not.toContain('正文二')
+    expect(blocks[3].source).not.toContain('末尾')
   })
   it('中文混排、重复引用、行内注和未定义引用可共存', () => {
     const text = '# 文档\n\n这里有短脚注[^short]，长脚注[^long]，再次短脚注[^short]，行内注^[**行内说明**]，未知[^missing]。\n\n[^short]: 短\n\n[^long]: 长\n\n末尾'

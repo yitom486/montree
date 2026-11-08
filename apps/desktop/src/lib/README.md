@@ -48,7 +48,7 @@
 | `wikilink-completion` | CodeMirror 6 `[[` 实时自动补全源 |
 | `inline-completion/` | AI 行内补全 ghost text：debounce、Tab/Esc/逐词/候选切换、IME 与在途请求取消；补全专用 provider（API Key/ChatGPT OAuth）与文档标题、标题路径、Markdown 块类型提示、CJK/单行清洗 |
 | `markdown-it-artifacts` | Markdown 数据组件入口：montree-diagram/montree-ui 围栏或静态图片＋隐藏 JSON 注释；保留源行映射，64KiB 限制，参数经组件二次校验 |
-| `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位；列表内代码保留容器上下文，成对且一致空格缩进的围栏由共享解析器兼容，原文不改写 |
+| `live-preview/` (内含 `index`, `live-preview-inline`, `live-preview-blocks`, `live-preview-theme`, `task-checkbox-widget`, `quote-mark-widget`, `horizontal-rule-widget`, `image-widget`, `.test.ts`) | CodeMirror 6 实时预览：行内光标感知装饰、任务复选框与 StateField 多行块；复用 markdown-it/KaTeX/highlight.js/Mermaid 的表格、代码、公式、HTML/图片渲染及源单元格定位；独立 HTML 注释显示可展开的备注摘要，显式编辑源码，未闭合注释保留原文；列表内代码保留容器上下文，成对且一致空格缩进的围栏由共享解析器兼容，原文不改写 |
 | `draft-utils` | 草稿 key 与可恢复草稿挑选 |
 | `editor-focus` | 判断 Markdown 编辑器是否聚焦 |
 | `text-normalize` | 换行规范化 |

@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { MarkdownContent } from './MarkdownContent'
 import { FrontmatterPreview } from './FrontmatterPreview'
+import { CommentPreview } from './CommentPreview'
 import { useMarkdownPreview } from '@/hooks/editor/useMarkdownPreview'
 import { useCodeBlockCopy } from '@/hooks/preview/useCodeBlockCopy'
 import { useHighlightTheme } from '@/hooks/preview/useHighlightTheme'
@@ -25,10 +26,13 @@ interface LivePreviewBlockProps {
 export function LivePreviewBlock({ source, filePath, env, kind, renderedHtml, onFootnoteJump, editLabel = '编辑源码', onEdit, onCell }: LivePreviewBlockProps) {
   const theme = useEditorUiStore((state) => state.theme)
   const isFrontmatter = kind === 'frontmatter'
-  const html = useMarkdownPreview(isFrontmatter ? '' : source, filePath, 0, env, renderedHtml)
+  const isComment = kind === 'html-comment'
+  const html = useMarkdownPreview(isFrontmatter || isComment ? '' : source, filePath, 0, env, renderedHtml)
   const container = useRef<HTMLDivElement>(null)
   useCodeBlockCopy(container, html)
   useHighlightTheme(theme)
+
+  if (isComment) return <CommentPreview source={source} onEdit={onEdit} />
 
   return (
     <div className="cm-live-block-content" ref={container}>
