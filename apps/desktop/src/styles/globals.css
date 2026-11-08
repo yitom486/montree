@@ -201,69 +201,69 @@
 }
 
 .sepia {
-  /* 护眼暖 · 温润麦香 (Warm Linen / Sepia) */
-  --color-bg-base: #ede4d3;
-  --color-bg-surface: #faf6ed;
-  --color-bg-elevated: #e4dac5;
-  --color-hud-bg: rgba(250, 246, 237, 0.98);
-  --color-hud-border: rgba(60, 48, 35, 0.10);
-  --color-border-subtle: rgba(60, 48, 35, 0.08);
-  --color-border-hover: rgba(60, 48, 35, 0.15);
-  --color-border-strong: rgba(60, 48, 35, 0.24);
-  
-  --color-text-primary: #2c241b;
-  --color-text-secondary: #5e5142;
-  --color-text-muted: #8a7b69;
-  
-  --color-accent-primary: #2a4e3f;
-  --color-accent-subtle: rgba(42, 78, 63, 0.10);
-  --color-accent-hover: #203d31;
-  --color-accent-secondary: #8f5a34;
+  /* 雾砂 · 明显去黄的暖灰纸面，适合长时间阅读 (Mist Sand) */
+  --color-bg-base: #e5e4df;
+  --color-bg-surface: #f2f1ec;
+  --color-bg-elevated: #d9d8d2;
+  --color-hud-bg: rgba(242, 241, 236, 0.98);
+  --color-hud-border: rgba(48, 47, 43, 0.12);
+  --color-border-subtle: rgba(48, 47, 43, 0.10);
+  --color-border-hover: rgba(48, 47, 43, 0.17);
+  --color-border-strong: rgba(48, 47, 43, 0.26);
 
-  --color-mark-yellow: #f5dc85;
-  --color-mark-yellow-text: #2c241b;
-  --color-mark-green: #d2e4d4;
-  --color-mark-green-text: #234731;
-  --color-mark-blue: #d4e1ec;
-  --color-mark-blue-text: #203f56;
-  --color-mark-purple: #e7d8ec;
-  --color-mark-purple-text: #4e2e59;
+  --color-text-primary: #2a2925;
+  --color-text-secondary: #504e48;
+  --color-text-muted: #5d5b55;
 
-  --card-concept-bg: #e1ecf4;
-  --card-concept-text: #26475b;
-  --card-quote-bg: #f8ece2;
-  --card-quote-text: #6f4226;
-  --card-method-bg: #e5efe8;
-  --card-method-text: #254d33;
-  --card-diagram-bg: #ebe5ef;
-  --card-diagram-text: #493856;
-  --card-question-bg: #f7f1e2;
-  --card-question-text: #7b4f25;
+  --color-accent-primary: #435a50;
+  --color-accent-subtle: rgba(67, 90, 80, 0.10);
+  --color-accent-hover: #374b42;
+  --color-accent-secondary: #86664f;
 
-  --background: #ede4d3;
-  --foreground: #2c241b;
-  --card: #faf6ed;
-  --card-foreground: #2c241b;
-  --popover: #e4dac5;
-  --popover-foreground: #2c241b;
-  --primary: #2a4e3f;
-  --primary-foreground: #ffffff;
-  --secondary: #e4dac5;
-  --secondary-foreground: #2c241b;
-  --muted: #e4dac5;
-  --muted-foreground: #8a7b69;
-  --accent: rgba(42, 78, 63, 0.10);
-  --accent-foreground: #2a4e3f;
-  --destructive: #b91c1c;
-  --success: #234731;
-  --warning: #7b4f25;
-  --info: #203f56;
-  --border: rgba(60, 48, 35, 0.12);
-  --input: rgba(60, 48, 35, 0.14);
-  --ring: #2a4e3f;
-  --sidebar: #e4dac5;
-  --editor: #faf6ed;
-  --preview: #faf6ed;
+  --color-mark-yellow: #e8e3c4;
+  --color-mark-yellow-text: #2a2925;
+  --color-mark-green: #d8e2da;
+  --color-mark-green-text: #284338;
+  --color-mark-blue: #d9e1e8;
+  --color-mark-blue-text: #233f50;
+  --color-mark-purple: #e4dfe6;
+  --color-mark-purple-text: #4a3750;
+
+  --card-concept-bg: #e1e8ec;
+  --card-concept-text: #2d4756;
+  --card-quote-bg: #f0eae2;
+  --card-quote-text: #664a36;
+  --card-method-bg: #e5ece6;
+  --card-method-text: #2d4a38;
+  --card-diagram-bg: #eae6ec;
+  --card-diagram-text: #4a3a51;
+  --card-question-bg: #f1ece3;
+  --card-question-text: #71535a;
+
+  --background: #e5e4df;
+  --foreground: #2a2925;
+  --card: #f8f7f3;
+  --card-foreground: #2a2925;
+  --popover: #e2e1db;
+  --popover-foreground: #2a2925;
+  --primary: #435a50;
+  --primary-foreground: #f8f7f3;
+  --secondary: #d9d8d2;
+  --secondary-foreground: #2a2925;
+  --muted: #d9d8d2;
+  --muted-foreground: #5d5b55;
+  --accent: rgba(67, 90, 80, 0.10);
+  --accent-foreground: #435a50;
+  --destructive: #a83a36;
+  --success: #315843;
+  --warning: #73543a;
+  --info: #365265;
+  --border: rgba(48, 47, 43, 0.15);
+  --input: rgba(48, 47, 43, 0.18);
+  --ring: #435a50;
+  --sidebar: #d9d8d2;
+  --editor: #f2f1ec;
+  --preview: #f2f1ec;
 
   color-scheme: light;
 }
