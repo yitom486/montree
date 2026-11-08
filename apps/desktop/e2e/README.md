@@ -106,7 +106,7 @@ R3 生成式 UI 集成回归（`agent-generative-ui.spec.ts`）：真实 MCP 源
 
 历史图表恢复用真实 UI 产生空工具结果→断开重连→会话 `_meta.toolOutputRecovery` 补回原消息→真实图表 iframe 节点交互→页面重载保留且无重复。结果由真实 MCP 生成，Agent 恢复响应用 `mock-window-agent.cjs` 的 `E2E_ACP_TOOL_RECOVERY_FILE` 确定性回放。
 
-Markdown 文档组件回归：markdown-live-preview.spec.ts 覆盖 ER 参数图解（字段与关系）iframe、本地选择汇总、非法源码拒绝、源码往返及阅读预览；agent-generative-ui.spec.ts 验证 montree_markdown_guide 真实 MCP 返回。
+Markdown 文档组件回归：markdown-live-preview.spec.ts 覆盖 ER 参数图解（字段与关系）iframe、本地选择汇总、非法源码拒绝、源码往返及阅读预览；另验证写作备注摘要/展开/编辑/撤销、亮暗主题对比度与窄屏布局；agent-generative-ui.spec.ts 验证 montree_markdown_guide 真实 MCP 返回。
 
 `agent-rich-result.spec.ts` 增加网页跨章节：真实 Electron/MCP→目录 href→后台读取另一篇文章→原文验证→mock Agent 回放比较卡 UI，当前阅读页保持不变；网络使用离线网页夹具，不调用真实模型。
 

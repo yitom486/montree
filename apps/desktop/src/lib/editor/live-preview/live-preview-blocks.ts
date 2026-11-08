@@ -120,8 +120,11 @@ export function parsePreviewBlocks(state: EditorState): PreviewBlock[] {
     const to = state.doc.line(Math.min(end, state.doc.lines)).to
     if ((blocks.at(-1)?.to ?? -1) > from) continue
     const source = state.sliceDoc(from, to)
-    // Comments should remain handled by inline syntax decorations.
-    if (kind === 'html_block' && /^\s*<!--[\s\S]*-->\s*$/.test(source)) continue
+    if (kind === 'html_block' && /^\s*<!--/.test(source)) {
+      // Incomplete or mixed HTML stays editable; a standalone comment gets a discoverable summary.
+      if (!/^\s*<!--(?:(?!-->)[\s\S])*-->\s*$/.test(source)) continue
+      kind = 'html-comment'
+    }
     const attachedNotes = notes.filter((part) => {
       const note = part[0]
       const meta = footnoteMeta(note)
@@ -202,11 +205,11 @@ class PreviewBlockWidget extends WidgetType {
       if (!this.alive) return
       const base = currentFrom()
       const range = relative ? { from: base + relative.from - this.block.from, to: base + relative.to - this.block.from } : { from: base, to: base }
-      if (this.block.kind === 'frontmatter') {
-        // 首屏属性块不因初始光标落在 0 号位置就铺开 YAML；只有显式点击才进入源码。
+      if (this.block.kind === 'frontmatter' || this.block.kind === 'html-comment') {
+        // 属性和备注不会因初始光标位置而铺开；保留独立的查看与编辑操作。
         view.dispatch({
-          selection: { anchor: this.block.from, head: this.block.to },
-          effects: [showBlockSource.of(this.block.from), EditorView.scrollIntoView(this.block.from, { y: 'nearest' })],
+          selection: this.block.kind === 'frontmatter' ? { anchor: base, head: base + this.block.source.length } : { anchor: base + this.block.source.indexOf('<!--') + 4 },
+          effects: [showBlockSource.of(base), EditorView.scrollIntoView(base, { y: 'nearest' })],
         })
         view.focus()
         return
@@ -278,7 +281,7 @@ class SourceToolbarWidget extends WidgetType {
 function decorations(state: EditorState, blocks: PreviewBlock[], previewAt?: number, sourceAt?: number): DecorationSet {
   const config = state.facet(livePreviewConfig)
   return Decoration.set(blocks.flatMap((block) => {
-    const active = block.kind === 'frontmatter'
+    const active = block.kind === 'frontmatter' || block.kind === 'html-comment'
       ? sourceAt === block.from
       : state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from) && block.from !== previewAt
     if (active) {
@@ -301,7 +304,7 @@ export const livePreviewBlocks = StateField.define<{ blocks: PreviewBlock[]; dec
   update(value, transaction) {
     const blocks = transaction.docChanged ? parsePreviewBlocks(transaction.state) : value.blocks
     let previewAt = transaction.docChanged || transaction.selection ? undefined : value.previewAt
-    let sourceAt = value.sourceAt
+    let sourceAt = value.sourceAt === undefined ? undefined : transaction.changes.mapPos(value.sourceAt)
     for (const effect of transaction.effects) {
       if (effect.is(showBlockPreview)) {
         previewAt = effect.value
@@ -312,9 +315,9 @@ export const livePreviewBlocks = StateField.define<{ blocks: PreviewBlock[]; dec
         previewAt = undefined
       }
     }
-    // 光标离开属性块时回到卡片；在块内打字时保留源码编辑。
+    // 光标离开属性或备注时收起；在块内打字时保留源码编辑。
     if (sourceAt !== undefined && transaction.selection) {
-      const sourceBlock = blocks.find((block) => block.kind === 'frontmatter' && block.from === sourceAt)
+      const sourceBlock = blocks.find((block) => (block.kind === 'frontmatter' || block.kind === 'html-comment') && block.from === sourceAt)
       if (sourceBlock && !transaction.state.selection.ranges.some((range) => range.from <= sourceBlock.to && range.to >= sourceBlock.from)) {
         sourceAt = undefined
       }

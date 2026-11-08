@@ -29,6 +29,116 @@ const source = [
   '```montree-ui', JSON.stringify({ schemaVersion: 1, title: '拒绝脚本', source: 'window.__liveXss=5' }), '```', '',
 ].join('\n')
 
+test('写作备注可发现、展开、键盘编辑与撤销，兼容窄屏和深色模式', async ({}, testInfo) => {
+  const workspace = await mkdtemp(join(tmpdir(), 'montree-comments-'))
+  const name = 'comments.md'
+  const original = '# 注释体验\n\n正文保留。\n\n<!--\n================\n【待审阅：全文核心主旨与后续展开脉络】\n\n### 核心主旨\n1. **勇气**\n<img src=x onerror="window.__commentXss=1">\n-->\n\n后面的正文。'
+  await writeFile(join(workspace, name), original)
+  const app = await launchBuiltApp({ E2E_AUTO_OPEN_PATH: workspace })
+  try {
+    const page = await app.firstWindow()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.waitForLoadState('domcontentloaded')
+    await page.getByRole('button', { name: '更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: /打开文件夹/ }).click()
+    await page.keyboard.press('Control+p')
+    const dialog = page.getByRole('dialog', { name: '快速打开文件' })
+    await dialog.getByPlaceholder('搜索工作区文件或电子书...').fill(name)
+    await page.keyboard.press('Enter')
+    await expect(dialog).toBeHidden()
+    await page.keyboard.press('Control+1')
+    const editor = page.locator('.cm-editor')
+    const content = editor.locator('.cm-content')
+    const toggle = page.getByRole('button', { name: '编辑器所见即所得模式切换' })
+    const comment = editor.locator('[data-preview-kind="html-comment"]')
+    const trigger = comment.getByRole('button', { name: /^查看写作备注/ })
+    const expectSummary = async () => {
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+      await expect.poll(() => comment.evaluate((node) => {
+        const card = node.querySelector('[data-slot="collapsible"]')!
+        return node.getBoundingClientRect().height - card.getBoundingClientRect().height
+      })).toBeLessThanOrEqual(16)
+    }
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(content).not.toContainText('<!--')
+    await expect(trigger).toContainText('待审阅：全文核心主旨与后续展开脉络')
+    const expectContrast = async () => {
+      const ratio = await comment.locator('[data-slot="collapsible"]').evaluate((node) => {
+        const style = getComputedStyle(node)
+        const luminance = (color: string) => {
+          const rgb = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((channel) => {
+            const value = channel / 255
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+          })
+          return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+        }
+        const foreground = luminance(style.color)
+        const background = luminance(style.backgroundColor)
+        return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+      })
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    }
+    await expectContrast()
+    await expectSummary()
+    await comment.screenshot({ path: testInfo.outputPath('comment-summary-card.png') })
+    await page.screenshot({ path: testInfo.outputPath('comment-summary.png') })
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const body = comment.getByRole('region')
+    await expect(body).toContainText('### 核心主旨')
+    await expect(body).toContainText('**勇气**')
+    await expect(body.locator('img, script, h3, strong')).toHaveCount(0)
+    const expectExpanded = async () => {
+      await expect.poll(() => body.evaluate((node) => {
+        const bounds = node.getBoundingClientRect()
+        const contents = node.firstElementChild!.getBoundingClientRect()
+        return contents.bottom <= bounds.bottom + 1 && bounds.height > 1
+      })).toBe(true)
+    }
+    await expectExpanded()
+    await page.screenshot({ path: testInfo.outputPath('comment-expanded.png') })
+    await page.keyboard.press('Tab')
+    await expect(comment.getByRole('button', { name: '编辑写作备注' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(content).toContainText('<!--')
+    await page.keyboard.insertText('备注修改')
+    await editor.getByRole('button', { name: '完成编辑并预览' }).click()
+    await expect(trigger).toContainText('备注修改')
+    await expectSummary()
+    await expect(content).not.toContainText('<!--')
+    await toggle.click()
+    await expect(content).toContainText('<!--')
+    await content.focus()
+    await page.keyboard.press('Control+z')
+    await expect.poll(async () => (await content.locator('.cm-line').allTextContents()).join('\n')).toBe(original)
+    await page.keyboard.press('Control+Home')
+    await toggle.click()
+    await expect(trigger).toContainText('待审阅：全文核心主旨与后续展开脉络')
+    await page.getByRole('button', { name: '切换主题', exact: true }).click()
+    await page.getByRole('button', { name: '切换主题', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true)
+    await expectContrast()
+    await page.screenshot({ path: testInfo.outputPath('comment-dark.png') })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.setViewportSize({ width: 540, height: 860 })
+    await trigger.click()
+    await expect(body).toBeVisible()
+    await expectExpanded()
+    expect(await comment.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('comment-narrow.png') })
+    await page.getByRole('button', { name: '折叠侧边栏' }).click()
+    await page.getByRole('button', { name: '收起文档目录', exact: true }).click()
+    await page.setViewportSize({ width: 360, height: 860 })
+    await expectExpanded()
+    expect(await comment.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('comment-360.png') })
+    expect(await page.evaluate(() => (window as unknown as { __commentXss?: number }).__commentXss)).toBeUndefined()
+    expect(errors).toEqual([])
+  } finally { await app.close() }
+})
+
 test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题切换和安全清理', async ({}, testInfo) => {
   test.setTimeout(120_000)
   const workspace = await mkdtemp(join(tmpdir(), 'montree-live-preview-'))
