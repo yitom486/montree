@@ -33,7 +33,7 @@ export async function recognizePdfPage(
   }
 }
 
-/** 主路径：pdf-inspector 选择性 OCR（自带阅读顺序与表格，几何进缓存） */
+/** 单页识别已由调用方判定需要 OCR，强制识别以修复有文字但字体映射损坏的页面。 */
 async function recognizePdfPageWithInspector(
   payload: RecognizePdfPagePayload,
 ): Promise<Result<PdfOcrPageCache, AppError>> {
@@ -51,7 +51,7 @@ async function recognizePdfPageWithInspector(
   const data = await readFile(filePath)
   const mod = await loadPdfInspector()
   const result = await mod.processPdfWithOcr(data, {
-    mode: mod.OcrMode.Auto,
+    mode: mod.OcrMode.Force,
     pageNumbers: [page],
     dpi: Math.round(scale * 72),
     modelDirectory: runtime.value.modelDir,

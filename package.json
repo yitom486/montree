@@ -1,9 +1,9 @@
 {
   "name": "montree",
-  "version": "0.4.27",
+  "version": "0.4.31",
   "description": "Montree — Markdown 编辑、电子书与在线文档阅读、Agent 助手",
   "author": "Yitom <yitom486@gmail.com>",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "main": "out/main/main.js",
   "type": "module",
   "private": true,
@@ -131,7 +131,9 @@
     "vanilla-jsoneditor": "^3.13.0",
     "xlsx": "^0.18.5",
     "zod": "^4.6.5",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "d3-drag": "3.0.0",
+    "d3-selection": "3.0.0"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.8",

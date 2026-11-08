@@ -11,6 +11,7 @@ import {
   normalizeWebDocFigureRows,
   normalizeWebDocSandpackPlaygrounds,
   normalizeWebDocStandaloneFigures,
+  normalizeLatexmlTransformedBlocks,
   backfillWebDocCardHrefs,
   extractNextFlightCardHrefs,
   stripCodeBlockLineNumbers,
@@ -44,6 +45,16 @@ import {
   pickPeopleDailyArticleRoot,
 } from '@/lib/reader/web-doc/people-daily-extract'
 import { pickHrttArticleRoot } from '@/lib/reader/web-doc/hrtt-extract'
+import {
+  detectDiscussionLink,
+  type WebDocPageContentWithDiscussion,
+} from '@/lib/reader/web-doc/discussion-link'
+import {
+  buildHackerNewsDiscussion,
+  buildWebDocHnDiscussionCss,
+  extractHackerNewsTitle,
+  isHackerNewsItemUrl,
+} from '@/lib/reader/web-doc/hn-discussion'
 
 const GENERIC_ARTICLE_SELECTORS = [
   'article.md-content__inner',
@@ -859,6 +870,11 @@ export function pickArticleRoot(
   if (siteId === 'hrtt-news') {
     return pickHrttArticleRoot(doc)
   }
+  // HN 讨论页没有正文图，占位图与缩进层级需要单独重建
+  if (isHackerNewsItemUrl(pageUrl)) {
+    const hn = buildHackerNewsDiscussion(doc, pageUrl!)
+    if (hn) return hn
+  }
 
   const selectors = SITE_ARTICLE_SELECTORS[siteId] ?? GENERIC_ARTICLE_SELECTORS
   let winner: HTMLElement | null = null
@@ -1073,6 +1089,7 @@ export function extractWebDocArticle(
   const clone = root.cloneNode(true) as HTMLElement
   normalizeWebDocImageObjects(clone, pageUrl)
   stripWebDocChrome(clone, siteId, pageUrl)
+  normalizeLatexmlTransformedBlocks(clone)
   // flight 回填必须在消毒（扔 script）之前从原始 HTML 提取，在归一化之后落到卡上
   backfillWebDocCardHrefs(clone, extractNextFlightCardHrefs(html))
   rewriteRelativeUrls(clone, pageUrl)
@@ -1080,6 +1097,7 @@ export function extractWebDocArticle(
   const { bodyHtml } = ensureWebDocHeadingIds(sanitized)
   const title =
     (siteId === 'people-daily-paper' ? extractPeopleDailyTitle(doc, pageUrl) : null) ??
+    (isHackerNewsItemUrl(pageUrl) ? extractHackerNewsTitle(doc) : null) ??
     extractDocumentTitle(doc)
   return {
     title,
@@ -1377,6 +1395,7 @@ export function buildWebDocReaderDocument(
   const mathCss = buildWebDocMathCss()
   const embedCss = buildWebDocEmbedCss(theme)
   const playgroundCss = buildWebDocPlaygroundCss(theme)
+  const hnDiscussionCss = buildWebDocHnDiscussionCss(theme)
   const safeTitle = DOMPurify.sanitize(content.title)
   // Query cache/HMR 可能让旧版 bodyHtml 在一次会话内继续存在；在最终生成
   // srcdoc 前再归一化一次，确保旧片段也不会把 display:contents 卡片撑坏。
@@ -1395,6 +1414,7 @@ export function buildWebDocReaderDocument(
     normalizeWebDocCardGrids(root)
     normalizeWebDocStandaloneFigures(root)
     normalizeWebDocSandpackPlaygrounds(root)
+    normalizeLatexmlTransformedBlocks(root)
     // 缓存里可能有修复前生成的 bodyHtml（演示区带同源沙箱或 srcdoc），生成阅读文档前统一收紧
     root.querySelectorAll('iframe').forEach(hardenWebDocIframe)
     root.querySelectorAll('table').forEach((table) => {
@@ -1434,9 +1454,19 @@ export function buildWebDocReaderDocument(
   <style>${mathCss}</style>
   <style>${embedCss}</style>
   <style>${playgroundCss}</style>
+  <style>${hnDiscussionCss}</style>
   <style>
     body { margin: 0; padding: 1.25rem 1.5rem 2rem; }
     a { word-break: break-word; }
+    /* LaTeXML（arXiv HTML）的缩放容器在阅读器里改为正常文档流，宽表交给滚动容器 */
+    .web-doc-ltx-transformed {
+      display: block !important;
+      width: 100% !important;
+      height: auto !important;
+      transform: none !important;
+      vertical-align: baseline !important;
+    }
+    .web-doc-ltx-transformed table { width: auto; max-width: none; }
     [data-montree-href] { cursor: pointer; }
     pre { overflow-x: auto; }
     img { max-width: 100%; height: auto; }
@@ -1542,12 +1572,14 @@ export function buildWebDocPageContent(
   html: string,
   pageUrl: string,
   siteId: WebDocSiteId,
-): WebDocPageContent {
+): WebDocPageContentWithDiscussion {
   const article = extractWebDocArticle(html, pageUrl, siteId)
+  const discussion = detectDiscussionLink(html, pageUrl)
   return {
     ...article,
     baseUrl: pageUrl,
     siteId,
+    ...(discussion ? { discussion } : {}),
   }
 }
 

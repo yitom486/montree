@@ -8,6 +8,7 @@ import {
   detectWebDocIframeEscape,
   isWebDocNavigationTarget,
   isWebDocReaderDocument,
+  isWebDocExternalResource,
   neutralizeWebDocNavigationLinks,
   resolveWebDocClickHref,
   resolveWebDocFragment,
@@ -179,5 +180,14 @@ describe('web-doc-link', () => {
       value: { location: { href: 'http://localhost:5173/' } },
     })
     expect(detectWebDocIframeEscape(iframe, 'http://localhost:5173')).toBe('http://localhost:5173/')
+  })
+
+  it('PDF / arXiv 源码等非 HTML 资源交给系统浏览器', () => {
+    expect(isWebDocExternalResource('https://example.com/paper.pdf')).toBe(true)
+    expect(isWebDocExternalResource('https://arxiv.org/pdf/2611.00001')).toBe(true)
+    expect(isWebDocExternalResource('https://arxiv.org/src/2611.00001')).toBe(true)
+    expect(isWebDocExternalResource('https://arxiv.org/html/2611.00001')).toBe(false)
+    expect(isWebDocExternalResource('https://arxiv.org/abs/2611.00001')).toBe(false)
+    expect(isWebDocExternalResource('not a url')).toBe(false)
   })
 })

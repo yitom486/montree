@@ -33,7 +33,7 @@ test.describe('阅读器冒烟（自研最小 fixture）', () => {
       await expect(window.getByText(mdName).first()).toBeVisible({ timeout: 15_000 })
 
       await openViaQuickOpen(window, mdName, 'smoke-demo')
-      await window.getByRole('button', { name: '独立预览', exact: true }).click()
+      await window.keyboard.press('Control+3')
 
       const panel = window.locator('#main')
       await expect(panel.locator('[data-testid="mermaid-block"] svg[id]').first()).toBeVisible({ timeout: 20_000 })

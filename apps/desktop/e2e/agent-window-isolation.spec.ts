@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { configureMockTranslation } from './helpers/mock-agent'
 
 async function observe(page: Page) {
   await page.waitForFunction(() => Boolean((window as any).electronAPI))
@@ -102,6 +103,7 @@ test('two real windows isolate persistence, ACP processes, streaming, permission
   try {
     const first = await app.firstWindow()
     await first.waitForFunction(() => Boolean((window as any).electronAPI))
+    await configureMockTranslation(first)
     // 静置：等启动期 persist 节流排空，否则播种会被应用落盘覆盖
     await first.waitForTimeout(3000)
     await first.evaluate(async () => {

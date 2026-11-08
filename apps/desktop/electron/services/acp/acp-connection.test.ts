@@ -69,6 +69,7 @@ beforeEach(() => {
   configHome = mkdtempSync(join(tmpdir(), 'montree-reconnect-home-'))
   writeFileSync(join(configHome, 'config.toml'), 'model = "fixture"\n')
   vi.stubEnv('CODEX_HOME', configHome)
+  vi.stubEnv('CODEX_PATH', '')
   vi.stubEnv('CODEX_CONFIG', '{}')
   vi.clearAllMocks()
   mocks.sessionRequest.mockResolvedValue({sessionId:'secondary',configOptions:[]})

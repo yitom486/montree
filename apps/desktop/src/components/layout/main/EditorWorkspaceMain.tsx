@@ -1,7 +1,9 @@
+import { WorkspaceDocumentArea } from '@/components/layout/WorkspaceDocumentArea'
 import {
   forwardRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -9,9 +11,12 @@ import {
   Suspense,
   lazy,
 } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Eye, Loader2, PanelsTopLeft, PenLine } from 'lucide-react'
 import { reportRuntimeError } from '@/lib/workspace/error-reporter'
 import { useDefaultLayout } from 'react-resizable-panels'
+import { Button } from '@/components/ui/button'
+import { MarkdownPreviewTools } from '@/components/preview/MarkdownPreviewTools'
+import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { FileBreadcrumb } from '@/components/layout/panels/FileBreadcrumb'
 import { WelcomePage } from '@/components/layout/main/WelcomePage'
 import { ViewModeToggle } from '@/components/layout/main/ViewModeToggle'
@@ -188,9 +193,13 @@ export const EditorWorkspaceMain = forwardRef<
   const editorFontSize = useAppSettingsStore((state) => state.editorFontSize)
   const markdownEditorMode = useAppSettingsStore((state) => state.markdownEditorMode)
   const setMarkdownEditorMode = useAppSettingsStore((state) => state.setMarkdownEditorMode)
-  const toggleMarkdownEditorMode = useAppSettingsStore((state) => state.toggleMarkdownEditorMode)
 
-  const viewMode = fileState.viewMode
+  const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
+  const isImageDocument = Boolean(filePath && isImagePath(filePath))
+  // TXT shares Markdown's file routing, but should not receive Markdown preview decorations.
+  const isMarkdown = documentKind === 'markdown' && (!filePath || getFileExtension(filePath) !== '.txt')
+
+  const viewMode = isMarkdown && markdownEditorMode === 'source' ? 'split' : fileState.viewMode
   const previewHtml = useMarkdownPreview(filePath && getDocumentKind(filePath) !== 'markdown' ? '' : content, filePath, previewDebounceMs)
   const { handlePasteImage } = usePasteImage(filePath)
   const headings = useMemo(() => {
@@ -225,6 +234,12 @@ export const EditorWorkspaceMain = forwardRef<
     rememberLocalAnchor(path, anchor)
     onOpenRecentFile(path)
   }, [onOpenRecentFile])
+
+  const getPreviewRoot = useCallback(() => previewRef.current?.getScrollElement() ?? null, [])
+  const openMarkdownPreview = useCallback(() => {
+    setMarkdownEditorMode('live-preview')
+    setViewMode(filePath, 'preview')
+  }, [filePath, setViewMode, setMarkdownEditorMode])
 
   const contentPanelIds = useMemo(() => {
     if (showEditor && showPreview) return ['editor', 'preview']
@@ -374,15 +389,18 @@ export const EditorWorkspaceMain = forwardRef<
     }
   }, [headings, updateActiveHeading, viewMode])
 
-  const documentKind = filePath ? getDocumentKind(filePath) : 'markdown'
-  const isImageDocument = Boolean(filePath && isImagePath(filePath))
-  // TXT shares Markdown's file routing, but should not receive Markdown preview decorations.
-  const isMarkdown = documentKind === 'markdown' && (!filePath || getFileExtension(filePath) !== '.txt')
   const dataRoot = useRef<HTMLElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!filePath || !isMarkdown) return
     setMarkdownEditorMode('live-preview')
-  }, [filePath, setMarkdownEditorMode])
+    setViewMode(filePath, 'editor')
+  }, [filePath, isMarkdown, setMarkdownEditorMode, setViewMode])
+
+  const changeMarkdownMode = useCallback((mode: 'source' | 'live-preview') => {
+    setMarkdownEditorMode(mode)
+    setViewMode(filePath, mode === 'source' ? 'split' : 'editor')
+  }, [filePath, setMarkdownEditorMode, setViewMode])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -411,8 +429,7 @@ export const EditorWorkspaceMain = forwardRef<
       if (key === '/' || code === 'Slash') {
         if (filePath && isMarkdown) {
           event.preventDefault()
-          toggleMarkdownEditorMode()
-          if (viewMode === 'preview') setViewMode(filePath, 'editor')
+          changeMarkdownMode(markdownEditorMode === 'source' ? 'live-preview' : 'source')
         }
         return
       }
@@ -428,12 +445,20 @@ export const EditorWorkspaceMain = forwardRef<
       if (!nextMode) return
 
       event.preventDefault()
-      setViewMode(filePath, nextMode)
+      if (isMarkdown) {
+        if (nextMode === 'preview') {
+          // 保留只读预览快捷键；源码编辑始终使用双栏。
+          setMarkdownEditorMode('live-preview')
+          setViewMode(filePath, 'preview')
+        } else {
+          changeMarkdownMode(nextMode === 'split' ? 'source' : 'live-preview')
+        }
+      } else setViewMode(filePath, nextMode)
     }
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [filePath, setViewMode, isMarkdown, viewMode, toggleMarkdownEditorMode])
+  }, [filePath, setViewMode, isMarkdown, markdownEditorMode, changeMarkdownMode, setMarkdownEditorMode])
 
   const isTextData = documentKind === 'json' || documentKind === 'log'
   const isDataOrOfficeDoc =
@@ -454,19 +479,8 @@ export const EditorWorkspaceMain = forwardRef<
         isDirty={isDirty}
         welcome={showWelcome}
         trailing={
-          showWelcome || isDataOrOfficeDoc ? undefined : (
-            <div className="flex items-center gap-1.5">
-              {isMarkdown && (
-                <EditorModeToggle
-                  mode={markdownEditorMode}
-                  onChange={(mode) => {
-                    setMarkdownEditorMode(mode)
-                    if (!showEditor) setViewMode(filePath, 'editor')
-                  }}
-                />
-              )}
-              <ViewModeToggle mode={viewMode} onChange={(mode) => setViewMode(filePath, mode)} />
-            </div>
+          showWelcome || isDataOrOfficeDoc || isMarkdown ? undefined : (
+            <ViewModeToggle mode={viewMode} onChange={(mode) => setViewMode(filePath, mode)} />
           )
         }
       />
@@ -505,7 +519,19 @@ export const EditorWorkspaceMain = forwardRef<
         </div>
       ) : null}
 
-      <main ref={dataRoot} data-reader-viewport className="min-h-0 flex-1 bg-editor flex flex-col overflow-hidden">
+      <WorkspaceDocumentArea mainRef={dataRoot} readerViewport footer={isMarkdown && filePath ? (
+        <div className="flex h-8 shrink-0 items-center border-t border-border/40 bg-editor px-3" role="toolbar" aria-label="文档编辑模式">
+          <EditorModeToggle mode={markdownEditorMode} onChange={changeMarkdownMode} />
+          <Button variant="ghost" size="xs" className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground" aria-label={viewMode === 'preview' ? '返回编辑' : '预览'} aria-pressed={viewMode === 'preview'}
+            onClick={() => viewMode === 'preview' ? changeMarkdownMode('live-preview') : openMarkdownPreview()}>
+            {viewMode === 'preview' ? <PenLine className="size-3" /> : <Eye className="size-3" />}
+            {viewMode === 'preview' ? '返回编辑' : '预览'}
+          </Button>
+          <Button variant="ghost" size="xs" className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground" aria-label="打开卡片流" onClick={() => useReaderHudUiStore.getState().setIsCardRailOpen(true)}>
+            <PanelsTopLeft className="size-3" />卡片
+          </Button>
+        </div>
+      ) : undefined}>
         {isTextData && filePath && <TextDataReaderContext filePath={filePath} content={content} kind={documentKind} root={() => dataRoot.current} />}
         {documentKind === 'html' && filePath && <HtmlReaderFallbackContext filePath={filePath} content={content} />}
         {showWelcome ? (
@@ -640,7 +666,11 @@ export const EditorWorkspaceMain = forwardRef<
           </ResizablePanelGroup>
           </ProposalReviewLayout>
         )}
-      </main>
+      </WorkspaceDocumentArea>
+      {isMarkdown && filePath && <MarkdownPreviewTools key={filePath} filePath={filePath} source={content} html={previewHtml}
+        visible={showPreview} surfaceKey={viewMode} theme={theme} headings={headings} activeHeadingId={activeHeadingId}
+        getSourceSelection={() => textDocument?.selectionSnapshot() ?? null}
+        getRoot={getPreviewRoot} openPreview={openMarkdownPreview} onHeadingChange={setActiveHeadingId} />}
     </div>
   )
 })

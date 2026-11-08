@@ -67,6 +67,14 @@ describe('MarginaliaBar', () => {
     },
   ]
 
+  async function openTypeFilters() {
+    const trigger = container.querySelector('[aria-label="筛选卡片类型"]')!
+    await act(async () => {
+      trigger.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
   it('renders mark categories, counts and titles accurately', async () => {
     const onMarkClick = vi.fn()
     const onToggleCardCollapse = vi.fn()
@@ -84,10 +92,11 @@ describe('MarginaliaBar', () => {
     })
 
     expect(container.textContent).toContain('知识卡片')
-    expect(container.textContent).toContain('全部 (3)')
-    expect(container.textContent).toContain('概念 (1)')
-    expect(container.textContent).toContain('引用 (1)')
-    expect(container.textContent).toContain('图谱 (1)')
+    expect(container.textContent).toContain('全部类型 (3)')
+    await openTypeFilters()
+    expect(document.body.textContent).toContain('概念 (1)')
+    expect(document.body.textContent).toContain('引用 (1)')
+    expect(document.body.textContent).toContain('图谱 (1)')
     expect(container.textContent).toContain('分布式共识')
     expect(container.textContent).toContain('经典名句')
     expect(container.textContent).toContain('握手时序图谱')
@@ -109,7 +118,8 @@ describe('MarginaliaBar', () => {
       )
     })
 
-    const conceptBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    await openTypeFilters()
+    const conceptBtn = Array.from(document.querySelectorAll('[role="menuitemradio"]')).find((b) =>
       b.textContent?.includes('概念 (1)')
     )
     expect(conceptBtn).toBeDefined()
@@ -256,35 +266,25 @@ describe('MarginaliaBar', () => {
     expect(container.textContent).toContain('经典名句')
   })
 
-  it('renders up to 3 high-frequency category pills and archives excess into More dropdown', async () => {
-    // 构造 5 个不同分类的 marks（note, diagram, concept, quote, method）
-    const manyCategoryMarks: ReadingMark[] = [
-      { ...mockMarks[0], id: 'm-note-1', kind: 'note', category: 'note' },
-      { ...mockMarks[0], id: 'm-note-2', kind: 'note', category: 'note' },
-      { ...mockMarks[0], id: 'm-diagram-1', kind: 'note', category: 'diagram' },
-      { ...mockMarks[0], id: 'm-concept-1', kind: 'note', category: 'concept' },
-      { ...mockMarks[0], id: 'm-quote-1', kind: 'highlight', category: 'quote' },
-      { ...mockMarks[0], id: 'm-method-1', kind: 'note', category: 'method' },
-    ]
-
+  it('书签统一在卡片流筛选、定位和删除，不混入引用类别', async () => {
+    const onMarkClick = vi.fn()
+    const onDeleteMark = vi.fn()
+    const bookmark: ReadingMark = { ...mockMarks[0], id: 'bookmark-1', kind: 'bookmark', category: undefined, title: '阅读位置' }
     await act(async () => {
-      root.render(
-        createElement(MarginaliaBar, {
-          marks: manyCategoryMarks,
-          onMarkClick: vi.fn(),
-          onToggleCardCollapse: vi.fn(),
-          onToggleAllCollapse: vi.fn(),
-        })
-      )
+      root.render(createElement(MarginaliaBar, {
+        marks: [...mockMarks, bookmark], onMarkClick, onDeleteMark,
+        onToggleCardCollapse: vi.fn(), onToggleAllCollapse: vi.fn(),
+      }))
     })
-
-    // 前排常驻「全部 (6)」
-    expect(container.textContent).toContain('全部 (6)')
-    // 前排展示数量最多的前 3 个：批注 (2), 图谱 (1), 概念 (1)
-    expect(container.textContent).toContain('批注 (2)')
-    expect(container.textContent).toContain('图谱 (1)')
-    expect(container.textContent).toContain('概念 (1)')
-    // 超过 3 个的被收纳进「更多 (2)」按钮
-    expect(container.textContent).toContain('更多 (2)')
+    await openTypeFilters()
+    const item = Array.from(document.querySelectorAll('[role="menuitemradio"]')).find((item) => item.textContent === '书签 (1)')!
+    await act(async () => item.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    const card = container.querySelector('#card-bookmark-1')!
+    expect(card.textContent).toContain('书签')
+    expect(container.querySelector('#card-mark-quote-1')).toBeNull()
+    await act(async () => card.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(onMarkClick).toHaveBeenCalledWith(bookmark)
+    await act(async () => card.querySelector('[title="删除卡片"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(onDeleteMark).toHaveBeenCalledWith('bookmark-1')
   })
 })

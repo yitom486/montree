@@ -149,6 +149,29 @@ export function shouldNavigateWebDocInApp(href: string, currentPageUrl: string):
   }
 }
 
+const BINARY_DOCUMENT_EXTENSION =
+  /\.(pdf|ps|eps|dvi|zip|gz|tgz|tar|bz2|xz|7z|rar|docx?|pptx?|xlsx?)$/i
+
+/**
+ * 阅读器只能渲染 HTML；PDF、TeX 源码压缩包等一律交给系统浏览器打开。
+ * arXiv 的 PDF/源码地址没有扩展名（/pdf/xxx、/src/xxx），单独识别。
+ */
+export function isWebDocExternalResource(href: string): boolean {
+  try {
+    const url = new URL(href)
+    if (BINARY_DOCUMENT_EXTENSION.test(url.pathname)) return true
+    if (
+      url.hostname === 'arxiv.org' &&
+      /^\/(pdf|src|e-print)\//i.test(url.pathname)
+    ) {
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 /** 返回当前在线文档页面内的 hash 目标；跨页 hash 仍按普通网页链接处理。 */
 export function resolveWebDocFragment(href: string, currentPageUrl: string): string | null {
   try {

@@ -8,3 +8,5 @@
 export * from "./protocol";
 export * from "./paths";
 export * from "./revision";
+
+export * from "./markdown-preview";

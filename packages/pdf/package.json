@@ -2,6 +2,7 @@
   "name": "@montree/pdf",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@yitom/contracts": "0.1.26"

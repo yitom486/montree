@@ -9,6 +9,8 @@ import type { DocumentRef } from '@yitom/contracts'
  * - 既有单参调用方无需改动（workspaceId 缺省），有身份处显式传入。
  */
 export const queryKeys = {
+  translationConfig: (runtimeId: string, model: string, thought: string) =>
+    ['translation-config', runtimeId, model, thought] as const,
   agentInspection: (threadId: string, sessionId: string | null, runtimeId: string, kind: string | null) =>
     ['agent-inspection', threadId, sessionId, runtimeId, kind] as const,
   agentSkill: (threadId: string, sessionId: string | null, runtimeId: string, skillId: string | null) =>
@@ -35,6 +37,12 @@ export const queryKeys = {
   marksSearchPrefix: (filePath: string, workspaceId: string = LOCAL_WORKSPACE_ID) =>
     ['reading-marks-search', workspaceId, filePath] as const,
   webDocPage: (pageUrl: string) => ['web-doc-page', pageUrl] as const,
+  /** 文章 URL → HN 讨论反查，空结果也缓存 24 小时 */
+  hnDiscussion: (url: string) => ['hn-discussion', url] as const,
+  /** 通用资讯源（source + channel） */
+  feed: (source: string, channel: string) => ['feed', source, channel] as const,
+  /** 资讯来源登录状态 */
+  feedAuth: (source: string) => ['feed-auth', source] as const,
   webDocToc: (discoveryUrl: string) => ['web-doc-toc', discoveryUrl] as const,
   /** 按书籍路径读取测验历史 */
   quizSessions: (filePath: string, workspaceId: string = LOCAL_WORKSPACE_ID) =>

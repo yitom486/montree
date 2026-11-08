@@ -62,6 +62,8 @@ import type { AcpConfigOption, AcpProviderStatus, AcpProxySettings } from '@yito
 
 interface AgentPanelProps {
   workspaceRoot?: string
+  /** 工作区共享辅助区提供边框、页签与关闭入口。 */
+  embedded?: boolean
   floating?: boolean
   onToggleFloating?: () => void
   onMinimizeToCapsule?: () => void
@@ -72,7 +74,7 @@ interface AgentPanelProps {
 
 /**
  * docked 侧栏可见性单一真相源：面板开 + 侧栏态 + 非禅模式。
- * WorkspaceShell 与各阅读器共用，保证两处挂载点互斥、状态一致。
+ * 工作区共享辅助区使用此状态；阅读器不再单独挂载聊天面板。
  */
 export function useIsDockedAgentVisible(): boolean {
   const panelOpen = useAcpUiStore((s) => s.panelOpen)
@@ -83,6 +85,7 @@ export function useIsDockedAgentVisible(): boolean {
 
 export const AgentPanel = memo(function AgentPanel({
   workspaceRoot,
+  embedded = false,
   floating = false,
   onToggleFloating,
   onMinimizeToCapsule,
@@ -405,8 +408,10 @@ export const AgentPanel = memo(function AgentPanel({
         kind={resourceKind}
         onClose={() => setResourceKind(null)}
       />
-      {/* 内嵌子卡：侧栏是工作区内框的孩子，不再顶天立地贴边 */}
-      <div className="m-2 ml-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-sidebar/95 shadow-sm backdrop-blur-sm">
+      <div className={cn(
+        'flex min-h-0 flex-1 flex-col overflow-hidden',
+        embedded ? 'bg-background' : 'm-2 ml-1 rounded-xl border border-border/50 bg-sidebar/95 shadow-sm backdrop-blur-sm',
+      )}>
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 px-3">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <AgentMark className="size-4" />
@@ -567,19 +572,21 @@ export const AgentPanel = memo(function AgentPanel({
               setHudDisplayMode('floating')
             }}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7 rounded-lg"
-            title="关闭面板"
-            onClick={() => {
-              setPanelOpen(false)
-              if (floating) setHudDisplayMode('docked')
-            }}
-          >
-            <X className="size-3.5" />
-          </Button>
+          {!embedded && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-lg"
+              title="关闭面板"
+              onClick={() => {
+                setPanelOpen(false)
+                if (floating) setHudDisplayMode('docked')
+              }}
+            >
+              <X className="size-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

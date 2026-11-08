@@ -14,6 +14,7 @@ import {
   stripWebDocFragment,
 } from '@montree/web-doc'
 import {
+  isWebDocExternalResource,
   resolveWebDocClickHref,
   resolveWebDocFragment,
   shouldNavigateWebDocInApp,
@@ -24,6 +25,7 @@ import {
   webDocTocEntriesToReaderUnits,
 } from '@yitom/reader-core'
 import { extractWebDocHeadings } from '@/lib/reader/web-doc/web-doc-outline'
+import { identifyDiscussionProvider } from '@/lib/reader/web-doc/discussion-link'
 import {
   collectPreviewHeadingPositions,
   findActiveHeadingByPositions,
@@ -78,10 +80,44 @@ export function useWebDocNavigation({
     setTocMode('section')
   }, [documentId])
 
-  const sectionUnits = useMemo(
-    () => webDocTocEntriesToReaderUnits(tocData?.sectionEntries ?? tocData?.entries ?? []),
-    [tocData?.entries, tocData?.sectionEntries],
+  const pageHeadings = useMemo(
+    () => (data?.content.bodyHtml ? extractWebDocHeadings(data.content.bodyHtml) : []),
+    [data?.content.bodyHtml],
   )
+
+  // HN 讨论页是单页评论树：左「目录」直接列顶层评论，点击跳到对应楼层，
+  // 不再展示站点导航 / 用户 / reply 这些同源链接。
+  const isHackerNewsDiscussion = useMemo(
+    () => identifyDiscussionProvider(documentUrl)?.source === 'Hacker News',
+    [documentUrl],
+  )
+
+  const sectionUnits = useMemo(() => {
+    const entries = tocData?.sectionEntries ?? tocData?.entries ?? []
+    if (isHackerNewsDiscussion) {
+      const commentEntries = pageHeadings
+        .filter((heading) => heading.id.startsWith('hn-comment-'))
+        .map((heading) => ({
+          href: `${documentUrl}#${heading.id}`,
+          label: heading.text,
+          level: 1,
+        }))
+      if (commentEntries.length > 0) {
+        return webDocTocEntriesToReaderUnits([
+          { href: documentUrl, label: data?.content.title || '讨论', level: 1 },
+          ...commentEntries,
+        ])
+      }
+    }
+    return webDocTocEntriesToReaderUnits(entries)
+  }, [
+    tocData?.entries,
+    tocData?.sectionEntries,
+    isHackerNewsDiscussion,
+    pageHeadings,
+    documentUrl,
+    data?.content.title,
+  ])
   const siteUnits = useMemo(
     () => (tocData?.siteEntries ? webDocTocEntriesToReaderUnits(tocData.siteEntries) : []),
     [tocData?.siteEntries],
@@ -133,10 +169,6 @@ export function useWebDocNavigation({
     [data?.content.title, pageUrl],
   )
 
-  const pageHeadings = useMemo(
-    () => (data?.content.bodyHtml ? extractWebDocHeadings(data.content.bodyHtml) : []),
-    [data?.content.bodyHtml],
-  )
   const pageHeadingsRef = useRef(pageHeadings)
   pageHeadingsRef.current = pageHeadings
   const [activeHeadingId, setActiveHeadingId] = useState<string>()
@@ -227,7 +259,10 @@ export function useWebDocNavigation({
   const handleWebDocLink = useCallback(
     (href: string) => {
       logWebDoc('link-click', { href, pageUrl: pageUrlRef.current })
-      if (shouldNavigateWebDocInApp(href, pageUrlRef.current)) {
+      if (
+        shouldNavigateWebDocInApp(href, pageUrlRef.current) &&
+        !isWebDocExternalResource(href)
+      ) {
         navigateToUrl(href)
         return
       }

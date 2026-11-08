@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import {
   forwardRef,
   useEffect,
@@ -5,9 +6,8 @@ import {
   useMemo,
   useRef,
 } from 'react'
-import { ExternalLink, FileDown, Loader2, RefreshCw } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
 import { AnnotationNoteDialog } from '@/components/reader/AnnotationNoteDialog'
 import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
@@ -17,6 +17,7 @@ import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
 import { ReaderTypographyControls } from '@/components/reader/ReaderTypographyControls'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
+import { TranslationCard } from '@/components/reader/TranslationCard'
 import { DeepAnswerDialog } from '@/components/reader/DeepAnswerDialog'
 import { useReaderSidePanels } from '@/hooks/reader/useReaderSidePanels'
 import { useReaderExportMenu } from '@/hooks/reader/useReaderExportMenu'
@@ -180,12 +181,13 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
       addPageBookmark,
       handleSaveAnnotation,
       handleCreateMarkAt,
+      onDismissTranslation: selectionActions.dismissTranslation,
     })
 
     syncWebMarkOverlaysRef.current = session.syncWebMarkOverlays
 
     const { ready, readerDocument, handleSelectMark } = session
-    const { tocOpen, marksOpen, toggleToc, toggleMarks, closeToc, closeMarks } = useReaderSidePanels()
+    const { tocOpen, toggleToc, closeToc } = useReaderSidePanels()
 
     useEffect(() => {
       if (error) {
@@ -252,6 +254,9 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         <div
           className={cn('web-doc-viewer-host relative h-full min-h-0 bg-[var(--color-bg-base)]', `theme-${theme}`)}
           data-reader-viewport
+          onClick={(event) => {
+            if (isReaderBlankClick(event.nativeEvent, event.currentTarget)) selectionActions.dismissTranslation()
+          }}
           data-theme={theme}
         >
           {isLoading && !data ? (
@@ -280,36 +285,18 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
         <ReaderToolbarShell
           ready={ready}
           tocDisabled={units.length === 0}
-          cardCount={marks.length}
           readAloudDisabled={true}
           readAloudDisabledReason="网页版语音朗读优化中，暂未开放"
           onTocToggle={toggleToc}
-          onMarksToggle={toggleMarks}
           onAddBookmark={() => void addPageBookmark()}
+          menuItems={[
+            { key: 'reload', label: '重新加载', disabled: isLoading || isFetching, onSelect: handleReload },
+            { key: 'open-browser', label: '在浏览器中打开', onSelect: handleOpenInBrowser },
+            { key: 'export-markdown', label: '导出为 Markdown', disabled: !ready || !data, onSelect: () => void handleExportMarkdown() },
+          ]}
           trailing={
             <>
               <ReaderTypographyControls disabled={!ready} />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={isLoading || isFetching}
-                onClick={handleReload}
-                title="重新加载"
-              >
-                <RefreshCw className={cn('size-4', isFetching && 'animate-spin')} />
-              </Button>
-              <Button variant="ghost" size="icon-sm" onClick={handleOpenInBrowser} title="在浏览器中打开">
-                <ExternalLink className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!ready || !data}
-                onClick={() => void handleExportMarkdown()}
-                title="一键导出为 Markdown"
-              >
-                <FileDown className="size-4" />
-              </Button>
               {(isLoading || isFetching) && !data ? (
                 <Loader2 className="size-4 animate-spin text-muted-foreground" />
               ) : null}
@@ -317,18 +304,16 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           }
         />
 
-        {/* 内框行：正文（含卡轨）与 AI 侧栏并列，同属左大块；底导航收进正文列 */}
+        {/* 内框行：正文与目录留在工作区，卡片统一展示在外壳辅助区 */}
         <div className="flex min-h-0 flex-1">
           <ReaderContentShell
             bookTitle={displayTitle}
             footerNav={
               <ReaderFooterNav ready={ready && units.length > 0} onPrevious={goPrevious} onNext={goNext} />
             }
-            marksOpen={marksOpen}
             marks={marks}
             onSelectMark={handleSelectMark}
             onDeleteMark={(mark) => void handleDeleteMark(mark)}
-            onCloseMarks={closeMarks}
             onExportNotes={handleExportNotes}
             onExportAnkiCards={handleExportAnkiCards}
             marksToc={tocFromWebUnits(units)}
@@ -375,10 +360,10 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
           <SelectionToolbar
             x={selectionToolbarPos.x}
             y={selectionToolbarPos.y}
-            readOnly
             onCopy={selectionActions.handleCopy}
             hasSelectionForCopy={Boolean(selectionSnapshot?.text?.trim())}
             keyEventDocs={iframeRef.current?.contentDocument ? [iframeRef.current.contentDocument] : []}
+            onTranslate={selectionActions.translate}
             onAnnotate={selectionActions.handleAnnotate}
             onReadAloud={() => {
               if (selectionSnapshot?.text) {
@@ -387,13 +372,23 @@ export const WebDocViewer = forwardRef<WebDocViewerHandle, WebDocViewerProps>(
               }
             }}
             onHighlight={selectionActions.handleHighlight}
-            onAddToChat={selectionActions.handleAddToChat}
             onAskAgent={selectionActions.handleAskAgent}
             onAskDeepAnswer={selectionActions.askDeepAnswer}
             deepAnswerPending={selectionActions.deepAnswerPending}
             onGenerateCardPreset={selectionActions.generateAiCard}
             cardPresetPending={selectionActions.aiCardPending}
             onDismiss={selectionActions.handleDismiss}
+          />
+        ) : null}
+
+        {selectionActions.translation ? (
+          <TranslationCard
+            translation={selectionActions.translation}
+            onClose={selectionActions.dismissTranslation}
+          onMove={selectionActions.moveTranslation}
+            onRetry={() => void selectionActions.retryTranslation()}
+            onCopy={selectionActions.copyTranslation}
+            onSave={() => void selectionActions.saveTranslationNote()}
           />
         ) : null}
 

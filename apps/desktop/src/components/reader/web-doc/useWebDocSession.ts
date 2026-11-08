@@ -1,3 +1,5 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
+import { bindWebDocImageRecovery } from '@/lib/reader/web-doc/web-doc-images'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReadingMark } from '@yitom/contracts'
 import {
@@ -100,6 +102,7 @@ export interface UseWebDocSessionOptions {
   restoreScrollProgress: () => void
   addPageBookmark: () => Promise<ReadingMark>
   handleSaveAnnotation: (note: string) => Promise<ReadingMark>
+  onDismissTranslation: () => void
   handleCreateMarkAt: (params: CreateMarkAtParams) => Promise<ReadingMark>
 }
 
@@ -137,6 +140,7 @@ export function useWebDocSession({
   addPageBookmark,
   handleSaveAnnotation,
   handleCreateMarkAt,
+  onDismissTranslation,
 }: UseWebDocSessionOptions) {
   const [iframeReady, setIframeReady] = useState(false)
   const ready = Boolean(data) && iframeReady
@@ -381,6 +385,7 @@ export function useWebDocSession({
       }
 
       const onClickCapture = (event: MouseEvent) => {
+        if (isReaderBlankClick(event, doc.documentElement)) onDismissTranslation()
         const href = resolveWebDocClickHref(event.target, pageUrlRef.current)
         if (!href) return
 
@@ -446,6 +451,7 @@ export function useWebDocSession({
         })
       }
 
+      const stopImageRecovery = bindWebDocImageRecovery(doc, pageUrlRef.current)
       doc.addEventListener('click', onCodeChromeClick)
       doc.addEventListener('click', onClickCapture, true)
       doc.addEventListener('keydown', onKeyDownCapture, true)
@@ -461,6 +467,7 @@ export function useWebDocSession({
       iframe.dataset.webDocInteractive = 'true'
 
       frameCleanupRef.current = () => {
+        stopImageRecovery()
         delete iframe.dataset.webDocInteractive
         doc.removeEventListener('click', onCodeChromeClick)
         doc.removeEventListener('click', onClickCapture, true)
@@ -475,7 +482,7 @@ export function useWebDocSession({
         doc.removeEventListener('mouseleave', onMarkLeave)
       }
     },
-    [documentId, handleWebDocLink, hoveredMarkIdRef, inspectorRef, marksRef, persistScrollProgress, pointerOriginRef, scheduleWebMarkLayout, setHoveredMark, setMarkTooltipPos, setSelectionSnapshot, setSelectionToolbarPos, syncActiveHeadingFromScroll],
+    [documentId, onDismissTranslation, handleWebDocLink, hoveredMarkIdRef, inspectorRef, marksRef, persistScrollProgress, pointerOriginRef, scheduleWebMarkLayout, setHoveredMark, setMarkTooltipPos, setSelectionSnapshot, setSelectionToolbarPos, syncActiveHeadingFromScroll],
   )
 
   const bindIframeFrameRef = useRef(bindIframeFrame)
@@ -661,6 +668,8 @@ export function useWebDocSession({
     }, () => {
       if (noteDialogOpen) return
       dimTextSelection()
+      // 点侧栏/导航等阅读区外 = 放弃当前选区；点 Agent 面板不会走到这里。
+      clearReaderSelection()
     })
   }, [dimTextSelection, iframeRef, noteDialogOpen])
 

@@ -11,6 +11,14 @@ directories:
 files:
   - out/**/*
   - package.json
+  - THIRD_PARTY_NOTICES.md
+  - LICENSES/**/*
+  - third-party/foliate-js/LICENSE
+  - third-party/foliate-js/vendor/pdfjs/cmaps/LICENSE
+  - third-party/foliate-js/vendor/pdfjs/standard_fonts/LICENSE_FOXIT
+  - third-party/foliate-js/vendor/pdfjs/standard_fonts/LICENSE_LIBERATION
+  - apps/desktop/src/components/ai-elements/LICENSE
+  - apps/desktop/src/components/ui/LICENSE.md
   # 先排除全部 node_modules，再按白名单加回主进程运行时闭包（渲染端依赖已由 Vite 打进 out/renderer，
   # 不需要再以 node_modules 形式进 asar；check:bundle 6.3 保证主进程 import 的包都在白名单里）
   - '!node_modules/**'
@@ -58,6 +66,8 @@ files:
   # 聊天/阅读器 npm 包中主进程实际 import 的运行时依赖（renderer 侧由 vite 打进包，无需收录）
   - node_modules/@yitom/annotations/**/*
   - node_modules/@yitom/reader-core/**/*
+  # RSS / arXiv Atom 解析（主进程运行时 require）
+  - node_modules/@xmldom/xmldom/**/*
   - node_modules/@google/genai/**/*
   - node_modules/gemini-tts-studio/**/*
   - node_modules/microsoft-cognitiveservices-speech-sdk/**/*

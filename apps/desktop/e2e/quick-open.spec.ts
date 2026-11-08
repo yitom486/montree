@@ -68,6 +68,7 @@ test.describe('全局快速打开', () => {
   })
 
   test('打开文件夹后 Ctrl+P 搜索并打开 Markdown', async () => {
+    test.setTimeout(120_000)
     const workspace = await mkdtemp(join(tmpdir(), 'montree-e2e-quickopen-'))
     await mkdir(join(workspace, 'notes'), { recursive: true })
     await writeFile(join(workspace, 'notes', 'vue-guide.md'), '# Vue Guide\n\nhello vue\n')

@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { ocrWordsToPlainText, pageHasNativeText } from '@montree/ocr-core'
 import type { PdfOcrPageCache } from '@yitom/contracts'
+import { hasUnreadableText } from '../text-quality'
 
 export async function readPdfPageNativeText(
   pdf: PDFDocumentProxy,
@@ -16,7 +17,19 @@ export function textFromOcrPageCache(cache: PdfOcrPageCache): string {
 
 export function pdfPageNeedsOcr(nativeText: string): boolean {
   const charCount = nativeText.replace(/\s/g, '').length
-  return !pageHasNativeText(charCount)
+  return !pageHasNativeText(charCount) || hasUnreadableText(nativeText)
+}
+
+/**
+ * PDF 字体映射异常时，PDF.js text layer 可能产出替换字符、控制字符或私用字形编码；
+ * 页面 Canvas 仍正常，但划词/翻译拿到的是坏文本。
+ */
+export function pdfTextItemsHaveUnreadableChars(items: ReadonlyArray<unknown>): boolean {
+  return items.some((item) => {
+    if (!item || typeof item !== 'object') return false
+    const str = (item as { str?: unknown }).str
+    return typeof str === 'string' && hasUnreadableText(str)
+  })
 }
 
 /** 校验 OCR 缓存与请求页码一致，防止错页复用 */

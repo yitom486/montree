@@ -10,6 +10,7 @@
 | `card` / `checkbox` / `label` | ACP 表单提问的容器、布尔字段与可访问标签；经官方 CLI 安装，仅对齐路径与样式尺度 |
 | `dropdown-menu` / `menubar` | 菜单 |
 | `breadcrumb` / `separator` / `scroll-area` / `progress` | 导航、进度与布局装饰 |
+| `tabs` | 辅助区页签（shadcn 官方 new-york-v4 Radix registry，经 CLI 安装） |
 | `resizable` | `react-resizable-panels` 封装 |
 | `sonner` | Toast |
 | `tooltip` / `hover-card` | 悬停提示与附件预览 |

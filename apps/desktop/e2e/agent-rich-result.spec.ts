@@ -169,7 +169,7 @@ test.describe('富结果生产链路 S2', () => {
         const rect = line.getBoundingClientRect()
         return rect.top >= bounds.top && rect.bottom <= bounds.bottom && el.scrollTop > 0
       })).toBe(true)
-      await window.getByRole('button', { name: '独立预览', exact: true }).click()
+      await window.keyboard.press('Control+3')
       const preview = window.locator('.markdown-preview:not(.agent-md)')
       await expect(preview).toBeVisible()
       await card.getByRole('button', { name: '定位原文' }).nth(1).click()

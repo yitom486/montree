@@ -45,6 +45,10 @@ test.describe('底栏翻页（正文列内聚）', () => {
       const panel = window.locator('#main')
       await expect(panel.locator('foliate-view').first()).toBeAttached({ timeout: 20_000 })
 
+      await window.getByRole('button', { name: '卡片流', exact: true }).click()
+      const rail = window.getByTestId('workspace-cards-host').locator('#marginalia-notes-stream')
+      await expect(rail).toBeVisible()
+
       const footer = panel.locator('footer', { hasText: '当前单元' })
       await expect(footer).toBeVisible({ timeout: 15_000 })
       const host = panel.locator('.foliate-reader-host')
@@ -56,13 +60,10 @@ test.describe('底栏翻页（正文列内聚）', () => {
       expect(Math.abs(footerBox!.x - hostBox!.x)).toBeLessThanOrEqual(2)
       expect(Math.abs(footerBox!.width - hostBox!.width)).toBeLessThanOrEqual(2)
       expect(footerBox!.y).toBeGreaterThan(hostBox!.y)
-      // 不横跨右侧卡片轨
-      const rail = panel.locator('#marginalia-notes-stream')
-      if ((await rail.count()) > 0 && (await rail.isVisible())) {
-        const railBox = await rail.boundingBox()
-        expect(railBox).not.toBeNull()
-        expect(footerBox!.x + footerBox!.width).toBeLessThanOrEqual(railBox!.x + 1)
-      }
+      // 卡片轨已移入外壳辅助区，底栏仍只占正文列。
+      const railBox = await rail.boundingBox()
+      expect(railBox).not.toBeNull()
+      expect(footerBox!.x + footerBox!.width).toBeLessThanOrEqual(railBox!.x + 1)
     } finally {
       await app.close()
     }

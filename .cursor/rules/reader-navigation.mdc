@@ -1,6 +1,6 @@
 ---
 description: 阅读器侧栏 flatIndex vs 底栏渲染级章节导航
-globs: src/components/reader/**/*.{ts,tsx},src/lib/reader/*nav*.ts,src/lib/reader/epub*.ts,src/lib/reader/mobi*.ts,src/stores/reader-navigation-store.ts
+globs: apps/desktop/src/components/reader/**/*.{ts,tsx},apps/desktop/src/lib/reader/*nav*.ts,apps/desktop/src/lib/reader/epub*.ts,apps/desktop/src/lib/reader/mobi*.ts,apps/desktop/src/stores/reader-navigation-store.ts
 alwaysApply: false
 ---
 

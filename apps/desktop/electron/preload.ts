@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { ACP_ELICITATION_IPC, type AcpElicitationAPI, type ElicitationEvent } from '../contracts/acp-elicitation'
+import { WEB_DOC_IMAGE_IPC, type WebDocImagesAPI } from '../contracts/web-doc'
+import { HN_FIND_DISCUSSION_IPC, type HnAPI } from '../contracts/hn'
+import {
+  FEED_AUTH_LOGIN_IPC,
+  FEED_AUTH_LOGOUT_IPC,
+  FEED_AUTH_STATUS_IPC,
+  FEED_FETCH_IPC,
+  type FeedAPI,
+  type FeedAuthAPI,
+} from '../contracts/feed'
+import { TRANSLATION_IPC, type TranslationAPI } from '../contracts/translation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
@@ -30,6 +41,28 @@ const windowInit = ipcRenderer.sendSync(IPC.APP_GET_WINDOW_INIT) as WindowInit
 const isFreshWindow = windowInit?.isFreshWindow ?? false
 const e2eFoliateReader = windowInit?.e2eFoliateReader ?? false
 const e2ePdfStructure = windowInit?.e2ePdfStructure ?? false
+
+const webDocImagesAPI: WebDocImagesAPI = {
+  fetch: (payload) => ipcRenderer.invoke(WEB_DOC_IMAGE_IPC, payload),
+}
+contextBridge.exposeInMainWorld('montreeWebDocImages', webDocImagesAPI)
+
+const hnAPI: HnAPI = {
+  findDiscussion: (payload) => ipcRenderer.invoke(HN_FIND_DISCUSSION_IPC, payload),
+}
+contextBridge.exposeInMainWorld('montreeHn', hnAPI)
+
+const feedAPI: FeedAPI = {
+  fetch: (payload) => ipcRenderer.invoke(FEED_FETCH_IPC, payload),
+}
+contextBridge.exposeInMainWorld('montreeFeed', feedAPI)
+
+const feedAuthAPI: FeedAuthAPI = {
+  login: (source) => ipcRenderer.invoke(FEED_AUTH_LOGIN_IPC, source),
+  status: (source) => ipcRenderer.invoke(FEED_AUTH_STATUS_IPC, source),
+  logout: (source) => ipcRenderer.invoke(FEED_AUTH_LOGOUT_IPC, source),
+}
+contextBridge.exposeInMainWorld('montreeFeedAuth', feedAuthAPI)
 
 const electronAPI: ElectronAPI = {
   typstGetConfig: filePath => ipcRenderer.invoke(IPC.TYPST_GET_CONFIG, filePath),
@@ -474,3 +507,27 @@ const acpElicitationAPI: AcpElicitationAPI = {
   respond: reply => ipcRenderer.invoke(ACP_ELICITATION_IPC.respond, reply),
 }
 contextBridge.exposeInMainWorld('montreeAcpElicitation', acpElicitationAPI)
+const translationAPI: TranslationAPI = {
+  onOutput: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof callback>[0]) => callback(payload)
+    ipcRenderer.on(TRANSLATION_IPC.output, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.output, handler)
+  },
+  connect: (runtimeId) => ipcRenderer.invoke(TRANSLATION_IPC.connect, runtimeId),
+  authenticate: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.authenticate, payload),
+  sessionNew: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.sessionNew, payload),
+  loadSession: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.loadSession, payload),
+  prompt: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.prompt, payload),
+  setConfigOption: (payload) => ipcRenderer.invoke(TRANSLATION_IPC.setConfigOption, payload),
+  onSessionUpdate: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+    ipcRenderer.on(TRANSLATION_IPC.update, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.update, handler)
+  },
+  onStatusChanged: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+    ipcRenderer.on(TRANSLATION_IPC.status, handler)
+    return () => ipcRenderer.removeListener(TRANSLATION_IPC.status, handler)
+  },
+}
+contextBridge.exposeInMainWorld('montreeTranslation', translationAPI)

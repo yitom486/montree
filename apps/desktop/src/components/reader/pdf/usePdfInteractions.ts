@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import type { ReadingMark } from '@yitom/contracts'
+import type { ReadingMark, PdfOcrPageCache } from '@yitom/contracts'
+import { textFromOcrSelection } from '@/lib/reader/pdf-ocr/pdf-ocr-selection'
+import { hasUnreadableText } from '@/lib/reader/text-quality'
 import { isOk } from '@yitom/contracts'
 import {
   clearWindowSelection,
@@ -58,6 +60,8 @@ export interface UsePdfInteractionsOptions {
   deleteMark: (id: string) => Promise<any>
   jumpToPage: (page: number) => void
   goToFlatIndex: (index: number) => void
+  runPageOcr: (page: number) => Promise<PdfOcrPageCache>
+  ocrPageCachesRef: React.RefObject<Record<number, PdfOcrPageCache>>
 }
 
 export function usePdfInteractions({
@@ -77,6 +81,8 @@ export function usePdfInteractions({
   deleteMark,
   jumpToPage,
   goToFlatIndex,
+  runPageOcr,
+  ocrPageCachesRef,
 }: UsePdfInteractionsOptions) {
   const [selectionSnapshot, setSelectionSnapshot] = useState<PdfSelectionSnapshot | null>(null)
   const [selectionToolbarPos, setSelectionToolbarPos] = useState<{ x: number; y: number } | null>(null)
@@ -95,10 +101,11 @@ export function usePdfInteractions({
     clearWindowSelection(window)
   }, [])
 
+  // 收工具条但保留 sticky：点「问 Agent」后发送时仍要能带出选区。
   const dimTextSelection = useCallback(() => {
-    clearTextSelection()
+    setSelectionToolbarPos(null)
     inspector.close()
-  }, [clearTextSelection, inspector])
+  }, [inspector])
 
   const captureSelectionSnapshot = useCallback((snapshot: PdfSelectionSnapshot) => {
     selectionTransactionRef.current = snapshot
@@ -176,8 +183,9 @@ export function usePdfInteractions({
       color = DEFAULT_HIGHLIGHT_COLOR,
       overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
+      frozenSelection?: PdfSelectionSnapshot,
     ) => {
-      const snapshot = selectionTransactionRef.current
+      const snapshot = frozenSelection ?? selectionTransactionRef.current
       if (!snapshot) {
         throw new Error('当前没有可用选区，请先划选文本')
       }
@@ -191,7 +199,7 @@ export function usePdfInteractions({
         page: snapshot.page,
       })
       const meta = parseNoteToCardMeta(note)
-      if (existing) {
+      if (existing && !frozenSelection) {
         const trimmed = meta.note?.trim()
         const result = await updateMark({
           id: existing.id,
@@ -251,7 +259,7 @@ export function usePdfInteractions({
       }
 
       toast.success(note ? '已保存批注' : '已添加高亮')
-      clearTextSelection()
+      if (!frozenSelection) clearTextSelection()
       return result.value as ReadingMark
     },
     [clearTextSelection, createMark, fileFingerprint, filePath, marks, marksToc, updateMark],
@@ -259,6 +267,28 @@ export function usePdfInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    captureTranslationNote: () => {
+      const snapshot = selectionTransactionRef.current ?? selectionSnapshot
+      if (!snapshot) return undefined
+      return (note, text) => handleSaveAnnotation(note, 'yellow', undefined, '翻译', {
+        ...snapshot, text,
+        // 翻译期间可能 OCR 换层，固定原页几何，避免使用已失效的 item 索引。
+        begin: undefined, end: undefined, quote: undefined,
+      })
+    },
+    // 闭包锁定点击时的快照；识别期间的新选区不能改变本次翻译范围。
+    recoverTranslationText: selectionSnapshot ? async () => {
+      const cache = ocrPageCachesRef.current[selectionSnapshot.page]
+      if (cache?.words.length && cache.fileFingerprint === fileFingerprint) {
+        try {
+          const text = textFromOcrSelection(cache, selectionSnapshot)
+          if (!hasUnreadableText(text)) return text
+        } catch {
+          // 旧 Auto 缓存也可能来自坏原生层，重新强制 OCR 后再定位。
+        }
+      }
+      return textFromOcrSelection(await runPageOcr(selectionSnapshot.page), selectionSnapshot)
+    } : undefined,
     dimTextSelection,
     clearTextSelection,
     openAnnotateDialog: () => {
@@ -276,7 +306,8 @@ export function usePdfInteractions({
     onHighlightError: (cause) => {
       toast.error(cause instanceof Error ? cause.message : '添加高亮失败')
     },
-    sessionKey: fileFingerprint ?? filePath,
+    sessionKey: fileFingerprint || filePath,
+    translationSourceKey: filePath,
   })
 
   const handleCreateMarkAt = useCallback(

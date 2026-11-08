@@ -312,9 +312,9 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await expect(invalidComponent).toContainText('可切回源码修正')
     expect(await page.evaluate(() => (window as unknown as { __liveXss?: number }).__liveXss)).toBeUndefined()
 
-    // Mode switching is a decoration-only operation; source and history survive it.
+    // Mode switching preserves the buffer and undo history; source mode adds its preview pane.
     await toggle.click()
-    await expect(toggle).toHaveText('可视编辑')
+    await expect(toggle).toHaveText('返回所见即所得')
     await expect(editor.locator('.cm-gutters')).toBeVisible()
     await expect(editor.locator('.cm-live-block')).toHaveCount(0)
     await content.click()
@@ -348,6 +348,9 @@ test('Markdown 实时预览复用社区渲染、准确编辑、撤销、主题�
     await expect(toggle).toBeVisible()
     await toggle.click()
     await expect(editor).toBeVisible()
+    await expect(toggle).toHaveAttribute('data-editor-mode', 'source')
+    await page.keyboard.press('Control+/')
+    await expect(toggle).toHaveAttribute('data-editor-mode', 'live-preview')
     await page.keyboard.press('Control+/')
     await expect(toggle).toHaveAttribute('data-editor-mode', 'source')
     const openFile = async (file: string) => {

@@ -10,6 +10,7 @@ import type {
   WebDocFetchPayloadWithMarkdown,
   WebDocFetchResultWithMarkdown,
   WebDocMarkdownSource,
+  WebDocImagePayload, WebDocImageResult,
 } from '../../contracts/web-doc'
 import {
   extractGenericWebDocToc,
@@ -41,6 +42,27 @@ const WEB_DOC_MAX_REDIRECTS = 5
  */
 const WEB_DOC_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Montree/0.2.7'
+
+/**
+ * Hacker News 讨论页没有章节结构；页面里的同源链接全是导航、用户主页与回复链接，
+ * 交给通用 TOC 会产出上百条噪声。这里只保留当前讨论页本身作为唯一目录项。
+ */
+function isHackerNewsItemUrl(url: URL): boolean {
+  return url.hostname === 'news.ycombinator.com' && url.pathname === '/item'
+}
+
+function hackerNewsPageTitle(html: string): string {
+  const raw = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''
+  return raw
+    .replace(/\s*\|\s*Hacker News\s*$/i, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 function webDocHtmlHeaders(): Record<string, string> {
   return {
@@ -108,6 +130,7 @@ async function fetchWebDocResponse(
   initialUrl: string,
   headers: Record<string, string>,
   localOrigin?: string,
+  signal?: AbortSignal,
 ): Promise<Response> {
   let current = initialUrl
   for (let hop = 0; hop <= WEB_DOC_MAX_REDIRECTS; hop++) {
@@ -117,7 +140,7 @@ async function fetchWebDocResponse(
     let response: Response
     try {
       response = await fetch(current, {
-        signal: controller.signal,
+        signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
         redirect: 'manual',
         headers,
       })
@@ -143,6 +166,74 @@ async function fetchWebDocResponse(
     current = next
   }
   throw new Error('重定向处理异常')
+}
+
+const IMAGE_MAX_BYTES = 12 * 1024 * 1024
+const IMAGE_CACHE_MAX_BYTES = 32 * 1024 * 1024
+const imageCache = new Map<string, { result: WebDocImageResult; expires: number; bytes: number }>()
+const imagePending = new Map<string, Promise<Result<WebDocImageResult, AppError>>>()
+
+/** 资源由主进程按正文同一 URL 边界读取，供被 CORP 阻止的 <img> 回退显示。 */
+export async function fetchWebDocImage(payload: WebDocImagePayload): Promise<Result<WebDocImageResult, AppError>> {
+  try {
+    const localOrigin = getWebDocLoopbackOrigin(payload?.pageUrl)
+    normalizeWebDocUrl(payload?.pageUrl, localOrigin)
+    // 权限来自用户打开的文档，不能由图片自身的 localhost URL 授予。
+    const url = normalizeWebDocUrl(payload?.url, localOrigin)
+    const cached = imageCache.get(url)
+    if (cached && cached.expires > Date.now()) {
+      imageCache.delete(url); imageCache.set(url, cached)
+      return ok(cached.result)
+    }
+    imageCache.delete(url)
+    const pending = imagePending.get(url)
+    if (pending) return pending
+    const task = (async (): Promise<Result<WebDocImageResult, AppError>> => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), WEB_DOC_FETCH_TIMEOUT_MS)
+      try {
+        const response = await fetchWebDocResponse(url, { ...webDocHtmlHeaders(), Accept: 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8' }, localOrigin, controller.signal)
+        if (!response.ok) { await response.body?.cancel(); return toFetchError(httpStatusErrorMessage(response.status)) }
+        const type = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
+        if (!/^image\/(png|jpeg|gif|webp|avif|svg\+xml|bmp|x-icon|vnd\.microsoft\.icon)$/.test(type)) {
+          await response.body?.cancel()
+          return toFetchError('图片资源返回了不支持的内容类型')
+        }
+        if (Number(response.headers.get('content-length')) > IMAGE_MAX_BYTES) {
+          await response.body?.cancel()
+          return toFetchError('图片超过 12MB 限制')
+        }
+        const reader = response.body?.getReader()
+        if (!reader) return toFetchError('图片内容为空')
+        const chunks: Uint8Array[] = []
+        let bytes = 0
+        try {
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            bytes += value.byteLength
+            if (bytes > IMAGE_MAX_BYTES) { await reader.cancel(); return toFetchError('图片超过 12MB 限制') }
+            chunks.push(value)
+          }
+        } finally { reader.releaseLock() }
+        if (!bytes) return toFetchError('图片内容为空')
+        const result = { url: response.url || url, dataUrl: `data:${type};base64,${Buffer.concat(chunks).toString('base64')}` }
+        const cost = result.dataUrl.length * 2
+        if (cost <= IMAGE_CACHE_MAX_BYTES) {
+          let used = [...imageCache.values()].reduce((sum, entry) => sum + entry.bytes, 0)
+          for (const [key, entry] of imageCache) {
+            if (entry.expires <= Date.now() || used + cost > IMAGE_CACHE_MAX_BYTES) { imageCache.delete(key); used -= entry.bytes }
+          }
+          imageCache.set(url, { result, bytes: cost, expires: Date.now() + 5 * 60_000 })
+        }
+        return ok(result)
+      } catch (cause) {
+        return toFetchError(cause instanceof Error && cause.name === 'AbortError' ? '读取图片超时' : cause instanceof Error ? cause.message : '读取图片失败')
+      } finally { clearTimeout(timer) }
+    })().finally(() => { imagePending.delete(url) })
+    imagePending.set(url, task)
+    return task
+  } catch (cause) { return toFetchError(cause instanceof Error ? cause.message : '图片地址无效') }
 }
 
 async function readResponseTextLimited(response: Response): Promise<string> {
@@ -287,6 +378,14 @@ export async function discoverWebDocToc(
   try {
     const pageUrl = new URL(fetchResult.value.url)
     const siteId = resolveWebDocSiteId(pageUrl)
+    // HN 讨论页单页成文：不要抓同源链接当目录
+    if (isHackerNewsItemUrl(pageUrl)) {
+      const label = hackerNewsPageTitle(fetchResult.value.html)
+      return ok({
+        siteId,
+        entries: label ? [{ href: fetchResult.value.url, label, level: 1 }] : [],
+      })
+    }
     const mdbookInline = extractMdBookToc(fetchResult.value.html, fetchResult.value.url)
     if (mdbookInline.length) return ok({ siteId, entries: mdbookInline })
     const mdbookTocUrl = resolveMdBookTocUrl(fetchResult.value.html, fetchResult.value.url)

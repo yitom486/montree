@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { app } from 'electron'
+import { isMarkdownPreviewAnchor } from '@montree/workspace-core'
 import { toAppError, type AppError } from '@yitom/contracts'
 import { err, ok, type Result } from '@yitom/contracts'
 import type {
@@ -252,7 +253,7 @@ export async function createReadingMark(
       return err({ code: 'UNKNOWN', message: '文件路径无效' })
     }
 
-    const anchorError = validateReadingAnchor(payload.anchor)
+    const anchorError = isMarkdownPreviewAnchor(filePath, payload.anchor) ? null : validateReadingAnchor(payload.anchor)
     if (anchorError) {
       return err({ code: 'UNKNOWN', message: anchorError })
     }

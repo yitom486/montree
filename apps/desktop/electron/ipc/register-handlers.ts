@@ -46,7 +46,7 @@ import type {
   AcpProxySettings,
 } from '@yitom/contracts'
 import type { WebDocDiscoverTocPayload } from '@yitom/contracts'
-import type { WebDocFetchPayloadWithMarkdown } from '../../contracts/web-doc'
+import { WEB_DOC_IMAGE_IPC, type WebDocImagePayload, type WebDocFetchPayloadWithMarkdown } from '../../contracts/web-doc'
 import { saveBinaryDocument } from '../services/binary-document-service'
 import type { SaveBinaryDocumentPayload } from '@yitom/contracts'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
@@ -193,8 +193,24 @@ import type { QuizSessionRecord } from '@yitom/contracts'
 import {
   discoverWebDocToc,
   fetchWebDocPage,
+  fetchWebDocImage,
   parseWebDocUrlInput,
 } from '../services/web-doc-service'
+import { findHnDiscussion } from '../services/hn-service'
+import { fetchFeed } from '../services/feed-service'
+import {
+  FEED_AUTH_LOGIN_IPC,
+  FEED_AUTH_LOGOUT_IPC,
+  FEED_AUTH_STATUS_IPC,
+  FEED_FETCH_IPC,
+  type FeedFetchPayload,
+  type FeedSourceId,
+} from '../../contracts/feed'
+import { getFeedAuthStatus, loginFeed, logoutFeed } from '../services/feed-auth-service'
+import {
+  HN_FIND_DISCUSSION_IPC,
+  type HnFindDiscussionPayload,
+} from '../../contracts/hn'
 import { readPdfOcrTocCache, deletePdfOcrTocCache, clearAllPdfOcrCaches, writePdfOcrTocCache } from '../services/ocr/ocr-toc-cache'
 import {
   deleteAllPdfOcrPageCaches,
@@ -958,7 +974,56 @@ export function registerIpcHandlers(): void {
     touchAiSession(withAiSessionWindow(_event.sender, payload)),
   )
 
+  // --- 通用资讯源 ---
+  ipcMain.handle(FEED_FETCH_IPC, (event, payload: FeedFetchPayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口读取资讯源' })
+    }
+    return fetchFeed(payload)
+  })
+  ipcMain.handle(FEED_AUTH_STATUS_IPC, async (event, source: FeedSourceId) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口查询登录状态' })
+    }
+    return ok(await getFeedAuthStatus(source))
+  })
+  ipcMain.handle(FEED_AUTH_LOGIN_IPC, async (event, source: FeedSourceId) => {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender)
+    if (!senderWindow) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口发起登录' })
+    }
+    try {
+      return ok(await loginFeed(source, senderWindow))
+    } catch (cause) {
+      return err({
+        code: 'UNKNOWN',
+        message: `打开登录窗口失败：${cause instanceof Error ? cause.message : String(cause)}`,
+      })
+    }
+  })
+  ipcMain.handle(FEED_AUTH_LOGOUT_IPC, async (event, source: FeedSourceId) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口退出登录' })
+    }
+    await logoutFeed(source)
+    return ok(undefined)
+  })
+
+  // --- Hacker News 资讯源 ---
+  ipcMain.handle(HN_FIND_DISCUSSION_IPC, (event, payload: HnFindDiscussionPayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口查询 Hacker News 讨论' })
+    }
+    return findHnDiscussion(payload)
+  })
+
   // --- 在线文档 ---
+  ipcMain.handle(WEB_DOC_IMAGE_IPC, (event, payload: WebDocImagePayload) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      return err({ code: 'FORBIDDEN', message: '仅允许应用主窗口读取阅读器图片' })
+    }
+    return fetchWebDocImage(payload)
+  })
   ipcMain.handle(IPC.WEB_DOC_FETCH_PAGE, async (_event, payload: WebDocFetchPayloadWithMarkdown) => {
     const urlResult = parseWebDocUrlInput(payload?.url, true)
     if (!urlResult.ok) return urlResult

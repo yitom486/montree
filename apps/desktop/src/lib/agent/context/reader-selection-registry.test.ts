@@ -3,10 +3,10 @@ import {
   beginPromptSelectionCycle,
   clearReaderSelection,
   commitReaderSelection,
+  getTurnReaderSelection,
   hasActiveSelection,
   readSelectionText,
   registerSelectionProvider,
-  reviveSelectionNotify,
 } from './reader-selection-registry'
 
 describe('reader-selection-registry sticky', () => {
@@ -21,17 +21,19 @@ describe('reader-selection-registry sticky', () => {
     dispose()
   })
 
-  it('注销 provider 时清除同文件 sticky', () => {
+  it('注销 provider 时清除同文件 sticky，但保留本轮已冻结快照', () => {
     const dispose = registerSelectionProvider({
       filePath: '/book.epub',
       getSelectionText: () => null,
     })
     commitReaderSelection('/book.epub', '段落')
+    expect(beginPromptSelectionCycle()).toBe(true)
     dispose()
-    expect(readSelectionText()).toBeNull()
+    expect(readSelectionText()).toBe('段落')
+    expect(beginPromptSelectionCycle()).toBe(false)
   })
 
-  it('clearReaderSelection 清空 sticky', () => {
+  it('clearReaderSelection 清空当前选区', () => {
     commitReaderSelection('/a.pdf', '页内文字')
     clearReaderSelection()
     expect(hasActiveSelection()).toBe(false)
@@ -56,16 +58,31 @@ describe('reader-selection-registry sticky', () => {
   })
 })
 
-describe('selection one-shot notify', () => {
-  it('划选后第一轮 prompt 通知，本轮工具仍可读', () => {
+describe('selection turn snapshot', () => {
+  it('发送时冻结本轮选区，AI 回答期间取消也不影响本轮', () => {
     commitReaderSelection('/book.epub', '共天下')
+    expect(beginPromptSelectionCycle()).toBe(true)
+    expect(getTurnReaderSelection()?.text).toBe('共天下')
+
+    // 模拟 AI 回答期间用户取消选区
+    clearReaderSelection()
+
+    expect(readSelectionText()).toBe('共天下')
+    expect(getTurnReaderSelection()?.text).toBe('共天下')
+  })
+
+  it('选区仍未取消时，下一轮继续通知同一段', () => {
+    commitReaderSelection('/book.epub', '共天下')
+    expect(beginPromptSelectionCycle()).toBe(true)
     expect(beginPromptSelectionCycle()).toBe(true)
     expect(readSelectionText()).toBe('共天下')
   })
 
-  it('下一轮未重新划选则不再通知，并清掉 sticky', () => {
+  it('取消后下一轮不再通知，也不保留旧选区', () => {
     commitReaderSelection('/book.epub', '共天下')
     expect(beginPromptSelectionCycle()).toBe(true)
+    clearReaderSelection()
+
     expect(beginPromptSelectionCycle()).toBe(false)
     expect(readSelectionText()).toBeNull()
     expect(hasActiveSelection()).toBe(false)
@@ -74,33 +91,22 @@ describe('selection one-shot notify', () => {
   it('重新划选（含相同文字）再次通知', () => {
     commitReaderSelection('/book.epub', '共天下')
     expect(beginPromptSelectionCycle()).toBe(true)
-    expect(beginPromptSelectionCycle()).toBe(false)
+    clearReaderSelection()
 
     commitReaderSelection('/book.epub', '共天下')
     expect(beginPromptSelectionCycle()).toBe(true)
     expect(readSelectionText()).toBe('共天下')
   })
 
-  it('换了选区内容会在下一轮通知新内容', () => {
+  it('本轮冻结后新选区不污染当前轮，下一轮才生效', () => {
     commitReaderSelection('/book.epub', '旧选区')
     expect(beginPromptSelectionCycle()).toBe(true)
 
     commitReaderSelection('/book.epub', '新选区')
+    expect(readSelectionText()).toBe('旧选区')
+    expect(getTurnReaderSelection()?.text).toBe('旧选区')
+
     expect(beginPromptSelectionCycle()).toBe(true)
     expect(readSelectionText()).toBe('新选区')
-  })
-
-  it('reviveSelectionNotify 可在问 Agent 时重新挂起通知', () => {
-    commitReaderSelection('/book.epub', '选段')
-    expect(beginPromptSelectionCycle()).toBe(true)
-    expect(beginPromptSelectionCycle()).toBe(false)
-    expect(reviveSelectionNotify()).toBe(false) // sticky 已清
-
-    commitReaderSelection('/book.epub', '选段')
-    expect(beginPromptSelectionCycle()).toBe(true)
-    // 本轮工具仍可读；模拟「问 Agent」在通知已消费后再次挂起
-    expect(readSelectionText()).toBe('选段')
-    expect(reviveSelectionNotify()).toBe(true)
-    expect(beginPromptSelectionCycle()).toBe(true)
   })
 })

@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
+import { configureMockTranslation, mockAgentEnv } from './helpers/mock-agent'
 
 test('行内补全可以单独配置 provider 并恢复跟随 Agent', async () => {
-  const app = await launchBuiltApp({ E2E_INLINE_COMPLETION_MOCK: '1' })
+  const app = await launchBuiltApp(mockAgentEnv('', { E2E_INLINE_COMPLETION_MOCK: '1' }))
   try {
     const window = await app.firstWindow()
     await window.waitForLoadState('domcontentloaded')
+    await configureMockTranslation(window)
     await window.getByRole('button', { name: '更多操作', exact: true }).click()
     await window.getByRole('menuitem', { name: /设置/ }).click()
 

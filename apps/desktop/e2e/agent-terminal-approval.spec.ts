@@ -23,9 +23,10 @@ test('Agent 终端命令先审批：拒绝/允许一次/信任此工作区，并
     await page.waitForLoadState('domcontentloaded')
     await connectMockAgent(page, 'terminal-thread')
     const chat = page.getByRole('region', { name: 'Agent 聊天' })
-    const spec = JSON.stringify({ command: process.execPath, args: ['-e', "console.log('HELLO_TERMINAL')"] })
-    const run = async (choice: '拒绝' | '允许一次' | '信任此工作区' | null, expected: RegExp, index: number) => {
-      const before = await chat.getByText(expected).count()
+    const run = async (choice: '拒绝' | '允许一次' | '信任此工作区' | null, index: number) => {
+      const output = `HELLO_TERMINAL_${index}`
+      const spec = JSON.stringify({ command: process.execPath, args: ['-e', `console.log('${output}')`] })
+      const expected = choice === '拒绝' ? /TERMINAL:denied\|用户拒绝/ : new RegExp(`TERMINAL:ok\\|${output}`)
       await sendToAgent(page, `terminal:${spec}`)
       if (choice) {
         const card = chat.getByText(/运行命令：/).last()
@@ -33,15 +34,15 @@ test('Agent 终端命令先审批：拒绝/允许一次/信任此工作区，并
         if (index === 0 && shotDir) { await mkdir(shotDir, { recursive: true }); await page.screenshot({ path: join(shotDir, 'terminal-approval-card.png') }) }
         await chat.getByRole('button', { name: choice, exact: true }).last().click()
       }
-      await expect.poll(() => chat.getByText(expected).count(), { timeout: 20_000 }).toBeGreaterThan(before)
+      // 高 DPI 下历史消息会被虚拟列表卸载，用每轮唯一回执验证执行结果。
+      await expect(chat.getByText(expected).last()).toBeVisible({ timeout: 20_000 })
     }
-    await run('拒绝', /TERMINAL:denied\|用户拒绝/, 0)
-    await run('允许一次', /TERMINAL:ok\|HELLO_TERMINAL/, 1)
-    await run('信任此工作区', /TERMINAL:ok\|HELLO_TERMINAL/, 2)
+    await run('拒绝', 0)
+    await run('允许一次', 1)
+    await run('信任此工作区', 2)
     // 已信任：不再出审批卡
-    const cardsBefore = await chat.getByText(/运行命令：/).count()
-    await run(null, /TERMINAL:ok\|HELLO_TERMINAL/, 3)
-    expect(await chat.getByText(/运行命令：/).count()).toBe(cardsBefore)
+    await run(null, 3)
+    await expect(chat.getByRole('button', { name: '允许一次', exact: true })).toHaveCount(0)
 
     const userData = await app.evaluate(({ app }) => app.getPath('userData'))
     const audit = (await readFile(join(userData, 'logs', 'agent-terminal-audit.jsonl'), 'utf8')).trim().split('\n').map((line) => JSON.parse(line))

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect, type ElectronApplication, type Page } from '@playwright/test'
 import { launchBuiltApp } from './helpers/launch-app'
-import { connectMockAgent, mockAgentEnv } from './helpers/mock-agent'
+import { configureMockTranslation, connectMockAgent, mockAgentEnv } from './helpers/mock-agent'
 import { screenshotWithoutToasts } from './helpers/screenshot'
 
 // 新用例不允许靠重试掩盖抖动（全局 CI retries=1 对本文件关闭）
@@ -30,6 +30,7 @@ test('修改建议按 MCP _meta toolCallId 去重；审阅模式拦截直接编�
   try {
     const page = await app.firstWindow()
     await page.waitForLoadState('domcontentloaded')
+    await configureMockTranslation(page)
     await connectMockAgent(page, 'life-thread')
     await page.getByRole('button', { name: '更多操作', exact: true }).click()
     await page.getByRole('menuitem', { name: /打开文件夹/ }).click()

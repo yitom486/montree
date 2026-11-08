@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FoliateViewElement } from '@foliate/view.js'
 import type { ReadingMark } from '@yitom/contracts'
@@ -39,6 +40,7 @@ export interface UseFoliateInteractionsOptions {
   filePath: string
   fileFingerprint: string
   kindRef: React.RefObject<'epub' | 'mobi'>
+  containerRef: React.RefObject<HTMLDivElement | null>
   viewRef: React.RefObject<FoliateViewElement | null>
   adapterRef: React.RefObject<FoliateBookAdapter | null>
   chaptersRef: React.RefObject<EpubChapter[]>
@@ -62,6 +64,7 @@ export function useFoliateInteractions({
   filePath,
   fileFingerprint,
   kindRef,
+  containerRef,
   viewRef,
   adapterRef,
   chaptersRef,
@@ -123,6 +126,19 @@ export function useFoliateInteractions({
     inspectorRef.current.close()
   }, [noteDialogOpen])
 
+  // 点侧栏/导航等阅读区外 = 放弃当前选区；点工具条或 Agent 面板不会走到这里。
+  useEffect(() => {
+    return bindOutsideReaderPointerDismiss(
+      (target) => {
+        const container = containerRef.current
+        return Boolean(container && (target === container || container.contains(target)))
+      },
+      () => {
+        if (!noteDialogOpen) clearTextSelection()
+      },
+    )
+  }, [clearTextSelection, containerRef, noteDialogOpen])
+
   const handleDeleteMark = useCallback(
     async (mark: ReadingMark) => {
       const key = overlayerKeyForMark(mark)
@@ -171,18 +187,20 @@ export function useFoliateInteractions({
       color = DEFAULT_HIGHLIGHT_COLOR,
       overrideCategory?: import('@yitom/contracts').ReadingMarkCategory,
       overrideTitle?: string,
+      frozenSelection?: { snapshot: NonNullable<typeof selectionSnapshot>; kind: 'epub' | 'mobi'; sectionId: string },
     ): Promise<ReadingMark> => {
-      const snapshot = selectionSnapshotRef.current
+      const snapshot = frozenSelection?.snapshot ?? selectionSnapshotRef.current
       if (!snapshot || !fileFingerprint) {
         throw new Error('当前没有可用选区，请先划选文本')
       }
       const sectionIndex = lastLocationRef.current?.sectionIndex
-      const sectionId =
+      const sectionId = frozenSelection?.sectionId ?? (
         typeof sectionIndex === 'number'
           ? (adapterRef.current?.sections[sectionIndex]?.id ?? '')
-          : ''
+          : '')
+      const kind = frozenSelection?.kind ?? kindRef.current
       const anchor =
-        kindRef.current === 'epub'
+        kind === 'epub'
           ? {
               format: 'epub' as const,
               cfi: snapshot.cfiRange,
@@ -199,14 +217,14 @@ export function useFoliateInteractions({
             }
 
       const existing = findMarkForSelection(marks, {
-        format: kindRef.current,
+        format: kind,
         text: snapshot.text,
         cfiRange: snapshot.cfiRange,
       })
       const anchorChapter =
         toCanonicalChapter(anchor, tocFromEpubUnits(chaptersRef.current)) ?? undefined
       const meta = parseNoteToCardMeta(note)
-      if (existing) {
+      if (existing && !frozenSelection) {
         const trimmed = meta.note?.trim()
         const result = await updateMark({
           id: existing.id,
@@ -252,10 +270,12 @@ export function useFoliateInteractions({
       if (!isOk(result)) {
         throw new Error(result.error.message || '创建批注失败')
       }
-      removePendingAnnotateHighlight()
-      syncVisualMarks()
+      if (!frozenSelection) {
+        removePendingAnnotateHighlight()
+        syncVisualMarks()
+        clearTextSelection()
+      }
       toast.success(note ? '已保存批注' : '已添加高亮')
-      clearTextSelection()
       return result.value as ReadingMark
     },
     [
@@ -276,6 +296,18 @@ export function useFoliateInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    captureTranslationNote: () => {
+      const snapshot = selectionSnapshotRef.current
+      if (!snapshot) return undefined
+      const sectionIndex = lastLocationRef.current?.sectionIndex
+      const frozen = {
+        snapshot, kind: kindRef.current,
+        sectionId: typeof sectionIndex === 'number' ? adapterRef.current?.sections[sectionIndex]?.id ?? '' : '',
+      }
+      return (note, text) => handleSaveAnnotation(note, DEFAULT_HIGHLIGHT_COLOR, undefined, '翻译', {
+        ...frozen, snapshot: { ...snapshot, text },
+      })
+    },
     dimTextSelection,
     clearTextSelection,
     openAnnotateDialog: () => {
@@ -286,6 +318,7 @@ export function useFoliateInteractions({
     showPendingHighlight: showPendingAnnotateHighlight,
     saveHighlight: handleSaveAnnotation,
     sessionKey: fileFingerprint ?? filePath,
+    translationSourceKey: filePath,
   })
 
   const markHoverHandlers = useCallback(
@@ -384,6 +417,8 @@ export function useFoliateInteractions({
         if (!snapshot) {
           if (isClick) {
             inspectorRef.current.close()
+            // 点击正文空白 = 用户主动放弃选区；滚轮折叠只收工具条，不动 sticky。
+            clearTextSelection()
           }
           return
         }
@@ -430,6 +465,8 @@ export function useFoliateInteractions({
         if (!mark) return
         emitRailFocus(mark.id)
       }
+      const onBlankClick = (event: MouseEvent) => { if (isReaderBlankClick(event, doc.documentElement)) selectionActions.dismissTranslation() }
+      doc.addEventListener('click', onBlankClick)
       doc.addEventListener('click', onMarkClick)
       const unbindCollapse = doc.defaultView
         ? bindDocumentSelectionCollapse(doc, doc.defaultView as Window, () => {
@@ -439,6 +476,7 @@ export function useFoliateInteractions({
       cleanupFns.push(() => {
         doc.removeEventListener('mousedown', onMouseDown)
         doc.removeEventListener('mouseup', onMouseUp)
+        doc.removeEventListener('click', onBlankClick)
         doc.removeEventListener('click', onMarkClick)
         unbindCollapse()
       })
@@ -495,7 +533,7 @@ export function useFoliateInteractions({
         })
       }
     },
-    [filePath, markHoverHandlers, marksRef, viewRef],
+    [clearTextSelection, filePath, markHoverHandlers, marksRef, viewRef, selectionActions.dismissTranslation],
   )
 
   return {

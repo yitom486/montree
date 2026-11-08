@@ -1,6 +1,6 @@
 ---
 description: Zustand selector 禁止返回新对象以免无限重渲染
-globs: src/stores/**/*.ts
+globs: apps/desktop/src/stores/**/*.ts
 alwaysApply: false
 ---
 

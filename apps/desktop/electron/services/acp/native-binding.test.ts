@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildProfileTag,
   digestNativeRules,
@@ -17,7 +17,13 @@ import {
 
 describe('native-binding 原生规则绑定', () => {
   const dirs: string[] = []
+  beforeEach(() => {
+    // 不让启动测试的 Codex 宿主路径/配置改变 SDK 的资格判定。
+    vi.stubEnv('CODEX_PATH', '')
+    vi.stubEnv('CODEX_CONFIG', '{}')
+  })
   afterEach(() => {
+    vi.unstubAllEnvs()
     while (dirs.length > 0) rmSync(dirs.pop() as string, { recursive: true, force: true })
   })
 

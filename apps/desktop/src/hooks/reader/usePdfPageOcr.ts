@@ -34,6 +34,7 @@ export interface PdfPageOcrOptions {
    * 为 true 时 runPageOcr 直接拒绝，防第二趟 OCR 叠跑（W1：单次 OCR 常驻 2–3GB）。
    */
   importRunning?: boolean
+  importRunningRef?: { current: boolean }
 }
 
 export function usePdfPageOcr(options: PdfPageOcrOptions) {
@@ -42,10 +43,9 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
     fileFingerprint,
     pageNum,
     pdfDocRef,
-    isScannedPdf,
-    isMixedPdf,
     getPageSizePt,
     importRunning = false,
+    importRunningRef: externalImportRunningRef,
   } = options
   const pdfOcrScale = useAppSettingsStore((state) => state.pdfOcrScale)
 
@@ -53,8 +53,12 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
   const [ocrPageRecognizing, setOcrPageRecognizing] = useState<number | null>(null)
   const [ocrPagesInFlight, setOcrPagesInFlight] = useState<ReadonlySet<number>>(() => new Set())
 
-  const ocrPagePendingRef = useRef<Map<number, Promise<string>>>(new Map())
+  const ocrPagePendingRef = useRef<Map<number, Promise<PdfOcrPageCache>>>(new Map())
   const ocrPageCachesRef = useRef(ocrPageCaches)
+  const documentRef = useRef({ filePath, fileFingerprint })
+  if (documentRef.current.filePath !== filePath || documentRef.current.fileFingerprint !== fileFingerprint) {
+    documentRef.current = { filePath, fileFingerprint }
+  }
   // 调用时刻判定（ref 镜像，避免回调身份随导入状态抖动）
   const importRunningRef = useRef(importRunning)
   useEffect(() => {
@@ -76,6 +80,8 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
 
   /** 文档切换：清页缓存与识别态（含去重表，避免旧文档任务串入新文档） */
   const resetPageOcr = useCallback(() => {
+    documentRef.current = { ...documentRef.current }
+    ocrPageCachesRef.current = {}
     setOcrPageCaches({})
     setOcrPageRecognizing(null)
     setOcrPagesInFlight(new Set())
@@ -88,7 +94,11 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
   }, [])
 
   const runPageOcr = useCallback(
-    async (page: number): Promise<string> => {
+    async (page: number): Promise<PdfOcrPageCache> => {
+      const document = documentRef.current
+      if (document.filePath !== filePath || document.fileFingerprint !== fileFingerprint) {
+        throw new Error('文档已切换，请重新选择文字')
+      }
       if (!fileFingerprint) {
         throw new Error(`第 ${page} 页 OCR 失败：文档指纹未就绪`)
       }
@@ -97,7 +107,7 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
       if (pending) return pending
 
       const task = (async () => {
-        assertPageOcrAllowed({ importRunning: importRunningRef.current, page })
+        assertPageOcrAllowed({ importRunning: externalImportRunningRef?.current ?? importRunningRef.current, page })
         setOcrPagesInFlight((prev) => new Set(prev).add(page))
         try {
           const size = await getPageSizePt?.(page)
@@ -112,29 +122,31 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
             pageWidthPt: size.width,
             pageHeightPt: size.height,
           })
+          if (documentRef.current !== document) throw new Error('文档已切换，请重新选择文字')
           if (result.ok) {
             if (result.value.page !== page) {
               throw new Error(`OCR 结果页码不一致：请求第 ${page} 页，返回第 ${result.value.page} 页`)
             }
+            ocrPageCachesRef.current = { ...ocrPageCachesRef.current, [page]: result.value }
             setOcrPageCaches((prev) => ({ ...prev, [page]: result.value }))
-            return textFromOcrPageCache(result.value)
+            return result.value
           }
           throw new Error(`第 ${page} 页 OCR 失败：${result.error.message}`)
         } finally {
-          setOcrPagesInFlight((prev) => {
+          if (documentRef.current === document) setOcrPagesInFlight((prev) => {
             const next = new Set(prev)
             next.delete(page)
             return next
           })
         }
       })().finally(() => {
-        ocrPagePendingRef.current.delete(page)
+        if (ocrPagePendingRef.current.get(page) === task) ocrPagePendingRef.current.delete(page)
       })
 
       ocrPagePendingRef.current.set(page, task)
       return task
     },
-    [fileFingerprint, filePath, pdfOcrScale, getPageSizePt],
+    [fileFingerprint, filePath, pdfOcrScale, getPageSizePt, externalImportRunningRef],
   )
 
   const handleRecognizePage = useCallback(async () => {
@@ -152,7 +164,7 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
   }, [fileFingerprint, ocrPageRecognizing, pageNum, runPageOcr])
 
   /**
-   * 统一正文读取：嵌入文字层 → OCR 缓存 → 扫描版按需 OCR。
+   * 统一正文读取：OCR 缓存 → 可读嵌入文字层 → 缺失/损坏文字层按需 OCR。
    * Agent（montree_read 等）与 UI 共用此路径，MCP 工具接口不变。
    */
   const readPageText = useCallback(
@@ -172,7 +184,7 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
       const native = await readPdfPageNativeText(pdf, page)
       if (!pdfPageNeedsOcr(native)) return native
 
-      if ((!isScannedPdf && !isMixedPdf) || !fileFingerprint) return native
+      if (!fileFingerprint) return native
 
       if (!allowAutoOcr) {
         throw new Error(
@@ -180,9 +192,9 @@ export function usePdfPageOcr(options: PdfPageOcrOptions) {
         )
       }
 
-      return runPageOcr(page)
+      return textFromOcrPageCache(await runPageOcr(page))
     },
-    [fileFingerprint, isMixedPdf, isScannedPdf, ocrPageCaches, runPageOcr],
+    [fileFingerprint, ocrPageCaches, runPageOcr],
   )
 
   /** 后台预识别用：该页是否已有在途任务（去重表，不经过 state） */

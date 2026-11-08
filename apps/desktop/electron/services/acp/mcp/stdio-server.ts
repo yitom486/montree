@@ -10,6 +10,7 @@ import { READER_VISUAL_TOOLS, callReaderVisualTool } from './reader-visual-tools
 import { DOCUMENT_TOOLS, callDocumentTool } from './document-tools'
 import { logAcpDiagnostic } from './diagnostics'
 import { McpConnectionHealth } from './connection-health'
+import { TRANSLATION_TOOLS, callTranslationTool } from './translation-tools'
 
 const states = new WeakMap<AcpContext, Map<string, Promise<MontreeMcpServerHandle>>>()
 
@@ -35,7 +36,8 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
   const nonce = randomBytes(16).toString('hex')
   const endpoint = process.platform === 'win32' ? `\\\\.\\pipe\\montree-${nonce}` : join(tmpdir(), `montree-${nonce}.sock`)
   const token = randomBytes(24).toString('hex')
-  const tools = scope === 'toc' ? INKDOWN_TOC_MCP_TOOLS : [...adaptMontreeTools(INKDOWN_MCP_TOOLS), ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS]
+  const translation = owner.purpose === 'translation'
+  const tools = translation ? TRANSLATION_TOOLS : scope === 'toc' ? INKDOWN_TOC_MCP_TOOLS : [...adaptMontreeTools(INKDOWN_MCP_TOOLS), ...READER_VISUAL_TOOLS, ...DOCUMENT_TOOLS]
   const sockets = new Set<Socket>()
   const health = new McpConnectionHealth()
   const server = createServer(bindAcpContext((socket) => {
@@ -74,7 +76,7 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
           }
           const started = Date.now()
           const name = typeof message.params?.name === 'string' ? message.params.name : ''
-          const extension = scope === 'full' && message.method === 'tools/call' && message.id != null
+          const extension = !translation && scope === 'full' && message.method === 'tools/call' && message.id != null
             ? DOCUMENT_TOOLS.some((tool) => tool.name === name) ? callDocumentTool
               : READER_VISUAL_TOOLS.some((tool) => tool.name === name) ? callReaderVisualTool : undefined
             : undefined
@@ -82,7 +84,7 @@ async function serve(context: MontreeMcpToolContext, scope: 'full' | 'toc'): Pro
           try {
             response = extension
               ? { jsonrpc: '2.0', id: message.id, result: await extension(name, context, message.params?.arguments as Record<string, unknown> | undefined) }
-              : await handleInkdownMcpRpc(message, context, tools, scope === 'toc' ? callInkdownTocTool : callAdaptedMontreeTool)
+              : await handleInkdownMcpRpc(message, context, tools, translation ? callTranslationTool : scope === 'toc' ? callInkdownTocTool : callAdaptedMontreeTool)
           } catch {
             response = { jsonrpc: '2.0', id: message.id ?? null, error: { code: -32603, message: '工具执行失败' } }
           }

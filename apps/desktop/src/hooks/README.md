@@ -45,10 +45,13 @@
 | `useReadingMarks` | 当前文档书签 / 高亮 / 批注的 list + create/update/delete |
 | `useDeferredReaderLayout` | 等待 iframe 排版稳定后合并执行标记几何重算 |
 | `useReadingMarkInspector` | 点击高亮后的浮层：命中栈、当前标记、位置 |
-| `useReaderSidePanels` | 目录侧栏与标记侧栏互斥开关 |
-| `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/加入对话/问 Agent |
+| `useMarkdownPreviewMarks` | Markdown 预览选区与引用快照、持久卡片、原文定位、CSS Highlight、Agent 标记 provider；按路径隔离并拒绝过期选区写入 |
+| `useReaderSidePanels` | 正文目录侧栏开关（标记统一进入外壳卡片区） |
+| `useReaderSelectionActions` | 三阅读器划选工具条共享动作：复制/批注/高亮/翻译/加入对话/问 Agent |
+| `useReaderTranslation` / `.test.ts` | Zustand 按文档暂存翻译卡、浮窗位置与在途任务（重挂载继续接收结果、显式关闭删除）；OCR 回退、独立 Agent 配置、译文流式输出后补充语言/短语/术语、复制/重试/关闭；锁定原选区保存完整翻译批注、防重复写入与保存失败重试，丢弃过期结果 |
+| `useTranslationConfig` | 设置页用 TanStack Query 读取翻译独立连接的模型/思考候选，按翻译 Agent、模型和思考偏好隔离；不依赖主聊天连接，提供独立认证 mutation，只准备配置、不发送翻译请求 |
 | `useReaderExportMenu` | 三阅读器笔记与 Anki 导出菜单共享外壳（toc/当前章由各家传入） |
-| `usePdfPageOcr` | PDF 单页 OCR 域：页缓存/识别去重/统一正文读取/当前页识别 |
+| `usePdfPageOcr` / `.test.ts` | PDF 单页 OCR 域：强制识别返回带几何的页缓存、在途去重、缺失/损坏文字层按需恢复、全书导入互斥及切书隔离 |
 | `useOcrComponent` | OCR 组件状态（初始 invoke + 推送写回 Query 缓存、下载/取消） |
 | `useRosettaImport` | 罗盘导入视图状态：横幅按钮 + 进度 + 已索引信息（Query 按 fingerprint 缓存）+ 纯本地目录重建 |
 | `useReaderWheelNavigation` | 滚轮到顶/底翻页。逻辑已抽出，Viewer 里仍有内联调用，此 Hook **暂无引用** |

@@ -20,6 +20,7 @@ import type {
 } from './acp-subsession'
 import {
   accumulateSubsessionUpdate,
+  accumulateSubsessionUpdateFor,
   clearSubsessionSessions,
   ensureSubsessionSession,
   isSubsessionPrompting,
@@ -83,6 +84,27 @@ beforeEach(() => {
 })
 
 describe('ensure 建新与复用', () => {
+  it('does not replay a failed prompt after the caller has received structured output', async () => {
+    mockedPrompt.mockResolvedValueOnce(err({ code: 'ACP_PROTOCOL_ERROR', message: 'connection lost' }))
+    const result = await sendSubsessionPrompt({ ...baseOpts(), canRetry: () => false }, 'translate')
+    expect(result.status).toBe('failed')
+    expect(mockedPrompt).toHaveBeenCalledOnce()
+    expect(mockedSessionNew).toHaveBeenCalledOnce()
+  })
+  it('does not merge agent thoughts or tool output into assistant reply text', async () => {
+    const opts = baseOpts()
+    const sid = sidOf(await ensureSubsessionSession(opts))
+    const deltas: string[] = []
+    mockedPrompt.mockImplementationOnce(async () => {
+      for (const sessionUpdate of ['agent_thought_chunk', 'tool_call_update', 'user_message_chunk']) {
+        accumulateSubsessionUpdate(sid, { sessionUpdate, content: { type: 'text', text: 'private' } })
+      }
+      accumulateSubsessionUpdate(sid, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'reply' } })
+      return ok({ stopReason: 'end_turn' })
+    })
+    expect(await sendSubsessionPrompt({ ...opts, onDelta: text => deltas.push(text) }, 'hi')).toMatchObject({ reply: 'reply' })
+    expect(deltas).toEqual(['reply'])
+  })
   it('首次建新会话并写 store', async () => {
     const store = createMemoryStore()
     const ensured = await ensureSubsessionSession(baseOpts({ store }))
@@ -113,6 +135,21 @@ describe('ensure 建新与复用', () => {
     expect(mockedSessionNew).toHaveBeenCalledWith(expect.objectContaining({ toolScope: 'toc' }))
   })
 
+  it('新建后应用独立配置覆盖（翻译模型）', async () => {
+    mockedSessionNew.mockResolvedValueOnce(ok({
+      sessionId: 'model-sid',
+      configOptions: [{ configId: 'model', name: 'Model', type: 'select', currentValue: 'default' }],
+    }))
+    await ensureSubsessionSession(
+      baseOpts({ purpose: 'translate', key: 'opencode:fast', configPatches: [{ configId: 'model', value: 'fast' }] }),
+    )
+    expect(vi.mocked(acpApi.setConfigOption)).toHaveBeenCalledWith({
+      sessionId: 'model-sid',
+      configId: 'model',
+      value: 'fast',
+    })
+  })
+
   it('always-new 每次新建且不读 store', async () => {
     const store = createMemoryStore()
     const opts = baseOpts({ purpose: 'toc', key: 'op-1', rotation: { mode: 'always-new' }, store })
@@ -121,6 +158,26 @@ describe('ensure 建新与复用', () => {
     expect(sidOf(first)).not.toBe(sidOf(second))
     expect(mockedSessionNew).toHaveBeenCalledTimes(2)
     expect(store.load).not.toHaveBeenCalled()
+  })
+
+  it('翻译可以跳过主聊天偏好并返回独立配置后的选项', async () => {
+    const initial = [{ configId: 'effort', name: 'Effort', type: 'select' as const, currentValue: 'medium', options: [{ value: 'medium', name: 'Medium' }, { value: 'max', name: 'Max' }] }]
+    const runtimeId = useAcpUiStore.getState().selectedRuntimeId
+    useAcpUiStore.setState({ preferredConfigByRuntime: { [runtimeId]: { effort: 'max' } } })
+    mockedSessionNew.mockResolvedValueOnce(ok({ sessionId: 'translation', configOptions: initial }))
+    const configureSession = vi.fn(async () => [{ ...initial[0], currentValue: 'low' }])
+    const ensured = await ensureSubsessionSession(baseOpts({ purpose: 'translate', runtimeId: useAcpUiStore.getState().selectedRuntimeId, inheritConfigPreferences: false, configureSession }))
+    expect(configureSession).toHaveBeenCalledWith('translation', initial)
+    expect(acpApi.setConfigOption).not.toHaveBeenCalled()
+    expect('configOptions' in ensured && ensured.configOptions[0].currentValue).toBe('low')
+  })
+
+  it('独立配置失败时不发送 prompt，也不复用未配置好的会话', async () => {
+    mockedSessionNew.mockResolvedValueOnce(ok({ sessionId: 'unconfigured', configOptions: [] }))
+    const opts = baseOpts({ purpose: 'translate', configureSession: async () => { throw new Error('配置被拒绝') } })
+    await expect(sendSubsessionPrompt(opts, 'hello')).rejects.toThrow('配置被拒绝')
+    expect(mockedPrompt).not.toHaveBeenCalled()
+    expect(subsessionOwnsSessionId('unconfigured')).toBe(false)
   })
 
   it('promptCount 达阈值轮转新会话', async () => {
@@ -134,6 +191,21 @@ describe('ensure 建新与复用', () => {
 })
 
 describe('purpose-key 隔离与流式路由', () => {
+  it('独立翻译传输不拦截主聊天事件，主聊天增量不进入翻译', async () => {
+    const client = {
+      sessionNew: vi.fn(async () => ok({ sessionId: 'same-id', configOptions: [] })),
+      loadSession: acpApi.loadSession, setConfigOption: acpApi.setConfigOption,
+      prompt: vi.fn(async () => {
+        expect(subsessionOwnsSessionId('same-id')).toBe(false)
+        expect(isSubsessionPrompting()).toBe(false)
+        accumulateSubsessionUpdate('same-id', { content: [{ type: 'text', text: '主聊天' }] })
+        accumulateSubsessionUpdateFor('translate', 'same-id', { content: [{ type: 'text', text: '翻译' }] }, 'opencode')
+        return ok({ stopReason: 'end_turn' })
+      }),
+    }
+    const result = await sendSubsessionPrompt(baseOpts({ purpose: 'translate', runtimeId: 'opencode', client, ensureTransport: async () => 'connected', inheritConfigPreferences: false }), 'translate')
+    expect(result.reply).toBe('翻译')
+  })
   it('不同 purpose-key 互不干扰', async () => {
     const a = await ensureSubsessionSession(baseOpts({ purpose: 'quiz', key: 'default' }))
     const b = await ensureSubsessionSession(baseOpts({ purpose: 'card', key: 'fp-abc' }))
@@ -157,6 +229,21 @@ describe('purpose-key 隔离与流式路由', () => {
     const sent = await sendSubsessionPrompt(opts, 'hi')
     expect(sent.status).toBe('ok')
     expect(sent.reply).toBe('hello world')
+  })
+
+  it('onDelta 只转发本次 prompt 的增量', async () => {
+    const opts = baseOpts()
+    const ensured = await ensureSubsessionSession(opts)
+    const sid = 'sessionId' in ensured ? ensured.sessionId : ''
+    const deltas: string[] = []
+    mockedPrompt.mockImplementation(async () => {
+      streamText(sid, '你')
+      streamText(sid, '好')
+      return ok({ stopReason: 'end_turn' })
+    })
+    const sent = await sendSubsessionPrompt({ ...opts, onDelta: (delta) => deltas.push(delta) }, 'hi')
+    expect(sent.reply).toBe('你好')
+    expect(deltas).toEqual(['你', '好'])
   })
 
   it('非 prompting 且 sid 未命中时不收集', async () => {

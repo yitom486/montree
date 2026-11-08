@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
   READER_LINE_HEIGHT_OPTION_LABELS,
   RECENT_FILES_LIMIT_OPTIONS,
   TAB_SIZE_OPTION_LABELS,
+  TRANSLATION_TARGET_OPTIONS,
   PDF_OCR_SCALE_OPTION_LABELS,
   useAppSettingsStore,
   type AutoSaveIntervalMs,
@@ -28,8 +30,14 @@ import {
   type ReaderFontSize,
   type ReaderLineHeight,
   type PdfOcrScale,
+  type TranslationTargetLang,
 } from '@/stores/app-settings-store'
 import { useEditorUiStore } from '@/stores/editor-ui-store'
+import { useTranslationConfig } from '@/hooks/reader/useTranslationConfig'
+import { AgentAuthDialog } from '@/components/agent/AgentAuthDialog'
+import { BUILTIN_ACP_RUNTIMES } from '@yitom/contracts'
+import { TRANSLATION_LOWEST_THOUGHT, TRANSLATION_DEFAULT_THOUGHT } from '@/lib/agent/translation-config'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { AppTheme } from '@/stores/editor-ui-store'
 import type { EditorViewMode } from '@/stores/editor-ui-store'
 import { cn } from '@/lib/utils'
@@ -47,6 +55,34 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void
   onOpenErrorLog: () => void
   onOpenAbout: () => void
+}
+
+function TranslationConfigMenu({ label, value, options, disabled, onChange }: {
+  label: string
+  value: string
+  options: Array<{ value: string; name: string }>
+  disabled: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" aria-label={label} disabled={disabled} className="max-w-56 gap-2">
+          <span className="truncate">{options.find((option) => option.value === value)?.name ?? '所选配置已不可用'}</span>
+          <ChevronDown className="size-3.5 shrink-0" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-72 max-w-[calc(100vw-2rem)] overflow-y-auto">
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange} aria-label={label}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value} className="max-w-80 whitespace-normal break-words text-xs">
+              {option.name}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 function SettingRow({
@@ -159,6 +195,17 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
   const setPdfOcrBackgroundPrefetch = useAppSettingsStore((state) => state.setPdfOcrBackgroundPrefetch)
   const pdfOcrAgentAutoOcr = useAppSettingsStore((state) => state.pdfOcrAgentAutoOcr)
   const setPdfOcrAgentAutoOcr = useAppSettingsStore((state) => state.setPdfOcrAgentAutoOcr)
+  const translationTargetLang = useAppSettingsStore((state) => state.translationTargetLang)
+  const setTranslationTargetLang = useAppSettingsStore((state) => state.setTranslationTargetLang)
+  const setTranslationModel = useAppSettingsStore((state) => state.setTranslationModel)
+  const setTranslationThought = useAppSettingsStore((state) => state.setTranslationThought)
+  const setTranslationRuntime = useAppSettingsStore((state) => state.setTranslationRuntime)
+  const [translationAuthOpen, setTranslationAuthOpen] = useState(false)
+  const translationConfig = useTranslationConfig(open)
+  const translationRuntimeOptions = BUILTIN_ACP_RUNTIMES.map((runtime) => ({ value: runtime.id, name: runtime.name }))
+  if (!translationRuntimeOptions.some((runtime) => runtime.value === translationConfig.runtimeId)) {
+    translationRuntimeOptions.push({ value: translationConfig.runtimeId, name: translationConfig.runtimeId })
+  }
   const pdfOcrScale = useAppSettingsStore((state) => state.pdfOcrScale)
   const setPdfOcrScale = useAppSettingsStore((state) => state.setPdfOcrScale)
   const verboseRendererLogs = useAppSettingsStore((state) => state.verboseRendererLogs)
@@ -497,6 +544,77 @@ export function SettingsDialog({ open, onOpenChange, onOpenErrorLog, onOpenAbout
               <ToggleSwitch checked={aiInlineCompletion} onChange={setAiInlineCompletion} label="行内补全" />
             </SettingRow>
             <InlineCompletionProviderSettings />
+          </section>
+
+          <Separator className="my-2" />
+
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI 阅读</h3>
+            <SettingRow
+              title="划词翻译"
+              description="选中文字后点「翻译」，自动识别源语言。目标语言、模型与思考档独立保存。"
+            >
+              <OptionButtons<TranslationTargetLang>
+                value={translationTargetLang}
+                options={TRANSLATION_TARGET_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={setTranslationTargetLang}
+              />
+            </SettingRow>
+            <SettingRow
+              title="翻译模型"
+              description="可选择轻量模型，下一次翻译生效。模型列表来自当前 Agent。"
+            >
+              <TranslationConfigMenu
+                label="翻译模型"
+                value={translationConfig.model}
+                options={[{ value: '', name: '运行时默认模型' }, ...(translationConfig.modelOption?.options ?? [])]}
+                disabled={translationConfig.loading}
+                onChange={(value) => {
+                  setTranslationModel(translationConfig.runtimeId, value)
+                  setTranslationThought(translationConfig.runtimeId, TRANSLATION_LOWEST_THOUGHT)
+                }}
+              />
+            </SettingRow>
+            <SettingRow
+              title="翻译思考档"
+              description={translationConfig.thoughtOption
+                ? `默认使用最低可用档，独立于主聊天。${translationConfig.ready ? `当前生效：${translationConfig.thoughtOption.options?.find((option) => option.value === translationConfig.thoughtOption?.currentValue)?.name ?? translationConfig.thoughtOption.currentValue}。` : ''}`
+                : '默认使用最低可用档；模型未提供可调档位时使用其默认配置。'}
+            >
+              <TranslationConfigMenu
+                label="翻译思考档"
+                value={translationConfig.thought}
+                options={[
+                  { value: TRANSLATION_LOWEST_THOUGHT, name: '最低可用（推荐）' },
+                  { value: TRANSLATION_DEFAULT_THOUGHT, name: '运行时默认档位' },
+                  ...(translationConfig.thoughtOption?.options ?? []),
+                ]}
+                disabled={translationConfig.loading}
+                onChange={(value) => setTranslationThought(translationConfig.runtimeId, value)}
+              />
+            </SettingRow>
+            {translationConfig.loading ? <p role="status" className="text-xs text-muted-foreground">正在读取翻译模型配置…</p> : null}
+            {translationConfig.authMethods ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => setTranslationAuthOpen(true)}>登录翻译 Agent</Button>
+            ) : null}
+            {translationConfig.error ? (
+              <div role="alert" className="flex items-center justify-between gap-2 text-xs text-destructive">
+                <span>{translationConfig.error}</span>
+                <Button type="button" size="xs" variant="ghost" onClick={() => void translationConfig.refresh()}>重试读取</Button>
+              </div>
+            ) : null}
+            <SettingRow
+              title="翻译 Agent"
+              description="单独选择翻译 Agent，自动读取可用模型。与右侧聊天的连接和设置互相独立。"
+            >
+              <TranslationConfigMenu label="翻译 Agent" value={translationConfig.runtimeId}
+                options={translationRuntimeOptions} disabled={false} onChange={setTranslationRuntime} />
+            </SettingRow>
+            <AgentAuthDialog key={translationConfig.runtimeId} open={translationAuthOpen && Boolean(translationConfig.authMethods)}
+              methods={translationConfig.authMethods ?? []} runtimeId={translationConfig.runtimeId}
+              runtimeName={`翻译 · ${translationRuntimeOptions.find((runtime) => runtime.value === translationConfig.runtimeId)?.name}`}
+              busy={translationConfig.authenticating} error={translationConfig.authError}
+              onSelect={translationConfig.authenticate} onCancel={() => setTranslationAuthOpen(false)} />
           </section>
 
           <Separator className="my-2" />

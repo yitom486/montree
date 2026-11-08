@@ -9,11 +9,11 @@ import { enrichWebDocCompatTables } from '@/lib/reader/web-doc/web-doc-compat'
 import { resolveWebDocSiteId, stripWebDocFragment } from '@montree/web-doc'
 import { isOk } from '@yitom/contracts'
 import type { AppError } from '@yitom/contracts'
-import type { WebDocPageContent } from '@yitom/contracts'
+import type { WebDocPageContentWithDiscussion } from '@/lib/reader/web-doc/discussion-link'
 
 export interface WebDocPageData {
   pageUrl: string
-  content: WebDocPageContent
+  content: WebDocPageContentWithDiscussion
 }
 
 import { logWebDoc } from '@/lib/reader/web-doc/web-doc-debug'
@@ -55,6 +55,10 @@ export function useWebDocPage(pageUrl: string | null | undefined) {
     queryKey: queryKeys.webDocPage(documentUrl ?? ''),
     enabled: Boolean(documentUrl),
     queryFn: () => fetchWebDocPageData(documentUrl!),
-    staleTime: 60_000,
+    // 同一篇文章 60 分钟内直接复用抽取结果；离开再回来不重新抓取。
+    // 阅读中不因窗口聚焦被动刷新，需要更新走工具栏「重新加载」。
+    staleTime: 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }

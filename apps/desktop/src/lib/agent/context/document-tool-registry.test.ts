@@ -17,7 +17,10 @@ describe('结构化文档桥接', () => {
     commitDocumentSelection(target, 'Sheet1!C3:D4')
     expect(beginPromptSelectionCycle()).toBe(true)
     expect((await readSelectionWithContext()).target).toEqual(target)
-    expect(beginPromptSelectionCycle()).toBe(false)
+    // 选区仍有效时下一轮仍可带出；本轮冻结后即使清除，工具仍读本轮快照
+    expect(beginPromptSelectionCycle()).toBe(true)
     clearReaderSelection()
+    expect((await readSelectionWithContext()).target).toEqual(target)
+    expect(beginPromptSelectionCycle()).toBe(false)
   })
 })

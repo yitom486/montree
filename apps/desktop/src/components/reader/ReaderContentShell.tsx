@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ReadingMarkPanel } from '@/components/reader/ReadingMarkPanel'
 import { ReaderUnitOutline } from '@/components/reader/ReaderUnitOutline'
 import { MarginaliaBar } from '@/components/reader/MarginaliaBar'
+import { WorkspaceCardRail } from '@/components/layout/WorkspaceCardRail'
 import { FlashcardReviewDialog } from '@/components/reader/FlashcardReviewDialog'
 import { AiQuizDialog } from '@/components/quiz/AiQuizDialog'
 import { QuizHistoryDialog } from '@/components/quiz/QuizHistoryDialog'
 import { buildAnkiCardsExport } from '@/lib/reader/marks/export-anki-cards'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
 import { useAcpUiStore } from '@/stores/acp-ui-store'
-import { preserveScrollAnchor } from '@/lib/reader/scroll-anchor'
 import type { Flashcard } from '@yitom/annotations'
 import type { FlashcardReviewRating } from '@yitom/annotations'
 import { flashcardsApi } from '@/api/flashcards-api'
@@ -32,13 +31,13 @@ import type { DiagramVisualStep } from '@yitom/chat-ui'
 import { toast } from 'sonner'
 
 interface ReaderContentShellProps {
+  companionOnly?: boolean
+  markReferenceNotice?: (mark: ReadingMark) => string | undefined
   filePath?: string
   bookTitle?: string
-  marksOpen: boolean
   marks: ReadingMark[]
   onSelectMark: (mark: ReadingMark) => void
   onDeleteMark: (mark: ReadingMark) => void
-  onCloseMarks: () => void
   onExportNotes?: (contentKind: ReadingNotesContentKind, scope: ReadingNotesScope) => void
   onExportAnkiCards?: (scope: ReadingNotesScope) => void
   marksToc?: ReadingNotesChapterRef[]
@@ -68,13 +67,13 @@ interface ReaderContentShellProps {
 }
 
 export function ReaderContentShell({
+  companionOnly = false,
+  markReferenceNotice,
   filePath,
   bookTitle,
-  marksOpen,
   marks,
   onSelectMark,
   onDeleteMark,
-  onCloseMarks,
   onExportNotes,
   onExportAnkiCards,
   marksToc,
@@ -98,11 +97,6 @@ export function ReaderContentShell({
   footerNav,
 }: ReaderContentShellProps) {
   // 知识卡轨与伴读联动状态
-  const isCardRailOpen = useReaderHudUiStore((s) => s.isCardRailOpen)
-  const setIsCardRailOpen = useReaderHudUiStore((s) => s.setIsCardRailOpen)
-  const hudDisplayMode = useAcpUiStore((s) => s.hudDisplayMode)
-  const panelOpen = useAcpUiStore((s) => s.panelOpen)
-  const zenMode = useReaderHudUiStore((s) => s.zenMode)
   const setSelectedDiagram = useReaderHudUiStore((s) => s.setSelectedDiagram)
   const openPanelAndFocusComposer = useAcpUiStore((s) => s.openPanelAndFocusComposer)
 
@@ -366,24 +360,8 @@ export function ReaderContentShell({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      {marksOpen ? (
-        <ReadingMarkPanel
-          marks={marks}
-          onSelect={onSelectMark}
-          onDelete={onDeleteMark}
-          onClose={onCloseMarks}
-          onExportNotes={onExportNotes}
-          onExportAnkiCards={onExportAnkiCards}
-          onReviewFlashcards={handleReviewFlashcards}
-          onOpenQuiz={handleOpenQuiz}
-          onOpenQuizHistory={() => setQuizHistoryOpen(true)}
-          onQuizMark={handleOpenQuiz}
-          marksToc={marksToc}
-          currentChapterKey={marksCurrentChapterKey}
-          resolveChapter={marksResolveChapter}
-        />
-      ) : null}
+    <div className={companionOnly ? 'contents' : 'flex min-h-0 flex-1 overflow-hidden'}>
+      {!companionOnly && <>
       {tocOpen && tocAside ? tocAside : null}
       {tocOpen && !tocAside && units.length > 0 ? (
         <aside className="flex w-[min(28%,320px)] min-w-[180px] shrink-0 flex-col border-r border-border/60">
@@ -405,9 +383,11 @@ export function ReaderContentShell({
         {footerNav}
       </div>
 
-      {isCardRailOpen ? (
+      </>}
+      <WorkspaceCardRail>
         <MarginaliaBar
           marks={enhancedMarks}
+          markReferenceNotice={markReferenceNotice}
           onMarkClick={onSelectMark}
           onHoverAnchor={onHoverExcerpt}
           chapterOfMark={(m) => {
@@ -475,15 +455,15 @@ export function ReaderContentShell({
           }}
           onToggleCardCollapse={handleToggleCardCollapse}
           onToggleAllCollapse={handleToggleAllCollapse}
-          onCloseRail={() => preserveScrollAnchor(() => setIsCardRailOpen(false))}
           onGenerateAiCard={() => openPanelAndFocusComposer()}
           onOpenQuiz={handleOpenQuiz}
           onOpenQuizHistory={() => setQuizHistoryOpen(true)}
           onReviewFlashcards={handleReviewFlashcards}
           onExportAnkiCards={onExportAnkiCards}
-          className="h-full"
+          onExportNotes={onExportNotes}
+          className="h-full w-full"
         />
-      ) : null}
+      </WorkspaceCardRail>
 
       <FlashcardReviewDialog
         open={reviewOpen}

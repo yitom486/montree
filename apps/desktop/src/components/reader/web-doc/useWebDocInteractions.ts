@@ -129,8 +129,9 @@ export function useWebDocInteractions({
       color = DEFAULT_HIGHLIGHT_COLOR,
       overrideCategory?: ReadingMarkCategory,
       overrideTitle?: string,
+      frozenSelection?: PdfSelectionSnapshot,
     ): Promise<ReadingMark> => {
-      const snapshot = selectionSnapshotRef.current
+      const snapshot = frozenSelection ?? selectionSnapshotRef.current
       if (!snapshot) {
         throw new Error('当前没有可用选区，请先划选文本')
       }
@@ -141,7 +142,7 @@ export function useWebDocInteractions({
         pageUrl: normalizedPageUrl,
       })
       const meta = parseNoteToCardMeta(note)
-      if (existing) {
+      if (existing && !frozenSelection) {
         const trimmed = meta.note?.trim()
         const result = await updateMark({
           id: existing.id,
@@ -200,11 +201,13 @@ export function useWebDocInteractions({
         throw new Error(result.error.message || '创建批注失败')
       }
 
-      marksRef.current = [...marksRef.current, result.value as ReadingMark]
+      if (!frozenSelection) marksRef.current = [...marksRef.current, result.value as ReadingMark]
       toast.success(note ? '已保存批注' : '已添加高亮')
-      const doc = iframeRef.current?.contentDocument
-      if (doc?.body) syncWebMarkOverlays(doc, pageUrl)
-      clearTextSelection()
+      if (!frozenSelection) {
+        const doc = iframeRef.current?.contentDocument
+        if (doc?.body) syncWebMarkOverlays(doc, pageUrl)
+        clearTextSelection()
+      }
       return result.value as ReadingMark
     },
     [clearTextSelection, createMark, documentId, fileFingerprint, iframeRef, marks, marksRef, normalizedPageUrl, pageUrl, syncWebMarkOverlays, units, updateMark],
@@ -212,6 +215,11 @@ export function useWebDocInteractions({
 
   const selectionActions = useReaderSelectionActions({
     snapshotText: selectionSnapshot?.text,
+    captureTranslationNote: () => {
+      const snapshot = selectionSnapshotRef.current
+      if (!snapshot) return undefined
+      return (note, text) => handleSaveAnnotation(note, DEFAULT_HIGHLIGHT_COLOR, undefined, '翻译', { ...snapshot, text })
+    },
     dimTextSelection,
     clearTextSelection,
     openAnnotateDialog: () => {
@@ -222,6 +230,7 @@ export function useWebDocInteractions({
     showPendingHighlight: showPendingSelectionHighlight,
     saveHighlight: handleSaveAnnotation,
     sessionKey: fileFingerprint ?? documentId,
+    translationSourceKey: documentId,
   })
 
   const handleCreateMarkAt = useCallback(

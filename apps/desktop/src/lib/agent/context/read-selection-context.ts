@@ -1,6 +1,11 @@
 import { buildSelectionContext, type SelectionContextResult } from './expand-selection-context'
 import { readCurrentDocumentText } from './reader-content-registry'
-import { readSelectionText, getStickyReaderSelection, getSelectionProvider } from './reader-selection-registry'
+import {
+  readSelectionText,
+  getStickyReaderSelection,
+  getTurnReaderSelection,
+  getSelectionProvider,
+} from './reader-selection-registry'
 import type { DocumentSelection } from '@yitom/contracts'
 
 /**
@@ -9,9 +14,10 @@ import type { DocumentSelection } from '@yitom/contracts'
  * 父文本只用于定位选区位置，最终返回仍是短 excerpt。
  */
 export async function readSelectionWithContext(): Promise<SelectionContextResult & { target?: DocumentSelection }> {
-  const sticky = getStickyReaderSelection()
-  if (sticky?.target && sticky.target.kind !== 'text') {
-    return { selection: sticky.text, excerpt: sticky.text, expanded: false, selectionLength: sticky.text.length, target: sticky.target }
+  // 本轮已冻结的快照优先：AI 回答期间用户取消选区也不能换掉本次对话的上下文。
+  const snapshot = getTurnReaderSelection() ?? getStickyReaderSelection()
+  if (snapshot?.target && snapshot.target.kind !== 'text') {
+    return { selection: snapshot.text, excerpt: snapshot.text, expanded: false, selectionLength: snapshot.text.length, target: snapshot.target }
   }
   const provider = getSelectionProvider()
   const target = provider?.getSelectionTarget?.()

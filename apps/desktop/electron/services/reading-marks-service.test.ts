@@ -19,6 +19,7 @@ import {
   updateReadingMark,
 } from './reading-marks-service'
 import { isOk } from '@yitom/contracts'
+import { markdownPreviewUrl } from '@montree/workspace-core'
 
 describe('reading-marks-service', () => {
   beforeEach(async () => {
@@ -32,6 +33,16 @@ describe('reading-marks-service', () => {
     // 文件后端无 DB 句柄，直接删目录；用后即焚，不留 tmp 堆积
     if (tempUserData) rmSync(tempUserData, { recursive: true, force: true })
     tempUserData = ''
+  })
+
+  it('只允许与 Markdown 文档路径绑定的内部文本引用锚点', async () => {
+    const payload = { filePath: '/notes/local.md', fileFingerprint: 'markdown:/notes/local.md', kind: 'highlight' as const,
+      excerpt: '摘录快照', anchor: { format: 'web' as const, url: markdownPreviewUrl('/notes/local.md'), selectedText: '摘录快照' } }
+    expect((await createReadingMark(payload)).ok).toBe(true)
+    expect((await createReadingMark({ ...payload, filePath: '/notes/other.md' })).ok).toBe(false)
+    expect((await createReadingMark({ ...payload, filePath: '/notes/local.pdf' })).ok).toBe(false)
+    const list = await listReadingMarks('/notes/local.md')
+    expect(list.ok && list.value[0].excerpt).toBe('摘录快照')
   })
 
   it('创建、列出、更新并删除书签', async () => {

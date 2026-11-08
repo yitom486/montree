@@ -1,5 +1,7 @@
 # Chat Feed 设计输入（ACP 事件 → ChatMessage 归约器用，全只读测绘）
 
+> 历史迁移记录：本文保留拆包时的目录、包名与验收结果。相关实现现由外部 montree-chat 仓库维护，包名已从 `@montree/*` 迁为 `@yitom/*`；本文中的旧 `packages/` 路径不代表当前仓库布局。当前依赖与职责见[根 README](../README.md#聊天与-acp-包依赖)。
+
 > 来源：`chat-render-init` 工作树现状代码逐文件实测，非推测。
 > 目标：E1 把"ACP 事件流 → ChatMessage append/patch/收尾冻结"抽成 core 纯 reducer 时的行为契约。
 > 约定：`ChatMessage` 即 `@montree/chat-core` 的 `ChatMessage`

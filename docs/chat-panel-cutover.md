@@ -1,5 +1,7 @@
 # ChatPanel 切流盘点（AgentPanel → `@montree/chat-session` ChatPanel）
 
+> 历史迁移记录：本文保留拆包时的目录、包名与验收结果。相关实现现由外部 montree-chat 仓库维护，包名已从 `@montree/*` 迁为 `@yitom/*`；本文中的旧 `packages/` 路径不代表当前仓库布局。当前依赖与职责见[根 README](../README.md#聊天与-acp-包依赖)。
+
 > 只读审计，不改生产/测试代码。审计基线：工作树 `chat-render-init`。
 > 包侧读：`packages/chat-session/src/panel/ChatPanel.tsx` + `session/use-chat-session.ts` + `session/store.ts` + `session/types.ts` + `panel/ChatComposer.tsx` + `packages/chat-session/README.md`。
 > 宿主读：`apps/desktop/src/components/agent/AgentPanel.tsx` / `DockedAgentPane.tsx` / `FloatingAIHud.tsx` / `AgentComposer.tsx` / `chat/AgentMessageList.tsx` / `chat/AgentContextMenu.tsx` / `hooks/agent/useAcpSession.ts` / `hooks/agent/useAnnotationAgentAssist.ts`。

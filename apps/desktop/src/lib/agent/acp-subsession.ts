@@ -6,6 +6,7 @@ import { listPreferredConfigPatches } from '@/lib/agent/acp-config-preferences'
 import { buildAcpPromptBlocks, type ComposerAttachment } from '@/lib/agent/acp-composer'
 import { extractTextFromContent } from '@/stores/acp-chat-types'
 import { ensureAcpTransport } from '@/lib/agent/acp-transport'
+import type { AcpTransportState } from '@/lib/agent/acp-transport'
 
 import {
   useSubsessionProgressStore,
@@ -43,16 +44,29 @@ export interface SubsessionStore {
 }
 
 export interface SubsessionEnsureOptions extends SubsessionIdentity {
+  client?: Pick<typeof acpApi, 'sessionNew' | 'loadSession' | 'setConfigOption' | 'prompt'>
+  ensureTransport?: () => Promise<AcpTransportState>
+  cwd?: string
   toolScope?: 'toc' | 'full' // 传给 acpApi.sessionNew（toc 传 'toc'，其余缺省）
   rotation: SubsessionRotation
   store?: SubsessionStore
   runtimeId?: string // 显式指定运行时的 Agent（如 TOC AI 自由选择运行时）
+  /** 新建会话后覆盖的配置项（如独立翻译模型）；key 必须已存在于 configOptions */
+  configPatches?: Array<{ configId: string; value: string | boolean }>
+  /** 翻译等独立任务可以关闭聊天偏好继承。 */
+  inheritConfigPreferences?: boolean
+  /** 新建后按该副会话的实际能力级联配置，返回最终生效选项。 */
+  configureSession?: (sessionId: string, options: AcpConfigOption[]) => Promise<AcpConfigOption[]>
 }
 
 export interface SubsessionSendOptions extends SubsessionEnsureOptions {
   /** 显式指定已有会话（如 TOC prepare 后的特定会话），避免重复新建导致孤儿会话与配置丢失 */
   sessionId?: string
   images?: Array<{ id: string; kind: 'image'; name: string; mimeType: string; base64: string }> // toc 专用，缺省无
+  /** 流式增量（仅本次 prompt 有效；用于翻译等短文本边到边渲染） */
+  onDelta?: (delta: string) => void
+  /** 已产生结构化副作用时禁止自动重放整个 prompt。 */
+  canRetry?: () => boolean
 }
 
 export type SubsessionEnsureResult =
@@ -66,6 +80,8 @@ export type SubsessionSendResult = {
 }
 
 interface SubsessionEntry extends SubsessionPersistedState {
+  isolated?: boolean
+  runtimeId?: string
   purpose: string
   key: string
   replyBuffer: string
@@ -76,6 +92,8 @@ interface SubsessionEntry extends SubsessionPersistedState {
   fresh: boolean
   configOptions: AcpConfigOption[]
   progress?: SubsessionProgress
+  /** 仅本次 prompt 的流式回调；promptOnce finally 清理 */
+  onDelta?: (delta: string) => void
 }
 
 const entries = new Map<string, SubsessionEntry>()
@@ -113,11 +131,12 @@ function resolvePreferredAgentCwd(): string | undefined {
   return undefined
 }
 
-/** 任一在册 entry 命中 */
+/** 主聊天传输上的在册会话；独立翻译传输不参与主聊天事件路由。 */
 export function subsessionOwnsSessionId(sessionId: string): boolean {
   const sid = sessionId.trim()
   if (!sid) return false
   for (const entry of entries.values()) {
+    if (entry.isolated) continue
     if (entry.sessionId === sid) return true
   }
   return false
@@ -239,9 +258,13 @@ export function accumulateSubsessionUpdate(
   const sid = sessionId.trim()
   if (!sid) return
   for (const entry of entries.values()) {
+    if (entry.isolated) continue
     if (entry.sessionId !== sid && !entry.prompting) continue
-    const text = extractTextFromContent(update.content)
-    if (text) entry.replyBuffer += text
+    const text = !update.sessionUpdate || update.sessionUpdate === 'agent_message_chunk' ? extractTextFromContent(update.content) : ''
+    if (text) {
+      entry.replyBuffer += text
+      entry.onDelta?.(text)
+    }
     entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
@@ -252,14 +275,20 @@ export function accumulateSubsessionUpdateFor(
   purpose: string,
   sessionId: string,
   update: Record<string, unknown>,
+  runtimeId?: string,
 ): void {
   const sid = sessionId.trim()
   if (!sid) return
   for (const entry of entries.values()) {
     if (entry.purpose !== purpose) continue
+    if (entry.isolated && !runtimeId) continue
+    if (runtimeId && entry.runtimeId !== runtimeId) continue
     if (entry.sessionId !== sid && !entry.prompting) continue
-    const text = extractTextFromContent(update.content)
-    if (text) entry.replyBuffer += text
+    const text = !update.sessionUpdate || update.sessionUpdate === 'agent_message_chunk' ? extractTextFromContent(update.content) : ''
+    if (text) {
+      entry.replyBuffer += text
+      entry.onDelta?.(text)
+    }
     entry.lastUpdateAt = Date.now()
     updateEntryProgress(entry, update)
   }
@@ -268,6 +297,7 @@ export function accumulateSubsessionUpdateFor(
 /** 任一（或指定 purpose）entry.prompting */
 export function isSubsessionPrompting(purpose?: string): boolean {
   for (const entry of entries.values()) {
+    if (entry.isolated && purpose === undefined) continue
     if (purpose !== undefined && entry.purpose !== purpose) continue
     if (entry.prompting) return true
   }
@@ -280,8 +310,9 @@ async function createSubsessionSession(
   now: number,
 ): Promise<SubsessionEnsureResult> {
   const { purpose, key } = opts
-  const created = await acpApi.sessionNew({
-    cwd: resolvePreferredAgentCwd(),
+  const client = opts.client ?? acpApi
+  const created = await client.sessionNew({
+    cwd: opts.cwd ?? resolvePreferredAgentCwd(),
     ...(opts.toolScope ? { toolScope: opts.toolScope } : {}),
   })
   if (!isOk(created)) {
@@ -289,22 +320,36 @@ async function createSubsessionSession(
     return { error: 'unavailable' }
   }
   const sid = created.value.sessionId
-  const configOptions = created.value.configOptions ?? []
+  let configOptions = created.value.configOptions ?? []
 
   // 继承该运行时下的模型与配置偏好
   const acpState = useAcpUiStore.getState()
   const runtimeId = opts.runtimeId || acpState.selectedRuntimeId
   const preferred = acpState.preferredConfigByRuntime[runtimeId] ?? undefined
-  const patches = listPreferredConfigPatches(configOptions, preferred)
+  const patches = opts.inheritConfigPreferences === false ? [] : listPreferredConfigPatches(configOptions, preferred)
   for (const patch of patches) {
-    await acpApi.setConfigOption({
+    const applied = await client.setConfigOption({
       sessionId: sid,
       configId: patch.configId,
       value: patch.value,
     })
+    if (applied?.ok) configOptions = applied.value.configOptions
   }
+  // 子会话独立配置（如翻译模型）最后覆盖，避免被运行时偏好盖回。
+  for (const patch of opts.configPatches ?? []) {
+    if (!configOptions.some((option) => option.configId === patch.configId)) continue
+    const applied = await client.setConfigOption({
+      sessionId: sid,
+      configId: patch.configId,
+      value: patch.value,
+    })
+    if (applied?.ok) configOptions = applied.value.configOptions
+  }
+  if (opts.configureSession) configOptions = await opts.configureSession(sid, configOptions)
 
   entries.set(mapKey, {
+    isolated: Boolean(opts.client),
+    runtimeId: opts.runtimeId,
     purpose,
     key,
     sessionId: sid,
@@ -330,7 +375,7 @@ export async function ensureSubsessionSession(
   const { purpose, key, rotation } = opts
   const mapKey = entryKey(purpose, key)
 
-  const transport = await ensureAcpTransport(12000, opts.runtimeId)
+  const transport = await (opts.ensureTransport ? opts.ensureTransport() : ensureAcpTransport(12000, opts.runtimeId))
   if (transport !== 'connected') {
     console.info(`[subsession] ensure:abort purpose=${purpose} key=${keyTail(key)} reason=${transport}`)
     return { error: transport }
@@ -355,7 +400,7 @@ export async function ensureSubsessionSession(
         now - stored.lastUsedAt <= rotation.idleMs &&
         stored.promptCount < rotation.maxPrompts
       ) {
-        const loaded = await acpApi.loadSession({
+        const loaded = await (opts.client ?? acpApi).loadSession({
           sessionId: stored.sessionId,
           cwd: resolvePreferredAgentCwd(),
           secondary: true,
@@ -412,6 +457,7 @@ async function promptOnce(
   const entry = entries.get(mapKey)
   if (!entry || entry.sessionId !== sessionId) return { error: true, retryable: true }
   entry.replyBuffer = ''
+  entry.onDelta = opts.onDelta
   entry.prompting = true
   try {
     const attachments: ComposerAttachment[] = (opts.images ?? []).map((image) => ({
@@ -421,7 +467,7 @@ async function promptOnce(
       mimeType: image.mimeType,
       base64: image.base64,
     }))
-    const rawCaps = useAcpUiStore.getState().promptCapabilities
+    const rawCaps = opts.client ? { image: false } : useAcpUiStore.getState().promptCapabilities
     const caps = {
       ...rawCaps,
       ...(opts.images && opts.images.length > 0 && rawCaps.image !== false ? { image: true } : {}),
@@ -439,7 +485,7 @@ async function promptOnce(
     }
     entry.progress = initialProgress
     useSubsessionProgressStore.getState().setProgress(entry.purpose, initialProgress)
-    const result = await acpApi.prompt({ sessionId, prompt: blocks })
+    const result = await (opts.client ?? acpApi).prompt({ sessionId, prompt: blocks })
     if (!isOk(result)) {
       // ACP_TIMEOUT 表示服务端可能仍在跑（toc 调用方要等工具草稿），不算会话已死，不自转
       return { error: true, errorCode: result.error.code, retryable: result.error.code !== 'ACP_TIMEOUT' }
@@ -454,6 +500,7 @@ async function promptOnce(
     return { error: true, retryable: false }
   } finally {
     entry.prompting = false
+    entry.onDelta = undefined
   }
 }
 
@@ -469,6 +516,8 @@ export async function sendSubsessionPrompt(
     const existing = entries.get(mapKey)
     if (!existing || existing.sessionId !== targetSessionId) {
       entries.set(mapKey, {
+        isolated: Boolean(opts.client),
+        runtimeId: opts.runtimeId,
         purpose,
         key,
         sessionId: targetSessionId,
@@ -499,7 +548,7 @@ export async function sendSubsessionPrompt(
     )
     return { status: 'ok', reply: first.reply }
   }
-  if (!first.retryable) {
+  if (!first.retryable || opts.canRetry?.() === false) {
     console.info(
       `[subsession] send:return purpose=${purpose} key=${keyTail(key)} outcome=failed error=${first.errorCode ?? 'thrown'}`,
     )

@@ -2,12 +2,14 @@
  * 子目录 README 与实际文件一致性检查（AGENTS.md「子目录 README」规则的机器版本）。
  * Run: bun run lint:docs [repoRoot]
  *
- * 两项检查（仅扫描 apps/desktop/src/ 与 apps/desktop/electron/，与规则范围一致）：
+ * A/B 扫描 apps/desktop/src/ 与 apps/desktop/electron/，与规则范围一致：
  * A. 显式引用必须存在：README 中带源码/资源后缀的 `token`（如 `file-service.ts`）
  *    必须能解析到真实文件（README 所在目录优先，其次仓库根）。失败 → error。
  * B. 源码文件必须被收录：目录顶层 *.ts/*.tsx（不含 *.test.* 与 *.d.ts）须被同目录
  *    README 以精确名（含/不含后缀）或前缀模式（`epub-*`）覆盖。失败 → error。
  *    「见上级 README」式转交文档（含「见」+「README」）跳过 B（由上级按前缀覆盖）。
+ * C. 当前架构文档中的 @montree/<包名> 与 packages/<包名> 必须对应本地包；
+ *    同时检查根 README/AGENTS 与 packages 下 README，不扫描 docs/ 历史迁移记录。
  *
  * 退出码：有 error 则非零。
  */
@@ -79,6 +81,29 @@ function reportWarning(readme: string, message: string): void {
   console.log(`WARN   ${relative(root, readme)}: ${message}`)
 }
 
+function checkWorkspacePackageReferences(readme: string, content: string): void {
+  const names = new Set<string>()
+  for (const match of content.matchAll(/(?:@montree\/|\bpackages\/)([a-z][a-z0-9-]*)/g)) {
+    names.add(match[1]!)
+  }
+  for (const name of names) {
+    if (!existsSync(join(root, 'packages', name, 'package.json'))) {
+      reportError(readme, `本地包不存在: packages/${name}；已发布包请使用当前 @yitom/* 名称`)
+    }
+  }
+}
+
+for (const file of ['README.md', 'AGENTS.md']) {
+  const full = join(root, file)
+  if (existsSync(full)) checkWorkspacePackageReferences(full, readFileSync(full, 'utf-8'))
+}
+const packagesDir = join(root, 'packages')
+if (existsSync(packagesDir)) {
+  for (const readme of collectReadmes(packagesDir)) {
+    checkWorkspacePackageReferences(readme, readFileSync(readme, 'utf-8'))
+  }
+}
+
 for (const subtree of SCAN_SUBTREES) {
   const base = join(root, subtree)
   if (!existsSync(base)) continue
@@ -86,6 +111,7 @@ for (const subtree of SCAN_SUBTREES) {
     const dir = dirname(readme)
     const content = readFileSync(readme, 'utf-8')
     const tokens = extractTokens(content)
+    checkWorkspacePackageReferences(readme, content)
 
     // A. 显式后缀引用必须存在（README 目录逐级上溯至仓库根均可，如 `main.tsx` 指 src/ 下）
     for (const token of tokens) {

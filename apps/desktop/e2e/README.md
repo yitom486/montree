@@ -13,6 +13,8 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 高 DPI：`E2E_DEVICE_SCALE_FACTOR=1.5 bun run test:e2e …` 以 `--force-device-scale-factor` 启动（CI 的 Windows 作业跑 1x 与 1.5x）。截图请用 `helpers/screenshot.ts` 的 `screenshotWithoutToasts`（样式隐藏 toast，**不要删除 toast DOM**，会让 React 崩溃）。
 
+打开设置的离线用例应使用 `helpers/mock-agent.ts` 的 `mockAgentEnv` 与 `configureMockTranslation`，防止独立翻译配置读取启动真实 Agent 或依赖外网登录。
+
 ## 用例
 
 | 文件 | 说明 |
@@ -24,6 +26,8 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `agent-epipe.spec.ts` | 回合中杀掉 Agent 进程后再写 stdin（EPIPE）：主进程无未捕获异常/错误框，可重连 |
 | `ime-composition.spec.ts` | CDP 真实输入法组合（`Input.imeSetComposition`）：编辑器实时预览行与聊天输入框，组合中 Enter 不发送 |
 | `window-width-stability.spec.ts` | 奇数窗口宽度、滚动条临界内容、拖动分隔条后外框宽度静置不抖动；`E2E_DEVICE_SCALE_FACTOR` 模拟 125%/150% |
+| `markdown-preview-cards.spec.ts` | Markdown 独立预览、批注/AI 制卡（mock Agent 真会话链路）、MCP 选区/卡片查询/提议采用/书签、持久卡片跨模式与重载恢复、段落移位与改写后的引用快照和定位提示，附截图 |
+| `workspace-companion-panel.spec.ts` | AI / 卡片流共享辅助区、键盘切换与制卡返回、草稿保留、正文宽度稳定、窄窗工具栏无重叠及关闭释放空间，附截图 |
 | `workspace-render-isolation.spec.ts` | md→PDF→在线文档→本地 md 切换与 Mermaid 渲染时，聊天面板零重渲染（渲染计数探针）、聊天/工作区外框零位移 |
 | `markdown-mermaid-stability.spec.ts` | 实时预览 Mermaid：上方输入不重建 SVG、不跳高度；源码/预览切换命中缓存首帧出图 |
 | `react-dev-sandbox.spec.ts` / `fixtures/react-dev-sandbox.html` | 独立 Vite 开发服务 + Electron：React 开发版收到沙盒 iframe 的 Window/DOM 属性后，初次挂载、切换、点击和输入仍可用，无渲染异常 |
@@ -65,9 +69,10 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 | `reader-pdf-structure.spec.ts` | PDF 结构化 WASM：生产包真加载（非回退）+ Agent 正文走结构化（`E2E_PDF_STRUCTURE` 门控测试钩子） |
 | `reader-pdf-ocr.spec.ts` | 扫描版 PDF 单页 OCR：「更多工具 → 识别本页」落缓存 + 文字层可读（当前页无文字层会自动识别；`apps/desktop/e2e/fixtures/ocr/scanned-hello.pdf`） |
 | `sync-webdav.spec.ts` | 本地内存 WebDAV stub → 设置页测试连接 + 一次同步落数 |
+| `reader-translation.spec.ts` | 原生最大化/最小化保留卡片、阅读区外点击保留/正文空白关闭； 划词翻译：流式译文/语言方向/关键短语/术语、复制不夹带 JSON、网页与 PDF OCR 选区的翻译批注真实落盘、关闭与窄窗口；翻译独立 Agent/模型/思考档、最低档级联、持久化、主聊天从未连接/后来连接 Max/断开后均可翻译（模型与 OCR 使用替身） |
 | `web-doc-smoke.spec.ts` | 在线文档：正文选段批注保存及重载恢复、优先渲染 `rel=alternate` Markdown 源（失败回退 HTML）、真实 localhost HTTP 服务读取 mdBook/目录/跨章导航，Rust 代码语法高亮/亮暗主题/逐字复制、mdBook 独立 toc.html 章节树/子章跳转/底栏返回、打开、地址栏换页、目录跳转、论文 SVG 图片与表格对齐/合并/横向滚动 |
 | `web-doc-xss.spec.ts` | 在线文档 XSS 回归（真浏览器）：恶意载荷不执行、正文完好 |
-| `web-doc-rendering.spec.ts` | Markdown 优先读取后的 Pele 流程/时序图、源码复制、亮暗主题、KaTeX 行内/分式/矩阵与离线本地字体；`E2E_WEB_DOC_RENDERING_LIVE=1` 额外实测 MkDocs Math 与 D2L 线性代数真实网页，并输出截图和公式数量 |
+| `web-doc-rendering.spec.ts` | 原生 Markdown 受保护图片失败恢复、实际像素解码与来源保留； Markdown 优先读取后的 Pele 流程/时序图、源码复制、亮暗主题、KaTeX 行内/分式/矩阵与离线本地字体；`E2E_WEB_DOC_RENDERING_LIVE=1` 额外实测 MkDocs Math 与 D2L 线性代数真实网页，并输出截图和公式数量 |
 | `reader-visual-context.spec.ts` | 网页/Markdown/EPUB/PDF 图片发现、图片地址和图注、主进程阅读区 PNG 截图（`E2E_READER_VISUAL` 门控，不连接 AI） |
 
 ## 在线文档 Fixture

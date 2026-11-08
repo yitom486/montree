@@ -56,7 +56,7 @@ export function buildMontreePromptPrefix(
     })
   }
 
-  // 选区只「通知一轮」：本轮若刚划选则 hasSelection；否则清掉上一轮 sticky
+  // 以发送时为准冻结选区：仍有效则本轮带 hasSelection；已消失则本轮不带
   const hasSelection = beginPromptSelectionCycle()
   const activeDocument = collectActiveDocument()
   const decision = takeTurnContextDecision(

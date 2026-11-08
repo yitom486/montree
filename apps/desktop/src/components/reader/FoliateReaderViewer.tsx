@@ -1,3 +1,4 @@
+import { isReaderBlankClick } from '@/lib/reader/reader-blank-click'
 import { useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { PaneErrorBoundary } from '@/components/shared/PaneErrorBoundary'
@@ -7,6 +8,7 @@ import { ReaderToolbarShell } from '@/components/reader/ReaderToolbarShell'
 import { ReadingProgressRing } from '@/components/reader/ReadingProgressRing'
 import { ReaderTypographyControls } from '@/components/reader/ReaderTypographyControls'
 import { SelectionToolbar } from '@/components/reader/SelectionToolbar'
+import { TranslationCard } from '@/components/reader/TranslationCard'
 import { AnnotationNoteDialog } from '@/components/reader/AnnotationNoteDialog'
 import { ReadingMarkPopover } from '@/components/reader/ReadingMarkPopover'
 import { EpubMarkTooltip } from '@/components/reader/EpubMarkTooltip'
@@ -52,7 +54,7 @@ export function FoliateReaderViewer({
   workspaceRoot,
 }: FoliateReaderViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { tocOpen, marksOpen, toggleToc, toggleMarks, closeToc, closeMarks } = useReaderSidePanels()
+  const { tocOpen, toggleToc, closeToc } = useReaderSidePanels()
   const nav = useReaderNavigationStore((state) => state.nav)
   const readerFontSize = useAppSettingsStore((state) => state.readerFontSize)
   const readerLineHeight = useAppSettingsStore((state) => state.readerLineHeight)
@@ -123,6 +125,7 @@ export function FoliateReaderViewer({
     filePath,
     fileFingerprint,
     kindRef,
+    containerRef,
     viewRef,
     adapterRef,
     chaptersRef,
@@ -188,9 +191,7 @@ export function FoliateReaderViewer({
       <ReaderToolbarShell
         ready={session.ready}
         tocDisabled={!session.ready || session.chapters.length === 0}
-        cardCount={marks.length}
         onTocToggle={toggleToc}
-        onMarksToggle={toggleMarks}
         onAddBookmark={() => void interactions.addBookmarkAtCurrent()}
         trailing={
           <>
@@ -211,15 +212,13 @@ export function FoliateReaderViewer({
         }
       />
 
-      {/* 内框行：正文（含卡轨）与 AI 侧栏并列，同属左大块；底导航收进正文列 */}
+      {/* 内框行：正文与目录留在工作区，卡片统一展示在外壳辅助区 */}
       <div className="flex min-h-0 flex-1">
         <ReaderContentShell
           filePath={filePath}
-          marksOpen={marksOpen}
           marks={marks}
           onSelectMark={session.handleSelectMark}
           onDeleteMark={(mark) => void interactions.handleDeleteMark(mark)}
-          onCloseMarks={closeMarks}
           onExportNotes={handleExportNotes}
           onExportAnkiCards={handleExportAnkiCards}
           marksToc={tocFromEpubUnits(session.chapters)}
@@ -250,6 +249,9 @@ export function FoliateReaderViewer({
               ref={containerRef}
               className="foliate-reader-host relative h-full min-h-0 overflow-hidden bg-[var(--color-bg-base)]"
               data-reader-viewport
+              onClick={(event) => {
+                if (isReaderBlankClick(event.nativeEvent, event.currentTarget)) interactions.selectionActions.dismissTranslation()
+              }}
               data-theme={theme}
             >
               {isLoading && (
@@ -296,10 +298,10 @@ export function FoliateReaderViewer({
         <SelectionToolbar
           x={interactions.selectionToolbarPos.x}
           y={interactions.selectionToolbarPos.y}
-          readOnly
           onCopy={interactions.selectionActions.handleCopy}
           hasSelectionForCopy={Boolean(interactions.selectionSnapshot?.text?.trim())}
           keyEventDocs={session.getRenderedDocs().map((item) => item.doc)}
+          onTranslate={interactions.selectionActions.translate}
           onAnnotate={interactions.selectionActions.handleAnnotate}
           onReadAloud={() => {
             if (interactions.selectionSnapshot?.text) {
@@ -308,13 +310,23 @@ export function FoliateReaderViewer({
             }
           }}
           onHighlight={interactions.selectionActions.handleHighlight}
-          onAddToChat={interactions.selectionActions.handleAddToChat}
           onAskAgent={interactions.selectionActions.handleAskAgent}
           onAskDeepAnswer={interactions.selectionActions.askDeepAnswer}
           deepAnswerPending={interactions.selectionActions.deepAnswerPending}
           onGenerateCardPreset={interactions.selectionActions.generateAiCard}
           cardPresetPending={interactions.selectionActions.aiCardPending}
           onDismiss={interactions.selectionActions.handleDismiss}
+        />
+      ) : null}
+
+      {interactions.selectionActions.translation ? (
+        <TranslationCard
+          translation={interactions.selectionActions.translation}
+          onClose={interactions.selectionActions.dismissTranslation}
+          onMove={interactions.selectionActions.moveTranslation}
+          onRetry={() => void interactions.selectionActions.retryTranslation()}
+          onCopy={interactions.selectionActions.copyTranslation}
+          onSave={() => void interactions.selectionActions.saveTranslationNote()}
         />
       ) : null}
 

@@ -15,8 +15,9 @@ export {
   serializeMarkPassage as serializeMarkForAgent,
 } from '@yitom/reader-core'
 
-function supportsMontreeMarks(kind: DocumentKind): boolean {
-  return kind === 'web' || isReaderDocumentKind(kind)
+function supportsMontreeMarks(kind: DocumentKind, filePath: string): boolean {
+  return kind === 'web' || isReaderDocumentKind(kind) ||
+    (kind === 'markdown' && getReaderMarksProvider()?.filePath === filePath)
 }
 
 async function loadMarksForOpenDocument() {
@@ -24,8 +25,8 @@ async function loadMarksForOpenDocument() {
   if (!document?.path) {
     throw new Error('当前没有打开的文档')
   }
-  if (!supportsMontreeMarks(document.kind)) {
-    throw new Error('当前不是 EPUB/PDF/MOBI/在线文档，不必用 Montree 书签工具')
+  if (!supportsMontreeMarks(document.kind, document.path)) {
+    throw new Error('当前文档不支持 Montree 书签工具，或卡片模块尚未就绪')
   }
 
   const result = await readingMarksApi.list(document.path)

@@ -24,6 +24,39 @@ async function expectLocalMathFonts(page: Page) {
   expect(loaded, '随应用打包的 KaTeX 字体应实际加载').toBe(true)
 }
 
+test('原生 Markdown 图片：内嵌请求失败后读取受限图片资源并保留原始来源', async () => {
+  let markdownReads = 0, imageReads = 0
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/GkAAAAASUVORK5CYII=', 'base64')
+  const server = createServer((req, res) => {
+    if (req.url === '/blog/post/') res.writeHead(200, { 'content-type': 'text/html' }).end('<html><head><link rel="alternate" type="text/markdown" href="/blog/post.md"></head><body><article>HTML fallback</article></body></html>')
+    else if (req.url === '/blog/post.md') { markdownReads++; res.writeHead(200, { 'content-type': 'text/markdown' }).end('# Native Markdown article\n\n![Architecture](/protected.png)') }
+    else if (req.url === '/protected.png') { imageReads++; res.writeHead(200, { 'content-type': 'image/png', 'cross-origin-resource-policy': 'same-origin' }).end(png) }
+    else res.writeHead(404).end()
+  })
+  await new Promise<void>(resolve => server.listen(0, 'localhost', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Image fixture not listening')
+  const origin = `http://localhost:${address.port}`
+  const app = await launchBuiltApp({ E2E_WEB_DOC_FIXTURE_DIR: '' })
+  try {
+    const page = await app.firstWindow()
+    await welcomeWebDocUrlField(page).fill(`${origin}/blog/post/`)
+    await welcomeWebDocUrlField(page).press('Enter')
+    await expect(frame(page).getByRole('heading', { name: 'Native Markdown article' })).toBeVisible()
+    const image = frame(page).getByRole('img', { name: 'Architecture' })
+    await expect.poll(() => image.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBe(1)
+    await expect(image).toHaveAttribute('src', /^data:image\/png;base64,/)
+    await expect(image).toHaveAttribute('data-montree-image-source', `${origin}/protected.png`)
+    expect(markdownReads).toBeGreaterThan(0)
+    expect(imageReads).toBeGreaterThan(0)
+    await page.locator('.web-doc-viewer-host').screenshot({ path: 'test-results/web-doc-protected-image.png' })
+  } finally {
+    await app.close()
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+})
+
 test('在线 Markdown：Pele 图表、源码复制、公式字体与亮暗主题', async ({}, info) => {
   const server = createServer((req, res) => {
     if (req.url === '/docs/page') {

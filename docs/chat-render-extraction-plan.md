@@ -1,5 +1,7 @@
 # 聊天渲染抽离计划：`@montree/chat-core` + `@montree/chat-ui`
 
+> 历史迁移记录：本文保留拆包时的目录、包名与验收结果。相关实现现由外部 montree-chat 仓库维护，包名已从 `@montree/*` 迁为 `@yitom/*`；本文中的旧 `packages/` 路径不代表当前仓库布局。当前依赖与职责见[根 README](../README.md#聊天与-acp-包依赖)。
+
 > 工作区：本分支 `chat-render-init`（由 `master@551be1f` 建工作树）。
 > 目标：把聊天框的富文本渲染能力抽成**与 ACP 协议零耦合**的包（`acp-client` 管协议和会话，新包只管展示），先在 monorepo 内孵化（`private:true`），API 冻结 + 出现第一个外部消费方后再毕业到独立 repo 发 npm。
 > 总性质：**80% 搬运 + 换 import 源，20% 剪 store 改 props**；渲染逻辑不重写，每步行为不变。

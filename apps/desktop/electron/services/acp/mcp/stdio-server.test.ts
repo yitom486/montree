@@ -14,6 +14,7 @@ import { configureAcpDiagnostics } from './diagnostics'
 import type { MontreeMcpServerHandle } from './montree-mcp-server'
 import { windowMcpEntry } from './session-config'
 import { resolveAgentCwd } from '../agent-sandbox-cwd'
+import { openTranslationOutput, onTranslationOutput } from './translation-tools'
 
 vi.mock('electron', async () => {
   const { tmpdir } = await import('node:os')
@@ -62,6 +63,26 @@ afterEach(async () => {
 })
 
 describe('window MCP stdio', () => {
+  it('translation exposes only its result tool and streams validated events over the real pipe', async () => {
+    const scope = getAcpContext('stdio-translation')
+    scope.purpose = 'translation'
+    scopes.push(scope)
+    const received: unknown[] = []
+    const requestId = '12345678-1234-1234-1234-123456789abc'
+    const close = runInAcpContext(scope, () => {
+      onTranslationOutput(event => received.push(event))
+      return openTranslationOutput(requestId, 'translate-session')
+    })
+    const handle = await runInAcpContext(scope, () => startWindowMcpServer({ readSnapshot: async () => { throw new Error('must not read workspace') } }))
+    const c = client(handle)
+    expect((await c.request('tools/list')).result.tools.map((tool: { name: string }) => tool.name)).toEqual(['montree_translation_emit'])
+    expect((await c.request('tools/call', { name: 'montree_read', arguments: { scope: 'viewport' } })).result.isError).toBe(true)
+    const submit = { name: 'montree_translation_emit', arguments: { requestId, sequence: 0, type: 'text', text: '即时译文' } }
+    expect((await c.request('tools/call', submit)).result.isError).toBeUndefined()
+    expect(received).toMatchObject([{ sessionId: 'translate-session', event: { type: 'text', text: '即时译文' } }])
+    close()
+    expect((await c.request('tools/call', submit)).result.isError).toBe(true)
+  }, 15000)
   it.runIf(process.env.MONTREE_TEST_BUILT_MCP === '1')('真实构建入口在旧相对目录恢复后完成握手与工具调用', async () => {
     const scope = getAcpContext(`stdio-built-${process.pid}`)
     scopes.push(scope)

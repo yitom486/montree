@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  addSelectionMarkerToComposer,
-  openAgentComposerToAskSelection,
-} from '@/lib/agent/context/focus-agent-composer'
+import { addSelectionMarkerToComposer } from '@/lib/agent/context/focus-agent-composer'
 import { copyTextToClipboard } from '@yitom/reader-core'
 import type { HighlightColorId } from '@yitom/reader-core'
 import { useReaderHudUiStore } from '@/stores/acp/reader-hud-store'
@@ -14,13 +11,21 @@ import {
   getDeepAnswerDirection,
   type DeepAnswerDirectionId,
 } from '@/lib/agent/deep-answer'
+import {
+  useReaderTranslation,
+  type ReaderTranslationState,
+  type TranslationNoteWriter,
+} from '@/hooks/reader/useReaderTranslation'
 
 /**
  * 三阅读器（PDF / Foliate / WebDoc）划选工具条的共享动作。
- * 只收敛六个按钮行为；选区快照的读取、批注落盘（anchor 各异）仍归各 Viewer。
+ * 只收敛复制/标记/朗读/AI 入口的行为；选区快照的读取、批注落盘（anchor 各异）仍归各 Viewer。
  */
 export interface ReaderSelectionActionsOptions {
   snapshotText: string | null | undefined
+  /** PDF 坏文字层的 OCR 回退；闭包必须锁定本次选区。 */
+  recoverTranslationText?: () => Promise<string>
+  captureTranslationNote?: () => TranslationNoteWriter | undefined
   dimTextSelection: () => void
   clearTextSelection: () => void
   /** 打开批注对话框：各家都是清编辑态 + 开弹窗 + 收工具条 */
@@ -40,14 +45,22 @@ export interface ReaderSelectionActionsOptions {
    * 决定一书一会话落哪一行；缺省仅内存会话（不断流，但重启不恢复）。
    */
   sessionKey?: string
+  translationSourceKey?: string
 }
 
 export interface ReaderSelectionActions {
   handleCopy: () => void
   handleAnnotate: () => void
   handleHighlight: (color: HighlightColorId) => void
-  handleAddToChat: () => void
   handleAskAgent: () => void
+  /** 划词翻译：隐藏副会话，卡片按流式增量渲染 */
+  translation: ReaderTranslationState | null
+  translate: (position: { x: number; y: number }) => Promise<void>
+  retryTranslation: () => Promise<void>
+  dismissTranslation: () => void
+  moveTranslation: (position: { x: number; y: number }) => void
+  copyTranslation: () => void
+  saveTranslationNote: () => Promise<void>
   /**
    * AI 制卡（P1 菜单驱动）：选预设 → 本书会话调模型 → 落卡。
    * 调不通直接报错（无启发式兜底）；pending 期间调用方禁用菜单。
@@ -119,15 +132,20 @@ export function useReaderSelectionActions(
     [retainSelection, saveHighlight, onHighlightError],
   )
 
-  const handleAddToChat = useCallback(() => {
+  // 打开面板并插入「选区」短标记：用户可继续写自己的问题，正文由 Agent 读取。
+  const handleAskAgent = useCallback(() => {
     addSelectionMarkerToComposer()
     dimTextSelection()
   }, [dimTextSelection])
 
-  const handleAskAgent = useCallback(() => {
-    openAgentComposerToAskSelection()
-    dimTextSelection()
-  }, [dimTextSelection])
+  const translationActions = useReaderTranslation({
+    getSourceText: () => snapshotText ?? null,
+    dimTextSelection,
+    recoverSourceText: options.recoverTranslationText,
+    sourceKey: options.translationSourceKey ?? sessionKey,
+    captureNoteWriter: options.captureTranslationNote,
+    onNoteSaved: () => useReaderHudUiStore.getState().setIsCardRailOpen(true),
+  })
 
   const [aiCardPending, setAiCardPending] = useState(false)
 
@@ -317,8 +335,14 @@ export function useReaderSelectionActions(
     handleCopy,
     handleAnnotate,
     handleHighlight,
-    handleAddToChat,
     handleAskAgent,
+    translation: translationActions.translation,
+    translate: translationActions.translate,
+    retryTranslation: translationActions.retry,
+    dismissTranslation: translationActions.dismiss,
+    moveTranslation: translationActions.move,
+    copyTranslation: translationActions.copy,
+    saveTranslationNote: translationActions.saveNote,
     generateAiCard,
     aiCardPending,
     deepAnswer,

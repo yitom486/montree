@@ -10,7 +10,8 @@
 | `file-api.ts` | 打开/保存/读写文件、工作区、导出、粘贴图等 |
 | `app-api.ts` | 应用级：窗口/标题/关闭确认、更新、外部文件与链接、日志、E2E 门控、工作区监听等 |
 | `terminal-api.ts` | 交互终端 IPC：Shell 列表、会话创建/读写/尺寸/关闭及输出事件；独立沙盒 preload 桥接 |
-| `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@montree/contracts`，传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`，主进程留守见 `apps/desktop/electron/services/acp/`） |
+| `acp-api.ts` | ACP Agent：连接、prompt、权限、配置（IPC 薄封装；类型单一源 `@yitom/contracts`，传输/认证/MCP 纯逻辑已独立至 `@yitom/acp-client`，主进程留守见 `apps/desktop/electron/services/acp/`） |
+| `translation-api.ts` | 翻译专用 IPC：独立 Agent 连接/认证、会话/配置/翻译请求和专属流式/状态事件，经 `montreeTranslation` 访问，不改变右侧聊天状态 |
 | `agent-inspection-api.ts` | MCP/Skills 详情、完整技能说明和打开已发现文件位置；封装独立 preload 桥接与 Result 错误 |
 | `html-preview-api.ts` | 本地 HTML 预览会话：登记文件得到 `montree-html://` 独立源地址、推送当前（含未保存）HTML 文本、释放、请求主进程校验链接范围；封装独立 preload 桥接与 Result 错误 |
 | `reading-marks-api.ts` | 书签 / 高亮 / 批注 CRUD + 本书全文搜 + 按章查询 |
@@ -19,6 +20,9 @@
 | `quiz-api.ts` | AI 测验与答题打分记录持久化（全局 `montree.db`，API 签名自 JSONL 时代未变） |
 | `sync-api.ts` | 云端同步（WebDAV 配置、连接测试、双向同步） |
 | `web-doc-api.ts` | 在线文档：抓取页面（优先页面声明的 Markdown 源，失败回退 HTML）、发现目录 |
+| `hn-api.ts` | 文章 URL → HN 讨论反查，经 preload `montreeHn` 桥接；24 小时反查缓存 |
+| `feed-api.ts` | 通用资讯流：Hacker News / Lobsters / 精选 RSS / arXiv / AI 前沿 / 自定义订阅，主进程按 source+channel 回源与缓存 |
+| `feed-auth-api.ts` | 需要登录的资讯来源：打开真实登录窗口、查询登录态、退出登录；Cookie 只留在主进程独立分区 |
 | `bun-api.ts` | Bun 运行时状态查询与一键安装 |
 | `ocr-api.ts` | OCR 组件状态、单页识别、目录识别与目录页范围探测（只建议范围） |
 | `rosetta-api.ts` | 罗盘索引：扫描书一键导入、进度订阅、书信息、统一读查询、纯本地目录重建、正文水印只读预览、备份并应用正文水印（二次确认后调用，空计划 noop）、已入库内容只读取证 |
@@ -29,7 +33,7 @@
 | `workspace-api.ts` | 本机工作区宿主绑定：connect/disconnect/getStatus/状态订阅；B2/B3 宿主相对读写（revision 冲突检查）、远端另存为、宿主图片、可取消分页搜索（IPC 薄封装）；P1 `toHostTextRef` 裸路径→宿主引用 |
 | `query-keys.ts` | TanStack Query key 工厂（含 workspaceId/文档身份隔离） |
 
-新增能力顺序（见 AGENTS.md）：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。
+新增能力顺序（见 AGENTS.md）：共享契约 `@yitom/contracts` / 桌面专用 `apps/desktop/contracts/`→ `apps/desktop/electron/services` → IPC 注册 → preload → **本目录** → hooks。
 
 - React artifact 编译 API：`react-artifact-api.ts`，仅通过 preload 请求主进程转换 JSX/TSX，返回离线 HTML；模型代码只在隔离 iframe 运行。
 

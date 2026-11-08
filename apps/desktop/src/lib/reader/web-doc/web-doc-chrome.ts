@@ -1188,6 +1188,17 @@ function stripPeopleDailyChrome(root: HTMLElement): void {
   root.querySelectorAll('h2:empty, h3:empty').forEach((node) => node.remove())
 }
 
+export function normalizeLatexmlTransformedBlocks(root: HTMLElement): void {
+  // LaTeXML 用 transform + 固定宽高 + 负 vertical-align 把宽表缩放进页面。
+  // 阅读器没有它的站点 CSS，保留这些 inline style 会让表格溢出并压住正文。
+  root
+    .querySelectorAll<HTMLElement>('.ltx_transformed_outer, .ltx_transformed_inner')
+    .forEach((element) => {
+      element.removeAttribute('style')
+      element.classList.add('web-doc-ltx-transformed')
+    })
+}
+
 export function stripWebDocChrome(root: HTMLElement, siteId: WebDocSiteId, pageUrl: string): void {
   stripGenericChrome(root, pageUrl)
 

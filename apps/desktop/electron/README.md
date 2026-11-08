@@ -1,7 +1,7 @@
 # electron
 
 **主进程**源码。入口：`main.ts`；渲染进程通过 `preload.ts` 的 `contextBridge` 调 IPC。  
-渲染进程在 [`src/`](../src/README.md)；跨进程契约在 `packages/contracts/`（`@montree/contracts`，原 `shared/` 核心/IPC/类型；`shared/` 已清空，阶段 10 删除）。
+渲染进程在 [`src/`](../src/README.md)；跨进程契约在外部包 `@yitom/contracts`；桌面专用补充契约在 `apps/desktop/contracts/`。
 
 门禁：`bun run lint:docs`（`scripts/lint-docs.ts`）+ `bun run lint:deps`（`scripts/check-deps.ts`，R1–R7 依赖边界）。
 
@@ -9,14 +9,14 @@
 |-------------|------|
 | `main.ts` | 应用生命周期、初始化用户 `~/.montree` 规则/Skills（已有文件不覆盖）、注册 IPC、创建窗口、退出时释放 ACP / 工作区监听 |
 | `mcp-stdio.ts` | Agent 启动的 MCP stdio 子进程入口；经窗口专属命名管道/Unix socket 访问主进程文档服务，stdout 仅输出协议消息 |
-| `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI` |
+| `preload.ts` | `contextIsolation` 下暴露 `window.electronAPI`；`window.montreeWebDocImages` 仅供宿主恢复阅读器失败图片 |
 | [`ipc/`](./ipc/) | `ipcMain` 处理器注册 |
 | [`window/`](./window/) | BrowserWindow 创建、关闭确认、标题；`window/app-menu.ts` 安装 Edit 菜单角色（Ctrl+C/V） |
-| [`services/`](./services/) | 业务服务（文件、工作区、阅读标记、ACP、**在线文档 web-doc**、**OCR 目录**；含 `web-doc/`（`url-policy`/`site-registry` 留守网络边界，目录抽取/站点谓词已迁 `@montree/web-doc`）、`ocr/`；ACP 纯逻辑已独立至 `@yitom/acp-client`，本树 `services/acp/` 仅留守 client/manager/terminal/fs/preflight/router/session-open；标注纯核/合并见 `@montree/annotations`） |
+| [`services/`](./services/) | 业务服务（文件、工作区、阅读标记、ACP、**在线文档 web-doc**、**OCR 目录**；含 `web-doc/`（`url-policy`/`site-registry` 留守网络边界，目录抽取/站点谓词已迁 `@montree/web-doc`）、`ocr/`；ACP 纯逻辑已独立至 `@yitom/acp-client`，本树 `services/acp/` 仅留守 client/manager/terminal/fs/preflight/router/session-open；标注纯核/合并见 `@yitom/annotations`） |
 | [`vite-plugins/`](./vite-plugins/) | 主进程构建用 Vite 插件 |
 
 `webPreferences`：preload + `contextIsolation: true` + `nodeIntegration: false`。渲染端禁止 Node / `@electron/remote`。
 
-新增能力顺序见 [AGENTS.md](../../AGENTS.md)：`packages/contracts`（`@montree/contracts`，原 `shared/`）→ **本目录 services** → ipc → `electron-api.types`（已迁 contracts）→ preload → `apps/desktop/src/api` → hooks。
+新增能力顺序见 [AGENTS.md](../../../AGENTS.md)：共享契约 `@yitom/contracts` / 桌面专用 `apps/desktop/contracts/`→ **本目录 services** → ipc → `electron-api.types`（已迁 contracts）→ preload → `apps/desktop/src/api` → hooks。
 
 Typst 集成由 `services/typst/` 与 `ipc/typst-handlers.ts` 管理，退出/关窗释放 Tinymist。

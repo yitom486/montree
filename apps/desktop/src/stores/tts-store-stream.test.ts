@@ -282,6 +282,27 @@ describe('TTS receiving and playback lifecycle', () => {
     expect(useTtsStore.getState()).toMatchObject({ isReceiving: false, isFromCache: true, receivedDuration: 3 })
   })
 
+  it('keeps rate validation, active audio speed and persisted preferences in sync', async () => {
+    await useTtsStore.getState().playText('缓存章', '完整缓存正文。')
+    end(0, true)
+    const audio = FakeAudio.instances[0]
+    useTtsStore.getState().setRate(5)
+    expect(audio.playbackRate).toBe(2)
+    expect(useTtsStore.getState().rate).toBe(2)
+    expect(JSON.parse(storage.getItem('montree_tts_preferences')!).state.rate).toBe(2)
+    expect(ttsApi.saveConfig).toHaveBeenLastCalledWith(expect.objectContaining({ rate: 2 }))
+    useTtsStore.getState().setRate(0.1)
+    expect(audio.playbackRate).toBe(0.5)
+    expect(ttsApi.saveConfig).toHaveBeenLastCalledWith(expect.objectContaining({ rate: 0.5 }))
+  })
+
+  it('still enables and saves reader highlighting when locating the current sentence', () => {
+    useTtsStore.setState({ highlightInReader: false })
+    useTtsStore.getState().locateCurrentSentenceInReader()
+    expect(useTtsStore.getState().highlightInReader).toBe(true)
+    expect(ttsApi.saveConfig).toHaveBeenLastCalledWith(expect.objectContaining({ highlightInReader: true }))
+  })
+
   it('allows seeking backward and forward within ready audio while isReceiving is true', async () => {
     await useTtsStore.getState().playText('测试章', '第一句。第二句。第三句。')
     push(0, 4)

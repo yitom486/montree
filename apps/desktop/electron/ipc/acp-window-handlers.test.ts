@@ -3,13 +3,14 @@ import { PassThrough } from 'node:stream'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { IPC, ok } from '@yitom/contracts'
+import { TRANSLATION_IPC } from '../../contracts/translation'
 
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>(), connect: vi.fn() }))
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
   const ipc = new EventEmitter() as EventEmitter & { handle: (name: string, fn: (...args: any[]) => any) => void }
   ipc.handle = (name, fn) => mocks.handlers.set(name, fn)
-  return { ipcMain: ipc, app: { getPath: () => process.cwd(), getVersion: () => 'test' } }
+  return { ipcMain: ipc, BrowserWindow: { fromWebContents: (sender: unknown) => sender }, app: { getPath: () => process.cwd(), getVersion: () => 'test' } }
 })
 vi.mock('../services/acp/acp-connection', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/acp/acp-connection')>()
@@ -33,6 +34,7 @@ import { requestElicitation } from '../services/acp/elicitation'
 let nextId = 800
 const windows: FakeWindow[] = []
 class FakeWindow extends EventEmitter {
+  mainFrame = {}
   id = ++nextId
   destroyed = false
   sent: Array<{ channel: string; payload: any }> = []
@@ -42,7 +44,7 @@ class FakeWindow extends EventEmitter {
   destroy() { this.destroyed = true; this.emit('destroyed') }
 }
 const window = () => { const value = new FakeWindow(); windows.push(value); return value }
-const invoke = (sender: FakeWindow, channel: string, payload?: unknown) => mocks.handlers.get(channel)!({ sender: sender.webContents }, payload)
+const invoke = (sender: FakeWindow, channel: string, payload?: unknown) => mocks.handlers.get(channel)!({ sender: sender.webContents, senderFrame: sender.mainFrame }, payload)
 beforeAll(registerAcpWindowHandlers)
 afterEach(async () => {
   windows.splice(0).forEach((window) => { window.destroy(); forgetAcpContext(getAcpContext(`window-${window.id}`)) })
@@ -68,6 +70,35 @@ describe('window-owned ACP IPC', () => {
     const navigated = withAcpWindow(a.webContents, () => requestElicitation(form, new AbortController().signal))
     a.emit('did-start-navigation', {}, 'file:///reload', false, true)
     expect(await navigated).toEqual({ action: 'cancel' })
+  })
+  it('翻译连接及事件独立于同窗口主聊天，跨用途会话不可操作', async () => {
+    const owner = window()
+    withAcpWindow(owner.webContents, () => { acpState.runtimeId = 'opencode'; acpState.sessionId = 'main'; claimAcpSession('main') })
+    mocks.connect.mockImplementation(async () => {
+      expect(currentAcpContext().id).toBe(`window-${owner.id}-translation-opencode`)
+      acpState.runtimeId = 'opencode'
+      acpState.sessionId = 'translation'
+      claimAcpSession('translation')
+      setStatus('connected')
+      return ok({ phase: 'ready', sessionId: 'translation', configOptions: [] })
+    })
+    expect((await invoke(owner, TRANSLATION_IPC.connect, 'opencode')).ok).toBe(true)
+    expect(getAcpState(getAcpContext(`window-${owner.id}`)).sessionId).toBe('main')
+    expect(owner.sent.some((event) => event.channel === IPC.ACP_STATUS_CHANGED)).toBe(false)
+    expect(owner.sent.some((event) => event.channel === TRANSLATION_IPC.status)).toBe(true)
+    expect((await invoke(owner, TRANSLATION_IPC.prompt, { runtimeId: 'opencode', sessionId: 'main', prompt: [] })).ok).toBe(false)
+    const blocked = await mocks.handlers.get(TRANSLATION_IPC.connect)!({ sender: owner.webContents, senderFrame: {} }, 'opencode')
+    expect(blocked.error.code).toBe('FORBIDDEN')
+  })
+
+  it('翻译的同名会话不会阻止主聊天恢复自己的历史会话', async () => {
+    const owner = window()
+    withAcpWindow(owner.webContents, () => {
+      acpState.runtimeId = 'opencode'
+      claimAcpSession('repeated-id')
+    }, 'opencode')
+    mocks.connect.mockImplementation(async () => ok({ phase: 'ready', sessionId: 'repeated-id', configOptions: [] }))
+    expect((await invoke(owner, IPC.ACP_CONNECT, { runtimeId: 'opencode', resumeSessionId: 'repeated-id' })).ok).toBe(true)
   })
   it('窗口销毁后迟到的 SDK 写入不再到达已结束的子进程 stdin，也不影响其他窗口', async () => {
     const a = window(), b = window()
