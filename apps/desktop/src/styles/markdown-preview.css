@@ -900,3 +900,76 @@
 ::highlight(montree-md-orange) { background-color: var(--markdown-highlight-orange); color: inherit; }
 ::highlight(montree-md-purple) { background-color: var(--markdown-highlight-purple); color: inherit; }
 ::highlight(montree-md-focus) { background-color: var(--primary); color: var(--primary-foreground); }
+
+/* 写作备注：备注卡片内的 Markdown 预览，弱化标题层级，避免与正文争夺视觉权重。 */
+.comment-note-preview {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.comment-note-preview > div > :first-child {
+  margin-top: 0;
+}
+
+.comment-note-preview > div > :last-child {
+  margin-bottom: 0;
+}
+
+.comment-note-preview :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.9rem 0 0.4rem;
+  padding: 0;
+  border: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.comment-note-preview h1 { font-size: 1.15rem; }
+.comment-note-preview h2 { font-size: 1.08rem; }
+.comment-note-preview h3 { font-size: 1rem; }
+.comment-note-preview h4 { font-size: 0.95rem; }
+.comment-note-preview h5 { font-size: 0.9rem; }
+.comment-note-preview h6 { font-size: 0.85rem; color: var(--muted-foreground); }
+
+.comment-note-preview :is(p, ul, ol, pre, blockquote, table) {
+  margin: 0.5rem 0;
+  line-height: 1.65;
+}
+
+.comment-note-preview :is(ul, ol) {
+  padding-left: 1.25rem;
+}
+
+.comment-note-preview :is(ul, ol) > li + li {
+  margin-top: 0.2rem;
+}
+
+.comment-note-preview blockquote {
+  padding: 0.35rem 0.75rem;
+  border-left-width: 2px;
+}
+
+.comment-note-preview .code-block {
+  margin: 0.5rem 0;
+}
+
+.comment-note-preview img {
+  max-height: 320px;
+  margin-block: 0.5rem;
+}
+
+.comment-note-preview a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.comment-note-source {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--muted-foreground);
+}

@@ -87,9 +87,18 @@ test('写作备注可发现、展开、键盘编辑与撤销，兼容窄屏和�
     await page.keyboard.press('Enter')
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
     const body = comment.getByRole('region')
+    const notePreview = body.locator('.comment-note-preview')
+    await expect(notePreview.locator('h3')).toHaveText('核心主旨')
+    await expect(notePreview.locator('strong')).toHaveText('勇气')
+    await expect(notePreview.locator('img, script')).toHaveCount(0)
+    await expect(body).not.toContainText('### 核心主旨')
+
+    await body.getByRole('button', { name: '源码' }).click()
     await expect(body).toContainText('### 核心主旨')
     await expect(body).toContainText('**勇气**')
     await expect(body.locator('img, script, h3, strong')).toHaveCount(0)
+    await body.getByRole('button', { name: '预览' }).click()
+    await expect(notePreview.locator('h3')).toHaveText('核心主旨')
     const expectExpanded = async () => {
       await expect.poll(() => body.evaluate((node) => {
         const bounds = node.getBoundingClientRect()
@@ -99,6 +108,7 @@ test('写作备注可发现、展开、键盘编辑与撤销，兼容窄屏和�
     }
     await expectExpanded()
     await page.screenshot({ path: testInfo.outputPath('comment-expanded.png') })
+    await trigger.focus()
     await page.keyboard.press('Tab')
     await expect(comment.getByRole('button', { name: '编辑写作备注' })).toBeFocused()
     await page.keyboard.press('Enter')
