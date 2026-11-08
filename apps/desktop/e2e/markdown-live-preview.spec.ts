@@ -129,7 +129,7 @@ test('写作备注可发现、展开、键盘编辑与撤销，兼容窄屏和�
     expect(await comment.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
     await page.screenshot({ path: testInfo.outputPath('comment-narrow.png') })
     await page.getByRole('button', { name: '折叠侧边栏' }).click()
-    await page.getByRole('button', { name: '收起文档目录', exact: true }).click()
+    await page.getByRole('button', { name: '收起文档大纲', exact: true }).click()
     await page.setViewportSize({ width: 360, height: 860 })
     await expectExpanded()
     expect(await comment.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
