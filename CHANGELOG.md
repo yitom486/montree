@@ -6,6 +6,10 @@
 
 ## [未发布]
 
+---
+
+## [0.4.32] - 2026-11-09
+
 - **所见即所得写作备注**：独立 HTML 注释显示为可折叠的备注摘要，展开后可切换安全 Markdown 预览与源码；保留原始 Markdown 和撤销历史，适配亮暗主题、窄窗口、键盘操作及减少动态效果偏好。
 
 - **第三主题暮茶**：第三主题改为更暖的暮茶/陶土色系，降低纸面黄光与白底眩光；同步提升侧栏、工具栏等次要文字对比度，文字、卡片、边框、高亮与编辑器/预览底色一起适配。
@@ -763,7 +767,8 @@
 
 ---
 
-[未发布]: https://github.com/yitom486/montree/compare/v0.4.31...HEAD
+[未发布]: https://github.com/yitom486/montree/compare/v0.4.32...HEAD
+[0.4.32]: https://github.com/yitom486/montree/compare/v0.4.31...v0.4.32
 [0.4.31]: https://github.com/yitom486/montree/compare/v0.4.30...v0.4.31
 [0.4.30]: https://github.com/yitom486/montree/compare/v0.4.29...v0.4.30
 [0.4.29]: https://github.com/yitom486/montree/compare/v0.4.28...v0.4.29
