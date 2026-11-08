@@ -201,69 +201,69 @@
 }
 
 .sepia {
-  /* 暮茶 · 更深的暖纸底，显著降低白底眩光 (Dusk Tea) */
-  --color-bg-base: #ddd2c1;
-  --color-bg-surface: #ebe1d2;
-  --color-bg-elevated: #d0c4b3;
-  --color-hud-bg: rgba(235, 225, 210, 0.98);
-  --color-hud-border: rgba(58, 46, 33, 0.15);
-  --color-border-subtle: rgba(58, 46, 33, 0.12);
-  --color-border-hover: rgba(58, 46, 33, 0.19);
-  --color-border-strong: rgba(58, 46, 33, 0.30);
+  /* 暮茶 · 暖棕陶土方向：保留暖感，压低黄光与白底眩光 (Warm Dusk) */
+  --color-bg-base: #ddccc0;
+  --color-bg-surface: #ecddd1;
+  --color-bg-elevated: #d1beb1;
+  --color-hud-bg: rgba(236, 221, 209, 0.98);
+  --color-hud-border: rgba(60, 44, 34, 0.15);
+  --color-border-subtle: rgba(60, 44, 34, 0.12);
+  --color-border-hover: rgba(60, 44, 34, 0.19);
+  --color-border-strong: rgba(60, 44, 34, 0.30);
 
-  --color-text-primary: #2a2219;
-  --color-text-secondary: #4e4134;
-  --color-text-muted: #5f5041;
+  --color-text-primary: #2b211a;
+  --color-text-secondary: #504135;
+  --color-text-muted: #5c4b3f;
 
-  --color-accent-primary: #3b5746;
-  --color-accent-subtle: rgba(59, 87, 70, 0.12);
-  --color-accent-hover: #2f4739;
-  --color-accent-secondary: #8e5b3a;
+  --color-accent-primary: #3c5346;
+  --color-accent-subtle: rgba(60, 83, 70, 0.12);
+  --color-accent-hover: #304439;
+  --color-accent-secondary: #9a5f42;
 
-  --color-mark-yellow: #e4cf97;
-  --color-mark-yellow-text: #2a2219;
-  --color-mark-green: #cbdbc9;
+  --color-mark-yellow: #e7d0a6;
+  --color-mark-yellow-text: #2b211a;
+  --color-mark-green: #ccdbca;
   --color-mark-green-text: #23402f;
-  --color-mark-blue: #cbdbdf;
+  --color-mark-blue: #cedcdf;
   --color-mark-blue-text: #1f3a49;
-  --color-mark-purple: #ddcee2;
+  --color-mark-purple: #dfcfdf;
   --color-mark-purple-text: #472d4c;
 
-  --card-concept-bg: #d9e4e9;
+  --card-concept-bg: #d9e4e7;
   --card-concept-text: #2a4350;
-  --card-quote-bg: #eddccd;
+  --card-quote-bg: #eedccd;
   --card-quote-text: #633c24;
-  --card-method-bg: #dbe7dc;
+  --card-method-bg: #dce7dc;
   --card-method-text: #28452f;
-  --card-diagram-bg: #e4d9e8;
+  --card-diagram-bg: #e6dae6;
   --card-diagram-text: #45324c;
-  --card-question-bg: #eee1cd;
+  --card-question-bg: #efe0cd;
   --card-question-text: #6d4728;
 
-  --background: #ddd2c1;
-  --foreground: #2a2219;
-  --card: #f0e8db;
-  --card-foreground: #2a2219;
-  --popover: #d8ccba;
-  --popover-foreground: #2a2219;
-  --primary: #3b5746;
-  --primary-foreground: #f0e8db;
-  --secondary: #d0c4b3;
-  --secondary-foreground: #2a2219;
-  --muted: #d0c4b3;
-  --muted-foreground: #5f5041;
-  --accent: rgba(59, 87, 70, 0.12);
-  --accent-foreground: #3b5746;
+  --background: #ddccc0;
+  --foreground: #2b211a;
+  --card: #f1e5da;
+  --card-foreground: #2b211a;
+  --popover: #d9c8bb;
+  --popover-foreground: #2b211a;
+  --primary: #3c5346;
+  --primary-foreground: #f1e5da;
+  --secondary: #d1beb1;
+  --secondary-foreground: #2b211a;
+  --muted: #d1beb1;
+  --muted-foreground: #5c4b3f;
+  --accent: rgba(60, 83, 70, 0.12);
+  --accent-foreground: #3c5346;
   --destructive: #9f3532;
   --success: #2c503b;
   --warning: #704c2d;
   --info: #314e63;
-  --border: rgba(58, 46, 33, 0.16);
-  --input: rgba(58, 46, 33, 0.20);
-  --ring: #3b5746;
-  --sidebar: #d0c4b3;
-  --editor: #ebe1d2;
-  --preview: #ebe1d2;
+  --border: rgba(60, 44, 34, 0.16);
+  --input: rgba(60, 44, 34, 0.20);
+  --ring: #3c5346;
+  --sidebar: #d1beb1;
+  --editor: #ecddd1;
+  --preview: #ecddd1;
 
   color-scheme: light;
 }
