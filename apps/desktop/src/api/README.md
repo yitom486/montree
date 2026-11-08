@@ -6,6 +6,7 @@
 
 | 文件 | 功能 |
 |------|------|
+| `acp-elicitation-api.ts` | 标准 ACP 表单提问事件和回答 IPC；独立 preload 桥接，缺失或发送失败返回 Result 错误 |
 | `file-api.ts` | 打开/保存/读写文件、工作区、导出、粘贴图等 |
 | `app-api.ts` | 应用级：窗口/标题/关闭确认、更新、外部文件与链接、日志、E2E 门控、工作区监听等 |
 | `terminal-api.ts` | 交互终端 IPC：Shell 列表、会话创建/读写/尺寸/关闭及输出事件；独立沙盒 preload 桥接 |

@@ -24,6 +24,7 @@ const sessions = new Map()
 const permissions = new Map()
 const waiting = new Map()
 let sequence = 0, requestSequence = 1000
+let formElicitation = false
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
 const result = (id, value) => send({ id, result: value })
 const text = (sessionId, value) => send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: value } } } })
@@ -42,6 +43,7 @@ async function handle(message) {
   const { id, method, params = {} } = message
   if (!method) { permissions.get(id)?.(message.result ?? { __error: message.error }); permissions.delete(id); return }
   if (method === 'initialize') {
+    formElicitation = params.clientCapabilities?.elicitation?.form != null
     result(id, { protocolVersion: 1, agentInfo: { name: 'mock-window', version: '1' }, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true }, promptCapabilities: { image: true }, _meta: { toolsMode: { values: ['native', 'ptc'] } } }, authMethods: [] })
   } else if (method === 'session/new' || method === 'session/load' || method === 'session/resume') {
     const sessionId = params.sessionId || `mock-${process.pid}-${++sequence}`
@@ -64,6 +66,24 @@ async function handle(message) {
       }
     }
     if (!command) command = blocks.map((block) => block.text || '').join('') || ''
+    if (command === 'elicit-form') {
+      if (!formElicitation) throw new Error('Client did not advertise elicitation.form')
+      const toolCallId = `question-${sessionId}`
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, title: 'question', status: 'in_progress' } } })
+      const answer = await request('elicitation/create', { mode: 'form', sessionId, toolCallId, message: '请选择克隆方式并补充配置', requestedSchema: {
+        type: 'object', properties: {
+          strategy: { type: 'string', title: '克隆方式', oneOf: [{ const: 'clone', title: '完整克隆', description: '保留可工作的检出目录' }, { const: 'mirror', title: '裸镜像' }] },
+          extras: { type: 'array', title: '附加内容', items: { anyOf: [{ const: 'docs', title: '文档' }, { const: 'tests', title: '测试' }] }, minItems: 1 },
+          note: { type: 'string', title: '补充说明', minLength: 2 },
+          count: { type: 'integer', title: '副本数量', minimum: 1, maximum: 5, default: 1 },
+          keep: { type: 'boolean', title: '保留记录', default: false },
+        }, required: ['strategy', 'extras'],
+      } })
+      text(sessionId, `ELICITATION:${JSON.stringify(answer)}`)
+      send({ method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed' } } })
+      result(id, { stopReason: 'end_turn' })
+      return
+    }
     if (command === 'pid') {
       // EPIPE E2E：测试据此直接杀掉 Agent 进程
       text(sessionId, `PID:${process.pid}`)

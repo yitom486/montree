@@ -12,6 +12,8 @@ import { disposeContextAcpProcesses } from '../services/acp/process-manager'
 import { captureReaderViewport } from '../services/reader-screenshot-service'
 import { startWindowMcpServer, stopWindowMcpServers } from '../services/acp/mcp/stdio-server'
 import { handleSnapshotRequest } from '../services/acp/acp-bridges'
+import { ACP_ELICITATION_IPC, type ElicitationReply } from '../../contracts/acp-elicitation'
+import { cancelElicitations, respondElicitation, setElicitationBridge } from '../services/acp/elicitation'
 
 const registered = new WeakSet<AcpContext>()
 
@@ -59,6 +61,11 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
       const send = (channel: string, payload: unknown) => {
         if (!sender.isDestroyed() && !context.closed) sender.send(channel, payload)
       }
+      setElicitationBridge(event => send(ACP_ELICITATION_IPC.event, event))
+      sender.on('render-process-gone', () => runInAcpContext(context, () => cancelElicitations()))
+      sender.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+        if (isMainFrame && !isInPlace) runInAcpContext(context, () => cancelElicitations())
+      })
       onAcpSessionUpdate((event) => send(IPC.ACP_SESSION_UPDATE, event))
       onAcpStatusChanged((event) => send(IPC.ACP_STATUS_CHANGED, event))
       const snapshotGate = createSnapshotGate(MAX_SNAPSHOT_IN_FLIGHT)
@@ -119,6 +126,7 @@ export function withAcpWindow<T>(sender: WebContents, callback: () => T): T {
         return resource === 'viewport-image' ? JSON.stringify(await captureReaderViewport(sender, content)) : content
       })
       sender.once('destroyed', () => {
+        runInAcpContext(context, () => cancelElicitations())
         context.closed = true
         void runInAcpContext(context, async () => {
           acpState.connectGeneration += 1
@@ -172,6 +180,7 @@ async function restoreOwnedSession<T>(sessionId: string | undefined, runtimeId: 
 }
 
 export function registerAcpWindowHandlers(): void {
+  ipcMain.handle(ACP_ELICITATION_IPC.respond, (event, reply: ElicitationReply) => withAcpWindow(event.sender, () => respondElicitation(reply)))
   ipcMain.handle(IPC.ACP_CONNECT, (event, payload: AcpConnectPayload) => withAcpWindow(event.sender, () => restoreOwnedSession(payload.resumeSessionId, payload.runtimeId, () => connectAcp(payload))))
   ipcMain.handle(IPC.ACP_AUTHENTICATE, (event, payload: AcpAuthenticatePayload) => withAcpWindow(event.sender, () => authenticateAcp(payload)))
   ipcMain.handle(IPC.ACP_LOAD_SESSION, (event, payload: AcpLoadSessionPayload) => withAcpWindow(event.sender, () => restoreOwnedSession(payload.sessionId, acpState.runtimeId, () => loadAcpSession(payload))))

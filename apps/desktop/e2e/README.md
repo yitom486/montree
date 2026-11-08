@@ -17,6 +17,7 @@ bun run test:e2e:web-doc  # 仅在线文档 fixture 冒烟
 
 | 文件 | 说明 |
 |------|------|
+| `agent-elicitation.spec.ts` | 标准 ACP form 能力握手、真实 SDK→主进程→preload→UI→答案回传；单选/多选/输入/默认值/取消，320px 深浅主题、键盘和 reduced-motion |
 | `chat-links.spec.ts` | 聊天链接：http(s) 交系统浏览器，`file:`/自定义协议、主框架跳转与 `window.open` 被拦截 |
 | `agent-terminal-approval.spec.ts` | Agent `terminal/create` 审批卡：拒绝 / 允许一次 / 信任此工作区，审计日志与信任文件 |
 | `ai-edit-lifecycle.spec.ts` | 修改建议按 MCP `_meta.toolCallId` 去重；审阅模式拦截直接编辑；清空对话撤回全部建议 |

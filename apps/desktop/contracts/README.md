@@ -1,5 +1,7 @@
 # Desktop contracts
 
+`acp-elicitation.ts` defines standard ACP form-elicitation IPC, request/reply types and shared schema/content validation. It supports single/multiple selections, text, numeric and boolean fields. Only form mode is advertised; URL mode remains unsupported. The bridge stays local until the published contracts package exposes it.
+
 `agent-inspection.ts` defines window-scoped Agent resource inspection IPC: observed MCP health/tool schemas, locally discovered Skill metadata/full instructions, and revealing a discovered Skill file. It never transports MCP tokens or runtime credentials.
 
 `html-preview.ts` defines the isolated local HTML preview: the `montree-html` scheme, register/update/release/resolve-link IPC, and the postMessage bridge messages between the preview page and the host (page messages are untrusted and only trigger restricted actions).

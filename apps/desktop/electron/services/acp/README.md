@@ -1,5 +1,7 @@
 # electron/services/acp
 
+`elicitation.ts` (+ `.test.ts`) handles standard `elicitation/create` form requests. The host advertises `elicitation.form`, validates schemas and answers, assigns opaque request IDs and isolates pending responses by window. Each request settles once; SDK/session cancellation, disconnect, renderer navigation/crash and window destruction close pending forms. `client-handlers.ts` registers the SDK callback; published transport is unchanged. URL mode and unknown field types return Invalid params.
+
 MCP 长会话恢复由 `mcp-session-recovery.ts`（+ `.test.ts`）编排：新建/加载/恢复时记录会话自身的 cwd、完整/目录端点和已接受的元数据；`mcp/connection-health.ts` 跟踪窗口管道的工具发现及断连。检测到曾发现工具的客户端关闭后，下一轮 prompt 前仅尝试原会话 resume→load，保留 MCP 配置，并限时等待新的 tools/list；恢复失败则阻止该轮发送并提示重连，禁止 fallback 到新会话或重放 prompt。恢复期间压制历史回放，取消/切换连接会使旧恢复失效，主副会话恢复互斥。该观测确认 Agent 重新发现工具，不等同于模型目录或实际工具执行验证；从未发现工具的懒启动运行时仍按原路径发送首轮。
 
 ACP Agent 主进程侧 wiring：拉起 `codex-acp`、连接生命周期、权限/回调路由、会话开启、fs/终端、窗口文档服务与 stdio MCP 接入。

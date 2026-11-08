@@ -7,6 +7,7 @@
 | 文件 | 用途 |
 |------|------|
 | `button` / `dialog` / `alert-dialog` / `input` / `textarea` / `input-group` | 按钮与表单对话框 |
+| `card` / `checkbox` / `label` | ACP 表单提问的容器、布尔字段与可访问标签；经官方 CLI 安装，仅对齐路径与样式尺度 |
 | `dropdown-menu` / `menubar` | 菜单 |
 | `breadcrumb` / `separator` / `scroll-area` / `progress` | 导航、进度与布局装饰 |
 | `resizable` | `react-resizable-panels` 封装 |

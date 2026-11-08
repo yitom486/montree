@@ -29,6 +29,7 @@ import {
 } from './acp-bridges'
 import { MONTREE_PROMPT_COMPLETE_KIND } from '../../../contracts/acp'
 import { detachSdkStreamNow, disconnectAcp, restartAcpForMcp } from './acp-connection'
+import { cancelElicitations } from './elicitation'
 import { currentAcpContext, listAcpContexts, runInAcpContext } from './acp-context'
 
 function sessionPromptMode(nativeSessionAccepted:boolean, restored:boolean) {
@@ -268,6 +269,7 @@ export async function promptAcp(payload: {
 }
 
 export function cancelAcp(payload: { sessionId: string }): Result<void, AppError> {
+  cancelElicitations(payload.sessionId)
   cancelMcpRecovery(payload.sessionId)
   const a = requireAgent()
   if (!a.ok) return a

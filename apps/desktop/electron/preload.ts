@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { ACP_ELICITATION_IPC, type AcpElicitationAPI, type ElicitationEvent } from '../contracts/acp-elicitation'
 import { AGENT_INSPECTION_IPC, type AgentInspectionAPI } from '../contracts/agent-inspection'
 import { HTML_PREVIEW_IPC, type HtmlPreviewAPI } from '../contracts/html-preview'
 import { TERMINAL_IPC, type TerminalAPI, type TerminalEvent } from '../contracts/terminal'
@@ -464,3 +465,12 @@ const htmlPreviewAPI: HtmlPreviewAPI = {
   release: (token) => ipcRenderer.invoke(HTML_PREVIEW_IPC.release, token),
 }
 contextBridge.exposeInMainWorld('montreeHtmlPreview', htmlPreviewAPI)
+const acpElicitationAPI: AcpElicitationAPI = {
+  subscribe: callback => {
+    const handler = (_event: Electron.IpcRendererEvent, event: ElicitationEvent) => callback(event)
+    ipcRenderer.on(ACP_ELICITATION_IPC.event, handler)
+    return () => { ipcRenderer.removeListener(ACP_ELICITATION_IPC.event, handler) }
+  },
+  respond: reply => ipcRenderer.invoke(ACP_ELICITATION_IPC.respond, reply),
+}
+contextBridge.exposeInMainWorld('montreeAcpElicitation', acpElicitationAPI)

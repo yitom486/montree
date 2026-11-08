@@ -1,5 +1,7 @@
 # src/components/agent
 
+`chat/AgentElicitationPanel.tsx` 在侧栏/浮动聊天的消息列表与输入框之间显示真实 ACP 提问：复用官方 registry 安装的 assistant-ui OptionList 和 shadcn Card/Checkbox/Input/Label/Button，覆盖单选、多选、自定义文字、数值和布尔字段；校验后提交，也可拒绝或取消。队列、跨视图幂等提交与回执由宿主持有，已结束请求不会再次显示为可操作表单。
+
 ACP Agent 面板（壳自研；消息渲染可复用 Markdown/Mermaid 块）。已按渲染链分子目录（2026-09 重构）。
 
 Beautiful UI 展示语法来源：`slev12397/beautiful-ui`，main tree `44a274e598395ab61e7c96c26fda2758780253b7`（2026-10-14 获取）。完整许可见 `LICENSE.beautiful-ui`（MIT © 2026 Shane Levine）。Loading/Thinking/Approval 与工作记录 chip 行按真实 ACP 数据适配，无演示步骤。
